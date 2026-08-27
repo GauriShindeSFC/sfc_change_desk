@@ -85,6 +85,15 @@ cp frontend/.env.example frontend/.env
 | `DATABASE_URI` | PostgreSQL connection string                       | `postgresql://user:pass@host:5432/postgres`        |
 | `DB_LOGGING`   | `true` to log every SQL statement                  | `false`                                            |
 | `DB_SYNC`      | `true` to run `sequelize.sync()` on server boot    | *(unset)*                                          |
+| `JWT_SECRET`   | secret used to sign session JWTs                   | *(long random string)*                             |
+| `JWT_EXPIRES_IN` | session lifetime                                 | `7d`                                               |
+| `SEED_USER_PASSWORD` | password given to every seeded user by `db:sync` | `changedesk123`                            |
+| `MAIL_ENABLED` | `true` to actually send email (else it logs only) | `false`                                            |
+| `SMTP_HOST` / `SMTP_PORT` / `SMTP_SECURE` | SMTP server (`SECURE=true` for port 465) | `smtp.example.com` / `587` / `false`  |
+| `SMTP_USER` / `SMTP_PASS` | SMTP credentials                       | —                                                  |
+| `MAIL_FROM`    | From header on outgoing mail                       | `ChangeDesk <no-reply@example.com>`                |
+| `MAIL_APPROVER_FALLBACK` | inbox used if no active CAB Approver has an email | `cab-board@example.com`             |
+| `APP_BASE_URL` | link target inside emails                          | `http://localhost:5174`                            |
 
 **`frontend/.env`**
 
@@ -172,7 +181,21 @@ them when shaping each response.
 
 ## API
 
-Base path: `/api/dashboard` · health check: `GET /api/health`
+Health check: `GET /api/health`
+
+### Auth — `/api/auth`
+
+| Method & path         | Purpose |
+| --------------------- | ------- |
+| `POST /login`         | `{ email, password }` → `{ token, user }` |
+| `GET  /me`            | current user for the bearer token |
+
+Every `/api/dashboard/*` route below requires an `Authorization: Bearer <token>`
+header. The frontend attaches it automatically (`src/lib/apiFetch.js`); a `401`
+clears the session and returns the user to the login page. Microsoft Entra ID SSO
+is planned — see [`KT_Guide.md`](KT_Guide.md#5-authentication--current-state-and-the-sso-plan).
+
+### Dashboard — `/api/dashboard`
 
 | Method & path                        | Purpose |
 | ------------------------------------ | ------- |
@@ -188,6 +211,7 @@ Base path: `/api/dashboard` · health check: `GET /api/health`
 | `GET  /worklist`                     | CAB worklist (pending CRs) + metrics |
 | `POST /worklist/action`             | `{ id, action: approve\|reject\|sendback }` |
 | `GET  /settings/users`               | users (with role name) |
+| `POST /settings/users`               | invite a user — creates the row + emails them a sign-in link |
 | `GET  /settings/roles`               | roles (with derived user counts) |
 | `GET  /settings/audit-logs?filter=`  | audit log (optional activity filter) |
 | `GET  /reports/metrics`              | report KPIs + monthly / department volume |
@@ -201,12 +225,40 @@ with an appropriate status code.
 `audit_logs` row; creating a CR or acting on the worklist also updates the
 counters in `app_config`.
 
+### Email (`backend/services/mailService.js`, `nodemailer` / SMTP)
+
+Two branded HTML emails (shared `renderEmail()` layout, table-based, ST FOX header):
+
+- **Change request submitted** → every active **CAB Approver** (CC: the manager
+  email from the form; falls back to `MAIL_APPROVER_FALLBACK`).
+- **User invited** (`POST /settings/users`) → the new user, with their temporary
+  password and a "Sign in to ChangeDesk" link.
+
+Both are fire-and-forget — if `MAIL_ENABLED` is `false` or SMTP fails, the request
+still succeeds and the attempt is logged. Preview the templates without real SMTP:
+
+```bash
+npm run mail:test -- you@example.com            # both templates
+npm run mail:test -- you@example.com invite      # just the invite
+```
+
+(with `MAIL_ENABLED=false` it uses a throwaway Ethereal inbox and prints a preview URL).
+
 ---
 
 ## Notes
 
-- **No auth.** The login page is a 600 ms fake delay; the acting user defaults to
-  `Gauri Shinde` (`usr-1`).
+- **Auth** is email + password → JWT (bcrypt-hashed passwords in `users`).
+  Seed users share `SEED_USER_PASSWORD` (default `changedesk123`), e.g.
+  `gauri.shinde@company.com`. Microsoft Entra ID SSO is the planned replacement.
+  The acting user for audit logs / CR creation is the signed-in user.
+- The **sidebar** collapses to an icon rail (toggle button, state saved in
+  `localStorage`); on mobile it becomes a slide-in drawer opened from the header.
+  Layouts use `auto-fit` grids and horizontally-scrolling tables so pages work
+  down to phone widths.
 - `dashboard_stats` and the `*_breakdown` / `*_volume` tables hold curated demo
   numbers, not counts computed from `change_requests`.
 - `frontend/dist/` is checked in (a prebuilt bundle); `npm run build` regenerates it.
+
+See [`KT_Guide.md`](KT_Guide.md) for the process model and the roadmap of
+features still to be built.
