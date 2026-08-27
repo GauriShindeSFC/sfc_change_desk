@@ -1,0 +1,14 @@
+{
+  "name": "sfc-change-desk",
+  "private": true,
+  "version": "1.0.0",
+  "scripts": {
+    "dev": "npm --prefix frontend run dev",
+    "start": "npm --prefix frontend run dev",
+    "server": "node backend/server.js",
+    "build": "npm --prefix frontend run build",
+    "preview": "npm --prefix frontend run preview",
+    "install:frontend": "npm --prefix frontend install",
+    "install:backend": "npm --prefix backend install"
+  }
+}
