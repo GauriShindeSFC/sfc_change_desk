@@ -79,6 +79,21 @@ export default function MyRequestsPage({ onNavigate }) {
       statusBg: '#F3E8FF',
       statusColor: '#7C3AED',
       statusDot: '#7C3AED'
+    },
+    {
+      id: 'CR-2053',
+      title: 'Upgrade memory allocation for Staging Redis cluster',
+      category: 'Server / Patching',
+      requester: 'Gauri Shinde',
+      risk: 'Low',
+      riskColor: '#059669',
+      riskBars: 1,
+      raisedDate: '26 Aug 2026',
+      closedDate: 'Open',
+      status: 'Draft',
+      statusBg: 'var(--input-bg)',
+      statusColor: 'var(--text-secondary)',
+      statusDot: '#94A0B0'
     }
   ];
 
@@ -107,7 +122,8 @@ export default function MyRequestsPage({ onNavigate }) {
     Pending: Array.isArray(requests) ? requests.filter(r => (r.status || '').toLowerCase() === 'pending').length : 0,
     Approved: Array.isArray(requests) ? requests.filter(r => (r.status || '').toLowerCase() === 'approved').length : 0,
     'In progress': Array.isArray(requests) ? requests.filter(r => (r.status || '').toLowerCase() === 'in progress').length : 0,
-    Rejected: Array.isArray(requests) ? requests.filter(r => (r.status || '').toLowerCase() === 'rejected').length : 0
+    Rejected: Array.isArray(requests) ? requests.filter(r => (r.status || '').toLowerCase() === 'rejected').length : 0,
+    Draft: Array.isArray(requests) ? requests.filter(r => (r.status || '').toLowerCase() === 'draft').length : 0
   };
 
   const filteredRequests = activeFilter === 'All'
@@ -119,7 +135,8 @@ export default function MyRequestsPage({ onNavigate }) {
     { id: 'Pending', label: `Pending (${filterCounts.Pending})` },
     { id: 'Approved', label: `Approved (${filterCounts.Approved})` },
     { id: 'In progress', label: `In progress (${filterCounts['In progress']})` },
-    { id: 'Rejected', label: `Rejected (${filterCounts.Rejected})` }
+    { id: 'Rejected', label: `Rejected (${filterCounts.Rejected})` },
+    { id: 'Draft', label: `Draft (${filterCounts.Draft})` }
   ];
 
   return (
@@ -155,7 +172,7 @@ export default function MyRequestsPage({ onNavigate }) {
           }}
         >
           <Plus size={16} />
-          <span>+ New Change Request</span>
+          <span>New Change Request</span>
         </button>
       </div>
 

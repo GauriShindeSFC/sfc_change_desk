@@ -107,7 +107,7 @@ export default function MyWorklistPage({ onNavigate }) {
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: '1rem' }}>
         <div>
           <h1 style={{ fontSize: '1.45rem', fontWeight: 800, color: 'var(--text-primary)', lineHeight: 1.2 }}>
-            My Worklist
+            Organization worklist
           </h1>
           <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginTop: '0.2rem' }}>
             Change requests awaiting your sign-off as CAB approver
@@ -188,7 +188,6 @@ export default function MyWorklistPage({ onNavigate }) {
 
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
                 <button type="button" onClick={() => setSelectedCr(item)} style={{ padding: '0.45rem 0.9rem', backgroundColor: 'var(--card-bg)', color: 'var(--text-primary)', border: '1px solid var(--border-color)', borderRadius: '8px', fontSize: '0.825rem', fontWeight: 600, cursor: 'pointer' }}>View</button>
-                <button type="button" onClick={() => handleAction(item.id, 'sendback')} style={{ padding: '0.45rem 0.9rem', backgroundColor: '#FFFBEB', color: '#B45309', border: '1px solid #FCD34D', borderRadius: '8px', fontSize: '0.825rem', fontWeight: 700, cursor: 'pointer' }}>Send back</button>
                 <button type="button" onClick={() => handleAction(item.id, 'reject')} style={{ padding: '0.45rem 0.9rem', backgroundColor: '#FEF2F2', color: '#DC2626', border: '1px solid #FCA5A5', borderRadius: '8px', fontSize: '0.825rem', fontWeight: 700, cursor: 'pointer' }}>Reject</button>
                 <button type="button" onClick={() => handleAction(item.id, 'approve')} style={{ padding: '0.45rem 1.1rem', backgroundColor: '#0D9488', color: '#FFFFFF', border: 'none', borderRadius: '8px', fontSize: '0.825rem', fontWeight: 700, cursor: 'pointer', boxShadow: '0 1px 2px rgba(13, 148, 136, 0.2)' }}>Approve</button>
               </div>

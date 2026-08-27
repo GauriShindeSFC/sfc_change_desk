@@ -16,7 +16,7 @@ export default function Sidebar({ activeItem, onItemSelect }) {
     { id: 'Change Catalog', label: 'Change Catalog', icon: Menu },
     { id: 'Change Request', label: 'Change Request', icon: Plus },
     { id: 'My Requests', label: 'My Requests', icon: FileText, badge: 6 },
-    { id: 'My Worklist', label: 'My Worklist', icon: CheckCircle2, badge: 4 },
+    { id: 'Organization worklist', label: 'Organization worklist', icon: CheckCircle2, badge: 4 },
   ];
 
   const managementItems = [

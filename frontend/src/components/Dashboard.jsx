@@ -33,7 +33,7 @@ export default function Dashboard({ onLogout }) {
             <ChangeCatalogPage onNavigate={setActiveItem} />
           ) : activeItem === 'Change Request' ? (
             <ChangeRequestFormPage onNavigate={setActiveItem} />
-          ) : activeItem === 'My Worklist' ? (
+          ) : activeItem === 'Organization worklist' ? (
             <MyWorklistPage onNavigate={setActiveItem} />
           ) : activeItem === 'Settings' ? (
             <SettingsPage onNavigate={setActiveItem} />
