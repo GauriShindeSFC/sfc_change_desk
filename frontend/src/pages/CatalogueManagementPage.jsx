@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Plus } from 'lucide-react';
+import { API_BASE_URL } from '../lib/config';
 
 export default function CatalogueManagementPage() {
   const defaultItems = [
@@ -39,7 +40,7 @@ export default function CatalogueManagementPage() {
   useEffect(() => {
     const fetchCatalogue = async () => {
       try {
-        const res = await fetch('http://localhost:5001/api/dashboard/catalogue-management');
+        const res = await fetch(`${API_BASE_URL}/catalogue-management`);
         if (res.ok) {
           const body = await res.json();
           if (body.data && Array.isArray(body.data)) setItems(body.data);

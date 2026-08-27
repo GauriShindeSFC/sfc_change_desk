@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { FileText, Clock, Check, Loader2, X } from 'lucide-react';
 import RecentChangeRequests from '../components/ui/RecentChangeRequests';
+import { API_BASE_URL } from '../lib/config';
 
 export default function DashboardPage({ onNavigate }) {
   const iconMap = {
@@ -43,9 +44,9 @@ export default function DashboardPage({ onNavigate }) {
     const fetchDashboardData = async () => {
       try {
         const [mRes, cRes, sRes] = await Promise.all([
-          fetch('http://localhost:5001/api/dashboard/metrics'),
-          fetch('http://localhost:5001/api/dashboard/categories'),
-          fetch('http://localhost:5001/api/dashboard/status-breakdown')
+          fetch(`${API_BASE_URL}/metrics`),
+          fetch(`${API_BASE_URL}/categories`),
+          fetch(`${API_BASE_URL}/status-breakdown`)
         ]);
         if (mRes.ok) {
           const mData = await mRes.json();

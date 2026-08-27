@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { ArrowLeft, Send } from 'lucide-react';
+import { API_BASE_URL } from '../lib/config';
 
 export default function ChangeRequestFormPage({ onNavigate }) {
   const [formData, setFormData] = useState({
@@ -38,7 +39,7 @@ export default function ChangeRequestFormPage({ onNavigate }) {
     setIsSubmitting(true);
 
     try {
-      await fetch('http://localhost:5001/api/dashboard/change-requests', {
+      await fetch(`${API_BASE_URL}/change-requests`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

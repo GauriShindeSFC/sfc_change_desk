@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Clock, Check, X, ChevronLeft } from 'lucide-react';
 import ChangeRequestModal from '../components/ui/ChangeRequestModal';
+import { API_BASE_URL } from '../lib/config';
 
 export default function MyWorklistPage({ onNavigate }) {
   const defaultItems = [
@@ -58,7 +59,7 @@ export default function MyWorklistPage({ onNavigate }) {
   useEffect(() => {
     const fetchWorklist = async () => {
       try {
-        const res = await fetch('http://localhost:5001/api/dashboard/worklist');
+        const res = await fetch(`${API_BASE_URL}/worklist`);
         if (res.ok) {
           const body = await res.json();
           if (body.data && Array.isArray(body.data)) setItems(body.data);
@@ -73,7 +74,7 @@ export default function MyWorklistPage({ onNavigate }) {
 
   const handleAction = async (id, action) => {
     try {
-      await fetch('http://localhost:5001/api/dashboard/worklist/action', {
+      await fetch(`${API_BASE_URL}/worklist/action`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id, action })

@@ -1,5 +1,7 @@
 // Shared API Client Library Utility
-const BASE_URL = 'http://localhost:5001/api/dashboard';
+import { API_BASE_URL } from './config';
+
+const BASE_URL = API_BASE_URL;
 
 export const apiClient = {
   get: async (endpoint) => {

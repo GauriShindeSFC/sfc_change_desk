@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Plus, ArrowRight, Package, Server, Shield, Lock, HardDrive, AlertTriangle, Database, RefreshCw, Link } from 'lucide-react';
+import { API_BASE_URL } from '../lib/config';
 
 export default function ChangeCatalogPage({ onNavigate }) {
   const defaultItems = [
@@ -89,7 +90,7 @@ export default function ChangeCatalogPage({ onNavigate }) {
   useEffect(() => {
     const fetchCatalog = async () => {
       try {
-        const res = await fetch('http://localhost:5001/api/dashboard/catalog');
+        const res = await fetch(`${API_BASE_URL}/catalog`);
         if (res.ok) {
           const body = await res.json();
           if (body.data && Array.isArray(body.data)) {

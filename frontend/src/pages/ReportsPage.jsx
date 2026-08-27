@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { TrendingUp, FileText, CheckCircle2, Clock, Upload, Download } from 'lucide-react';
+import { API_BASE_URL } from '../lib/config';
 
 export default function ReportsPage() {
   const [metrics, setMetrics] = useState({
@@ -33,7 +34,7 @@ export default function ReportsPage() {
   useEffect(() => {
     const fetchReports = async () => {
       try {
-        const res = await fetch('http://localhost:5001/api/dashboard/reports/metrics');
+        const res = await fetch(`${API_BASE_URL}/reports/metrics`);
         if (res.ok) {
           const body = await res.json();
           if (body.metrics) setMetrics(body.metrics);

@@ -1,120 +1,119 @@
-// Backend Controller Layer
+// ────────────────────────────────────────────────────────────────
+//  Controller layer – thin async HTTP handlers over the services.
+//  GET responses:  { success, data }  (plus `count` for lists)
+//  POST responses: { success, message, data }
+// ────────────────────────────────────────────────────────────────
+import { asyncHandler } from '../utils/asyncHandler.js';
 import {
   getMetricsService,
   getCategoryMetricsService,
   getStatusBreakdownService,
-  getRecentRequestsService,
+  getChangeRequestsService,
+  filterChangeRequestsByCategoryService,
+  createChangeRequestService,
   getWorklistService,
+  applyWorklistActionService,
+  getCatalogService,
+  getCatalogueManagementService,
+  createCatalogItemService,
   getSettingsUsersService,
   getSettingsRolesService,
   getSettingsAuditLogsService,
-  getCatalogueManagementService,
   getReportsMetricsService
 } from '../services/dashboardService.js';
 
-export const getMetrics = (req, res) => {
-  res.json({ success: true, data: getMetricsService() });
-};
+// ---------- Dashboard analytics ---------------------------
 
-export const getCategories = (req, res) => {
-  res.json({ success: true, data: getCategoryMetricsService() });
-};
+export const getMetrics = asyncHandler(async (req, res) => {
+  res.json({ success: true, data: await getMetricsService() });
+});
 
-export const getStatusBreakdown = (req, res) => {
-  res.json({ success: true, data: getStatusBreakdownService() });
-};
+export const getCategories = asyncHandler(async (req, res) => {
+  res.json({ success: true, data: await getCategoryMetricsService() });
+});
 
-export const getRecentRequests = (req, res) => {
-  const requests = getRecentRequestsService();
+export const getStatusBreakdown = asyncHandler(async (req, res) => {
+  res.json({ success: true, data: await getStatusBreakdownService() });
+});
+
+// ---------- Change requests -------------------------------
+
+export const getRecentRequests = asyncHandler(async (req, res) => {
+  const requests = await getChangeRequestsService();
   const limit = parseInt(req.query.limit, 10);
-  if (limit && !isNaN(limit)) {
-    return res.json({ success: true, count: requests.length, data: requests.slice(0, limit) });
-  }
-  res.json({ success: true, count: requests.length, data: requests });
-};
+  const data = Number.isNaN(limit) ? requests : requests.slice(0, limit);
+  res.json({ success: true, count: data.length, data });
+});
 
-export const getMyRequests = (req, res) => {
-  const requests = getRecentRequestsService();
-  const categoryFilter = req.query.category;
-  if (categoryFilter && categoryFilter.toLowerCase() !== 'all') {
-    const filtered = requests.filter(r => r.category.toLowerCase().includes(categoryFilter.toLowerCase()));
-    return res.json({ success: true, count: filtered.length, data: filtered });
-  }
-  res.json({ success: true, count: requests.length, data: requests });
-};
+export const getMyRequests = asyncHandler(async (req, res) => {
+  const data = await filterChangeRequestsByCategoryService(req.query.category);
+  res.json({ success: true, count: data.length, data });
+});
 
-export const getWorklist = (req, res) => {
-  res.json({ success: true, ...getWorklistService() });
-};
+export const createChangeRequest = asyncHandler(async (req, res) => {
+  const cr = await createChangeRequestService(req.body || {});
+  res.status(201).json({
+    success: true,
+    message:
+      cr.status === 'Draft' ? 'Change Request saved as draft' : 'Change Request created successfully',
+    data: cr
+  });
+});
 
-export const handleWorklistAction = (req, res) => {
+// ---------- CAB worklist --------------------------------
+
+export const getWorklist = asyncHandler(async (req, res) => {
+  res.json({ success: true, ...(await getWorklistService()) });
+});
+
+export const handleWorklistAction = asyncHandler(async (req, res) => {
   const { id, action } = req.body || {};
-  res.json({ success: true, message: `Action ${action} processed for request ${id}` });
-};
-
-export const getSettingsUsers = (req, res) => {
-  res.json({ success: true, data: getSettingsUsersService() });
-};
-
-export const getSettingsRoles = (req, res) => {
-  res.json({ success: true, data: getSettingsRolesService() });
-};
-
-export const getSettingsAuditLogs = (req, res) => {
-  const filter = req.query.filter || 'All activity';
-  const logs = getSettingsAuditLogsService();
-  if (filter && filter.toLowerCase() !== 'all activity') {
-    const filtered = logs.filter(l => l.type.toLowerCase() === filter.toLowerCase());
-    return res.json({ success: true, count: filtered.length, data: filtered });
+  if (!id || !action) {
+    return res.status(400).json({ success: false, message: 'Both "id" and "action" are required' });
   }
-  res.json({ success: true, count: logs.length, data: logs });
-};
+  const result = await applyWorklistActionService({ id, action });
+  res.json({ success: true, message: `Action "${action}" processed for ${id}`, data: result });
+});
 
-export const getCatalogueManagement = (req, res) => {
-  res.json({ success: true, ...getCatalogueManagementService() });
-};
+// ---------- Change catalog (browse) --------------------
 
-export const createCatalogItem = (req, res) => {
-  const newItem = req.body || {};
-  res.json({ success: true, message: 'Catalog item added successfully', data: newItem });
-};
+export const getCatalog = asyncHandler(async (req, res) => {
+  res.json({ success: true, data: await getCatalogService() });
+});
 
-export const getReportsMetrics = (req, res) => {
-  res.json({ success: true, ...getReportsMetricsService() });
-};
+// ---------- Catalogue management (admin) ---------------
 
-export const exportReport = (req, res) => {
+export const getCatalogueManagement = asyncHandler(async (req, res) => {
+  res.json({ success: true, ...(await getCatalogueManagementService()) });
+});
+
+export const createCatalogItem = asyncHandler(async (req, res) => {
+  const item = await createCatalogItemService(req.body || {});
+  res.status(201).json({ success: true, message: 'Catalog item added successfully', data: item });
+});
+
+// ---------- Settings ----------------------------------
+
+export const getSettingsUsers = asyncHandler(async (req, res) => {
+  res.json({ success: true, data: await getSettingsUsersService() });
+});
+
+export const getSettingsRoles = asyncHandler(async (req, res) => {
+  res.json({ success: true, data: await getSettingsRolesService() });
+});
+
+export const getSettingsAuditLogs = asyncHandler(async (req, res) => {
+  const data = await getSettingsAuditLogsService(req.query.filter || 'All activity');
+  res.json({ success: true, count: data.length, data });
+});
+
+// ---------- Reports ----------------------------------
+
+export const getReportsMetrics = asyncHandler(async (req, res) => {
+  res.json({ success: true, ...(await getReportsMetricsService()) });
+});
+
+export const exportReport = asyncHandler(async (req, res) => {
   const { format } = req.body || {};
   res.json({ success: true, message: `Report exported successfully as ${format || 'PDF'}` });
-};
-
-export const createChangeRequest = (req, res) => {
-  const newCrData = req.body || {};
-  const newCr = {
-    id: `CR-${Math.floor(2050 + Math.random() * 50)}`,
-    title: newCrData.title || 'New Change Request',
-    category: newCrData.category || 'Software Deployment',
-    subCategory: newCrData.subCategory || '',
-    requester: 'Gauri Shinde',
-    employeeId: newCrData.employeeId || 'EMP-10432',
-    department: newCrData.department || 'IT Operations',
-    contactNumber: newCrData.contactNumber || '+91 98765 43210',
-    startDate: newCrData.startDate || '26 Aug 2026',
-    endDate: newCrData.endDate || '28 Aug 2026',
-    hostname: newCrData.hostname || 'PROD-DB-CLSTR-02',
-    location: newCrData.location || 'Ahmedabad HQ',
-    environment: newCrData.environment || 'Production',
-    managerEmail: newCrData.managerEmail || 'manager@company.com',
-    justification: newCrData.justification || '',
-    risk: newCrData.risk || 'Medium',
-    riskColor: '#D97706',
-    riskBars: 2,
-    raisedDate: '26 Aug 2026',
-    closedDate: 'Open',
-    status: newCrData.isDraft ? 'Draft' : 'Pending',
-    statusBg: newCrData.isDraft ? 'var(--input-bg)' : '#FEF3C7',
-    statusColor: newCrData.isDraft ? 'var(--text-secondary)' : '#D97706',
-    statusDot: newCrData.isDraft ? '#94A0B0' : '#D97706'
-  };
-  res.json({ success: true, message: 'Change Request created successfully', data: newCr });
-};
+});

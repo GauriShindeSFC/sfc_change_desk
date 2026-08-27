@@ -1,230 +1,356 @@
-export const getMetricsService = () => [
-  { id: 'total', title: 'Total Change Requests', count: '128', subtext: '▲ 12 this month', subtextColor: '#10B981', iconBg: '#EBF5FF', iconColor: '#00A4EF' },
-  { id: 'pending', title: 'Pending Approval', count: '17', subtext: 'CAB review pending', subtextColor: 'var(--text-secondary)', iconBg: '#FEF3C7', iconColor: '#D97706' },
-  { id: 'approved', title: 'Approved', count: '76', subtext: '▲ 59% of total', subtextColor: '#10B981', iconBg: '#D1FAE5', iconColor: '#059669' },
-  { id: 'in-progress', title: 'In Progress', count: '21', subtext: 'Scheduled this week: 6', subtextColor: 'var(--text-secondary)', iconBg: '#F3E8FF', iconColor: '#7C3AED' },
-  { id: 'rejected', title: 'Rejected', count: '14', subtext: '▼ 3 this month', subtextColor: '#DC2626', iconBg: '#FEE2E2', iconColor: '#DC2626' }
+// ────────────────────────────────────────────────────────────────
+//  Service layer – all reads/writes go through Sequelize models and
+//  their relationships. Returns data shaped exactly as the frontend
+//  consumes it (see ../utils/serializers.js).
+// ────────────────────────────────────────────────────────────────
+import { Op } from 'sequelize';
+import {
+  sequelize,
+  Role,
+  User,
+  Workflow,
+  CatalogItem,
+  ChangeRequest,
+  AuditLog,
+  CategoryBreakdown,
+  StatusBreakdown,
+  MonthlyVolume,
+  DepartmentVolume,
+  AppConfig
+} from '../models/index.js';
+import { formatTimestamp } from '../data/store.js';
+import {
+  serializeChangeRequest,
+  serializeWorklistEntry,
+  serializeCatalogItem,
+  serializeCatalogueTemplate,
+  serializeWorkflow,
+  serializeUser,
+  serializeRole,
+  serializeAuditLog,
+  serializeMetricCards
+} from '../utils/serializers.js';
+
+// Includes reused across change-request queries.
+const CR_INCLUDE = [
+  { model: User, as: 'requester', attributes: ['id', 'name'] },
+  { model: User, as: 'approver', attributes: ['id', 'name'] },
+  { model: Workflow, as: 'workflow', attributes: ['id', 'name'] }
 ];
 
-export const getCategoryMetricsService = () => [
-  { label: 'Software Deployment', count: 18, percentage: 38, color: '#2563EB' },
-  { label: 'Server Patching', count: 12, percentage: 25, color: '#0D9488' },
-  { label: 'Network Change', count: 8, percentage: 17, color: '#7C3AED' },
-  { label: 'Access & Permissions', count: 6, percentage: 12, color: '#D97706' },
-  { label: 'Hardware Change', count: 4, percentage: 8, color: '#DC2626' }
-];
+// ---------- AppConfig singletons --------------------------
 
-export const getStatusBreakdownService = () => [
-  { status: 'Approved', count: 28, color: '#059669', percentage: 58 },
-  { status: 'Pending', count: 12, color: '#D97706', percentage: 25 },
-  { status: 'In Progress', count: 5, color: '#7C3AED', percentage: 10 },
-  { status: 'Rejected', count: 3, color: '#DC2626', percentage: 7 }
-];
+const getConfig = async (key, fallback = {}) => {
+  const row = await AppConfig.findByPk(key);
+  return row ? row.value : fallback;
+};
 
-export const getRecentRequestsService = () => [
-  {
-    id: 'CR-2049',
-    title: 'Upgrade payment-gateway API to v4',
-    category: 'Software Deployment',
-    requester: 'Gauri Shinde',
-    risk: 'Medium',
-    riskColor: '#D97706',
-    riskBars: 2,
-    raisedDate: '24 Aug 2026',
-    closedDate: 'Open',
-    activeStep: 2,
-    status: 'Pending',
-    statusBg: '#FEF3C7',
-    statusColor: '#D97706',
-    statusDot: '#D97706'
-  },
-  {
-    id: 'CR-2048',
-    title: 'Apply Q3 security patch for prod DB cluster',
-    category: 'Server / Patching',
-    requester: 'Gauri Shinde',
-    risk: 'High',
-    riskColor: '#DC2626',
-    riskBars: 3,
-    raisedDate: '22 Aug 2026',
-    closedDate: 'Open',
-    activeStep: 3,
-    status: 'Approved',
-    statusBg: '#D1FAE5',
-    statusColor: '#059669',
-    statusDot: '#059669'
-  },
-  {
-    id: 'CR-2044',
-    title: 'Add VLAN for new Ahmedabad office floor',
-    category: 'Network Change',
-    requester: 'Gauri Shinde',
-    risk: 'Medium',
-    riskColor: '#D97706',
-    riskBars: 2,
-    raisedDate: '18 Aug 2026',
-    closedDate: 'Open',
-    activeStep: 3,
-    status: 'Approved',
-    statusBg: '#D1FAE5',
-    statusColor: '#059669',
-    statusDot: '#059669'
-  },
-  {
-    id: 'CR-2041',
-    title: 'Grant elevated access for Finance reporting tool',
-    category: 'Access & Permissions',
-    requester: 'Gauri Shinde',
-    risk: 'Low',
-    riskColor: '#059669',
-    riskBars: 1,
-    raisedDate: '15 Aug 2026',
-    closedDate: '16 Aug 2026',
-    activeStep: 6,
-    status: 'Closed',
-    statusBg: 'var(--input-bg)',
-    statusColor: 'var(--text-secondary)',
-    statusDot: '#94A0B0'
-  },
-  {
-    id: 'CR-2038',
-    title: 'Replace failing switch in Rack B12',
-    category: 'Hardware Change',
-    requester: 'Gauri Shinde',
-    risk: 'Low',
-    riskColor: '#059669',
-    riskBars: 1,
-    raisedDate: '10 Aug 2026',
-    closedDate: 'Open',
-    activeStep: 4,
-    status: 'In Progress',
-    statusBg: '#F3E8FF',
-    statusColor: '#7C3AED',
-    statusDot: '#7C3AED'
+const updateConfig = async (key, mutate, tx) => {
+  const row = await AppConfig.findByPk(key, { transaction: tx });
+  const current = row ? row.value : {};
+  const next = { ...current, ...mutate(current) };
+  if (row) {
+    row.value = next;
+    row.changed('value', true); // JSONB mutation detection
+    await row.save({ transaction: tx });
+  } else {
+    await AppConfig.create({ key, value: next }, { transaction: tx });
   }
-];
+  return next;
+};
 
-export const getWorklistService = () => ({
-  metrics: {
-    pending: 4,
-    approved: 32,
-    rejected: 6,
-    sentBack: 3
-  },
-  data: [
-    {
-      id: 'CR-2049',
-      title: 'Upgrade payment-gateway API to v4',
-      category: 'Software Deployment',
-      requester: 'Priya Nair',
-      submittedTime: 'submitted 2 days ago',
-      risk: 'Medium',
-      riskColor: '#D97706',
-      riskBars: 2
-    },
-    {
-      id: 'CR-2052',
-      title: 'Rotate SSH keys for all bastion hosts',
-      category: 'Server / Patching',
-      requester: 'Arjun Mehta',
-      submittedTime: 'submitted 6 hours ago',
-      risk: 'High',
-      riskColor: '#DC2626',
-      riskBars: 3
-    },
-    {
-      id: 'CR-2051',
-      title: 'Open port 8443 for partner API gateway',
-      category: 'Network Change',
-      requester: 'Sana Iqbal',
-      submittedTime: 'submitted 1 day ago',
-      risk: 'Medium',
-      riskColor: '#D97706',
-      riskBars: 2
-    },
-    {
-      id: 'CR-2050',
-      title: 'Onboard 12 new hires with standard access bundle',
-      category: 'Access & Permissions',
-      requester: 'Rahul Verma',
-      submittedTime: 'submitted 3 days ago',
-      risk: 'Low',
-      riskColor: '#059669',
-      riskBars: 1
+// ---------- Audit log ------------------------------------
+
+export const addAuditLog = async ({ actorId = null, action, ref = '—', detail = '' }, tx) =>
+  AuditLog.create({ timestamp: formatTimestamp(), actorId, action, ref, detail }, { transaction: tx });
+
+// ---------- Dashboard ----------------------------------
+
+export const getMetricsService = async () => serializeMetricCards(await getConfig('dashboard_stats'));
+
+export const getCategoryMetricsService = async () =>
+  (await CategoryBreakdown.findAll()).map((r) => r.get({ plain: true }));
+
+export const getStatusBreakdownService = async () =>
+  (await StatusBreakdown.findAll()).map((r) => r.get({ plain: true }));
+
+// ---------- Change requests ----------------------------
+
+export const getChangeRequestsService = async () => {
+  const rows = await ChangeRequest.findAll({ include: CR_INCLUDE, order: [['submittedAt', 'DESC']] });
+  return rows.map(serializeChangeRequest);
+};
+
+export const filterChangeRequestsByCategoryService = async (category) => {
+  const where =
+    category && category.toLowerCase() !== 'all'
+      ? { category: { [Op.iLike]: `%${category}%` } }
+      : undefined;
+  const rows = await ChangeRequest.findAll({
+    where,
+    include: CR_INCLUDE,
+    order: [['submittedAt', 'DESC']]
+  });
+  return rows.map(serializeChangeRequest);
+};
+
+const nextChangeRequestId = async () => {
+  const ids = (await ChangeRequest.findAll({ attributes: ['id'], raw: true })).map(
+    (r) => parseInt(String(r.id).replace(/\D/g, ''), 10) || 0
+  );
+  return `CR-${(ids.length ? Math.max(...ids) : 2049) + 1}`;
+};
+
+const resolveUserId = async (idOrName, fallback = 'usr-1') => {
+  if (!idOrName) return fallback;
+  const hit = await User.findOne({ where: { [Op.or]: [{ id: idOrName }, { name: idOrName }] } });
+  return hit ? hit.id : fallback;
+};
+
+export const createChangeRequestService = async (payload = {}) => {
+  const isDraft = Boolean(payload.isDraft);
+  const risk = payload.risk || 'Medium';
+  const status = isDraft ? 'Draft' : 'Pending';
+  const requesterId = await resolveUserId(payload.requesterId || payload.requester);
+
+  const id = await nextChangeRequestId();
+  await ChangeRequest.create({
+    id,
+    title: payload.title || 'Untitled change request',
+    category: payload.category || 'Software Deployment',
+    subCategory: payload.subCategory || '',
+    department: payload.department || 'IT Operations',
+    contactNumber: payload.contactNumber || '',
+    managerEmail: payload.managerEmail || '',
+    hostname: payload.hostname || '',
+    location: payload.location || 'Ahmedabad HQ',
+    environment: payload.environment || 'Production',
+    justification: payload.justification || '',
+    startDate: payload.startDate || '',
+    endDate: payload.endDate || '',
+    risk,
+    activeStep: isDraft ? 0 : 1,
+    status,
+    isDraft,
+    submittedAt: new Date(),
+    closedAt: null,
+    requesterId,
+    approverId: null,
+    workflowId: payload.workflowId || null
+  });
+
+  if (!isDraft) {
+    await updateConfig('dashboard_stats', (s) => ({
+      total: (s.total || 0) + 1,
+      pending: (s.pending || 0) + 1
+    }));
+  }
+
+  await addAuditLog({
+    actorId: requesterId,
+    action: isDraft ? 'Saved Draft Change Request' : 'Created Change Request',
+    ref: id,
+    detail: `${isDraft ? 'Saved draft' : 'Submitted'} ${id} ${payload.title || 'Untitled change request'}${
+      isDraft ? '' : ' for CAB review.'
+    }`
+  });
+
+  const created = await ChangeRequest.findByPk(id, { include: CR_INCLUDE });
+  return serializeChangeRequest(created);
+};
+
+// ---------- CAB worklist ------------------------------
+// The worklist is simply the pending change requests.
+
+export const getWorklistService = async () => {
+  const [rows, metrics] = await Promise.all([
+    ChangeRequest.findAll({
+      where: { status: 'Pending' },
+      include: [{ model: User, as: 'requester', attributes: ['id', 'name'] }],
+      order: [['submittedAt', 'ASC']]
+    }),
+    getConfig('worklist_metrics')
+  ]);
+  return { data: rows.map(serializeWorklistEntry), metrics: { ...metrics, pending: rows.length } };
+};
+
+const WORKLIST_ACTIONS = {
+  approve: { status: 'Approved', metric: 'approved', logAction: 'CR Approved', verb: 'Approved' },
+  reject: { status: 'Rejected', metric: 'rejected', logAction: 'CR Rejected', verb: 'Rejected' },
+  sendback: { status: 'Draft', metric: 'sentBack', logAction: 'CR Sent Back', verb: 'Sent back' }
+};
+
+export const applyWorklistActionService = async ({ id, action, actorId = 'usr-1' } = {}) => {
+  const config = WORKLIST_ACTIONS[action];
+  if (!config) {
+    const err = new Error(`Unknown worklist action "${action}"`);
+    err.statusCode = 400;
+    throw err;
+  }
+
+  await sequelize.transaction(async (tx) => {
+    const cr = await ChangeRequest.findByPk(id, { transaction: tx });
+    if (!cr) {
+      const err = new Error(`Change request "${id}" not found`);
+      err.statusCode = 404;
+      throw err;
     }
-  ]
-});
 
-export const getSettingsUsersService = () => [
-  { id: 'usr-10432', name: 'Gauri Shinde', employeeId: 'EMP-10432', department: 'IT Operations', role: 'Change Manager', status: 'Approved', statusBg: '#D1FAE5', statusColor: '#059669', statusDot: '#059669' },
-  { id: 'usr-10218', name: 'Priya Nair', employeeId: 'EMP-10218', department: 'IT Operations', role: 'Requester', status: 'Approved', statusBg: '#D1FAE5', statusColor: '#059669', statusDot: '#059669' },
-  { id: 'usr-10391', name: 'Arjun Mehta', employeeId: 'EMP-10391', department: 'Infrastructure', role: 'CAB Approver', status: 'Approved', statusBg: '#D1FAE5', statusColor: '#059669', statusDot: '#059669' },
-  { id: 'usr-10276', name: 'Sana Iqbal', employeeId: 'EMP-10276', department: 'Networking', role: 'CAB Approver', status: 'Approved', statusBg: '#D1FAE5', statusColor: '#059669', statusDot: '#059669' },
-  { id: 'usr-10305', name: 'Rahul Verma', employeeId: 'EMP-10305', department: 'HR', role: 'Requester', status: 'Approved', statusBg: '#D1FAE5', statusColor: '#059669', statusDot: '#059669' },
-  { id: 'usr-10119', name: 'Devika Rao', employeeId: 'EMP-10119', department: 'IT Operations', role: 'Admin', status: 'Approved', statusBg: '#D1FAE5', statusColor: '#059669', statusDot: '#059669' },
-  { id: 'usr-10088', name: 'Karan Bhatt', employeeId: 'EMP-10088', department: 'Engineering', role: 'Requester', status: 'Closed', statusBg: 'var(--input-bg)', statusColor: 'var(--text-secondary)', statusDot: '#94A0B0' }
-];
+    if (cr.status === 'Pending') {
+      cr.status = config.status;
+      if (action === 'approve' || action === 'reject') cr.approverId = actorId;
+      if (action === 'reject') cr.closedAt = new Date();
+      await cr.save({ transaction: tx });
 
-export const getSettingsRolesService = () => [
-  { id: 'role-1', name: 'Admin', description: 'Full system access, manage catalog, workflows, users, and settings.', permissions: 'Dashboard, Change Catalog, Change Request, My Requests, My Worklist, Catalogue Management, Reports, Settings', status: 'Approved' },
-  { id: 'role-2', name: 'Change Manager', description: 'Oversees the full change lifecycle and can override CAB decisions.', permissions: 'Dashboard, Change Request, My Requests, My Worklist, Reports, Catalogue Management', status: 'Approved' },
-  { id: 'role-3', name: 'CAB Approver', description: 'Reviews and approves, rejects, or sends back change requests routed to their board.', permissions: 'Dashboard, My Worklist, Reports', status: 'Approved' },
-  { id: 'role-4', name: 'Requester', description: 'Can raise change requests and track their own submissions.', permissions: 'Dashboard, Change Catalog, Change Request, My Requests', status: 'Approved' }
-];
+      await updateConfig(
+        'dashboard_stats',
+        (s) => ({
+          pending: Math.max(0, (s.pending || 0) - 1),
+          ...(action === 'approve' ? { approved: (s.approved || 0) + 1 } : {}),
+          ...(action === 'reject' ? { rejected: (s.rejected || 0) + 1 } : {})
+        }),
+        tx
+      );
+    }
 
-export const getSettingsAuditLogsService = () => [
-  { id: 'log-1', timestamp: '26 Aug 2026, 10:42 AM', actor: 'Gauri Shinde', action: 'Submitted change request', reference: 'CR-2049', details: 'Software Deployment auto-routed to CAB Application Board', type: 'Change requests' },
-  { id: 'log-2', timestamp: '26 Aug 2026, 09:15 AM', actor: 'Arjun Mehta', action: 'Approved change request', reference: 'CR-2052', details: 'Rotate SSH keys for all bastion hosts', type: 'Approvals' },
-  { id: 'log-3', timestamp: '25 Aug 2026, 05:03 PM', actor: 'Devika Rao', action: 'Modified catalog item', reference: 'Server Patching', details: 'Updated SLA from 7 to 5 business days', type: 'Catalog & workflow' },
-  { id: 'log-4', timestamp: '25 Aug 2026, 02:47 PM', actor: 'Sana Iqbal', action: 'Rejected change request', reference: 'CR-2035', details: 'Emergency rollback checkout service v2.3', type: 'Approvals' },
-  { id: 'log-5', timestamp: '24 Aug 2026, 11:20 AM', actor: 'Devika Rao', action: 'Updated user status', reference: 'Karan Bhatt', details: 'Status changed to Disabled', type: 'User & role changes' },
-  { id: 'log-6', timestamp: '23 Aug 2026, 04:08 PM', actor: 'Gauri Shinde', action: 'Created workflow', reference: 'Expedited Workflow', details: 'Applied to Emergency Change category', type: 'Catalog & workflow' }
-];
+    await updateConfig(
+      'worklist_metrics',
+      (m) => ({ [config.metric]: (m[config.metric] || 0) + 1 }),
+      tx
+    );
 
-export const getCatalogueManagementService = () => ({
-  data: [
-    { id: 'cat-1', title: 'Software Deployment', category: 'Software', sla: '3 business days', risk: 'Medium', riskColor: '#D97706', riskBars: 2, workflow: 'Standard Change Workflow', status: 'Approved', description: 'Deploy new application builds or features to production' },
-    { id: 'cat-2', title: 'Server Patching', category: 'Infrastructure', sla: '5 business days', risk: 'High', riskColor: '#DC2626', riskBars: 3, workflow: 'Expedited Workflow', status: 'Approved', description: 'Apply security patches or OS upgrades to server clusters' },
-    { id: 'cat-3', title: 'Network Change', category: 'Network', sla: '5 business days', risk: 'Medium', riskColor: '#D97706', riskBars: 2, workflow: 'Standard Change Workflow', status: 'Approved', description: 'Modify firewall rules, VLAN configurations, or routing' },
-    { id: 'cat-4', title: 'Access & Permissions', category: 'Access', sla: '1 business day', risk: 'Low', riskColor: '#059669', riskBars: 1, workflow: 'Lightweight Access Workflow', status: 'Approved', description: 'Grant role-based system access or elevated entitlements' },
-    { id: 'cat-5', title: 'Hardware Change', category: 'Infrastructure', sla: '7 business days', risk: 'Low', riskColor: '#059669', riskBars: 1, workflow: 'Standard Change Workflow', status: 'Approved', description: 'Replace physical server components or network switches' },
-    { id: 'cat-6', title: 'Emergency Change', category: 'Emergency', sla: '4 hours', risk: 'High', riskColor: '#DC2626', riskBars: 3, workflow: 'Expedited Workflow', status: 'Approved', description: 'Urgent hotfixes or incident remediation changes' },
-    { id: 'cat-7', title: 'Database Schema Change', category: 'Software', sla: '5 business days', risk: 'High', riskColor: '#DC2626', riskBars: 3, workflow: 'Expedited Workflow', status: 'Approved', description: 'Execute DDL migrations or column additions' },
-    { id: 'cat-8', title: 'SSL Certificate Renewal', category: 'Infrastructure', sla: '2 business days', risk: 'Low', riskColor: '#059669', riskBars: 1, workflow: 'Standard Change Workflow', status: 'Approved', description: 'Renew or rotate production SSL/TLS certificates' },
-    { id: 'cat-9', title: 'New Vendor Integration', category: 'Software', sla: '10 business days', risk: 'Medium', riskColor: '#D97706', riskBars: 2, workflow: 'Standard Change Workflow', status: 'Approved', description: 'Onboard new third-party webhooks or API connections' }
-  ],
-  workflows: [
-    { id: 'wf-1', name: 'Standard Change Workflow', steps: 'Draft → Submitted → CAB Review → Approved → Scheduled → Implemented → Closed', usedBy: 'Software Deployment, Network Change, Hardware Change' },
-    { id: 'wf-2', name: 'Expedited Workflow', steps: 'Draft → Submitted → CAB Review (4hr SLA) → Approved → Implemented → Closed', usedBy: 'Emergency Change' },
-    { id: 'wf-3', name: 'Lightweight Access Workflow', steps: 'Draft → Submitted → Manager Approval → Implemented → Closed', usedBy: 'Access & Permissions' }
-  ]
-});
+    await addAuditLog(
+      {
+        actorId,
+        action: config.logAction,
+        ref: id,
+        detail: `${config.verb} ${id} ${cr.title}.`
+      },
+      tx
+    );
+  });
 
-export const getReportsMetricsService = () => ({
-  metrics: {
-    successRate: '91.4%',
-    successRateTrend: '▲ 2.1% vs last quarter',
-    avgApprovalTime: '1.8',
-    avgApprovalUnit: 'days',
-    avgApprovalTrend: '▼ 0.4 days faster',
-    emergencyChanges: 7,
-    emergencySubtext: '5.5% of total volume',
-    relatedIncidents: 3,
-    incidentTrend: '▼ 2 fewer than last month'
-  },
-  monthlyData: [
-    { month: 'Mar', count: 18, color: '#2563EB' },
-    { month: 'Apr', count: 24, color: '#2563EB' },
-    { month: 'May', count: 21, color: '#2563EB' },
-    { month: 'Jun', count: 32, color: '#0D9488' },
-    { month: 'Jul', count: 38, color: '#0D9488' },
-    { month: 'Aug', count: 42, color: '#0D9488' }
-  ],
-  departmentData: [
-    { department: 'IT Operations', count: 41, max: 50, color: '#2563EB' },
-    { department: 'Engineering', count: 33, max: 50, color: '#0D9488' },
-    { department: 'Finance', count: 19, max: 50, color: '#7C3AED' },
-    { department: 'HR', count: 11, max: 50, color: '#D97706' },
-    { department: 'Sales', count: 7, max: 50, color: '#475569' }
-  ]
-});
+  const pending = await ChangeRequest.count({ where: { status: 'Pending' } });
+  const metrics = await getConfig('worklist_metrics');
+  return { id, action, status: config.status, worklistMetrics: { ...metrics, pending } };
+};
+
+// ---------- Change catalog (browse) -----------------
+
+export const getCatalogService = async () => {
+  const rows = await CatalogItem.findAll({ order: [['id', 'ASC']] });
+  return rows.map(serializeCatalogItem);
+};
+
+// ---------- Catalogue management (admin) ------------
+
+export const getCatalogueManagementService = async () => {
+  const [templates, wf] = await Promise.all([
+    CatalogItem.findAll({
+      include: [{ model: Workflow, as: 'workflow', attributes: ['id', 'name'] }],
+      order: [['id', 'ASC']]
+    }),
+    Workflow.findAll({
+      include: [{ model: CatalogItem, as: 'catalogItems', attributes: ['id', 'title'] }],
+      order: [['id', 'ASC']]
+    })
+  ]);
+  return {
+    data: templates.map(serializeCatalogueTemplate),
+    workflows: wf.map(serializeWorkflow)
+  };
+};
+
+const nextCatalogItemId = async () => {
+  const ids = (await CatalogItem.findAll({ attributes: ['id'], raw: true })).map(
+    (r) => parseInt(String(r.id).replace(/\D/g, ''), 10) || 0
+  );
+  const n = (ids.length ? Math.max(...ids) : 0) + 1;
+  return `CAT-${String(n).padStart(2, '0')}`;
+};
+
+export const createCatalogItemService = async (payload = {}) => {
+  const id = await nextCatalogItemId();
+  let workflowId = payload.workflowId || null;
+  if (!workflowId && payload.workflow) {
+    const wf = await Workflow.findOne({ where: { name: payload.workflow } });
+    workflowId = wf ? wf.id : null;
+  }
+  if (!workflowId) workflowId = 'wf-1';
+
+  await CatalogItem.create({
+    id,
+    title: payload.title || 'New Template',
+    category: payload.category || 'Software',
+    description: payload.description || '',
+    sla: payload.sla || '3 business days',
+    risk: payload.risk || 'Medium',
+    iconBg: payload.iconBg || '#EBF5FF',
+    iconColor: payload.iconColor || '#2563EB',
+    status: payload.status || 'Active',
+    workflowId
+  });
+
+  await addAuditLog({
+    actorId: await resolveUserId(payload.actor || 'Gauri Shinde'),
+    action: 'Catalog Template Created',
+    ref: id,
+    detail: `Added new template ${id} ${payload.title || 'New Template'} to Change Catalog.`
+  });
+
+  const created = await CatalogItem.findByPk(id, {
+    include: [{ model: Workflow, as: 'workflow', attributes: ['id', 'name'] }]
+  });
+  return serializeCatalogueTemplate(created);
+};
+
+// ---------- Settings -------------------------------
+
+export const getSettingsUsersService = async () => {
+  const rows = await User.findAll({
+    include: [{ model: Role, as: 'role', attributes: ['id', 'name'] }],
+    order: [['id', 'ASC']]
+  });
+  return rows.map(serializeUser);
+};
+
+export const getSettingsRolesService = async () => {
+  const rows = await Role.findAll({
+    include: [{ model: User, as: 'users', attributes: ['id'] }],
+    order: [['id', 'ASC']]
+  });
+  return rows.map(serializeRole);
+};
+
+const AUDIT_FILTERS = {
+  'change requests': (log) => /Created|Draft/i.test(log.action),
+  approvals: (log) => /Approved|Rejected|Sent Back/i.test(log.action),
+  'catalog & workflow': (log) => /Catalog|Workflow/i.test(log.action),
+  'user & role changes': (log) => /User|Permission|Role/i.test(log.action)
+};
+
+export const getSettingsAuditLogsService = async (filter = 'All activity') => {
+  const rows = await AuditLog.findAll({
+    include: [{ model: User, as: 'actor', attributes: ['id', 'name'] }],
+    order: [['id', 'DESC']]
+  });
+  const logs = rows.map(serializeAuditLog);
+  const key = String(filter).toLowerCase();
+  return key === 'all activity' || !AUDIT_FILTERS[key] ? logs : logs.filter(AUDIT_FILTERS[key]);
+};
+
+// ---------- Reports -------------------------------
+
+export const getReportsMetricsService = async () => {
+  const [metrics, monthly, dept] = await Promise.all([
+    getConfig('report_metrics'),
+    MonthlyVolume.findAll({ order: [['sortIndex', 'ASC']] }),
+    DepartmentVolume.findAll({ order: [['sortIndex', 'ASC']] })
+  ]);
+  const strip = (rows) =>
+    rows.map((r) => {
+      const { sortIndex, ...rest } = r.get({ plain: true });
+      return rest;
+    });
+  return { metrics, monthlyData: strip(monthly), departmentData: strip(dept) };
+};

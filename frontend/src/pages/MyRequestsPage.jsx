@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Plus } from 'lucide-react';
 import ChangeRequestModal from '../components/ui/ChangeRequestModal';
+import { API_BASE_URL } from '../lib/config';
 
 export default function MyRequestsPage({ onNavigate }) {
   const defaultRequests = [
@@ -88,7 +89,7 @@ export default function MyRequestsPage({ onNavigate }) {
   useEffect(() => {
     const fetchMyRequests = async () => {
       try {
-        const res = await fetch('http://localhost:5001/api/dashboard/my-requests');
+        const res = await fetch(`${API_BASE_URL}/my-requests`);
         if (res.ok) {
           const body = await res.json();
           if (body.data && Array.isArray(body.data)) setRequests(body.data);

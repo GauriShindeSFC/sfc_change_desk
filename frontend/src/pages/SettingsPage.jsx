@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Plus, Download } from 'lucide-react';
+import { API_BASE_URL } from '../lib/config';
 
 export default function SettingsPage() {
   const [activeTab, setActiveTab] = useState('users');
@@ -38,7 +39,7 @@ export default function SettingsPage() {
   useEffect(() => {
     const fetchUsers = async () => {
       try {
-        const res = await fetch('http://localhost:5001/api/dashboard/settings/users');
+        const res = await fetch(`${API_BASE_URL}/settings/users`);
         if (res.ok) {
           const body = await res.json();
           if (body.data && Array.isArray(body.data)) setUsers(body.data);
