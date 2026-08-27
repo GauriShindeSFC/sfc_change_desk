@@ -125,8 +125,8 @@ export default function RecentChangeRequests({ onNavigate }) {
       </div>
 
       {/* Table List */}
-      <div style={{ overflowX: 'auto' }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+      <div className="cd-scroll-x">
+        <table style={{ width: '100%', minWidth: '720px', borderCollapse: 'collapse', textAlign: 'left' }}>
           <thead>
             <tr style={{
               backgroundColor: 'var(--input-bg)',

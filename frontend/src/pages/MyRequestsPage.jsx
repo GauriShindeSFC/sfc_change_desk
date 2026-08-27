@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Plus } from 'lucide-react';
 import ChangeRequestModal from '../components/ui/ChangeRequestModal';
-import { API_BASE_URL } from '../lib/config';
+import { apiFetch } from '../lib/apiFetch';
 
 export default function MyRequestsPage({ onNavigate }) {
   const defaultRequests = [
@@ -104,7 +104,7 @@ export default function MyRequestsPage({ onNavigate }) {
   useEffect(() => {
     const fetchMyRequests = async () => {
       try {
-        const res = await fetch(`${API_BASE_URL}/my-requests`);
+        const res = await apiFetch('/my-requests');
         if (res.ok) {
           const body = await res.json();
           if (body.data && Array.isArray(body.data)) setRequests(body.data);
@@ -209,8 +209,8 @@ export default function MyRequestsPage({ onNavigate }) {
         boxShadow: '0 1px 3px rgba(16, 21, 30, 0.04)',
         overflow: 'hidden'
       }}>
-        <div style={{ overflowX: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+        <div className="cd-scroll-x">
+          <table style={{ width: '100%', minWidth: '820px', borderCollapse: 'collapse', textAlign: 'left' }}>
             <thead>
               <tr style={{
                 backgroundColor: 'var(--input-bg)',

@@ -18,7 +18,10 @@ import {
   DepartmentVolume,
   AppConfig
 } from '../models/index.js';
+import bcrypt from 'bcryptjs';
 import { formatTimestamp } from '../data/store.js';
+import { generateTempPassword } from './authService.js';
+import { sendChangeRequestCreatedEmail, sendUserInviteEmail } from './mailService.js';
 import {
   serializeChangeRequest,
   serializeWorklistEntry,
@@ -101,6 +104,17 @@ const nextChangeRequestId = async () => {
   return `CR-${(ids.length ? Math.max(...ids) : 2049) + 1}`;
 };
 
+// Emails of every active "CAB Approver" — the people who review new CRs.
+const getApproverEmails = async () => {
+  const rows = await User.findAll({
+    attributes: ['email'],
+    where: { status: 'Active' },
+    include: [{ model: Role, as: 'role', attributes: [], where: { name: 'CAB Approver' } }],
+    raw: true
+  });
+  return rows.map((r) => r.email).filter(Boolean);
+};
+
 const resolveUserId = async (idOrName, fallback = 'usr-1') => {
   if (!idOrName) return fallback;
   const hit = await User.findOne({ where: { [Op.or]: [{ id: idOrName }, { name: idOrName }] } });
@@ -156,7 +170,27 @@ export const createChangeRequestService = async (payload = {}) => {
   });
 
   const created = await ChangeRequest.findByPk(id, { include: CR_INCLUDE });
-  return serializeChangeRequest(created);
+  const serialized = serializeChangeRequest(created);
+
+  // Notify the CAB approver(s) + the requester's manager. Fire-and-forget:
+  // a slow or failing SMTP must never break change-request creation.
+  if (!isDraft) {
+    Promise.all([
+      getApproverEmails(),
+      User.findByPk(requesterId, { attributes: ['name', 'email'], raw: true })
+    ])
+      .then(([approverEmails, requester]) =>
+        sendChangeRequestCreatedEmail({
+          cr: serialized,
+          requesterName: requester?.name,
+          approverEmails,
+          managerEmail: payload.managerEmail
+        })
+      )
+      .catch((err) => console.error('[mail] change-request notification failed:', err.message));
+  }
+
+  return serialized;
 };
 
 // ---------- CAB worklist ------------------------------
@@ -312,6 +346,67 @@ export const getSettingsUsersService = async () => {
     order: [['id', 'ASC']]
   });
   return rows.map(serializeUser);
+};
+
+const STATUS_ALIASES = { enabled: 'Active', disabled: 'Inactive', active: 'Active', inactive: 'Inactive' };
+
+/** Invite a new user: create the row, then email them a sign-in link. */
+export const createSettingsUserService = async (payload = {}, meta = {}) => {
+  const name = String(payload.name || '').trim();
+  const email = String(payload.email || '').trim().toLowerCase();
+  if (!name || !email) {
+    const e = new Error('Name and email are required');
+    e.statusCode = 400;
+    throw e;
+  }
+
+  const clash = await User.findOne({ where: { email: { [Op.iLike]: email } } });
+  if (clash) {
+    const e = new Error('A user with that email already exists');
+    e.statusCode = 409;
+    throw e;
+  }
+
+  const roleName = payload.role || payload.roleName || 'Requester';
+  const role = await Role.findOne({ where: { name: { [Op.iLike]: roleName } } });
+  const status = STATUS_ALIASES[String(payload.status || 'Active').toLowerCase()] || 'Active';
+
+  const ids = (await User.findAll({ attributes: ['id'], raw: true })).map(
+    (r) => parseInt(String(r.id).replace(/\D/g, ''), 10) || 0
+  );
+  const seq = (ids.length ? Math.max(...ids) : 0) + 1;
+
+  const tempPassword = generateTempPassword();
+  await User.create({
+    id: `usr-${seq}`,
+    name,
+    email,
+    employeeId: payload.employeeId || payload.empId || `EMP-${10500 + seq}`,
+    department: payload.department || payload.dept || 'IT Operations',
+    status,
+    authProvider: 'local',
+    passwordHash: await bcrypt.hash(tempPassword, 10),
+    roleId: role ? role.id : null
+  });
+
+  await addAuditLog({
+    actorId: meta.actorId || null,
+    action: 'User Invited',
+    ref: `usr-${seq}`,
+    detail: `Invited ${name} (${email}) as ${role ? role.name : roleName}.`
+  });
+
+  const created = await User.findByPk(`usr-${seq}`, {
+    include: [{ model: Role, as: 'role', attributes: ['id', 'name'] }]
+  });
+  const serialized = serializeUser(created);
+
+  // Fire-and-forget welcome email with a sign-in link.
+  sendUserInviteEmail({ user: serialized, tempPassword, invitedByName: meta.invitedByName }).catch((err) =>
+    console.error('[mail] user-invite notification failed:', err.message)
+  );
+
+  return serialized;
 };
 
 export const getSettingsRolesService = async () => {

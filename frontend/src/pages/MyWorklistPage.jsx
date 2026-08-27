@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Clock, Check, X, ChevronLeft } from 'lucide-react';
 import ChangeRequestModal from '../components/ui/ChangeRequestModal';
-import { API_BASE_URL } from '../lib/config';
+import { apiFetch } from '../lib/apiFetch';
 
 export default function MyWorklistPage({ onNavigate }) {
   const defaultItems = [
@@ -59,7 +59,7 @@ export default function MyWorklistPage({ onNavigate }) {
   useEffect(() => {
     const fetchWorklist = async () => {
       try {
-        const res = await fetch(`${API_BASE_URL}/worklist`);
+        const res = await apiFetch('/worklist');
         if (res.ok) {
           const body = await res.json();
           if (body.data && Array.isArray(body.data)) setItems(body.data);
@@ -74,9 +74,8 @@ export default function MyWorklistPage({ onNavigate }) {
 
   const handleAction = async (id, action) => {
     try {
-      await fetch(`${API_BASE_URL}/worklist/action`, {
+      await apiFetch('/worklist/action', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id, action })
       });
     } catch (err) {
@@ -120,7 +119,7 @@ export default function MyWorklistPage({ onNavigate }) {
       </div>
 
       {/* Metric Cards Grid */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: '1rem' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))', gap: '1rem' }}>
         {metricCards.map(card => {
           const IconComp = card.icon;
           return (

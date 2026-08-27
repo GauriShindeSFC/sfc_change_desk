@@ -17,6 +17,7 @@ import {
   getCatalogueManagementService,
   createCatalogItemService,
   getSettingsUsersService,
+  createSettingsUserService,
   getSettingsRolesService,
   getSettingsAuditLogsService,
   getReportsMetricsService
@@ -51,7 +52,10 @@ export const getMyRequests = asyncHandler(async (req, res) => {
 });
 
 export const createChangeRequest = asyncHandler(async (req, res) => {
-  const cr = await createChangeRequestService(req.body || {});
+  const cr = await createChangeRequestService({
+    ...(req.body || {}),
+    requesterId: req.user?.id || req.body?.requesterId
+  });
   res.status(201).json({
     success: true,
     message:
@@ -71,7 +75,7 @@ export const handleWorklistAction = asyncHandler(async (req, res) => {
   if (!id || !action) {
     return res.status(400).json({ success: false, message: 'Both "id" and "action" are required' });
   }
-  const result = await applyWorklistActionService({ id, action });
+  const result = await applyWorklistActionService({ id, action, actorId: req.user?.id });
   res.json({ success: true, message: `Action "${action}" processed for ${id}`, data: result });
 });
 
@@ -88,7 +92,7 @@ export const getCatalogueManagement = asyncHandler(async (req, res) => {
 });
 
 export const createCatalogItem = asyncHandler(async (req, res) => {
-  const item = await createCatalogItemService(req.body || {});
+  const item = await createCatalogItemService({ ...(req.body || {}), actor: req.user?.name });
   res.status(201).json({ success: true, message: 'Catalog item added successfully', data: item });
 });
 
@@ -96,6 +100,14 @@ export const createCatalogItem = asyncHandler(async (req, res) => {
 
 export const getSettingsUsers = asyncHandler(async (req, res) => {
   res.json({ success: true, data: await getSettingsUsersService() });
+});
+
+export const createSettingsUser = asyncHandler(async (req, res) => {
+  const user = await createSettingsUserService(req.body || {}, {
+    actorId: req.user?.id,
+    invitedByName: req.user?.name
+  });
+  res.status(201).json({ success: true, message: 'User invited — a sign-in email has been sent', data: user });
 });
 
 export const getSettingsRoles = asyncHandler(async (req, res) => {

@@ -5,7 +5,13 @@
 //  riskColor / statusBg / etc. Relationship columns use *_id.
 //  Tables are filled parent-first so foreign keys resolve.
 // ────────────────────────────────────────────────────────────────
+import bcrypt from 'bcryptjs';
 import { models } from '../models/index.js';
+
+// Every seeded user gets the same dev password (overridable via env).
+// Swap this out for Microsoft Entra ID SSO later — see KT_Guide.md.
+const DEV_PASSWORD = process.env.SEED_USER_PASSWORD || 'changedesk123';
+const DEV_PASSWORD_HASH = bcrypt.hashSync(DEV_PASSWORD, 10);
 
 const NOW = Date.now();
 const daysAgo = (n) => new Date(NOW - n * 86_400_000);
@@ -26,7 +32,7 @@ export const users = [
   { id: 'usr-3', name: 'Arjun Mehta', employeeId: 'EMP-10434', department: 'Cloud Infrastructure', email: 'arjun.mehta@company.com', status: 'Active', roleId: 'role-3' },
   { id: 'usr-4', name: 'Sana Iqbal', employeeId: 'EMP-10435', department: 'Cybersecurity', email: 'sana.iqbal@company.com', status: 'Active', roleId: 'role-1' },
   { id: 'usr-5', name: 'Rahul Verma', employeeId: 'EMP-10436', department: 'Human Resources', email: 'rahul.verma@company.com', status: 'Inactive', roleId: 'role-4' }
-];
+].map((u) => ({ ...u, authProvider: 'local', passwordHash: DEV_PASSWORD_HASH }));
 
 // ---------- workflows ------------------------------------
 export const workflows = [
@@ -273,6 +279,16 @@ export async function seedDatabase({ force = false } = {}) {
   const results = [];
   results.push(await fill(Role, roles));
   results.push(await fill(User, users));
+
+  // Make sure every seeded user can authenticate, even on a non-forced
+  // re-sync where the users table was skipped (e.g. after `--alter`).
+  for (const u of users) {
+    await User.update(
+      { passwordHash: u.passwordHash, authProvider: u.authProvider },
+      { where: { id: u.id } }
+    );
+  }
+
   results.push(await fill(Workflow, workflows));
   results.push(await fill(CatalogItem, catalogItems));
   results.push(await fill(ChangeRequest, changeRequests));

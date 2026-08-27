@@ -2,8 +2,11 @@ import './config/env.js';
 import express from 'express';
 import cors from 'cors';
 import dashboardRoutes from './routes/dashboard.js';
+import authRoutes from './routes/auth.js';
+import { requireAuth } from './middlewares/auth.js';
 import { errorHandler, notFoundHandler } from './middlewares/errorHandler.js';
 import { sequelize } from './models/index.js';
+import { verifyMailTransport } from './services/mailService.js';
 
 const app = express();
 const PORT = process.env.PORT || 5001;
@@ -25,7 +28,8 @@ app.get('/api/health', (req, res) => {
 });
 
 // Mount modular routes
-app.use('/api/dashboard', dashboardRoutes);
+app.use('/api/auth', authRoutes);
+app.use('/api/dashboard', requireAuth, dashboardRoutes); // every dashboard route needs a session
 
 // 404 + centralized error handling (order matters — these come last)
 app.use(notFoundHandler);
@@ -45,6 +49,8 @@ const start = async () => {
     console.error('[ChangeDesk Backend] Database connection FAILED:', err.message);
     console.error('  → API will still start, but DB-backed routes will return 500 until it is reachable.');
   }
+
+  await verifyMailTransport();
 
   app.listen(PORT, () => {
     console.log(`[ChangeDesk Backend] Server running at http://localhost:${PORT} (env: ${NODE_ENV})`);

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Download, Plus, Upload, Trash2 } from 'lucide-react';
+import { apiFetch } from '../lib/apiFetch';
 
 export default function ReportsPage() {
   const [activeTab, setActiveTab] = useState('overview');
@@ -75,7 +76,7 @@ export default function ReportsPage() {
   useEffect(() => {
     const fetchReports = async () => {
       try {
-        const res = await fetch(`${API_BASE_URL}/reports/metrics`);
+        const res = await apiFetch('/reports/metrics');
         if (res.ok) {
           const body = await res.json();
           if (body.metrics) setMetrics(body.metrics);

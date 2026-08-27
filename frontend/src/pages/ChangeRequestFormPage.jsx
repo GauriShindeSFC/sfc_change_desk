@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Send, ArrowLeft } from 'lucide-react';
+import { apiFetch } from '../lib/apiFetch';
 
 export default function ChangeRequestFormPage({ onNavigate }) {
   const [formData, setFormData] = useState({
@@ -73,13 +74,9 @@ export default function ChangeRequestFormPage({ onNavigate }) {
     setIsSubmitting(true);
 
     try {
-      await fetch(`${API_BASE_URL}/change-requests`, {
+      await apiFetch('/change-requests', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          ...formData,
-          isDraft
-        })
+        body: JSON.stringify({ ...formData, isDraft })
       });
     } catch (err) {
       console.warn('Backend API request failed:', err);

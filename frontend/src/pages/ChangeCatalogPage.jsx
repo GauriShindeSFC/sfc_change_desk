@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Plus, X, ArrowRight } from 'lucide-react';
+import { apiFetch } from '../lib/apiFetch';
 
 export default function ChangeCatalogPage({ onNavigate }) {
   const defaultItems = [
@@ -94,7 +95,7 @@ export default function ChangeCatalogPage({ onNavigate }) {
   useEffect(() => {
     const fetchCatalog = async () => {
       try {
-        const res = await fetch(`${API_BASE_URL}/catalog`);
+        const res = await apiFetch('/catalog');
         if (res.ok) {
           const body = await res.json();
           if (body.data && Array.isArray(body.data)) {
@@ -144,9 +145,8 @@ export default function ChangeCatalogPage({ onNavigate }) {
     setNewItem({ title: '', category: 'Software', sla: '', description: '', risk: 'Low', workflow: 'Standard Change Workflow' });
 
     try {
-      await fetch('http://localhost:5001/api/dashboard/catalogue-management/item', {
+      await apiFetch('/catalogue-management/item', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(createdItem)
       });
     } catch (err) {

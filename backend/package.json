@@ -7,12 +7,16 @@
     "start": "node server.js",
     "dev": "node server.js",
     "db:sync": "node scripts/syncDatabase.js",
-    "db:sync:force": "node scripts/syncDatabase.js --force"
+    "db:sync:force": "node scripts/syncDatabase.js --force",
+    "mail:test": "node scripts/sendTestEmail.js"
   },
   "dependencies": {
+    "bcryptjs": "^2.4.3",
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
     "express": "^4.19.2",
+    "jsonwebtoken": "^9.0.2",
+    "nodemailer": "^6.9.14",
     "pg": "^8.12.0",
     "pg-hstore": "^2.3.4",
     "sequelize": "^6.37.3"

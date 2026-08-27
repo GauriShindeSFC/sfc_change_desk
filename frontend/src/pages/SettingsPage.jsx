@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Plus, X, Download } from 'lucide-react';
+import { apiFetch } from '../lib/apiFetch';
 
 export default function SettingsPage() {
   const defaultUsers = [
@@ -102,7 +103,7 @@ export default function SettingsPage() {
   useEffect(() => {
     const fetchUsers = async () => {
       try {
-        const res = await fetch(`${API_BASE_URL}/settings/users`);
+        const res = await apiFetch('/settings/users');
         if (res.ok) {
           const body = await res.json();
           if (body.data && Array.isArray(body.data)) setUsers(body.data);
@@ -133,9 +134,8 @@ export default function SettingsPage() {
     setNewUser({ name: '', email: '', department: '', role: 'Admin', status: 'Enabled' });
 
     try {
-      await fetch('http://localhost:5001/api/dashboard/settings/users', {
+      await apiFetch('/settings/users', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(createdUser)
       });
     } catch (err) {

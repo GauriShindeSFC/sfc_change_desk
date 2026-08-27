@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { FileText, Clock, CheckCircle2, RotateCw, XCircle } from 'lucide-react';
 import RecentChangeRequests from '../components/ui/RecentChangeRequests';
-import { API_BASE_URL } from '../lib/config';
+import { apiFetch } from '../lib/apiFetch';
 
 export default function DashboardPage({ onNavigate }) {
   const [metrics, setMetrics] = useState([
@@ -32,9 +32,9 @@ export default function DashboardPage({ onNavigate }) {
     const fetchDashboardData = async () => {
       try {
         const [mRes, cRes, sRes] = await Promise.all([
-          fetch(`${API_BASE_URL}/metrics`),
-          fetch(`${API_BASE_URL}/categories`),
-          fetch(`${API_BASE_URL}/status-breakdown`)
+          apiFetch('/metrics'),
+          apiFetch('/categories'),
+          apiFetch('/status-breakdown')
         ]);
         if (mRes.ok) {
           const mData = await mRes.json();

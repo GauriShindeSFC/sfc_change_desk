@@ -12,6 +12,7 @@ import {
   getCatalogueManagement,
   createCatalogItem,
   getSettingsUsers,
+  createSettingsUser,
   getSettingsRoles,
   getSettingsAuditLogs,
   getReportsMetrics,
@@ -40,6 +41,7 @@ router.post('/worklist/action', handleWorklistAction);
 
 // Settings & governance
 router.get('/settings/users', getSettingsUsers);
+router.post('/settings/users', createSettingsUser);
 router.get('/settings/roles', getSettingsRoles);
 router.get('/settings/audit-logs', getSettingsAuditLogs);
 

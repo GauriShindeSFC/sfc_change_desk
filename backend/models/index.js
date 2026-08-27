@@ -29,8 +29,10 @@ export const User = sequelize.define(
     name: { type: DataTypes.STRING, allowNull: false },
     employeeId: { type: DataTypes.STRING },
     department: { type: DataTypes.STRING },
-    email: { type: DataTypes.STRING },
+    email: { type: DataTypes.STRING, unique: true },
     status: { type: DataTypes.STRING, defaultValue: 'Active' },
+    passwordHash: { type: DataTypes.STRING, allowNull: true }, // null for SSO-only accounts
+    authProvider: { type: DataTypes.STRING, defaultValue: 'local' }, // 'local' | 'microsoft'
     roleId: { type: DataTypes.STRING } // FK -> roles.id
   },
   { tableName: 'users', timestamps: false }

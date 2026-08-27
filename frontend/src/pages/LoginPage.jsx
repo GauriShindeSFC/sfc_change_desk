@@ -1,18 +1,27 @@
 import React, { useState } from 'react';
 import { Sun, Moon } from 'lucide-react';
+import { login } from '../lib/auth';
 
-export default function LoginPage({ onLoginSuccess }) {
+export default function LoginPage({ onLogin, onLoginSuccess }) {
   const [isDarkMode, setIsDarkMode] = useState(true);
   const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
-  const handleLogin = (e) => {
+  const handleLogin = async (e) => {
     if (e) e.preventDefault();
+    setError('');
     setIsLoading(true);
-    setTimeout(() => {
+    try {
+      const session = await login(email.trim(), password);
+      if (onLogin) onLogin(session);
+      else if (onLoginSuccess) onLoginSuccess(session);
+    } catch (err) {
+      setError(err.message || 'Unable to sign in');
+    } finally {
       setIsLoading(false);
-      if (onLoginSuccess) onLoginSuccess();
-    }, 500);
+    }
   };
 
   return (
@@ -64,48 +73,24 @@ export default function LoginPage({ onLoginSuccess }) {
         gap: '1.5rem'
       }}>
         
-        {/* Razor-Sharp Resolution-Independent Vector ST FOX Logo (Matching Screenshot 2) */}
+        {/* Company logo */}
         <div style={{ marginBottom: '0.75rem', display: 'flex', justifyContent: 'center' }}>
-          {isDarkMode ? (
-            <svg width="240" height="52" viewBox="0 0 240 52" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <g transform="translate(0, 2)">
-                {/* Origami Polygon Fox Mark */}
-                <path d="M4 36L24 46L44 14L24 4L4 36Z" fill="#FFFFFF" />
-                <path d="M24 4L44 14L24 24L4 36L24 4Z" fill="#E2E8F0" opacity="0.85" />
-                
-                {/* ST Text with Square Dot Below T */}
-                <text x="56" y="36" fontFamily="'Inter', system-ui, -apple-system, sans-serif" fontWeight="900" fontSize="34" fill="#FFFFFF" letterSpacing="0.02em">S</text>
-                <text x="78" y="36" fontFamily="'Inter', system-ui, -apple-system, sans-serif" fontWeight="900" fontSize="34" fill="#FFFFFF" letterSpacing="0.02em">T</text>
-                <rect x="85" y="39" width="4" height="4" fill="#FFFFFF" rx="0.5" />
-                
-                {/* FOX Text */}
-                <text x="108" y="36" fontFamily="'Inter', system-ui, -apple-system, sans-serif" fontWeight="900" fontSize="34" fill="#FFFFFF" letterSpacing="0.04em">FOX</text>
-              </g>
-            </svg>
-          ) : (
-            <svg width="240" height="52" viewBox="0 0 240 52" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <g transform="translate(0, 2)">
-                {/* Origami Polygon Fox Mark */}
-                <path d="M4 36L24 46L44 14L24 4L4 36Z" fill="#0F172A" />
-                <path d="M24 4L44 14L24 24L4 36L24 4Z" fill="#334155" opacity="0.85" />
-                
-                {/* ST Text with Square Dot Below T */}
-                <text x="56" y="36" fontFamily="'Inter', system-ui, -apple-system, sans-serif" fontWeight="900" fontSize="34" fill="#0F172A" letterSpacing="0.02em">S</text>
-                <text x="78" y="36" fontFamily="'Inter', system-ui, -apple-system, sans-serif" fontWeight="900" fontSize="34" fill="#0F172A" letterSpacing="0.02em">T</text>
-                <rect x="85" y="39" width="4" height="4" fill="#0F172A" rx="0.5" />
-                
-                {/* FOX Text */}
-                <text x="108" y="36" fontFamily="'Inter', system-ui, -apple-system, sans-serif" fontWeight="900" fontSize="34" fill="#0F172A" letterSpacing="0.04em">FOX</text>
-              </g>
-            </svg>
-          )}
+          <img
+            src={isDarkMode ? '/images/white-stfox-logo.png' : '/images/black-stfox-logo.png'}
+            alt="ST FOX"
+            onError={(e) => {
+              e.target.onerror = null;
+              e.target.src = isDarkMode ? '/images/white-favicon.png' : '/images/black-favicon.png';
+            }}
+            style={{ height: '52px', width: 'auto', maxWidth: '100%', objectFit: 'contain', display: 'block' }}
+          />
         </div>
 
-        {/* Continue with Microsoft OAuth Button */}
+        {/* Continue with Microsoft OAuth Button (placeholder — SSO wiring pending) */}
         <button
           type="button"
-          onClick={handleLogin}
-          disabled={isLoading}
+          disabled
+          title="Microsoft sign-in will be enabled soon"
           style={{
             width: '100%',
             padding: '0.85rem 1rem',
@@ -115,7 +100,8 @@ export default function LoginPage({ onLoginSuccess }) {
             color: isDarkMode ? '#FFFFFF' : '#0F172A',
             fontSize: '0.925rem',
             fontWeight: 600,
-            cursor: 'pointer',
+            cursor: 'not-allowed',
+            opacity: 0.6,
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
@@ -130,7 +116,7 @@ export default function LoginPage({ onLoginSuccess }) {
             <div style={{ backgroundColor: '#00A4EF', width: '7px', height: '7px' }} />
             <div style={{ backgroundColor: '#FFB900', width: '7px', height: '7px' }} />
           </div>
-          <span>Continue with Microsoft</span>
+          <span>Continue with Microsoft (coming soon)</span>
         </button>
 
         {/* Divider Line */}
@@ -148,13 +134,53 @@ export default function LoginPage({ onLoginSuccess }) {
           <div style={{ flex: 1, height: '1px', backgroundColor: isDarkMode ? 'rgba(255, 255, 255, 0.12)' : '#CBD5E1' }} />
         </div>
 
-        {/* Email Input & Sign-in Code Form */}
+        {/* Email + Password Sign-in Form */}
         <form onSubmit={handleLogin} style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
+          {error && (
+            <div
+              role="alert"
+              style={{
+                width: '100%',
+                padding: '0.6rem 0.85rem',
+                borderRadius: '10px',
+                backgroundColor: isDarkMode ? 'rgba(220, 38, 38, 0.12)' : '#FEF2F2',
+                border: '1px solid ' + (isDarkMode ? 'rgba(248, 113, 113, 0.4)' : '#FCA5A5'),
+                color: isDarkMode ? '#FCA5A5' : '#B91C1C',
+                fontSize: '0.8rem',
+                fontWeight: 600,
+                textAlign: 'left'
+              }}
+            >
+              {error}
+            </div>
+          )}
+
           <input
             type="email"
+            required
+            autoComplete="email"
             placeholder="you@stfox.com"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
+            style={{
+              width: '100%',
+              padding: '0.85rem 1rem',
+              backgroundColor: isDarkMode ? 'rgba(255, 255, 255, 0.04)' : '#FFFFFF',
+              border: isDarkMode ? '1px solid rgba(255, 255, 255, 0.14)' : '1px solid #CBD5E1',
+              borderRadius: '10px',
+              fontSize: '0.9rem',
+              color: isDarkMode ? '#FFFFFF' : '#0F172A',
+              outline: 'none'
+            }}
+          />
+
+          <input
+            type="password"
+            required
+            autoComplete="current-password"
+            placeholder="Password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
             style={{
               width: '100%',
               padding: '0.85rem 1rem',
@@ -179,11 +205,12 @@ export default function LoginPage({ onLoginSuccess }) {
               borderRadius: '10px',
               fontSize: '0.95rem',
               fontWeight: 700,
-              cursor: 'pointer',
+              cursor: isLoading ? 'not-allowed' : 'pointer',
+              opacity: isLoading ? 0.7 : 1,
               boxShadow: '0 2px 6px rgba(0, 0, 0, 0.2)'
             }}
           >
-            {isLoading ? 'Sending sign-in code...' : 'Email me a sign-in code'}
+            {isLoading ? 'Signing in…' : 'Sign in'}
           </button>
         </form>
 
@@ -198,6 +225,10 @@ export default function LoginPage({ onLoginSuccess }) {
           maxWidth: '340px'
         }}>
           By continuing you agree to the terms of internal use. For access issues, contact your IT administrator.
+        </p>
+
+        <p style={{ fontSize: '0.72rem', color: isDarkMode ? '#475569' : '#94A3B8', textAlign: 'center', margin: 0 }}>
+          Demo: <strong>gauri.shinde@company.com</strong> · <strong>changedesk123</strong>
         </p>
 
       </div>

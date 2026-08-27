@@ -1,36 +1,16 @@
-// Shared API Client Library Utility
-import { API_BASE_URL } from './config';
-
-const BASE_URL = API_BASE_URL;
+// Shared API client utility (thin wrapper over apiFetch).
+import { apiFetch } from './apiFetch';
 
 export const apiClient = {
   get: async (endpoint) => {
-    try {
-      const response = await fetch(`${BASE_URL}${endpoint}`);
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-      return await response.json();
-    } catch (error) {
-      console.warn(`[apiClient.get] Error fetching ${endpoint}:`, error);
-      throw error;
-    }
+    const res = await apiFetch(endpoint);
+    if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
+    return res.json();
   },
 
   post: async (endpoint, payload) => {
-    try {
-      const response = await fetch(`${BASE_URL}${endpoint}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      });
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-      return await response.json();
-    } catch (error) {
-      console.warn(`[apiClient.post] Error requesting ${endpoint}:`, error);
-      throw error;
-    }
+    const res = await apiFetch(endpoint, { method: 'POST', body: JSON.stringify(payload) });
+    if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
+    return res.json();
   }
 };
