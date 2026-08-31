@@ -22,6 +22,7 @@ export default function ChangeRequestFormPage({ onNavigate }) {
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitSuccess, setSubmitSuccess] = useState(false);
+  const [isDraftSubmission, setIsDraftSubmission] = useState(false);
 
   const categories = [
     'Software Deployment',
@@ -72,6 +73,7 @@ export default function ChangeRequestFormPage({ onNavigate }) {
   const handleSubmit = async (e, isDraft = false) => {
     if (e) e.preventDefault();
     setIsSubmitting(true);
+    setIsDraftSubmission(isDraft);
 
     try {
       await apiFetch('/change-requests', {
@@ -100,8 +102,8 @@ export default function ChangeRequestFormPage({ onNavigate }) {
           width: '48px',
           height: '48px',
           borderRadius: '50%',
-          backgroundColor: '#D1FAE5',
-          color: '#059669',
+          backgroundColor: isDraftSubmission ? '#FEF3C7' : '#D1FAE5',
+          color: isDraftSubmission ? '#D97706' : '#059669',
           display: 'inline-flex',
           alignItems: 'center',
           justifyContent: 'center',
@@ -112,10 +114,12 @@ export default function ChangeRequestFormPage({ onNavigate }) {
           ✓
         </div>
         <h2 style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--text-primary)', marginBottom: '0.5rem' }}>
-          Change Request Submitted Successfully!
+          {isDraftSubmission ? 'Change Request Saved as Draft!' : 'Change Request Submitted Successfully!'}
         </h2>
         <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '1.5rem' }}>
-          Your change request has been routed to the assigned CAB approver. You can track its progress under <strong>My Requests</strong>.
+          {isDraftSubmission
+            ? 'Your change request has been saved as a draft. You can view, edit, or submit it anytime under My Requests → Draft.'
+            : 'Your change request has been routed to the assigned CAB approver. You can track its progress under My Requests.'}
         </p>
         <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'center' }}>
           <button
@@ -131,10 +135,10 @@ export default function ChangeRequestFormPage({ onNavigate }) {
               cursor: 'pointer'
             }}
           >
-            Go to My Requests
+            {isDraftSubmission ? 'Go to My Requests (Drafts)' : 'Go to My Requests'}
           </button>
           <button
-            onClick={() => { setSubmitSuccess(false); setFormData({ title: '', category: 'Network Change', subCategory: '', startDate: '', endDate: '', justification: '', employeeName: 'Aashini Shah', employeeEmail: '', department: '', contactNumber: '', hostname: '', location: 'Ahmedabad — HQ', environment: 'Production', managerEmail: '' }); }}
+            onClick={() => { setSubmitSuccess(false); setIsDraftSubmission(false); setFormData({ title: '', category: 'Network Change', subCategory: '', startDate: '', endDate: '', justification: '', employeeName: 'Aashini Shah', employeeEmail: '', department: '', contactNumber: '', hostname: '', location: 'Ahmedabad — HQ', environment: 'Production', managerEmail: '' }); }}
             style={{
               padding: '0.55rem 1.25rem',
               backgroundColor: 'var(--input-bg)',

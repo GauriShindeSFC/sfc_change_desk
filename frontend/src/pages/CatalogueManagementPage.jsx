@@ -112,26 +112,28 @@ export default function CatalogueManagementPage() {
           </p>
         </div>
 
-        <button
-          onClick={() => setIsModalOpen(true)}
-          style={{
-            padding: '0.55rem 1.1rem',
-            backgroundColor: '#0D9488',
-            color: '#FFFFFF',
-            border: 'none',
-            borderRadius: '8px',
-            fontSize: '0.85rem',
-            fontWeight: 700,
-            cursor: 'pointer',
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: '0.4rem',
-            boxShadow: '0 1px 3px rgba(13, 148, 136, 0.2)'
-          }}
-        >
-          <Plus size={16} />
-          <span>{activeTab === 'templates' ? 'New Template' : 'New Workflow'}</span>
-        </button>
+        {activeTab === 'templates' && (
+          <button
+            onClick={() => setIsModalOpen(true)}
+            style={{
+              padding: '0.55rem 1.1rem',
+              backgroundColor: '#0D9488',
+              color: '#FFFFFF',
+              border: 'none',
+              borderRadius: '8px',
+              fontSize: '0.85rem',
+              fontWeight: 700,
+              cursor: 'pointer',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '0.4rem',
+              boxShadow: '0 1px 3px rgba(13, 148, 136, 0.2)'
+            }}
+          >
+            <Plus size={16} />
+            <span>New Template</span>
+          </button>
+        )}
       </div>
 
       {/* Main Sub-Tabs */}

@@ -53,8 +53,8 @@ export const serializeCatalogItem = (row) => {
     sla: c.sla,
     risk: c.risk,
     ...riskStyle(c.risk),
-    iconBg: c.iconBg,
-    iconColor: c.iconColor
+    iconBg: c.iconBg || '#EBF5FF',
+    iconColor: c.iconColor || '#2563EB'
   };
 };
 

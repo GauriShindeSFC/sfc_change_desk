@@ -117,7 +117,7 @@ export default function DashboardPage({ onNavigate }) {
 
             <div style={{ marginTop: '0.6rem' }}>
               <div style={{ fontSize: '1.65rem', fontWeight: 900, color: 'var(--text-primary)', lineHeight: 1.1 }}>
-                {m.value}
+                {(m.value !== undefined && m.value !== null) ? m.value : (m.count ?? m.val ?? 0)}
               </div>
               <div style={{
                 fontSize: '0.775rem',
@@ -162,26 +162,36 @@ export default function DashboardPage({ onNavigate }) {
             </div>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1.1rem' }}>
-              {categoryData.map(cat => (
-                <div key={cat.category} style={{ display: 'grid', gridTemplateColumns: '160px 1fr 35px', alignItems: 'center', gap: '1rem' }}>
-                  <span style={{ fontSize: '0.875rem', fontWeight: 700, color: 'var(--text-primary)' }}>
-                    {cat.category}
-                  </span>
+              {categoryData.map((cat, catIdx) => {
+                const labelText = cat.category || cat.label || cat.name || cat.title || `Category ${catIdx + 1}`;
+                return (
+                  <div key={labelText} style={{ display: 'grid', gridTemplateColumns: '175px 1fr 35px', alignItems: 'center', gap: '1rem' }}>
+                    <span style={{
+                      fontSize: '0.875rem',
+                      fontWeight: 700,
+                      color: 'var(--text-primary, #0F172A)',
+                      whiteSpace: 'nowrap',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis'
+                    }}>
+                      {labelText}
+                    </span>
 
-                  <div style={{ width: '100%', height: '9px', backgroundColor: 'var(--border-color)', borderRadius: '99px', overflow: 'hidden' }}>
-                    <div style={{
-                      height: '100%',
-                      width: `${cat.percentage || (cat.count * 2)}%`,
-                      backgroundColor: cat.color || '#2563EB',
-                      borderRadius: '99px'
-                    }} />
+                    <div style={{ width: '100%', height: '9px', backgroundColor: 'var(--border-color)', borderRadius: '99px', overflow: 'hidden' }}>
+                      <div style={{
+                        height: '100%',
+                        width: `${cat.percentage || (cat.count * 2)}%`,
+                        backgroundColor: cat.color || '#2563EB',
+                        borderRadius: '99px'
+                      }} />
+                    </div>
+
+                    <span style={{ fontSize: '0.875rem', fontWeight: 800, color: 'var(--text-primary, #0F172A)', textAlign: 'right' }}>
+                      {cat.count}
+                    </span>
                   </div>
-
-                  <span style={{ fontSize: '0.875rem', fontWeight: 800, color: 'var(--text-primary)', textAlign: 'right' }}>
-                    {cat.count}
-                  </span>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         </div>
@@ -232,15 +242,18 @@ export default function DashboardPage({ onNavigate }) {
 
             {/* Status Breakdown Legend List */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem', marginTop: '0.5rem' }}>
-              {statusBreakdown.map(sb => (
-                <div key={sb.status} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.55rem' }}>
-                    <div style={{ width: '10px', height: '10px', borderRadius: '3px', backgroundColor: sb.color }} />
-                    <span style={{ color: 'var(--text-primary)', fontSize: '0.875rem', fontWeight: 700 }}>{sb.status}</span>
+              {statusBreakdown.map((sb, sbIdx) => {
+                const statusText = sb.status || sb.label || sb.name || `Status ${sbIdx + 1}`;
+                return (
+                  <div key={statusText} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.55rem' }}>
+                      <div style={{ width: '10px', height: '10px', borderRadius: '3px', backgroundColor: sb.color || '#0D9488' }} />
+                      <span style={{ color: 'var(--text-primary, #0F172A)', fontSize: '0.875rem', fontWeight: 700 }}>{statusText}</span>
+                    </div>
+                    <span style={{ fontSize: '0.9rem', fontWeight: 900, color: 'var(--text-primary, #0F172A)' }}>{sb.count}</span>
                   </div>
-                  <span style={{ fontSize: '0.9rem', fontWeight: 900, color: 'var(--text-primary)' }}>{sb.count}</span>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         </div>

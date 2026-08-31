@@ -3,120 +3,43 @@ import { Plus } from 'lucide-react';
 import ChangeRequestModal from '../components/ui/ChangeRequestModal';
 import { apiFetch } from '../lib/apiFetch';
 
-export default function MyRequestsPage({ onNavigate }) {
-  const defaultRequests = [
-    {
-      id: 'CR-2049',
-      title: 'Upgrade payment-gateway API to v4',
-      category: 'Software Deployment',
-      requester: 'Gauri Shinde',
-      risk: 'Medium',
-      riskColor: '#D97706',
-      riskBars: 2,
-      raisedDate: '24 Aug 2026',
-      closedDate: 'Open',
-      status: 'Pending',
-      statusBg: '#FEF3C7',
-      statusColor: '#D97706',
-      statusDot: '#D97706'
-    },
-    {
-      id: 'CR-2048',
-      title: 'Apply Q3 security patch for prod DB cluster',
-      category: 'Server / Patching',
-      requester: 'Gauri Shinde',
-      risk: 'High',
-      riskColor: '#DC2626',
-      riskBars: 3,
-      raisedDate: '22 Aug 2026',
-      closedDate: 'Open',
-      status: 'Approved',
-      statusBg: '#D1FAE5',
-      statusColor: '#059669',
-      statusDot: '#059669'
-    },
-    {
-      id: 'CR-2044',
-      title: 'Add VLAN for new Ahmedabad office floor',
-      category: 'Network Change',
-      requester: 'Gauri Shinde',
-      risk: 'Medium',
-      riskColor: '#D97706',
-      riskBars: 2,
-      raisedDate: '18 Aug 2026',
-      closedDate: 'Open',
-      status: 'Approved',
-      statusBg: '#D1FAE5',
-      statusColor: '#059669',
-      statusDot: '#059669'
-    },
-    {
-      id: 'CR-2041',
-      title: 'Grant elevated access for Finance reporting tool',
-      category: 'Access & Permissions',
-      requester: 'Gauri Shinde',
-      risk: 'Low',
-      riskColor: '#059669',
-      riskBars: 1,
-      raisedDate: '15 Aug 2026',
-      closedDate: '16 Aug 2026',
-      status: 'Closed',
-      statusBg: 'var(--input-bg)',
-      statusColor: 'var(--text-secondary)',
-      statusDot: '#94A0B0'
-    },
-    {
-      id: 'CR-2038',
-      title: 'Replace failing switch in Rack B12',
-      category: 'Hardware Change',
-      requester: 'Gauri Shinde',
-      risk: 'Low',
-      riskColor: '#059669',
-      riskBars: 1,
-      raisedDate: '10 Aug 2026',
-      closedDate: 'Open',
-      status: 'In progress',
-      statusBg: '#F3E8FF',
-      statusColor: '#7C3AED',
-      statusDot: '#7C3AED'
-    },
-    {
-      id: 'CR-2053',
-      title: 'Upgrade memory allocation for Staging Redis cluster',
-      category: 'Server / Patching',
-      requester: 'Gauri Shinde',
-      risk: 'Low',
-      riskColor: '#059669',
-      riskBars: 1,
-      raisedDate: '26 Aug 2026',
-      closedDate: 'Open',
-      status: 'Draft',
-      statusBg: 'var(--input-bg)',
-      statusColor: 'var(--text-secondary)',
-      statusDot: '#94A0B0'
-    }
-  ];
+export default function MyRequestsPage({ onNavigate, searchQuery = '', initialData, user }) {
+  const defaultRequests = [];
 
-  const [requests, setRequests] = useState(defaultRequests);
-  const [selectedCr, setSelectedCr] = useState(null);
-  const [activeFilter, setActiveFilter] = useState('All');
+  const [requests, setRequests] = useState([]);
+  const [activeFilter, setActiveFilter] = useState(() => {
+    if (initialData?.filter) return initialData.filter;
+    if (typeof initialData === 'string') return initialData;
+    return 'All';
+  });
+  const [selectedRequest, setSelectedRequest] = useState(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
 
   useEffect(() => {
-    const fetchMyRequests = async () => {
+    if (initialData?.filter) {
+      setActiveFilter(initialData.filter);
+    } else if (typeof initialData === 'string') {
+      setActiveFilter(initialData);
+    }
+  }, [initialData]);
+
+  useEffect(() => {
+    const fetchRequests = async () => {
       try {
         const res = await apiFetch('/my-requests');
         if (res.ok) {
           const body = await res.json();
-          if (body.data && Array.isArray(body.data)) setRequests(body.data);
+          if (body.data && Array.isArray(body.data)) {
+            setRequests(body.data);
+          }
         }
       } catch (err) {
-        console.warn('Backend API offline, using default my-requests list:', err);
+        console.warn('Backend API offline, using default requests:', err);
       }
     };
-    fetchMyRequests();
-  }, []);
+    fetchRequests();
+  }, [user?.id]);
 
-  // Filter calculation with safe optional chaining so missing status fields never crash
   const filterCounts = {
     All: Array.isArray(requests) ? requests.length : 0,
     Pending: Array.isArray(requests) ? requests.filter(r => (r.status || '').toLowerCase() === 'pending').length : 0,
@@ -126,9 +49,25 @@ export default function MyRequestsPage({ onNavigate }) {
     Draft: Array.isArray(requests) ? requests.filter(r => (r.status || '').toLowerCase() === 'draft').length : 0
   };
 
-  const filteredRequests = activeFilter === 'All'
-    ? requests
-    : requests.filter(r => (r.status || '').toLowerCase() === activeFilter.toLowerCase());
+  const filteredRequests = requests.filter(r => {
+    const matchesFilter = activeFilter === 'All' || (r.status || '').toLowerCase() === activeFilter.toLowerCase();
+    const query = searchQuery.trim().toLowerCase();
+    const matchesSearch = !query ||
+      (r.id || '').toLowerCase().includes(query) ||
+      (r.title || '').toLowerCase().includes(query) ||
+      (r.category || '').toLowerCase().includes(query) ||
+      (r.requester || '').toLowerCase().includes(query);
+    return matchesFilter && matchesSearch;
+  });
+
+  const sortedRequests = [...filteredRequests].sort((a, b) => {
+    const numA = parseInt((a.id || '').replace(/\D/g, ''), 10) || 0;
+    const numB = parseInt((b.id || '').replace(/\D/g, ''), 10) || 0;
+    if (numA !== numB) return numB - numA;
+    const timeA = new Date(a.submittedAt || a.raisedDate || a.createdAt || 0).getTime();
+    const timeB = new Date(b.submittedAt || b.raisedDate || b.createdAt || 0).getTime();
+    return timeB - timeA;
+  });
 
   const filterTabs = [
     { id: 'All', label: `All (${filterCounts.All})` },
@@ -138,6 +77,21 @@ export default function MyRequestsPage({ onNavigate }) {
     { id: 'Rejected', label: `Rejected (${filterCounts.Rejected})` },
     { id: 'Draft', label: `Draft (${filterCounts.Draft})` }
   ];
+
+  const handleSubmitDraft = async (crId) => {
+    try {
+      const res = await apiFetch(`/change-requests/${crId}/submit`, {
+        method: 'PATCH'
+      });
+      if (res.ok) {
+        setRequests(prev => prev.map(r => r.id === crId ? { ...r, status: 'Pending', isDraft: false, statusBg: '#FEF3C7', statusColor: '#D97706', statusDot: '#D97706' } : r));
+        setSelectedRequest(null);
+        setActiveFilter('Pending');
+      }
+    } catch (err) {
+      console.warn('Failed to submit draft on server:', err);
+    }
+  };
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
@@ -176,29 +130,27 @@ export default function MyRequestsPage({ onNavigate }) {
         </button>
       </div>
 
-      {/* Filter Tabs */}
-      <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-        {filterTabs.map(tab => {
-          const isActive = activeFilter === tab.id;
-          return (
-            <button
-              key={tab.id}
-              onClick={() => setActiveFilter(tab.id)}
-              style={{
-                padding: '0.4rem 0.85rem',
-                borderRadius: '99px',
-                border: '1px solid var(--border-color)',
-                backgroundColor: isActive ? '#0D9488' : 'var(--card-bg)',
-                color: isActive ? '#FFFFFF' : 'var(--text-primary)',
-                fontSize: '0.8rem',
-                fontWeight: isActive ? 700 : 500,
-                cursor: 'pointer'
-              }}
-            >
-              {tab.label}
-            </button>
-          );
-        })}
+      {/* Main Sub-Tabs / Status Filter */}
+      <div style={{ display: 'flex', gap: '0.5rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.5rem', flexWrap: 'wrap' }}>
+        {filterTabs.map(tab => (
+          <button
+            key={tab.id}
+            type="button"
+            onClick={() => setActiveFilter(tab.id)}
+            style={{
+              padding: '0.45rem 0.95rem',
+              backgroundColor: activeFilter === tab.id ? '#0D9488' : 'transparent',
+              color: activeFilter === tab.id ? '#FFFFFF' : 'var(--text-secondary)',
+              border: activeFilter === tab.id ? 'none' : '1px solid var(--border-color)',
+              borderRadius: '99px',
+              fontSize: '0.825rem',
+              fontWeight: 700,
+              cursor: 'pointer'
+            }}
+          >
+            {tab.label}
+          </button>
+        ))}
       </div>
 
       {/* Requests Table */}
@@ -206,128 +158,94 @@ export default function MyRequestsPage({ onNavigate }) {
         backgroundColor: 'var(--card-bg)',
         border: '1px solid var(--border-color)',
         borderRadius: '12px',
-        boxShadow: '0 1px 3px rgba(16, 21, 30, 0.04)',
-        overflow: 'hidden'
+        overflow: 'hidden',
+        boxShadow: '0 1px 3px rgba(16, 21, 30, 0.04)'
       }}>
-        <div className="cd-scroll-x">
-          <table style={{ width: '100%', minWidth: '820px', borderCollapse: 'collapse', textAlign: 'left' }}>
+        <div style={{ overflowX: 'auto' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.85rem' }}>
             <thead>
-              <tr style={{
-                backgroundColor: 'var(--input-bg)',
-                color: 'var(--text-secondary)',
-                fontSize: '0.6875rem',
-                fontWeight: 700,
-                letterSpacing: '0.08em',
-                textTransform: 'uppercase',
-                borderBottom: '1px solid var(--border-color)'
-              }}>
-                <th style={{ padding: '0.75rem 0.85rem' }}>CR ID</th>
-                <th style={{ padding: '0.75rem 0.85rem' }}>TITLE</th>
-                <th style={{ padding: '0.75rem 0.85rem' }}>CATEGORY</th>
-                <th style={{ padding: '0.75rem 0.85rem' }}>RISK</th>
-                <th style={{ padding: '0.75rem 0.85rem' }}>RAISED DATE</th>
-                <th style={{ padding: '0.75rem 0.85rem' }}>CLOSED DATE</th>
-                <th style={{ padding: '0.75rem 0.85rem' }}>STATUS</th>
-                <th style={{ padding: '0.75rem 0.85rem', textAlign: 'right' }}>ACTIONS</th>
+              <tr style={{ backgroundColor: 'var(--input-bg)', borderBottom: '1px solid var(--border-color)' }}>
+                <th style={{ padding: '0.75rem 1rem', fontWeight: 800, color: 'var(--text-secondary)', textTransform: 'uppercase', fontSize: '0.725rem', letterSpacing: '0.05em' }}>CR ID</th>
+                <th style={{ padding: '0.75rem 1rem', fontWeight: 800, color: 'var(--text-secondary)', textTransform: 'uppercase', fontSize: '0.725rem', letterSpacing: '0.05em' }}>Title</th>
+                <th style={{ padding: '0.75rem 1rem', fontWeight: 800, color: 'var(--text-secondary)', textTransform: 'uppercase', fontSize: '0.725rem', letterSpacing: '0.05em' }}>Category</th>
+                <th style={{ padding: '0.75rem 1rem', fontWeight: 800, color: 'var(--text-secondary)', textTransform: 'uppercase', fontSize: '0.725rem', letterSpacing: '0.05em' }}>Risk</th>
+                <th style={{ padding: '0.75rem 1rem', fontWeight: 800, color: 'var(--text-secondary)', textTransform: 'uppercase', fontSize: '0.725rem', letterSpacing: '0.05em' }}>Raised Date</th>
+                <th style={{ padding: '0.75rem 1rem', fontWeight: 800, color: 'var(--text-secondary)', textTransform: 'uppercase', fontSize: '0.725rem', letterSpacing: '0.05em' }}>Closed Date</th>
+                <th style={{ padding: '0.75rem 1rem', fontWeight: 800, color: 'var(--text-secondary)', textTransform: 'uppercase', fontSize: '0.725rem', letterSpacing: '0.05em' }}>Status</th>
+                <th style={{ padding: '0.75rem 1rem', fontWeight: 800, color: 'var(--text-secondary)', textTransform: 'uppercase', fontSize: '0.725rem', letterSpacing: '0.05em', textAlign: 'right' }}>Actions</th>
               </tr>
             </thead>
             <tbody>
-              {filteredRequests.length > 0 ? (
-                filteredRequests.map((cr, idx) => (
-                  <tr
-                    key={cr.id || idx}
-                    style={{
-                      borderBottom: idx === filteredRequests.length - 1 ? 'none' : '1px solid var(--border-color)'
-                    }}
-                  >
-                    <td style={{ padding: '0.75rem 0.85rem', fontSize: '0.825rem', fontFamily: 'var(--font-mono)', fontWeight: 600, color: 'var(--text-secondary)' }}>
-                      {cr.id}
-                    </td>
-
-                    <td style={{ padding: '0.75rem 0.85rem', maxWidth: '320px' }}>
-                      <div style={{ fontSize: '0.875rem', fontWeight: 700, color: 'var(--text-primary)', lineHeight: 1.3 }}>
-                        {cr.title}
-                      </div>
-                    </td>
-
-                    <td style={{ padding: '0.75rem 0.85rem' }}>
-                      <span style={{ fontSize: '0.825rem', fontWeight: 500, color: 'var(--text-primary)' }}>
-                        {cr.category}
-                      </span>
-                    </td>
-
-                    <td style={{ padding: '0.75rem 0.85rem' }}>
-                      <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}>
+              {sortedRequests.length > 0 ? (
+                sortedRequests.map(cr => (
+                  <tr key={cr.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
+                    <td style={{ padding: '0.85rem 1rem', fontWeight: 700, color: 'var(--text-primary)', fontFamily: 'var(--font-mono)' }}>{cr.id}</td>
+                    <td style={{ padding: '0.85rem 1rem', fontWeight: 700, color: 'var(--text-primary)' }}>{cr.title}</td>
+                    <td style={{ padding: '0.85rem 1rem', color: 'var(--text-secondary)' }}>{cr.category}</td>
+                    <td style={{ padding: '0.85rem 1rem' }}>
+                      <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}>
                         <div style={{ display: 'flex', gap: '2px', alignItems: 'center' }}>
                           {[1, 2, 3].map(bar => (
-                            <div
-                              key={bar}
-                              style={{
-                                width: '3.5px',
-                                height: '12px',
-                                borderRadius: '1.5px',
-                                backgroundColor: bar <= (cr.riskBars || 2) ? (cr.riskColor || '#D97706') : 'var(--border-color)'
-                              }}
-                            />
+                            <div key={bar} style={{ width: '3px', height: '12px', borderRadius: '1px', backgroundColor: bar <= (cr.riskBars || 2) ? (cr.riskColor || '#D97706') : 'var(--border-color)' }} />
                           ))}
                         </div>
-                        <span style={{ fontSize: '0.8rem', fontWeight: 600, color: cr.riskColor || '#D97706' }}>
-                          {cr.risk || 'Medium'}
-                        </span>
+                        <span style={{ fontWeight: 700, color: cr.riskColor || '#D97706', fontSize: '0.8rem' }}>{cr.risk || 'Medium'}</span>
                       </div>
                     </td>
-
-                    <td style={{ padding: '0.75rem 0.85rem' }}>
-                      <span style={{ fontSize: '0.825rem', fontWeight: 500, color: 'var(--text-secondary)' }}>
-                        {cr.raisedDate || '24 Aug 2026'}
-                      </span>
-                    </td>
-
-                    <td style={{ padding: '0.75rem 0.85rem' }}>
-                      <span style={{ fontSize: '0.825rem', fontWeight: 500, color: 'var(--text-secondary)' }}>
-                        {cr.closedDate || 'Open'}
-                      </span>
-                    </td>
-
-                    <td style={{ padding: '0.75rem 0.85rem' }}>
+                    <td style={{ padding: '0.85rem 1rem', color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)', fontSize: '0.8rem' }}>{cr.raisedDate}</td>
+                    <td style={{ padding: '0.85rem 1rem', color: 'var(--text-secondary)', fontSize: '0.8rem' }}>{cr.closedDate}</td>
+                    <td style={{ padding: '0.85rem 1rem' }}>
                       <div style={{
                         display: 'inline-flex',
                         alignItems: 'center',
                         gap: '0.35rem',
                         padding: '0.2rem 0.65rem',
                         borderRadius: '99px',
-                        backgroundColor: cr.statusBg || '#FEF3C7',
-                        color: cr.statusColor || '#D97706',
-                        fontSize: '0.75rem',
+                        backgroundColor: cr.statusBg || ((cr.status || '').toLowerCase() === 'draft' ? 'var(--input-bg)' : '#FEF3C7'),
+                        color: cr.statusColor || ((cr.status || '').toLowerCase() === 'draft' ? 'var(--text-secondary)' : '#D97706'),
+                        fontSize: '0.775rem',
                         fontWeight: 700
                       }}>
-                        <span style={{
-                          width: '5px',
-                          height: '5px',
-                          borderRadius: '50%',
-                          backgroundColor: cr.statusDot || '#D97706'
-                        }} />
-                        <span>{cr.status || 'Pending'}</span>
+                        <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: cr.statusDot || ((cr.status || '').toLowerCase() === 'draft' ? '#94A0B0' : '#D97706') }} />
+                        <span>{cr.status}</span>
                       </div>
                     </td>
-
-                    <td style={{ padding: '0.75rem 0.85rem', textAlign: 'right' }}>
-                      <button
-                        type="button"
-                        onClick={() => setSelectedCr(cr)}
-                        style={{
-                          background: 'none',
-                          border: 'none',
-                          color: '#0D9488',
-                          fontSize: '0.825rem',
-                          fontWeight: 600,
-                          cursor: 'pointer'
-                        }}
-                      >
-                        Details
-                      </button>
+                    <td style={{ padding: '0.85rem 1rem', textAlign: 'right' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '0.6rem' }}>
+                        {(cr.status || '').toLowerCase() === 'draft' && (
+                          <button
+                            type="button"
+                            onClick={() => onNavigate && onNavigate('Change Request', cr)}
+                            style={{
+                              padding: '0.3rem 0.65rem',
+                              backgroundColor: '#E6F4F1',
+                              color: '#0D9488',
+                              border: '1px solid #A7F3D0',
+                              borderRadius: '6px',
+                              fontWeight: 700,
+                              cursor: 'pointer',
+                              fontSize: '0.775rem'
+                            }}
+                          >
+                            Edit Draft
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => setSelectedRequest(cr)}
+                          style={{
+                            background: 'none',
+                            border: 'none',
+                            color: '#0D9488',
+                            fontWeight: 700,
+                            cursor: 'pointer',
+                            fontSize: '0.825rem'
+                          }}
+                        >
+                          Details
+                        </button>
+                      </div>
                     </td>
-
                   </tr>
                 ))
               ) : (
@@ -343,15 +261,21 @@ export default function MyRequestsPage({ onNavigate }) {
       </div>
 
       {/* Change Request Details Modal */}
-      {selectedCr && (
-        <ChangeRequestModal
-          cr={selectedCr}
-          onClose={() => setSelectedCr(null)}
-          onApprove={() => setSelectedCr(null)}
-          onReject={() => setSelectedCr(null)}
-          onSendBack={() => setSelectedCr(null)}
-        />
-      )}
+      {selectedRequest && (() => {
+        const roleName = (user?.role || '').toLowerCase();
+        const roleId = user?.roleId || '';
+        const isApprover = roleName.includes('cab') || roleName.includes('manager') || roleName.includes('admin') || ['role-1', 'role-2', 'role-3'].includes(roleId);
+        return (
+          <ChangeRequestModal
+            cr={selectedRequest}
+            onClose={() => setSelectedRequest(null)}
+            onApprove={isApprover ? () => setSelectedRequest(null) : null}
+            onReject={isApprover ? () => setSelectedRequest(null) : null}
+            onSendBack={isApprover ? () => setSelectedRequest(null) : null}
+            onSubmitForApproval={handleSubmitDraft}
+          />
+        );
+      })()}
 
     </div>
   );

@@ -1,7 +1,7 @@
 import React from 'react';
 import { X } from 'lucide-react';
 
-export default function ChangeRequestModal({ cr, onClose, onApprove, onReject, onSendBack }) {
+export default function ChangeRequestModal({ cr, onClose, onApprove, onReject, onSendBack, onSubmitForApproval }) {
   if (!cr) return null;
 
   return (
@@ -50,9 +50,19 @@ export default function ChangeRequestModal({ cr, onClose, onApprove, onReject, o
         <div style={{ padding: '1.25rem 1.75rem 0.5rem 1.75rem', display: 'flex', alignItems: 'center', gap: '3rem' }}>
           <div>
             <div style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '0.4rem' }}>Status</div>
-            <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', padding: '0.25rem 0.75rem', borderRadius: '99px', backgroundColor: '#FEF3C7', color: '#D97706', fontSize: '0.8rem', fontWeight: 700 }}>
-              <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: '#D97706' }} />
-              <span>Pending</span>
+            <div style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '0.35rem',
+              padding: '0.25rem 0.75rem',
+              borderRadius: '99px',
+              backgroundColor: cr.statusBg || ((cr.status || '').toLowerCase() === 'draft' ? 'var(--input-bg)' : '#FEF3C7'),
+              color: cr.statusColor || ((cr.status || '').toLowerCase() === 'draft' ? 'var(--text-secondary)' : '#D97706'),
+              fontSize: '0.8rem',
+              fontWeight: 700
+            }}>
+              <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: cr.statusDot || ((cr.status || '').toLowerCase() === 'draft' ? '#94A0B0' : '#D97706') }} />
+              <span>{cr.status || 'Pending'}</span>
             </div>
           </div>
 
@@ -79,8 +89,12 @@ export default function ChangeRequestModal({ cr, onClose, onApprove, onReject, o
             <div style={{ position: 'absolute', top: '10px', left: '20px', width: '33%', height: '2px', backgroundColor: '#0D9488', zIndex: 2 }} />
 
             {['Draft', 'Submitted', 'CAB Review', 'Approved', 'Scheduled', 'Implemented', 'Closed'].map((step, idx) => {
-              const isCompleted = idx < 2;
-              const isCurrent = idx === 2;
+              const currentStepIdx = (cr.status || '').toLowerCase() === 'draft' ? 0
+                : (cr.status || '').toLowerCase() === 'approved' ? 3
+                : (cr.status || '').toLowerCase() === 'in progress' ? 4
+                : 2;
+              const isCompleted = idx < currentStepIdx;
+              const isCurrent = idx === currentStepIdx;
               return (
                 <div key={step} style={{ position: 'relative', zIndex: 3, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.4rem' }}>
                   <div style={{
@@ -166,8 +180,37 @@ export default function ChangeRequestModal({ cr, onClose, onApprove, onReject, o
         {/* Footer Actions */}
         <div style={{ padding: '1rem 1.75rem 1.5rem 1.75rem', borderTop: '1px solid var(--border-color)', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '0.75rem', backgroundColor: 'var(--card-bg)', position: 'sticky', bottom: 0 }}>
           <button onClick={onClose} style={{ padding: '0.55rem 1.1rem', backgroundColor: 'var(--card-bg)', border: '1px solid var(--border-color)', borderRadius: '8px', fontSize: '0.825rem', fontWeight: 600, color: 'var(--text-primary)', cursor: 'pointer' }}>Close</button>
-          <button onClick={() => { if (onReject) onReject(cr.id); onClose(); }} style={{ padding: '0.55rem 1.1rem', backgroundColor: '#FEF2F2', color: '#DC2626', border: '1px solid #FCA5A5', borderRadius: '8px', fontSize: '0.825rem', fontWeight: 700, cursor: 'pointer' }}>Reject</button>
-          <button onClick={() => { if (onApprove) onApprove(cr.id); onClose(); }} style={{ padding: '0.55rem 1.25rem', backgroundColor: '#0D9488', color: '#FFFFFF', border: 'none', borderRadius: '8px', fontSize: '0.825rem', fontWeight: 700, cursor: 'pointer', boxShadow: '0 1px 3px rgba(13, 148, 136, 0.2)' }}>Approve</button>
+          
+          {(cr.status || '').toLowerCase() === 'draft' ? (
+            <button
+              onClick={() => {
+                if (onSubmitForApproval) onSubmitForApproval(cr.id);
+                onClose();
+              }}
+              style={{
+                padding: '0.55rem 1.25rem',
+                backgroundColor: '#0D9488',
+                color: '#FFFFFF',
+                border: 'none',
+                borderRadius: '8px',
+                fontSize: '0.825rem',
+                fontWeight: 700,
+                cursor: 'pointer',
+                boxShadow: '0 1px 3px rgba(13, 148, 136, 0.2)'
+              }}
+            >
+              Submit for Approval
+            </button>
+          ) : (
+            <>
+              {onReject && (
+                <button onClick={() => { onReject(cr.id); onClose(); }} style={{ padding: '0.55rem 1.1rem', backgroundColor: '#FEF2F2', color: '#DC2626', border: '1px solid #FCA5A5', borderRadius: '8px', fontSize: '0.825rem', fontWeight: 700, cursor: 'pointer' }}>Reject</button>
+              )}
+              {onApprove && (
+                <button onClick={() => { onApprove(cr.id); onClose(); }} style={{ padding: '0.55rem 1.25rem', backgroundColor: '#0D9488', color: '#FFFFFF', border: 'none', borderRadius: '8px', fontSize: '0.825rem', fontWeight: 700, cursor: 'pointer', boxShadow: '0 1px 3px rgba(13, 148, 136, 0.2)' }}>Approve</button>
+              )}
+            </>
+          )}
         </div>
 
       </div>
