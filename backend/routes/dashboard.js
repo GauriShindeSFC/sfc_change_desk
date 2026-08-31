@@ -3,54 +3,34 @@ import {
   getMetrics,
   getCategories,
   getStatusBreakdown,
-  getRecentRequests,
-  getMyRequests,
-  createChangeRequest,
-  getWorklist,
-  handleWorklistAction,
-  getCatalog,
-  getCatalogueManagement,
-  createCatalogItem,
-  getSettingsUsers,
-  createSettingsUser,
-  getSettingsRoles,
-  getSettingsAuditLogs,
-  getReportsMetrics,
-  exportReport
+  getRecentRequests
 } from '../controllers/dashboardController.js';
-import { validateChangeRequest } from '../validations/changeRequestValidation.js';
+import { authenticateUser } from '../middlewares/authMiddleware.js';
+
+import changeRequestsRouter from './changeRequests.js';
+import worklistRouter from './worklist.js';
+import reportsRouter from './reports.js';
+import settingsRouter from './settings.js';
+import catalogueRouter from './catalogue.js';
+import notificationsRouter from './notifications.js';
 
 const router = express.Router();
 
-// Dashboard analytics
+// Apply authentication middleware globally
+router.use(authenticateUser);
+
+// Core Dashboard analytics
 router.get('/metrics', getMetrics);
 router.get('/categories', getCategories);
 router.get('/status-breakdown', getStatusBreakdown);
 router.get('/change-requests/recent', getRecentRequests);
 
-// Change requests
-router.get('/my-requests', getMyRequests);
-router.post('/change-requests', validateChangeRequest, createChangeRequest);
-
-// Change catalog (browse)
-router.get('/catalog', getCatalog);
-
-// CAB worklist / approvals
-router.get('/worklist', getWorklist);
-router.post('/worklist/action', handleWorklistAction);
-
-// Settings & governance
-router.get('/settings/users', getSettingsUsers);
-router.post('/settings/users', createSettingsUser);
-router.get('/settings/roles', getSettingsRoles);
-router.get('/settings/audit-logs', getSettingsAuditLogs);
-
-// Catalogue & workflow management
-router.get('/catalogue-management', getCatalogueManagement);
-router.post('/catalogue-management/item', createCatalogItem);
-
-// Reports
-router.get('/reports/metrics', getReportsMetrics);
-router.post('/reports/export', exportReport);
+// Modular Domain Routers
+router.use('/', changeRequestsRouter);
+router.use('/', worklistRouter);
+router.use('/', reportsRouter);
+router.use('/', settingsRouter);
+router.use('/', catalogueRouter);
+router.use('/', notificationsRouter);
 
 export default router;

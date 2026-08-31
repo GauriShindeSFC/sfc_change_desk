@@ -49,24 +49,6 @@ export const Workflow = sequelize.define(
   { tableName: 'workflows', timestamps: false }
 );
 
-// ---------- Catalog items (browse + admin, one table) ----
-export const CatalogItem = sequelize.define(
-  'CatalogItem',
-  {
-    id: { type: DataTypes.STRING, primaryKey: true },
-    title: { type: DataTypes.STRING, allowNull: false },
-    category: { type: DataTypes.STRING },
-    description: { type: DataTypes.TEXT },
-    sla: { type: DataTypes.STRING },
-    risk: { type: DataTypes.STRING, defaultValue: 'Medium' },
-    iconBg: { type: DataTypes.STRING },
-    iconColor: { type: DataTypes.STRING },
-    status: { type: DataTypes.STRING, defaultValue: 'Active' },
-    workflowId: { type: DataTypes.STRING } // FK -> workflows.id
-  },
-  { tableName: 'catalog_items', timestamps: false }
-);
-
 // ---------- Change requests -----------------------------
 export const ChangeRequest = sequelize.define(
   'ChangeRequest',
@@ -82,8 +64,8 @@ export const ChangeRequest = sequelize.define(
     location: { type: DataTypes.STRING, defaultValue: '' },
     environment: { type: DataTypes.STRING, defaultValue: '' },
     justification: { type: DataTypes.TEXT, defaultValue: '' },
-    startDate: { type: DataTypes.STRING, defaultValue: '' },
-    endDate: { type: DataTypes.STRING, defaultValue: '' },
+    startDate: { type: DataTypes.DATE, allowNull: true },
+    endDate: { type: DataTypes.DATE, allowNull: true },
     risk: { type: DataTypes.STRING, defaultValue: 'Medium' },
     activeStep: { type: DataTypes.INTEGER, defaultValue: 1 },
     status: { type: DataTypes.STRING, defaultValue: 'Pending' },
@@ -92,7 +74,9 @@ export const ChangeRequest = sequelize.define(
     closedAt: { type: DataTypes.DATE, allowNull: true },
     requesterId: { type: DataTypes.STRING }, // FK -> users.id
     approverId: { type: DataTypes.STRING, allowNull: true }, // FK -> users.id
-    workflowId: { type: DataTypes.STRING, allowNull: true } // FK -> workflows.id
+    workflowId: { type: DataTypes.STRING, allowNull: true }, // FK -> workflows.id
+    rejectionReason: { type: DataTypes.TEXT, allowNull: true },
+    customFieldValues: { type: DataTypes.JSONB, defaultValue: {} }
   },
   { tableName: 'change_requests', timestamps: true }
 );
@@ -108,52 +92,18 @@ export const AuditLog = sequelize.define(
     detail: { type: DataTypes.TEXT },
     actorId: { type: DataTypes.STRING, allowNull: true } // FK -> users.id
   },
-  { tableName: 'audit_logs', timestamps: true }
-);
-
-// ---------- Standalone analytics / reporting data ------
-export const CategoryBreakdown = sequelize.define(
-  'CategoryBreakdown',
   {
-    label: { type: DataTypes.STRING, primaryKey: true },
-    count: { type: DataTypes.INTEGER, defaultValue: 0 },
-    max: { type: DataTypes.INTEGER, defaultValue: 40 },
-    color: { type: DataTypes.STRING }
-  },
-  { tableName: 'category_breakdown', timestamps: false }
-);
-
-export const StatusBreakdown = sequelize.define(
-  'StatusBreakdown',
-  {
-    label: { type: DataTypes.STRING, primaryKey: true },
-    count: { type: DataTypes.INTEGER, defaultValue: 0 },
-    color: { type: DataTypes.STRING }
-  },
-  { tableName: 'status_breakdown', timestamps: false }
-);
-
-export const MonthlyVolume = sequelize.define(
-  'MonthlyVolume',
-  {
-    month: { type: DataTypes.STRING, primaryKey: true },
-    count: { type: DataTypes.INTEGER, defaultValue: 0 },
-    barHeight: { type: DataTypes.STRING },
-    sortIndex: { type: DataTypes.INTEGER, defaultValue: 0 }
-  },
-  { tableName: 'monthly_volume', timestamps: false }
-);
-
-export const DepartmentVolume = sequelize.define(
-  'DepartmentVolume',
-  {
-    name: { type: DataTypes.STRING, primaryKey: true },
-    count: { type: DataTypes.INTEGER, defaultValue: 0 },
-    percentage: { type: DataTypes.INTEGER, defaultValue: 0 },
-    color: { type: DataTypes.STRING },
-    sortIndex: { type: DataTypes.INTEGER, defaultValue: 0 }
-  },
-  { tableName: 'department_volume', timestamps: false }
+    tableName: 'audit_logs',
+    timestamps: true,
+    hooks: {
+      beforeUpdate: () => {
+        throw new Error('Audit logs are immutable and cannot be updated.');
+      },
+      beforeDestroy: () => {
+        throw new Error('Audit logs are immutable and cannot be deleted.');
+      }
+    }
+  }
 );
 
 // Key/value singletons: dashboard_stats, worklist_metrics, report_metrics
@@ -166,34 +116,68 @@ export const AppConfig = sequelize.define(
   { tableName: 'app_config', timestamps: false }
 );
 
+// ---------- Notifications -------------------------------
+export const Notification = sequelize.define(
+  'Notification',
+  {
+    id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
+    userId: { type: DataTypes.STRING, allowNull: false }, // FK -> users.id
+    changeRequestId: { type: DataTypes.STRING, allowNull: true }, // FK -> change_requests.id
+    type: { type: DataTypes.STRING, allowNull: false }, // CR_SUBMITTED, CR_APPROVED, CR_REJECTED, CR_SENT_BACK
+    title: { type: DataTypes.STRING, allowNull: false },
+    message: { type: DataTypes.TEXT, allowNull: false },
+    isRead: { type: DataTypes.BOOLEAN, defaultValue: false },
+    isStale: { type: DataTypes.BOOLEAN, defaultValue: false },
+    createdAt: { type: DataTypes.DATE, defaultValue: DataTypes.NOW }
+  },
+  { tableName: 'notifications', timestamps: true }
+);
+
 // ---------- Associations ------------------------------
 Role.hasMany(User, { as: 'users', foreignKey: 'roleId' });
-User.belongsTo(Role, { as: 'role', foreignKey: 'roleId' });
+User.belongsTo(Role, { as: 'role', foreignKey: 'roleId', onDelete: 'SET NULL', onUpdate: 'CASCADE' });
 
 User.hasMany(ChangeRequest, { as: 'requestedChanges', foreignKey: 'requesterId' });
-ChangeRequest.belongsTo(User, { as: 'requester', foreignKey: 'requesterId' });
-ChangeRequest.belongsTo(User, { as: 'approver', foreignKey: 'approverId' });
+ChangeRequest.belongsTo(User, { as: 'requester', foreignKey: 'requesterId', onDelete: 'SET NULL', onUpdate: 'CASCADE' });
+ChangeRequest.belongsTo(User, { as: 'approver', foreignKey: 'approverId', onDelete: 'SET NULL', onUpdate: 'CASCADE' });
 
 Workflow.hasMany(ChangeRequest, { as: 'changeRequests', foreignKey: 'workflowId' });
-ChangeRequest.belongsTo(Workflow, { as: 'workflow', foreignKey: 'workflowId' });
+ChangeRequest.belongsTo(Workflow, { as: 'workflow', foreignKey: 'workflowId', onDelete: 'SET NULL', onUpdate: 'CASCADE' });
 
-Workflow.hasMany(CatalogItem, { as: 'catalogItems', foreignKey: 'workflowId' });
-CatalogItem.belongsTo(Workflow, { as: 'workflow', foreignKey: 'workflowId' });
+User.hasMany(AuditLog, { as: 'actorLogs', foreignKey: 'actorId' });
+AuditLog.belongsTo(User, { as: 'actor', foreignKey: 'actorId', onDelete: 'SET NULL', onUpdate: 'CASCADE' });
 
-User.hasMany(AuditLog, { as: 'auditLogs', foreignKey: 'actorId' });
-AuditLog.belongsTo(User, { as: 'actor', foreignKey: 'actorId' });
+User.hasMany(Notification, { as: 'notifications', foreignKey: 'userId' });
+Notification.belongsTo(User, { as: 'recipient', foreignKey: 'userId', onDelete: 'CASCADE', onUpdate: 'CASCADE' });
+
+import { ChangeRequestApproval } from './ChangeRequestApproval.js';
+import { CatalogCategory } from './CatalogCategory.js';
+import { CatalogSubcategory } from './CatalogSubcategory.js';
+import { CatalogSubcategoryField } from './CatalogSubcategoryField.js';
+
+export { ChangeRequestApproval, CatalogCategory, CatalogSubcategory, CatalogSubcategoryField };
+
+ChangeRequestApproval.belongsTo(ChangeRequest, { foreignKey: 'changeRequestId', onDelete: 'CASCADE', onUpdate: 'CASCADE' });
+ChangeRequestApproval.belongsTo(User, { as: 'approver', foreignKey: 'approverId', onDelete: 'CASCADE', onUpdate: 'CASCADE' });
+ChangeRequest.hasMany(ChangeRequestApproval, { as: 'approvals', foreignKey: 'changeRequestId' });
+
+CatalogCategory.hasMany(CatalogSubcategory, { as: 'subcategories', foreignKey: 'categoryId' });
+CatalogSubcategory.belongsTo(CatalogCategory, { as: 'category', foreignKey: 'categoryId' });
+CatalogSubcategory.hasMany(CatalogSubcategoryField, { as: 'fields', foreignKey: 'subcategoryId' });
+CatalogSubcategoryField.belongsTo(CatalogSubcategory, { as: 'subcategory', foreignKey: 'subcategoryId' });
+CatalogSubcategory.belongsTo(Workflow, { as: 'workflow', foreignKey: 'workflowId' });
 
 export const models = {
   Role,
   User,
   Workflow,
-  CatalogItem,
+  CatalogCategory,
+  CatalogSubcategory,
+  CatalogSubcategoryField,
   ChangeRequest,
+  ChangeRequestApproval,
   AuditLog,
-  CategoryBreakdown,
-  StatusBreakdown,
-  MonthlyVolume,
-  DepartmentVolume,
+  Notification,
   AppConfig
 };
 

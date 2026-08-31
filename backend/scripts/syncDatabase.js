@@ -23,6 +23,18 @@ const run = async () => {
   await sequelize.sync({ force, alter });
   console.log('[db:sync] tables synced');
 
+  try {
+    const [maxRes] = await sequelize.query(`
+      SELECT MAX(CAST(SUBSTRING(id FROM 'CR-([0-9]+)') AS INTEGER)) AS max_num FROM change_requests;
+    `);
+    const maxNum = (maxRes && maxRes[0] && maxRes[0].max_num) ? parseInt(maxRes[0].max_num, 10) : 2054;
+    const startNum = maxNum + 1;
+    await sequelize.query(`CREATE SEQUENCE IF NOT EXISTS change_request_id_seq START WITH ${startNum};`);
+    console.log(`[db:sync] sequence change_request_id_seq ready (start: ${startNum})`);
+  } catch (seqErr) {
+    console.warn('[db:sync] sequence init warning:', seqErr.message);
+  }
+
   const results = await seedDatabase({ force });
   for (const r of results) {
     console.log(

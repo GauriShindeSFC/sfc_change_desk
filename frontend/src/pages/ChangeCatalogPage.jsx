@@ -2,90 +2,60 @@ import React, { useState, useEffect } from 'react';
 import { Plus, X, ArrowRight } from 'lucide-react';
 import { apiFetch } from '../lib/apiFetch';
 
-export default function ChangeCatalogPage({ onNavigate }) {
+export default function ChangeCatalogPage({ onNavigate, searchQuery = '', user }) {
+  const roleName = (user?.role || '').toLowerCase();
+  const roleId = user?.roleId || '';
+  const canManageCatalog =
+    roleName.includes('admin') ||
+    roleName.includes('manager') ||
+    roleName.includes('cab') ||
+    roleName.includes('cam') ||
+    roleName.includes('approver') ||
+    ['role-1', 'role-2', 'role-3'].includes(roleId);
+
   const defaultItems = [
-    {
-      id: 'CAT-01',
-      title: 'Software Deployment',
-      category: 'Software',
-      description: 'Deploy new releases, hotfixes, or config updates to an existing application or service.',
-      sla: '3 business days',
-      risk: 'Medium',
-      riskColor: '#D97706',
-      riskBars: 2,
-      iconBg: '#EBF5FF',
-      iconColor: '#2563EB'
-    },
-    {
-      id: 'CAT-02',
-      title: 'Server Patching',
-      category: 'Infrastructure',
-      description: 'Apply OS-level or security patches to production, staging, or DR servers.',
-      sla: '5 business days',
-      risk: 'High',
-      riskColor: '#DC2626',
-      riskBars: 3,
-      iconBg: '#D1FAE5',
-      iconColor: '#059669'
-    },
-    {
-      id: 'CAT-03',
-      title: 'Network Change',
-      category: 'Network',
-      description: 'Firewall rules, VLAN, routing, or load-balancer configuration changes.',
-      sla: '5 business days',
-      risk: 'Medium',
-      riskColor: '#D97706',
-      riskBars: 2,
-      iconBg: '#F3E8FF',
-      iconColor: '#7C3AED'
-    },
-    {
-      id: 'CAT-04',
-      title: 'Access & Permissions',
-      category: 'Access',
-      description: 'Grant, modify, or revoke system, application, or data access for a user or team.',
-      sla: '1 business day',
-      risk: 'Low',
-      riskColor: '#059669',
-      riskBars: 1,
-      iconBg: '#FEF3C7',
-      iconColor: '#D97706'
-    },
-    {
-      id: 'CAT-05',
-      title: 'Hardware Change',
-      category: 'Infrastructure',
-      description: 'Physical hardware install, replacement, or decommission in a managed data center.',
-      sla: '7 business days',
-      risk: 'Low',
-      riskColor: '#059669',
-      riskBars: 1,
-      iconBg: '#F1F5F9',
-      iconColor: '#475569'
-    },
-    {
-      id: 'CAT-06',
-      title: 'Emergency Change',
-      category: 'Emergency',
-      description: 'Urgent, unplanned change to restore service or prevent imminent outage. Expedited CAB review.',
-      sla: '4 hours',
-      risk: 'High',
-      riskColor: '#DC2626',
-      riskBars: 3,
-      iconBg: '#FEE2E2',
-      iconColor: '#DC2626'
-    }
+    // 1. Server & Infra
+    { id: 'subcat-srv-lc', title: 'Server Lifecycle', category: 'Server & Infra', description: 'Create, modify, migrate, or decommission server instances.', sla: '3 business days', risk: 'Medium', riskColor: '#D97706', riskBars: 2, iconBg: '#EBF5FF', iconColor: '#2563EB' },
+    { id: 'subcat-srv-patch', title: 'OS / Patching', category: 'Server & Infra', description: 'Upgrade operating system version or apply security kernel patches.', sla: '5 business days', risk: 'High', riskColor: '#DC2626', riskBars: 3, iconBg: '#D1FAE5', iconColor: '#059669' },
+    { id: 'subcat-srv-oth', title: 'Other Server Changes', category: 'Server & Infra', description: 'Any other changes related to server infrastructure.', sla: '3 business days', risk: 'Medium', riskColor: '#D97706', riskBars: 2, iconBg: '#EBF5FF', iconColor: '#2563EB' },
+
+    // 2. Network & Connectivity
+    { id: 'subcat-net-fw', title: 'Firewall / Port', category: 'Network & Connectivity', description: 'Open ports, modify rules, or close firewall traffic rules.', sla: '2 business days', risk: 'Medium', riskColor: '#D97706', riskBars: 2, iconBg: '#F3E8FF', iconColor: '#7C3AED' },
+    { id: 'subcat-net-proxy', title: 'Proxy / URL Access', category: 'Network & Connectivity', description: 'Allow or block website URLs and web gateway categories.', sla: '1 business day', risk: 'Low', riskColor: '#059669', riskBars: 1, iconBg: '#FEF3C7', iconColor: '#D97706' },
+    { id: 'subcat-net-vpn', title: 'VPN', category: 'Network & Connectivity', description: 'Request, modify, or revoke SSL user VPN or IPsec tunnel access.', sla: '2 business days', risk: 'Medium', riskColor: '#D97706', riskBars: 2, iconBg: '#F3E8FF', iconColor: '#7C3AED' },
+    { id: 'subcat-net-oth', title: 'Other Network Changes', category: 'Network & Connectivity', description: 'Other network & routing related change requests.', sla: '3 business days', risk: 'Medium', riskColor: '#D97706', riskBars: 2, iconBg: '#F3E8FF', iconColor: '#7C3AED' },
+
+    // 3. Access & Security
+    { id: 'subcat-acc-app', title: 'Application Access', category: 'Access & Security', description: 'Request, modify, or revoke application role access entitlements.', sla: '1 business day', risk: 'Low', riskColor: '#059669', riskBars: 1, iconBg: '#FEF3C7', iconColor: '#D97706' },
+    { id: 'subcat-acc-phys', title: 'Physical Access', category: 'Access & Security', description: 'Request, modify, or revoke facility and server room access.', sla: '1 business day', risk: 'Low', riskColor: '#059669', riskBars: 1, iconBg: '#FEF3C7', iconColor: '#D97706' },
+    { id: 'subcat-acc-oth', title: 'Other Access Requests', category: 'Access & Security', description: 'Other access & security entitlement change requests.', sla: '2 business days', risk: 'Medium', riskColor: '#D97706', riskBars: 2, iconBg: '#FEF3C7', iconColor: '#D97706' },
+
+    // 4. IT Asset
+    { id: 'subcat-asset-dev', title: 'Laptop / Desktop', category: 'IT Asset', description: 'Procure, replace, repair, or dispose laptops & workstations.', sla: '5 business days', risk: 'Low', riskColor: '#059669', riskBars: 1, iconBg: '#F1F5F9', iconColor: '#475569' },
+    { id: 'subcat-asset-hw', title: 'Other IT Hardware', category: 'IT Asset', description: 'Procure, allot, return, repair, or dispose IT hardware accessories.', sla: '5 business days', risk: 'Low', riskColor: '#059669', riskBars: 1, iconBg: '#F1F5F9', iconColor: '#475569' },
+    { id: 'subcat-asset-sw', title: 'Software', category: 'IT Asset', description: 'Install or upgrade licensed desktop & server software applications.', sla: '3 business days', risk: 'Medium', riskColor: '#D97706', riskBars: 2, iconBg: '#EBF5FF', iconColor: '#2563EB' },
+    { id: 'subcat-asset-lic', title: 'License', category: 'IT Asset', description: 'Procure or renew software vendor licenses & subscriptions.', sla: '2 business days', risk: 'Low', riskColor: '#059669', riskBars: 1, iconBg: '#FEF3C7', iconColor: '#D97706' },
+    { id: 'subcat-asset-oth', title: 'Other IT Asset Requests', category: 'IT Asset', description: 'Other IT asset procurement & inventory change requests.', sla: '3 business days', risk: 'Low', riskColor: '#059669', riskBars: 1, iconBg: '#F1F5F9', iconColor: '#475569' },
+
+    // 5. Office 365 & Collaboration
+    { id: 'subcat-o365-mb', title: 'Mailbox', category: 'Office 365 & Collaboration', description: 'Create email ID, add alias, or disable/revoke Exchange mailbox.', sla: '1 business day', risk: 'Low', riskColor: '#059669', riskBars: 1, iconBg: '#FEF3C7', iconColor: '#D97706' },
+    { id: 'subcat-o365-lic', title: 'M365 License', category: 'Office 365 & Collaboration', description: 'Request, upgrade/downgrade, or remove Microsoft 365 licenses.', sla: '1 business day', risk: 'Low', riskColor: '#059669', riskBars: 1, iconBg: '#FEF3C7', iconColor: '#D97706' },
+    { id: 'subcat-o365-oth', title: 'Other Email / M365 Requests', category: 'Office 365 & Collaboration', description: 'Other email, Teams, & Microsoft 365 related change requests.', sla: '2 business days', risk: 'Low', riskColor: '#059669', riskBars: 1, iconBg: '#FEF3C7', iconColor: '#D97706' },
+
+    // 6. Security Tools & Policies
+    { id: 'subcat-sec-ep', title: 'End Point Agent', category: 'Security Tools & Policies', description: 'Remove security agent, modify EDR policy, or request exceptions.', sla: '2 business days', risk: 'High', riskColor: '#DC2626', riskBars: 3, iconBg: '#FEE2E2', iconColor: '#DC2626' },
+    { id: 'subcat-sec-oth', title: 'Other Security Changes', category: 'Security Tools & Policies', description: 'Other security policy, DLP, & SIEM rule change requests.', sla: '3 business days', risk: 'High', riskColor: '#DC2626', riskBars: 3, iconBg: '#FEE2E2', iconColor: '#DC2626' }
   ];
 
   const [items, setItems] = useState(defaultItems);
   const [activeCategory, setActiveCategory] = useState('All items');
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [loadFailed, setLoadFailed] = useState(false);
 
   // New Catalog Item Modal Form State
   const [newItem, setNewItem] = useState({
     title: '',
-    category: 'Software',
+    category: 'Server & Infra',
     sla: '',
     description: '',
     risk: 'Low',
@@ -95,59 +65,121 @@ export default function ChangeCatalogPage({ onNavigate }) {
   useEffect(() => {
     const fetchCatalog = async () => {
       try {
-        const res = await apiFetch('/catalog');
+        const res = await apiFetch('/catalog/categories');
         if (res.ok) {
           const body = await res.json();
           if (body.data && Array.isArray(body.data)) {
-            const enriched = body.data.map((item, idx) => ({
-              ...item,
-              iconBg: item.iconBg || defaultItems[idx % defaultItems.length].iconBg,
-              iconColor: item.iconColor || defaultItems[idx % defaultItems.length].iconColor
-            }));
-            setItems(enriched);
+            const flattened = [];
+            body.data.forEach(cat => {
+              if (cat.subcategories && Array.isArray(cat.subcategories)) {
+                cat.subcategories.forEach(sub => {
+                  const riskColorMap = { Low: '#059669', Medium: '#D97706', High: '#DC2626' };
+                  const riskBarsMap = { Low: 1, Medium: 2, High: 3 };
+                  flattened.push({
+                    id: sub.id,
+                    title: sub.name,
+                    category: cat.name,
+                    description: sub.description || `${sub.name} change request.`,
+                    sla: sub.sla || '3 business days',
+                    risk: sub.risk || 'Medium',
+                    riskColor: riskColorMap[sub.risk] || '#D97706',
+                    riskBars: riskBarsMap[sub.risk] || 2,
+                    iconBg: cat.name.includes('Server') ? '#EBF5FF' : cat.name.includes('Network') ? '#F3E8FF' : cat.name.includes('Security') ? '#FEE2E2' : '#D1FAE5',
+                    iconColor: cat.name.includes('Server') ? '#2563EB' : cat.name.includes('Network') ? '#7C3AED' : cat.name.includes('Security') ? '#DC2626' : '#059669'
+                  });
+                });
+              }
+            });
+            if (flattened.length > 0) {
+              setItems(flattened);
+              setLoadFailed(false);
+            }
+          } else {
+            setLoadFailed(true);
           }
+        } else {
+          setLoadFailed(true);
         }
       } catch (err) {
-        console.warn('Backend API offline, using default catalog items:', err);
+        console.error('Failed to load catalog:', err);
+        setLoadFailed(true);
       }
     };
     fetchCatalog();
   }, []);
 
-  const categories = ['All items', 'Software', 'Infrastructure', 'Network', 'Access', 'Emergency'];
+  const categories = [
+    'All items',
+    'Server & Infra',
+    'Network & Connectivity',
+    'Access & Security',
+    'IT Asset',
+    'Office 365 & Collaboration',
+    'Security Tools & Policies'
+  ];
 
-  const filteredItems = activeCategory === 'All items'
-    ? items
-    : items.filter(item => item.category && item.category.toLowerCase() === activeCategory.toLowerCase());
+  const filteredItems = items.filter(item => {
+    const matchesCat = activeCategory === 'All items' || (item.category && item.category.toLowerCase() === activeCategory.toLowerCase());
+    const q = searchQuery.trim().toLowerCase();
+    const matchesQuery = !q ||
+      (item.title || '').toLowerCase().includes(q) ||
+      (item.category || '').toLowerCase().includes(q) ||
+      (item.description || '').toLowerCase().includes(q);
+    return matchesCat && matchesQuery;
+  });
 
   const handleSaveCatalogItem = async (e) => {
     e.preventDefault();
     if (!newItem.title) return;
 
+    const catMap = {
+      'Server & Infra': 'cat-srv',
+      'Network & Connectivity': 'cat-net',
+      'Access & Security': 'cat-acc',
+      'IT Asset': 'cat-asset',
+      'Office 365 & Collaboration': 'cat-o365',
+      'Security Tools & Policies': 'cat-sec'
+    };
+
+    const categoryId = catMap[newItem.category] || 'cat-srv';
     const riskColorMap = { Low: '#059669', Medium: '#D97706', High: '#DC2626' };
     const riskBarsMap = { Low: 1, Medium: 2, High: 3 };
 
     const createdItem = {
-      id: `CAT-0${items.length + 1}`,
+      id: `subcat-custom-${Date.now()}`,
       title: newItem.title,
       category: newItem.category,
-      description: newItem.description || 'Custom catalog change item.',
+      description: newItem.description || `${newItem.title} change request.`,
       sla: newItem.sla || '3 business days',
       risk: newItem.risk,
       riskColor: riskColorMap[newItem.risk] || '#059669',
       riskBars: riskBarsMap[newItem.risk] || 1,
-      iconBg: '#EBF5FF',
-      iconColor: '#2563EB'
+      iconBg: newItem.category.includes('Server') ? '#EBF5FF' : newItem.category.includes('Network') ? '#F3E8FF' : newItem.category.includes('Security') ? '#FEE2E2' : '#D1FAE5',
+      iconColor: newItem.category.includes('Server') ? '#2563EB' : newItem.category.includes('Network') ? '#7C3AED' : newItem.category.includes('Security') ? '#DC2626' : '#059669'
     };
 
-    setItems(prev => [createdItem, ...prev]);
+    setItems((prev) => [createdItem, ...prev]);
     setIsModalOpen(false);
-    setNewItem({ title: '', category: 'Software', sla: '', description: '', risk: 'Low', workflow: 'Standard Change Workflow' });
+    const saveTitle = newItem.title;
+    const saveSla = newItem.sla;
+    const saveRisk = newItem.risk;
+    const saveWorkflow = newItem.workflow;
+    const saveDesc = newItem.description;
+
+    setNewItem({ title: '', category: 'Server & Infra', sla: '', description: '', risk: 'Low', workflow: 'Standard Change Workflow' });
 
     try {
-      await apiFetch('/catalogue-management/item', {
+      await apiFetch('/catalog/subcategories', {
         method: 'POST',
-        body: JSON.stringify(createdItem)
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          categoryId,
+          name: saveTitle,
+          sla: saveSla || '3 business days',
+          risk: saveRisk,
+          workflow: saveWorkflow,
+          description: saveDesc
+        })
       });
     } catch (err) {
       console.warn('Failed to post catalog item to backend:', err);
@@ -168,28 +200,68 @@ export default function ChangeCatalogPage({ onNavigate }) {
           </p>
         </div>
 
-        <button
-          type="button"
-          onClick={() => setIsModalOpen(true)}
-          style={{
-            padding: '0.55rem 1.1rem',
-            backgroundColor: '#0D9488',
-            color: '#FFFFFF',
-            border: 'none',
-            borderRadius: '8px',
-            fontSize: '0.85rem',
-            fontWeight: 700,
-            cursor: 'pointer',
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: '0.4rem',
-            boxShadow: '0 1px 3px rgba(13, 148, 136, 0.2)'
-          }}
-        >
-          <Plus size={16} />
-          <span>Add Catalog Item</span>
-        </button>
+        {canManageCatalog && (
+          <button
+            type="button"
+            onClick={() => setIsModalOpen(true)}
+            style={{
+              padding: '0.55rem 1.1rem',
+              backgroundColor: '#0D9488',
+              color: '#FFFFFF',
+              border: 'none',
+              borderRadius: '8px',
+              fontSize: '0.85rem',
+              fontWeight: 700,
+              cursor: 'pointer',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '0.4rem',
+              boxShadow: '0 1px 3px rgba(13, 148, 136, 0.2)'
+            }}
+          >
+            <Plus size={16} />
+            <span>Add Catalog Item</span>
+          </button>
+        )}
       </div>
+
+      {/* Load Failure Warning Banner */}
+      {loadFailed && (
+        <div style={{
+          backgroundColor: '#FEF2F2',
+          border: '1px solid #FCA5A5',
+          color: '#991B1B',
+          borderRadius: '10px',
+          padding: '0.85rem 1.15rem',
+          fontSize: '0.85rem',
+          fontWeight: 600,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: '0.75rem'
+        }}>
+          <span>
+            ⚠️ Could not load the latest live catalog from the database. Showing fallback items — values may be outdated.
+          </span>
+          <button
+            type="button"
+            onClick={() => window.location.reload()}
+            style={{
+              backgroundColor: '#DC2626',
+              color: '#FFFFFF',
+              border: 'none',
+              borderRadius: '6px',
+              padding: '0.35rem 0.75rem',
+              fontSize: '0.775rem',
+              fontWeight: 700,
+              cursor: 'pointer',
+              whiteSpace: 'nowrap'
+            }}
+          >
+            Refresh to retry
+          </button>
+        </div>
+      )}
 
       {/* Filter Category Pills */}
       <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
@@ -285,7 +357,7 @@ export default function ChangeCatalogPage({ onNavigate }) {
               {/* Bottom Teal Start Request Link */}
               <button
                 type="button"
-                onClick={() => onNavigate && onNavigate('Change Request')}
+                onClick={() => onNavigate && onNavigate('Change Request', { category: item.category, subCategory: item.title, subcategoryId: item.id })}
                 style={{
                   background: 'none',
                   border: 'none',
@@ -353,10 +425,9 @@ export default function ChangeCatalogPage({ onNavigate }) {
 
             {/* Modal Form Body */}
             <form onSubmit={handleSaveCatalogItem} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', padding: '1.5rem 1.75rem' }}>
-              
-              <div>
+                           <div>
                 <label style={{ display: 'block', fontSize: '0.825rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '0.4rem' }}>
-                  Item name
+                  Item name *
                 </label>
                 <input
                   type="text"
@@ -380,7 +451,7 @@ export default function ChangeCatalogPage({ onNavigate }) {
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                 <div>
                   <label style={{ display: 'block', fontSize: '0.825rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '0.4rem' }}>
-                    Category
+                    Category *
                   </label>
                   <select
                     value={newItem.category}
@@ -396,11 +467,12 @@ export default function ChangeCatalogPage({ onNavigate }) {
                       outline: 'none'
                     }}
                   >
-                    <option value="Software">Software</option>
-                    <option value="Infrastructure">Infrastructure</option>
-                    <option value="Network">Network</option>
-                    <option value="Access">Access</option>
-                    <option value="Emergency">Emergency</option>
+                    <option value="Server & Infra">Server & Infra</option>
+                    <option value="Network & Connectivity">Network & Connectivity</option>
+                    <option value="Access & Security">Access & Security</option>
+                    <option value="IT Asset">IT Asset</option>
+                    <option value="Office 365 & Collaboration">Office 365 & Collaboration</option>
+                    <option value="Security Tools & Policies">Security Tools & Policies</option>
                   </select>
                 </div>
 
@@ -410,7 +482,7 @@ export default function ChangeCatalogPage({ onNavigate }) {
                   </label>
                   <input
                     type="text"
-                    placeholder="e.g. 5 business days"
+                    placeholder="e.g. 3 business days"
                     value={newItem.sla}
                     onChange={(e) => setNewItem(prev => ({ ...prev, sla: e.target.value }))}
                     style={{
@@ -429,10 +501,11 @@ export default function ChangeCatalogPage({ onNavigate }) {
 
               <div>
                 <label style={{ display: 'block', fontSize: '0.825rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '0.4rem' }}>
-                  Description
+                  Description *
                 </label>
                 <textarea
                   rows={3}
+                  required
                   placeholder="What this catalog item covers..."
                   value={newItem.description}
                   onChange={(e) => setNewItem(prev => ({ ...prev, description: e.target.value }))}
@@ -453,7 +526,7 @@ export default function ChangeCatalogPage({ onNavigate }) {
               {/* Risk Level Selector */}
               <div>
                 <label style={{ display: 'block', fontSize: '0.825rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '0.4rem' }}>
-                  Risk level
+                  Risk level *
                 </label>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.75rem' }}>
                   {['Low', 'Medium', 'High'].map(riskLevel => {
@@ -484,7 +557,7 @@ export default function ChangeCatalogPage({ onNavigate }) {
               {/* Approval Workflow Selector */}
               <div>
                 <label style={{ display: 'block', fontSize: '0.825rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '0.4rem' }}>
-                  Approval workflow
+                  Approval workflow *
                 </label>
                 <select
                   value={newItem.workflow}
@@ -503,6 +576,7 @@ export default function ChangeCatalogPage({ onNavigate }) {
                   <option value="Standard Change Workflow">Standard Change Workflow</option>
                   <option value="Expedited Workflow">Expedited Workflow</option>
                   <option value="Lightweight Access Workflow">Lightweight Access Workflow</option>
+                  <option value="Emergency Approval Flow">Emergency Approval Flow</option>
                 </select>
               </div>
 

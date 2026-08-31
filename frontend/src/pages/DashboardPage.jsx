@@ -3,30 +3,10 @@ import { FileText, Clock, CheckCircle2, RotateCw, XCircle } from 'lucide-react';
 import RecentChangeRequests from '../components/ui/RecentChangeRequests';
 import { apiFetch } from '../lib/apiFetch';
 
-export default function DashboardPage({ onNavigate }) {
-  const [metrics, setMetrics] = useState([
-    { title: 'Total Change Requests', value: 128, change: '▲ 12 this month', iconBg: '#EBF5FF', iconColor: '#2563EB', isTotal: true },
-    { title: 'Pending Approval', value: 17, change: 'CAB review pending', iconBg: '#FEF3C7', iconColor: '#D97706', isPending: true },
-    { title: 'Approved', value: 76, change: '▲ 59% of total', iconBg: '#D1FAE5', iconColor: '#059669', isApproved: true },
-    { title: 'In Progress', value: 21, change: 'Scheduled this week: 6', iconBg: '#F3E8FF', iconColor: '#7C3AED', isInProgress: true },
-    { title: 'Rejected', value: 14, change: '▼ 3 this month', iconBg: '#FEE2E2', iconColor: '#DC2626', isRejected: true }
-  ]);
-
-  const [categoryData, setCategoryData] = useState([
-    { category: 'Software Deployment', count: 34, color: '#2563EB', percentage: 70 },
-    { category: 'Server / Patching', count: 28, color: '#0D9488', percentage: 58 },
-    { category: 'Network Change', count: 21, color: '#7C3AED', percentage: 44 },
-    { category: 'Access & Permissions', count: 18, color: '#D97706', percentage: 38 },
-    { category: 'Hardware Change', count: 13, color: '#475569', percentage: 28 },
-    { category: 'Emergency Change', count: 7, color: '#DC2626', percentage: 15 }
-  ]);
-
-  const [statusBreakdown, setStatusBreakdown] = useState([
-    { status: 'Approved', count: 76, color: '#0D9488' },
-    { status: 'Pending', count: 17, color: '#D97706' },
-    { status: 'In progress', count: 21, color: '#7C3AED' },
-    { status: 'Rejected', count: 14, color: '#DC2626' }
-  ]);
+export default function DashboardPage({ onNavigate, user }) {
+  const [metrics, setMetrics] = useState([]);
+  const [categoryData, setCategoryData] = useState([]);
+  const [statusBreakdown, setStatusBreakdown] = useState([]);
 
   useEffect(() => {
     const fetchDashboardData = async () => {
@@ -82,21 +62,33 @@ export default function DashboardPage({ onNavigate }) {
         gridTemplateColumns: 'repeat(5, minmax(0, 1fr))',
         gap: '1rem'
       }}>
-        {metrics.map((m, idx) => (
-          <div
-            key={idx}
-            style={{
-              backgroundColor: 'var(--card-bg)',
-              border: '1px solid var(--border-color)',
-              borderRadius: '12px',
-              padding: '1.1rem 1.15rem',
-              display: 'flex',
-              flexDirection: 'column',
-              justifyContent: 'space-between',
-              boxShadow: '0 1px 3px rgba(16, 21, 30, 0.04)',
-              minHeight: '115px'
-            }}
-          >
+        {metrics.map((m, idx) => {
+          const filterMap = {
+            'Total Change Requests': 'All',
+            'Pending Approval': 'Pending',
+            'Approved': 'Approved',
+            'In Progress': 'In progress',
+            'Rejected': 'Rejected',
+            'Drafts': 'Draft'
+          };
+          const targetFilter = filterMap[m.title] || 'All';
+          return (
+            <div
+              key={idx}
+              onClick={() => onNavigate && onNavigate('My Requests', { filter: targetFilter })}
+              style={{
+                backgroundColor: 'var(--card-bg)',
+                border: '1px solid var(--border-color)',
+                borderRadius: '12px',
+                padding: '1.1rem 1.15rem',
+                display: 'flex',
+                flexDirection: 'column',
+                justifyContent: 'space-between',
+                boxShadow: '0 1px 3px rgba(16, 21, 30, 0.04)',
+                minHeight: '115px',
+                cursor: 'pointer'
+              }}
+            >
             <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
               <span style={{ fontSize: '0.825rem', fontWeight: 700, color: 'var(--text-primary)', lineHeight: 1.25, maxWidth: '100px' }}>
                 {m.title}
@@ -129,7 +121,8 @@ export default function DashboardPage({ onNavigate }) {
               </div>
             </div>
           </div>
-        ))}
+        );
+      })}
       </div>
 
       {/* Middle Row: Tickets by Category & Status Breakdown Side-by-Side */}
@@ -197,48 +190,63 @@ export default function DashboardPage({ onNavigate }) {
         </div>
 
         {/* Card 2: Status Breakdown */}
-        <div style={{
-          backgroundColor: 'var(--card-bg)',
-          border: '1px solid var(--border-color)',
-          borderRadius: '12px',
-          padding: '1.35rem 1.5rem',
-          display: 'flex',
-          flexDirection: 'column',
-          justifyContent: 'space-between',
-          boxShadow: '0 1px 3px rgba(16, 21, 30, 0.04)'
-        }}>
-          <div>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem' }}>
-              <h3 style={{ fontSize: '1.05rem', fontWeight: 800, color: 'var(--text-primary)', margin: 0 }}>
-                Status Breakdown
-              </h3>
-              <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', fontWeight: 600 }}>
-                128 total
-              </span>
-            </div>
-
-            {/* SVG Donut Ring Chart with Center Text */}
-            <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', margin: '0.85rem 0' }}>
-              <div style={{ position: 'relative', width: '150px', height: '150px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <svg width="150" height="150" viewBox="0 0 42 42">
-                  <circle cx="21" cy="21" r="15.91549430918954" fill="transparent" stroke="var(--border-color)" strokeWidth="4.5" />
-
-                  {/* Approved segment (76 / 128 = 59%) */}
-                  <circle cx="21" cy="21" r="15.91549430918954" fill="transparent" stroke="#0D9488" strokeWidth="4.5" strokeDasharray="59.3 40.7" strokeDashoffset="25" />
-                  {/* Pending segment (17 / 128 = 13.3%) */}
-                  <circle cx="21" cy="21" r="15.91549430918954" fill="transparent" stroke="#D97706" strokeWidth="4.5" strokeDasharray="13.3 86.7" strokeDashoffset="65.7" />
-                  {/* In progress segment (21 / 128 = 16.4%) */}
-                  <circle cx="21" cy="21" r="15.91549430918954" fill="transparent" stroke="#7C3AED" strokeWidth="4.5" strokeDasharray="16.4 83.6" strokeDashoffset="52.4" />
-                  {/* Rejected segment (14 / 128 = 11%) */}
-                  <circle cx="21" cy="21" r="15.91549430918954" fill="transparent" stroke="#DC2626" strokeWidth="4.5" strokeDasharray="11 89" strokeDashoffset="36" />
-                </svg>
-
-                <div style={{ position: 'absolute', textAlign: 'center' }}>
-                  <div style={{ fontSize: '1.5rem', fontWeight: 900, color: 'var(--text-primary)', lineHeight: 1 }}>128</div>
-                  <div style={{ fontSize: '0.725rem', color: 'var(--text-primary)', fontWeight: 700 }}>total CRs</div>
+        {(() => {
+          const totalCRs = statusBreakdown.reduce((sum, item) => sum + (item.count || 0), 0);
+          return (
+            <div style={{
+              backgroundColor: 'var(--card-bg)',
+              border: '1px solid var(--border-color)',
+              borderRadius: '12px',
+              padding: '1.35rem 1.5rem',
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'space-between',
+              boxShadow: '0 1px 3px rgba(16, 21, 30, 0.04)'
+            }}>
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem' }}>
+                  <h3 style={{ fontSize: '1.05rem', fontWeight: 800, color: 'var(--text-primary)', margin: 0 }}>
+                    Status Breakdown
+                  </h3>
+                  <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', fontWeight: 600 }}>
+                    {totalCRs} total
+                  </span>
                 </div>
-              </div>
-            </div>
+
+                {/* SVG Donut Ring Chart with Center Text */}
+                <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', margin: '0.85rem 0' }}>
+                  <div style={{ position: 'relative', width: '150px', height: '150px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <svg width="150" height="150" viewBox="0 0 42 42">
+                      <circle cx="21" cy="21" r="15.91549430918954" fill="transparent" stroke="var(--border-color)" strokeWidth="4.5" />
+                      {(() => {
+                        let accumPercent = 0;
+                        return statusBreakdown.map((sb) => {
+                          const pct = totalCRs > 0 ? (sb.count / totalCRs) * 100 : 0;
+                          const offset = 100 - accumPercent + 25;
+                          accumPercent += pct;
+                          return (
+                            <circle
+                              key={sb.status || sb.label}
+                              cx="21"
+                              cy="21"
+                              r="15.91549430918954"
+                              fill="transparent"
+                              stroke={sb.color || '#0D9488'}
+                              strokeWidth="4.5"
+                              strokeDasharray={`${pct} ${100 - pct}`}
+                              strokeDashoffset={offset}
+                            />
+                          );
+                        });
+                      })()}
+                    </svg>
+
+                    <div style={{ position: 'absolute', textAlign: 'center' }}>
+                      <div style={{ fontSize: '1.5rem', fontWeight: 900, color: 'var(--text-primary)', lineHeight: 1 }}>{totalCRs}</div>
+                      <div style={{ fontSize: '0.725rem', color: 'var(--text-primary)', fontWeight: 700 }}>total CRs</div>
+                    </div>
+                  </div>
+                </div>
 
             {/* Status Breakdown Legend List */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem', marginTop: '0.5rem' }}>
@@ -257,11 +265,13 @@ export default function DashboardPage({ onNavigate }) {
             </div>
           </div>
         </div>
+      );
+    })()}
 
       </div>
 
       {/* Bottom Table: Recent Change Requests */}
-      <RecentChangeRequests onNavigate={onNavigate} />
+      <RecentChangeRequests onNavigate={onNavigate} user={user} />
 
     </div>
   );

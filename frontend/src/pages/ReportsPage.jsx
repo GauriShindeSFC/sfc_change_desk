@@ -73,6 +73,29 @@ export default function ReportsPage() {
 
   const [uploadedLogo, setUploadedLogo] = useState(null);
 
+  const handleExportCSV = async () => {
+    try {
+      const res = await apiFetch('/reports/export', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ format: 'csv' })
+      });
+      if (res.ok) {
+        const blob = await res.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'change_requests_report.csv';
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        a.remove();
+      }
+    } catch (err) {
+      console.error('Failed to export CSV:', err);
+    }
+  };
+
   useEffect(() => {
     const fetchReports = async () => {
       try {
@@ -122,7 +145,7 @@ export default function ReportsPage() {
         {/* Export Buttons */}
         <div style={{ display: 'flex', gap: '0.75rem' }}>
           <button
-            onClick={() => alert('Exporting Reports to Excel...')}
+            onClick={handleExportCSV}
             style={{
               padding: '0.55rem 1.1rem',
               backgroundColor: 'var(--card-bg)',
@@ -138,11 +161,11 @@ export default function ReportsPage() {
             }}
           >
             <Download size={15} />
-            <span>Export Excel</span>
+            <span>Export CSV</span>
           </button>
 
           <button
-            onClick={() => alert('Exporting Reports to PDF...')}
+            onClick={handleExportCSV}
             style={{
               padding: '0.55rem 1.1rem',
               backgroundColor: 'var(--card-bg)',
@@ -474,16 +497,22 @@ export default function ReportsPage() {
                     <td style={{ padding: '0.85rem 0.85rem', fontSize: '0.825rem', color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)' }}>
                       {sch.nextRun}
                     </td>
-                    <td style={{ padding: '0.85rem 0.85rem' }}>
+                    <td style={{ padding: '0.85rem 0.85rem', whiteSpace: 'nowrap' }}>
                       <span style={{
-                        padding: '0.2rem 0.55rem',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '0.35rem',
+                        padding: '0.25rem 0.65rem',
                         borderRadius: '99px',
                         fontSize: '0.75rem',
                         fontWeight: 700,
                         backgroundColor: sch.statusBg,
-                        color: sch.statusColor
+                        color: sch.statusColor,
+                        whiteSpace: 'nowrap',
+                        lineHeight: 1
                       }}>
-                        ● {sch.status}
+                        <span style={{ fontSize: '0.55rem', lineHeight: 1 }}>●</span>
+                        <span>{sch.status}</span>
                       </span>
                     </td>
                     <td style={{ padding: '0.85rem 0.85rem', textAlign: 'right' }}>

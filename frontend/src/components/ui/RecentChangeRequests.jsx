@@ -1,87 +1,30 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { ArrowRight } from 'lucide-react';
 import ChangeRequestModal from './ChangeRequestModal';
+import { apiFetch } from '../../lib/apiFetch';
 
-export default function RecentChangeRequests({ onNavigate }) {
+export default function RecentChangeRequests({ onNavigate, user }) {
   const [selectedCr, setSelectedCr] = useState(null);
+  const [changeRequests, setChangeRequests] = useState([]);
 
-  const changeRequests = [
-    {
-      id: 'CR-2049',
-      title: 'Upgrade payment-gateway API to v4',
-      category: 'Software Deployment',
-      requester: 'Aashini Shah',
-      risk: 'Medium',
-      riskColor: '#D97706',
-      riskBars: 2,
-      activeStep: 2,
-      stepName: 'CAB Review',
-      status: 'Pending',
-      statusBg: '#FEF3C7',
-      statusColor: '#D97706',
-      statusDot: '#D97706'
-    },
-    {
-      id: 'CR-2048',
-      title: 'Apply Q3 security patch — prod DB cluster',
-      category: 'Server / Patching',
-      requester: 'Aashini Shah',
-      risk: 'High',
-      riskColor: '#DC2626',
-      riskBars: 3,
-      activeStep: 3,
-      stepName: 'Approved',
-      status: 'Approved',
-      statusBg: '#D1FAE5',
-      statusColor: '#059669',
-      statusDot: '#059669'
-    },
-    {
-      id: 'CR-2044',
-      title: 'Add VLAN for new Ahmedabad office floor',
-      category: 'Network Change',
-      requester: 'Aashini Shah',
-      risk: 'Medium',
-      riskColor: '#D97706',
-      riskBars: 2,
-      activeStep: 3,
-      stepName: 'Approved',
-      status: 'Approved',
-      statusBg: '#D1FAE5',
-      statusColor: '#059669',
-      statusDot: '#059669'
-    },
-    {
-      id: 'CR-2041',
-      title: 'Grant elevated access — Finance reporting tool',
-      category: 'Access & Permissions',
-      requester: 'Aashini Shah',
-      risk: 'Low',
-      riskColor: '#059669',
-      riskBars: 1,
-      activeStep: 6,
-      stepName: 'Closed',
-      status: 'Closed',
-      statusBg: 'var(--input-bg)',
-      statusColor: 'var(--text-secondary)',
-      statusDot: '#94A0B0'
-    },
-    {
-      id: 'CR-2038',
-      title: 'Replace failing switch — Rack B12',
-      category: 'Hardware Change',
-      requester: 'Aashini Shah',
-      risk: 'Low',
-      riskColor: '#059669',
-      riskBars: 1,
-      activeStep: 4,
-      stepName: 'Implemented',
-      status: 'In Progress',
-      statusBg: '#F3E8FF',
-      statusColor: '#7C3AED',
-      statusDot: '#7C3AED'
-    }
-  ];
+  const roleName = (user?.role || '').toLowerCase();
+  const roleId = user?.roleId || '';
+  const isApprover = roleName.includes('cab') || roleName.includes('manager') || roleName.includes('admin') || ['role-1', 'role-2', 'role-3'].includes(roleId);
+
+  useEffect(() => {
+    const fetchRecent = async () => {
+      try {
+        const res = await apiFetch('/change-requests/recent?limit=5');
+        if (res.ok) {
+          const body = await res.json();
+          if (body.data && Array.isArray(body.data)) setChangeRequests(body.data);
+        }
+      } catch (err) {
+        console.warn('Failed to fetch recent change requests:', err);
+      }
+    };
+    fetchRecent();
+  }, []);
 
   const pipelineSteps = ['Draft', 'Submitted', 'CAB Review', 'Approved', 'Scheduled', 'Implemented', 'Closed'];
 
@@ -106,7 +49,7 @@ export default function RecentChangeRequests({ onNavigate }) {
         </h3>
 
         <button
-          onClick={() => onNavigate && onNavigate('My Requests')}
+          onClick={() => onNavigate && onNavigate('Organization worklist')}
           style={{
             display: 'inline-flex',
             alignItems: 'center',
@@ -264,9 +207,9 @@ export default function RecentChangeRequests({ onNavigate }) {
         <ChangeRequestModal
           cr={selectedCr}
           onClose={() => setSelectedCr(null)}
-          onApprove={() => setSelectedCr(null)}
-          onReject={() => setSelectedCr(null)}
-          onSendBack={() => setSelectedCr(null)}
+          onApprove={isApprover ? () => setSelectedCr(null) : null}
+          onReject={isApprover ? () => setSelectedCr(null) : null}
+          onSendBack={isApprover ? () => setSelectedCr(null) : null}
         />
       )}
 

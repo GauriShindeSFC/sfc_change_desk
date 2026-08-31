@@ -2,7 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { Plus, X, Download } from 'lucide-react';
 import { apiFetch } from '../lib/apiFetch';
 
-export default function SettingsPage() {
+export default function SettingsPage({ user }) {
+  const isRequester = user?.roleId === 'role-4' || user?.role === 'Requester';
+
   const defaultUsers = [
     { id: 'usr-1', name: 'Gauri Shinde', email: 'gauri.shinde@stfox.com', empId: 'EMP-10432', dept: 'IT Operations', role: 'Change Manager', status: 'Enabled' },
     { id: 'usr-2', name: 'Aashini Shah', email: 'aashini.shah@stfox.com', empId: 'EMP-10433', dept: 'Development', role: 'Requester', status: 'Enabled' },
@@ -90,6 +92,35 @@ export default function SettingsPage() {
   const [roles, setRoles] = useState(defaultRoles);
   const [auditLogs, setAuditLogs] = useState(defaultAuditLogs);
   const [isInviteModalOpen, setIsInviteModalOpen] = useState(false);
+  const [editingUser, setEditingUser] = useState(null);
+
+  const handleOpenManageUser = (targetUser) => {
+    if (isRequester) return; // Block role-4 Requester from opening Manage User modal
+    setEditingUser({
+      id: targetUser.id,
+      name: targetUser.name || '',
+      empId: targetUser.empId || targetUser.employeeId || 'EMP-10432',
+      dept: targetUser.dept || targetUser.department || 'IT Operations',
+      role: targetUser.role || 'Change Manager',
+      status: targetUser.status || 'Enabled'
+    });
+  };
+
+  const handleSaveManageUser = (e) => {
+    if (e) e.preventDefault();
+    if (!editingUser) return;
+
+    setUsers(prev => prev.map(u => u.id === editingUser.id ? {
+      ...u,
+      name: editingUser.name,
+      empId: editingUser.empId,
+      dept: editingUser.dept,
+      role: editingUser.role,
+      status: editingUser.status
+    } : u));
+
+    setEditingUser(null);
+  };
 
   // Invite User Modal Form State
   const [newUser, setNewUser] = useState({
@@ -140,6 +171,28 @@ export default function SettingsPage() {
       });
     } catch (err) {
       console.warn('Failed to post invited user to backend:', err);
+    }
+  };
+
+  const handleTogglePermission = async (roleId, permission) => {
+    const role = roles.find(r => r.id === roleId);
+    if (!role) return;
+
+    const currentPerms = role.permissions || [];
+    const updatedPerms = currentPerms.includes(permission)
+      ? currentPerms.filter(p => p !== permission)
+      : [...currentPerms, permission];
+
+    setRoles(prev => prev.map(r => r.id === roleId ? { ...r, permissions: updatedPerms } : r));
+
+    try {
+      await apiFetch(`/settings/roles/${roleId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ permissions: updatedPerms })
+      });
+    } catch (err) {
+      console.warn('Failed to update role permissions:', err);
     }
   };
 
@@ -300,7 +353,22 @@ export default function SettingsPage() {
                     </span>
                   </td>
                   <td style={{ padding: '0.75rem 0.85rem', textAlign: 'right' }}>
-                    <button style={{ background: 'none', border: 'none', color: '#0D9488', fontSize: '0.8rem', fontWeight: 600, cursor: 'pointer' }}>Manage user</button>
+                    <button
+                      type="button"
+                      onClick={() => handleOpenManageUser(u)}
+                      disabled={isRequester}
+                      style={{
+                        background: 'none',
+                        border: 'none',
+                        color: isRequester ? 'var(--text-secondary)' : '#0D9488',
+                        fontSize: '0.8rem',
+                        fontWeight: 600,
+                        cursor: isRequester ? 'not-allowed' : 'pointer',
+                        opacity: isRequester ? 0.4 : 1
+                      }}
+                    >
+                      Manage user
+                    </button>
                   </td>
                 </tr>
               ))}
@@ -336,10 +404,26 @@ export default function SettingsPage() {
                 <p style={{ fontSize: '0.825rem', color: 'var(--text-secondary)', lineHeight: 1.45, marginBottom: '1rem' }}>
                   {r.desc}
                 </p>
-              </div>
 
-              <div style={{ paddingTop: '0.75rem', borderTop: '1px solid var(--border-color)', display: 'flex', justifyContent: 'flex-end' }}>
-                <button style={{ background: 'none', border: 'none', color: '#0D9488', fontSize: '0.825rem', fontWeight: 700, cursor: 'pointer' }}>Edit permissions →</button>
+                {/* Interactive Permissions List */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', marginBottom: '1rem' }}>
+                  {['Create Change Requests', 'Approve / Reject Tickets', 'Manage Catalogue & Workflows', 'Manage Users & Roles'].map((perm) => {
+                    const isChecked = (r.permissions || []).includes(perm) || (r.name === 'Admin') || (r.name === 'Change Manager' && perm !== 'Approve / Reject Tickets');
+                    const isDisabled = r.name === 'Admin' || (r.name === 'Requester' && perm === 'Manage Users & Roles');
+                    return (
+                      <label key={perm} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.8rem', color: 'var(--text-primary)', cursor: isDisabled ? 'not-allowed' : 'pointer' }}>
+                        <input
+                          type="checkbox"
+                          checked={isChecked}
+                          disabled={isDisabled}
+                          onChange={() => handleTogglePermission(r.id, perm)}
+                          style={{ accentColor: '#0D9488', cursor: isDisabled ? 'not-allowed' : 'pointer' }}
+                        />
+                        <span style={{ opacity: isDisabled ? 0.6 : 1 }}>{perm}</span>
+                      </label>
+                    );
+                  })}
+                </div>
               </div>
             </div>
           ))}
@@ -630,6 +714,226 @@ export default function SettingsPage() {
 
             </form>
 
+          </div>
+        </div>
+      )}
+      {/* Edit User Modal */}
+      {editingUser && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(15, 23, 42, 0.65)',
+          backdropFilter: 'blur(4px)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1000,
+          padding: '1rem'
+        }}>
+          <div style={{
+            backgroundColor: 'var(--card-bg)',
+            border: '1px solid var(--border-color)',
+            borderRadius: '16px',
+            width: '100%',
+            maxWidth: '540px',
+            padding: '1.75rem 2rem',
+            boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '1.25rem'
+          }}>
+            {/* Header */}
+            <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
+              <div>
+                <h2 style={{ fontSize: '1.35rem', fontWeight: 800, color: 'var(--text-primary)', margin: 0 }}>
+                  Edit User
+                </h2>
+                <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginTop: '0.25rem' }}>
+                  Map this user to a defined role
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setEditingUser(null)}
+                style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', padding: '0.2rem' }}
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveManageUser} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+              {/* Row 1: Full name & Employee ID */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.825rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '0.4rem' }}>
+                    Full name
+                  </label>
+                  <input
+                    type="text"
+                    value={editingUser.name}
+                    onChange={(e) => setEditingUser(prev => ({ ...prev, name: e.target.value }))}
+                    style={{
+                      width: '100%',
+                      padding: '0.65rem 0.85rem',
+                      backgroundColor: 'var(--input-bg)',
+                      border: '1px solid var(--border-color)',
+                      borderRadius: '8px',
+                      fontSize: '0.85rem',
+                      color: 'var(--text-primary)',
+                      outline: 'none'
+                    }}
+                  />
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.825rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '0.4rem' }}>
+                    Employee ID
+                  </label>
+                  <input
+                    type="text"
+                    value={editingUser.empId}
+                    onChange={(e) => setEditingUser(prev => ({ ...prev, empId: e.target.value }))}
+                    style={{
+                      width: '100%',
+                      padding: '0.65rem 0.85rem',
+                      backgroundColor: 'var(--input-bg)',
+                      border: '1px solid var(--border-color)',
+                      borderRadius: '8px',
+                      fontSize: '0.85rem',
+                      color: 'var(--text-primary)',
+                      outline: 'none'
+                    }}
+                  />
+                </div>
+              </div>
+
+              {/* Row 2: Department & Role */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.825rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '0.4rem' }}>
+                    Department
+                  </label>
+                  <input
+                    type="text"
+                    value={editingUser.dept}
+                    onChange={(e) => setEditingUser(prev => ({ ...prev, dept: e.target.value }))}
+                    style={{
+                      width: '100%',
+                      padding: '0.65rem 0.85rem',
+                      backgroundColor: 'var(--input-bg)',
+                      border: '1px solid var(--border-color)',
+                      borderRadius: '8px',
+                      fontSize: '0.85rem',
+                      color: 'var(--text-primary)',
+                      outline: 'none'
+                    }}
+                  />
+                </div>
+                <div>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.4rem' }}>
+                    <label style={{ fontSize: '0.825rem', fontWeight: 700, color: 'var(--text-primary)' }}>Role</label>
+                    <span style={{ fontSize: '0.725rem', color: 'var(--text-secondary)' }}>defined under Roles</span>
+                  </div>
+                  <select
+                    value={editingUser.role}
+                    onChange={(e) => setEditingUser(prev => ({ ...prev, role: e.target.value }))}
+                    style={{
+                      width: '100%',
+                      padding: '0.65rem 0.85rem',
+                      backgroundColor: 'var(--input-bg)',
+                      border: '1px solid var(--border-color)',
+                      borderRadius: '8px',
+                      fontSize: '0.85rem',
+                      color: 'var(--text-primary)',
+                      outline: 'none'
+                    }}
+                  >
+                    <option value="Admin">Admin</option>
+                    <option value="Change Manager">Change Manager</option>
+                    <option value="CAB Approver">CAB Approver</option>
+                    <option value="Requester">Requester</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Status Section */}
+              <div>
+                <label style={{ display: 'block', fontSize: '0.825rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '0.5rem' }}>
+                  Status
+                </label>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                  <button
+                    type="button"
+                    onClick={() => setEditingUser(prev => ({ ...prev, status: 'Enabled' }))}
+                    style={{
+                      padding: '0.65rem',
+                      borderRadius: '8px',
+                      border: editingUser.status === 'Enabled' ? '1.5px solid #059669' : '1px solid var(--border-color)',
+                      backgroundColor: editingUser.status === 'Enabled' ? '#E6F4EA' : 'var(--input-bg)',
+                      color: editingUser.status === 'Enabled' ? '#059669' : 'var(--text-secondary)',
+                      fontWeight: 700,
+                      fontSize: '0.85rem',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    Enabled
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setEditingUser(prev => ({ ...prev, status: 'Disabled' }))}
+                    style={{
+                      padding: '0.65rem',
+                      borderRadius: '8px',
+                      border: editingUser.status === 'Disabled' ? '1.5px solid #DC2626' : '1px solid var(--border-color)',
+                      backgroundColor: editingUser.status === 'Disabled' ? '#FEE2E2' : 'var(--input-bg)',
+                      color: editingUser.status === 'Disabled' ? '#DC2626' : 'var(--text-secondary)',
+                      fontWeight: 700,
+                      fontSize: '0.85rem',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    Disabled
+                  </button>
+                </div>
+              </div>
+
+              {/* Actions Footer */}
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '0.5rem' }}>
+                <button
+                  type="button"
+                  onClick={() => setEditingUser(null)}
+                  style={{
+                    padding: '0.6rem 1.25rem',
+                    backgroundColor: 'var(--input-bg)',
+                    color: 'var(--text-primary)',
+                    border: '1px solid var(--border-color)',
+                    borderRadius: '8px',
+                    fontSize: '0.85rem',
+                    fontWeight: 600,
+                    cursor: 'pointer'
+                  }}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  style={{
+                    padding: '0.6rem 1.25rem',
+                    backgroundColor: '#0D9488',
+                    color: '#FFFFFF',
+                    border: 'none',
+                    borderRadius: '8px',
+                    fontSize: '0.85rem',
+                    fontWeight: 700,
+                    cursor: 'pointer'
+                  }}
+                >
+                  Save user
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

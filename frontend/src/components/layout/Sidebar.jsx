@@ -34,11 +34,20 @@ export default function Sidebar({
   collapsed = false,
   onToggleCollapse,
   mobileOpen = false,
-  onCloseMobile
+  onCloseMobile,
+  myRequestsCount = 6,
+  worklistCount = 4
 }) {
+  const topNavItems = [
+    { id: 'Dashboard', label: 'Dashboard', icon: LayoutGrid },
+    { id: 'Change Catalog', label: 'Change Catalog', icon: Menu },
+    { id: 'Change Request', label: 'Change Request', icon: Plus },
+    { id: 'My Requests', label: 'My Requests', icon: FileText, badge: myRequestsCount },
+    { id: 'Organization worklist', label: 'Organization worklist', icon: CheckCircle2, badge: worklistCount }
+  ];
   // On mobile the rail is always full width; it just slides in/out.
   const mini = collapsed && !isMobile;
-  const width = isMobile ? 250 : mini ? 68 : 230;
+  const width = isMobile ? 250 : mini ? 68 : 250;
 
   const handleSelect = (id) => {
     onItemSelect?.(id);
@@ -64,49 +73,49 @@ export default function Sidebar({
           border: 'none',
           backgroundColor: isActive ? '#1E293B' : 'transparent',
           color: isActive ? '#FFFFFF' : '#94A3B8',
-          fontSize: '0.85rem',
           fontWeight: isActive ? 700 : 500,
+          fontSize: '0.85rem',
           cursor: 'pointer',
-          textAlign: 'left',
+          transition: 'background-color 0.15s ease, color 0.15s ease',
           position: 'relative'
         }}
       >
-        <Icon
-          size={17}
-          color={isActive ? '#0D9488' : '#64748B'}
-          strokeWidth={isActive ? 2.5 : 2}
-          style={{ flexShrink: 0 }}
-        />
-        {!mini && <span style={{ flex: 1 }}>{item.label}</span>}
-        {item.badge != null &&
-          (mini ? (
-            <span
-              style={{
-                position: 'absolute',
-                top: '7px',
-                right: '9px',
-                width: '6px',
-                height: '6px',
-                borderRadius: '50%',
-                backgroundColor: '#0D9488'
-              }}
-            />
-          ) : (
-            <span
-              style={{
-                backgroundColor: '#1E293B',
-                color: '#94A3B8',
-                borderRadius: '99px',
-                padding: '0.1rem 0.5rem',
-                fontSize: '0.725rem',
-                fontWeight: 700
-              }}
-            >
-              {item.badge}
-            </span>
-          ))}
+        <Icon size={18} style={{ color: isActive ? '#0D9488' : '#64748B', flexShrink: 0 }} />
+        {!mini && (
+          <span style={{ flex: 1, textAlign: 'left', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {item.label}
+          </span>
+        )}
+        {!mini && !isActive && Boolean(item.badge) && item.badge > 0 && (
+          <span
+            style={{
+              padding: '0.1rem 0.45rem',
+              borderRadius: '99px',
+              fontSize: '0.7rem',
+              fontWeight: 700,
+              backgroundColor: '#0D9488',
+              color: '#FFFFFF'
+            }}
+          >
+            {item.badge}
+          </span>
+        )}
       </button>
     );
+  };
+
+  const iconBtnStyle = {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: '28px',
+    height: '28px',
+    borderRadius: '6px',
+    backgroundColor: '#1E293B',
+    border: '1px solid #334155',
+    color: '#94A3B8',
+    cursor: 'pointer',
+    flexShrink: 0
   };
 
   const aside = (
@@ -119,10 +128,10 @@ export default function Sidebar({
         flexDirection: 'column',
         minHeight: '100vh',
         height: '100vh',
-        position: isMobile ? 'fixed' : 'sticky',
+        position: 'fixed',
         top: 0,
         left: 0,
-        zIndex: isMobile ? 120 : 1,
+        zIndex: isMobile ? 120 : 100,
         transform: isMobile ? `translateX(${mobileOpen ? '0' : '-110%'})` : 'none',
         transition: 'transform 0.22s ease, width 0.16s ease',
         overflowX: 'hidden',
@@ -138,12 +147,12 @@ export default function Sidebar({
         style={{
           display: 'flex',
           alignItems: 'center',
-          gap: '0.6rem',
-          padding: mini ? '0.25rem 0 1.5rem 0' : '0.25rem 0.25rem 1.5rem 0.5rem',
+          gap: '0.5rem',
+          padding: mini ? '0.25rem 0 1.5rem 0' : '0.25rem 0.2rem 1.5rem 0.4rem',
           justifyContent: mini ? 'center' : 'space-between'
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', minWidth: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flex: 1, minWidth: 0 }}>
           <img
             src="/images/white-favicon.png"
             alt="Logo"
@@ -154,25 +163,29 @@ export default function Sidebar({
             style={{ width: '32px', height: '32px', objectFit: 'contain', display: 'block', flexShrink: 0 }}
           />
           {!mini && (
-            <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minWidth: 0 }}>
               <span
                 style={{
-                  fontSize: '1.1rem',
+                  fontSize: '1.05rem',
                   fontWeight: 800,
                   color: '#FFFFFF',
                   lineHeight: 1.15,
-                  letterSpacing: '-0.01em'
+                  letterSpacing: '-0.01em',
+                  whiteSpace: 'nowrap',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis'
                 }}
               >
                 ChangeDesk
               </span>
               <span
                 style={{
-                  fontSize: '0.62rem',
+                  fontSize: '0.6rem',
                   fontWeight: 700,
                   color: '#64748B',
                   letterSpacing: '0.08em',
-                  marginTop: '0.15rem'
+                  marginTop: '0.15rem',
+                  whiteSpace: 'nowrap'
                 }}
               >
                 IT CHANGE MGMT
@@ -219,7 +232,7 @@ export default function Sidebar({
 
       {/* Main nav */}
       <nav style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
-        {TOP_NAV.map((item) => (
+        {topNavItems.map((item) => (
           <NavButton key={item.id} item={item} />
         ))}
       </nav>

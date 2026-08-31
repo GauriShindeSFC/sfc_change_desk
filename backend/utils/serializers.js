@@ -21,6 +21,7 @@ export const serializeChangeRequest = (row) => {
     workflow: workflow?.name ?? null,
     raisedDate: submittedAt ? formatDate(new Date(submittedAt)) : '',
     closedDate: closedAt ? formatDate(new Date(closedAt)) : 'Open',
+    rejectionReason: cr.rejectionReason || null,
     ...riskStyle(cr.risk),
     ...statusStyle(cr.status)
   };
@@ -34,45 +35,32 @@ export const serializeWorklistEntry = (row) => {
     id: cr.id,
     title: cr.title,
     category: cr.category,
-    requester: cr.requester?.name ?? null,
+    subCategory: cr.subCategory,
+    status: cr.status || 'Pending',
+    isDraft: cr.isDraft || false,
+    justification: cr.justification,
+    hostname: cr.hostname,
+    location: cr.location,
+    environment: cr.environment,
+    department: cr.department,
+    contactNumber: cr.contactNumber,
+    managerEmail: cr.managerEmail,
+    employeeEmail: cr.customFieldValues?.employeeEmail || cr.requester?.email || 'priya.nair@sfc.com',
+    raisedDate: cr.submittedAt ? formatDate(new Date(cr.submittedAt)) : '',
+    closedDate: cr.closedAt ? formatDate(new Date(cr.closedAt)) : 'Open',
+    startDate: cr.startDate ? formatDate(new Date(cr.startDate)) : '',
+    endDate: cr.endDate ? formatDate(new Date(cr.endDate)) : '',
+    customFieldValues: cr.customFieldValues || {},
+    rejectionReason: cr.rejectionReason || null,
+    requester: cr.requester?.name || 'Gauri Shinde',
     submittedTime: `submitted ${relativeTime(cr.submittedAt)}`,
     risk: cr.risk,
-    ...riskStyle(cr.risk)
+    ...riskStyle(cr.risk),
+    ...statusStyle(cr.status)
   };
 };
 
 // ---------- Catalog ---------------------------------------
-// GET /catalog  – browse view
-export const serializeCatalogItem = (row) => {
-  const c = plain(row);
-  return {
-    id: c.id,
-    title: c.title,
-    category: c.category,
-    description: c.description,
-    sla: c.sla,
-    risk: c.risk,
-    ...riskStyle(c.risk),
-    iconBg: c.iconBg || '#EBF5FF',
-    iconColor: c.iconColor || '#2563EB'
-  };
-};
-
-// GET /catalogue-management  – admin view. Needs include: workflow
-export const serializeCatalogueTemplate = (row) => {
-  const c = plain(row);
-  return {
-    id: c.id,
-    title: c.title,
-    category: c.category,
-    sla: c.sla,
-    risk: c.risk,
-    ...riskStyle(c.risk),
-    workflow: c.workflow?.name ?? null,
-    status: c.status,
-    description: c.description
-  };
-};
 
 // A workflow with its derived "used by" list. Needs include: catalogItems
 export const serializeWorkflow = (row) => {

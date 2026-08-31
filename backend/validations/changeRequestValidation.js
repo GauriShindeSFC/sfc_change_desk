@@ -9,7 +9,7 @@ export const validateChangeRequest = (req, res, next) => {
   if (!isDraft) {
     const missing = [];
     if (!title || !String(title).trim()) missing.push('title');
-    if (!category || !String(category).trim()) missing.push('category');
+    if ((!category || !String(category).trim()) && !body.subcategoryId) missing.push('category');
 
     if (missing.length > 0) {
       return res.status(400).json({
