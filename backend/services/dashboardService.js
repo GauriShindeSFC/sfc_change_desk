@@ -16,12 +16,14 @@ import {
   ChangeRequestApproval,
   AuditLog,
   Notification,
-  AppConfig
+  AppConfig,
+  ScheduledReport
 } from '../models/index.js';
 import bcrypt from 'bcryptjs';
 import { formatTimestamp } from '../data/store.js';
 import { generateTempPassword } from './authService.js';
 import { sendChangeRequestCreatedEmail, sendUserInviteEmail } from './mailService.js';
+import { computeInitialNextRunAt } from './schedulerService.js';
 import {
   serializeChangeRequest,
   serializeWorklistEntry,
@@ -34,8 +36,8 @@ import {
 
 // Includes reused across change-request queries.
 const CR_INCLUDE = [
-  { model: User, as: 'requester', attributes: ['id', 'name'] },
-  { model: User, as: 'approver', attributes: ['id', 'name'] },
+  { model: User, as: 'requester', attributes: ['id', 'name', 'email'] },
+  { model: User, as: 'approver', attributes: ['id', 'name', 'email'] },
   { model: Workflow, as: 'workflow', attributes: ['id', 'name'] },
   { model: ChangeRequestApproval, as: 'approvals' }
 ];
@@ -94,29 +96,50 @@ export const getMetricsService = async () => {
 
 export const getCategoryMetricsService = async () => {
   const total = await ChangeRequest.count();
-  const defaultCategories = [
-    { category: 'Software Deployment', color: '#2563EB' },
-    { category: 'Server / Patching', color: '#0D9488' },
-    { category: 'Network Change', color: '#7C3AED' },
-    { category: 'Access & Permissions', color: '#D97706' },
-    { category: 'Hardware Change', color: '#475569' },
-    { category: 'Emergency Change', color: '#DC2626' }
-  ];
+  const palette = ['#2563EB', '#0D9488', '#7C3AED', '#D97706', '#475569', '#DC2626', '#E11D48', '#0284C7'];
+
+  // Fetch real categories from CatalogCategory table
+  const dbCategories = await CatalogCategory.findAll({
+    order: [['sortOrder', 'ASC']]
+  });
+
+  let categoryList = [];
+  if (dbCategories && dbCategories.length > 0) {
+    categoryList = dbCategories.map(c => c.name);
+  } else {
+    // Fallback: Query distinct category names from change_requests table
+    const distinctRows = await ChangeRequest.findAll({
+      attributes: [[sequelize.fn('DISTINCT', sequelize.col('category')), 'category']],
+      where: { category: { [Op.ne]: '' } }
+    });
+    categoryList = distinctRows.map(r => r.category).filter(Boolean);
+  }
 
   const results = [];
-  for (const cat of defaultCategories) {
+  for (let i = 0; i < categoryList.length; i++) {
+    const catName = categoryList[i];
     const count = await ChangeRequest.count({
-      where: { category: { [Op.iLike]: `%${cat.category.split(' ')[0]}%` } }
+      where: {
+        [Op.or]: [
+          { category: catName },
+          { category: { [Op.iLike]: `%${catName.split(' ')[0]}%` } }
+        ]
+      }
     });
+
     const percentage = total > 0 ? Math.round((count / total) * 100) : 0;
+    const color = palette[i % palette.length];
+
     results.push({
-      category: cat.category,
-      label: cat.category,
+      category: catName,
+      label: catName,
+      name: catName,
       count,
-      color: cat.color,
-      percentage: Math.max(percentage, count > 0 ? 10 : 0)
+      color,
+      percentage: Math.max(percentage, count > 0 ? 8 : 0)
     });
   }
+
   return results;
 };
 
@@ -150,17 +173,31 @@ export const getChangeRequestsService = async () => {
   return rows.map(serializeChangeRequest);
 };
 
-export const filterChangeRequestsByCategoryService = async (category, requesterId) => {
+export const filterChangeRequestsByCategoryService = async (category, requesterId, page = 1, limit = 10) => {
+  const p = Math.max(1, parseInt(page, 10) || 1);
+  const l = Math.max(1, parseInt(limit, 10) || 10);
+  const offset = (p - 1) * l;
+
   const where = {
     ...(requesterId ? { requesterId } : {}),
     ...(category && category.toLowerCase() !== 'all' ? { category: { [Op.iLike]: `%${category}%` } } : {})
   };
-  const rows = await ChangeRequest.findAll({
+
+  const { count: total, rows } = await ChangeRequest.findAndCountAll({
     where,
     include: CR_INCLUDE,
-    order: [['id', 'DESC'], ['submittedAt', 'DESC'], ['createdAt', 'DESC']]
+    order: [['id', 'DESC'], ['submittedAt', 'DESC'], ['createdAt', 'DESC']],
+    limit: l,
+    offset
   });
-  return rows.map(serializeChangeRequest);
+
+  return {
+    data: rows.map(serializeChangeRequest),
+    total,
+    page: p,
+    limit: l,
+    totalPages: Math.max(1, Math.ceil(total / l))
+  };
 };
 
 const nextChangeRequestId = async (tx) => {
@@ -256,6 +293,13 @@ export const updateDraftChangeRequestService = async (id, actorId, payload = {})
   if (workflowId) cr.workflowId = workflowId;
 
   await cr.save();
+
+  await addAuditLog({
+    actorId,
+    action: 'CR Draft Updated',
+    ref: id,
+    detail: `Updated draft ${id}.`
+  });
 
   const updated = await ChangeRequest.findByPk(id, { include: CR_INCLUDE });
   return serializeChangeRequest(updated);
@@ -380,12 +424,20 @@ export const createChangeRequestService = async (payload = {}) => {
     }
   }
 
+  const requesterUser = requesterId ? await User.findByPk(requesterId) : null;
+  const requesterEmail = requesterUser?.email || payload.customFieldValues?.employeeEmail || payload.employeeEmail || '';
+
+  const mergedCustomFields = {
+    ...(payload.customFieldValues || {}),
+    employeeEmail: payload.customFieldValues?.employeeEmail || requesterEmail
+  };
+
   const createdCR = await ChangeRequest.create({
     id,
     title: payload.title || 'Untitled change request',
     category: categoryName,
     subCategory: subCategoryName,
-    department: payload.department || '',
+    department: payload.department || requesterUser?.department || '',
     contactNumber: payload.contactNumber || '',
     managerEmail: payload.managerEmail || '',
     hostname: payload.hostname || '',
@@ -403,7 +455,7 @@ export const createChangeRequestService = async (payload = {}) => {
     requesterId,
     approverId: null,
     workflowId: workflowId || 'wf-1',
-    customFieldValues: payload.customFieldValues || {}
+    customFieldValues: mergedCustomFields
   });
 
   if (!isDraft) {
@@ -452,10 +504,16 @@ export const createChangeRequestService = async (payload = {}) => {
 
 // ---------- CAB worklist ------------------------------
 
-export const getWorklistService = async (actingUserId = 'usr-1') => {
-  const allCRs = await ChangeRequest.findAll({
+export const getWorklistService = async (actingUserId = 'usr-1', page = 1, limit = 10) => {
+  const p = Math.max(1, parseInt(page, 10) || 1);
+  const l = Math.max(1, parseInt(limit, 10) || 10);
+  const offset = (p - 1) * l;
+
+  const { count: total, rows: allCRs } = await ChangeRequest.findAndCountAll({
     include: CR_INCLUDE,
-    order: [['id', 'DESC'], ['submittedAt', 'DESC'], ['createdAt', 'DESC']]
+    order: [['id', 'DESC'], ['submittedAt', 'DESC'], ['createdAt', 'DESC']],
+    limit: l,
+    offset
   });
 
   const userApprovals = await ChangeRequestApproval.findAll({
@@ -488,10 +546,10 @@ export const getWorklistService = async (actingUserId = 'usr-1') => {
     };
   });
 
-  const pendingCount = allCRs.filter((cr) => (cr.status || 'Pending').toLowerCase() === 'pending').length;
-  const approvedCount = allCRs.filter((cr) => (cr.status || '').toLowerCase() === 'approved').length;
-  const rejectedCount = allCRs.filter((cr) => (cr.status || '').toLowerCase() === 'rejected').length;
-  const sentBackCount = allCRs.filter((cr) => (cr.status || '').toLowerCase() === 'draft' || cr.isDraft).length;
+  const pendingCount = await ChangeRequest.count({ where: { status: 'Pending' } });
+  const approvedCount = await ChangeRequest.count({ where: { status: 'Approved' } });
+  const rejectedCount = await ChangeRequest.count({ where: { status: 'Rejected' } });
+  const sentBackCount = await ChangeRequest.count({ where: { [Op.or]: [{ status: 'Draft' }, { isDraft: true }] } });
 
   const dynamicMetrics = {
     pending: pendingCount,
@@ -500,10 +558,23 @@ export const getWorklistService = async (actingUserId = 'usr-1') => {
     sentBack: sentBackCount
   };
 
-  return { data, metrics: dynamicMetrics };
+  return {
+    data,
+    total,
+    page: p,
+    limit: l,
+    totalPages: Math.max(1, Math.ceil(total / l)),
+    metrics: dynamicMetrics
+  };
 };
 
 export const applyWorklistActionService = async ({ id, action, rejectionReason = '', actorId = 'usr-1' } = {}) => {
+  const targetCR = await ChangeRequest.findByPk(id);
+  if (targetCR && actorId && targetCR.requesterId && String(targetCR.requesterId) === String(actorId)) {
+    const err = new Error(`Self-approval prohibited: You cannot ${action} your own Change Request (${id}).`);
+    err.statusCode = 403;
+    throw err;
+  }
   if (action === 'sendback') {
     await sequelize.transaction(async (tx) => {
       const cr = await ChangeRequest.findByPk(id, { transaction: tx });
@@ -829,8 +900,9 @@ export const updateRolePermissionsService = async (roleId, permissions = []) => 
 };
 
 const AUDIT_FILTERS = {
-  'change requests': (log) => /Created|Draft/i.test(log.action),
-  approvals: (log) => /Approved|Rejected|Sent Back/i.test(log.action),
+  'change requests': (log) => /Created|Draft|Submitted|Sent Back/i.test(log.action),
+  approvals: (log) => /Approved/i.test(log.action),
+  rejected: (log) => /Rejected/i.test(log.action),
   'catalog & workflow': (log) => /Catalog|Workflow/i.test(log.action),
   'user & role changes': (log) => /User|Permission|Role/i.test(log.action)
 };
@@ -1006,22 +1078,70 @@ export const createWorklistActionNotifications = async (changeRequest, action, a
 
 export const getUserNotificationsService = async (userId = 'usr-1') => {
   const rows = await Notification.findAll({
-    where: { userId },
+    where: { userId, isRead: false },
     order: [['createdAt', 'DESC']],
     limit: 25
   });
 
-  const unreadCount = await Notification.count({ where: { userId, isRead: false } });
+  const unreadCount = rows.length;
 
   return { data: rows.map((n) => n.get({ plain: true })), unreadCount };
 };
 
 export const markNotificationAsReadService = async (id, userId = 'usr-1') => {
-  await Notification.update({ isRead: true }, { where: { id, userId } });
+  await Notification.update({ isRead: true, isStale: true }, { where: { id, userId } });
   return getUserNotificationsService(userId);
 };
 
 export const markAllNotificationsAsReadService = async (userId = 'usr-1') => {
-  await Notification.update({ isRead: true }, { where: { userId, isRead: false } });
+  await Notification.update({ isRead: true, isStale: true }, { where: { userId, isRead: false } });
   return getUserNotificationsService(userId);
+};
+
+export const getScheduledReportsService = async () => {
+  const rows = await ScheduledReport.findAll({
+    order: [['createdAt', 'DESC']]
+  });
+  return rows.map(r => r.get({ plain: true }));
+};
+
+export const createScheduledReportService = async (payload, userId = 'usr-1') => {
+  const {
+    reportType,
+    categoryId,
+    subcategoryId,
+    dateRangeMode = 'rolling',
+    frequency,
+    customFromDate,
+    customToDate,
+    recipients,
+    format = 'pdf'
+  } = payload;
+
+  const initialNextRunAt = computeInitialNextRunAt(frequency, customToDate);
+
+  const report = await ScheduledReport.create({
+    reportType,
+    categoryId: categoryId || null,
+    subcategoryId: subcategoryId || null,
+    dateRangeMode,
+    frequency,
+    customFromDate: customFromDate ? new Date(customFromDate) : null,
+    customToDate: customToDate ? new Date(customToDate) : null,
+    recipients: recipients ? String(recipients).trim() : '',
+    format,
+    nextRunAt: initialNextRunAt,
+    createdBy: userId,
+    isActive: true
+  });
+
+  return report.get({ plain: true });
+};
+
+export const deleteScheduledReportService = async (id) => {
+  const report = await ScheduledReport.findByPk(id);
+  if (report) {
+    await report.destroy();
+  }
+  return true;
 };

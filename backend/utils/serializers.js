@@ -52,14 +52,14 @@ export const serializeWorklistEntry = (row) => {
     department: cr.department,
     contactNumber: cr.contactNumber,
     managerEmail: cr.managerEmail,
-    employeeEmail: cr.customFieldValues?.employeeEmail || cr.requester?.email || 'priya.nair@sfc.com',
+    employeeEmail: cr.customFieldValues?.employeeEmail || cr.requester?.email || cr.employeeEmail || '',
     raisedDate: cr.submittedAt ? formatDate(new Date(cr.submittedAt)) : '',
     closedDate: cr.closedAt ? formatDate(new Date(cr.closedAt)) : 'Open',
     startDate: cr.startDate ? formatDate(new Date(cr.startDate)) : '',
     endDate: cr.endDate ? formatDate(new Date(cr.endDate)) : '',
     customFieldValues: cr.customFieldValues || {},
     rejectionReason: rationale,
-    requester: cr.requester?.name || 'Gauri Shinde',
+    requester: cr.requester?.name || cr.employeeName || 'Requester',
     submittedTime: `submitted ${relativeTime(cr.submittedAt)}`,
     risk: cr.risk,
     ...riskStyle(cr.risk),
@@ -110,6 +110,17 @@ export const serializeRole = (row) => {
 // Needs include: actor
 export const serializeAuditLog = (row) => {
   const l = plain(row);
+  const act = l.action || '';
+  let category = 'User & role changes';
+  if (/Rejected/i.test(act)) {
+    category = 'Rejected';
+  } else if (/Approved/i.test(act)) {
+    category = 'Approvals';
+  } else if (/CR|Created|Draft|Submitted/i.test(act)) {
+    category = 'Change requests';
+  } else if (/Catalog|Subcategory|Workflow/i.test(act)) {
+    category = 'Catalog & workflow';
+  }
   return {
     id: l.id,
     timestamp: l.timestamp ? String(l.timestamp) : formatDate(new Date(l.createdAt || Date.now())),
@@ -117,7 +128,7 @@ export const serializeAuditLog = (row) => {
     action: l.action,
     reference: l.ref || '—',
     employeeEmail: l.actor?.email || 'gauri.shinde@stfox.com',
-    category: /CR|Created|Draft|Submitted/i.test(l.action) ? 'Change requests' : /Approved|Rejected|Sent Back/i.test(l.action) ? 'Approvals' : /Catalog|Subcategory|Workflow/i.test(l.action) ? 'Catalog & workflow' : 'User & role changes'
+    category
   };
 };
 

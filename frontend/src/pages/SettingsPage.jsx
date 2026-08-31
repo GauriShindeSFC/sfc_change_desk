@@ -3,7 +3,8 @@ import { Plus, X, Download } from 'lucide-react';
 import { apiFetch } from '../lib/apiFetch';
 
 export default function SettingsPage({ user }) {
-  const isRequester = user?.roleId === 'role-4' || user?.role === 'Requester';
+  const isSuperAdmin = user?.roleId === 'role-1' || (user?.role || '').toLowerCase() === 'super admin';
+  const isRequester = !isSuperAdmin && (user?.roleId === 'role-4' || user?.role === 'Requester');
 
   const defaultUsers = [
     { id: 'usr-1', name: 'Gauri Shinde', email: 'gauri.shinde@stfox.com', empId: 'EMP-10432', dept: 'IT Operations', role: 'Change Manager', status: 'Enabled' },
@@ -48,7 +49,7 @@ export default function SettingsPage({ user }) {
       action: 'Rejected change request',
       reference: 'CR-2035',
       details: 'Emergency rollback — checkout service v2.3',
-      category: 'Approvals'
+      category: 'Rejected'
     },
     {
       id: 'log-5',
@@ -79,7 +80,26 @@ export default function SettingsPage({ user }) {
     }
   ];
 
-  const [activeTab, setActiveTab] = useState('audit');
+  const [activeTab, setActiveTab] = useState(() => {
+    const hash = (window.location.hash || '').replace('#', '').toLowerCase();
+    return ['users', 'audit'].includes(hash) ? hash : 'audit';
+  });
+
+  useEffect(() => {
+    const handleHashChange = () => {
+      const hash = (window.location.hash || '').replace('#', '').toLowerCase();
+      if (['users', 'audit'].includes(hash)) {
+        setActiveTab(hash);
+      }
+    };
+    window.addEventListener('hashchange', handleHashChange);
+    return () => window.removeEventListener('hashchange', handleHashChange);
+  }, []);
+
+  const handleTabChange = (tabId) => {
+    setActiveTab(tabId);
+    window.location.hash = tabId;
+  };
   const [auditFilter, setAuditFilter] = useState('All activity');
   const [users, setUsers] = useState(defaultUsers);
   const [auditLogs, setAuditLogs] = useState(defaultAuditLogs);
@@ -124,28 +144,35 @@ export default function SettingsPage({ user }) {
   });
 
   useEffect(() => {
-    const fetchSettingsData = async () => {
+    const fetchUsers = async () => {
       try {
-        const [usersRes, auditRes] = await Promise.all([
-          apiFetch('/settings/users'),
-          apiFetch('/settings/audit-logs')
-        ]);
-
+        const usersRes = await apiFetch('/settings/users');
         if (usersRes.ok) {
           const body = await usersRes.json();
           if (body.data && Array.isArray(body.data)) setUsers(body.data);
         }
+      } catch (err) {
+        console.warn('Failed to load users from API:', err);
+      }
+    };
+    fetchUsers();
+  }, []);
 
+  useEffect(() => {
+    const fetchAuditLogs = async () => {
+      try {
+        const queryParam = auditFilter && auditFilter !== 'All activity' ? `?filter=${encodeURIComponent(auditFilter)}` : '';
+        const auditRes = await apiFetch(`/settings/audit-logs${queryParam}`);
         if (auditRes.ok) {
           const body = await auditRes.json();
           if (body.data && Array.isArray(body.data)) setAuditLogs(body.data);
         }
       } catch (err) {
-        console.warn('Backend API offline, using default settings data:', err);
+        console.warn('Failed to fetch audit logs:', err);
       }
     };
-    fetchSettingsData();
-  }, []);
+    fetchAuditLogs();
+  }, [auditFilter]);
 
   const handleSaveInviteUser = async (e) => {
     e.preventDefault();
@@ -175,7 +202,53 @@ export default function SettingsPage({ user }) {
     }
   };
 
-  const auditFilters = ['All activity', 'Change requests', 'Approvals', 'Catalog & workflow', 'User & role changes'];
+  const handleExportAuditExcel = async () => {
+    try {
+      const res = await apiFetch('/settings/audit-logs/export', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ format: 'excel', filter: auditFilter })
+      });
+      if (res.ok) {
+        const blob = await res.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `audit_logs_${auditFilter.toLowerCase().replace(/\s+/g, '_')}.csv`;
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        a.remove();
+      }
+    } catch (err) {
+      console.error('Failed to export audit logs to Excel:', err);
+    }
+  };
+
+  const handleExportAuditPDF = async () => {
+    try {
+      const res = await apiFetch('/settings/audit-logs/export', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ format: 'pdf', filter: auditFilter })
+      });
+      if (res.ok) {
+        const blob = await res.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `audit_logs_${auditFilter.toLowerCase().replace(/\s+/g, '_')}.pdf`;
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        a.remove();
+      }
+    } catch (err) {
+      console.error('Failed to export audit logs to PDF:', err);
+    }
+  };
+
+  const auditFilters = ['All activity', 'Change requests', 'Approvals', 'Rejected', 'Catalog & workflow', 'User & role changes'];
 
   const filteredLogs = auditFilter === 'All activity'
     ? auditLogs
@@ -196,7 +269,7 @@ export default function SettingsPage({ user }) {
         </div>
 
         {/* Right Header Actions */}
-        {activeTab === 'users' && (
+        {isSuperAdmin && activeTab === 'users' && (
           <button
             onClick={() => setIsInviteModalOpen(true)}
             style={{
@@ -219,9 +292,9 @@ export default function SettingsPage({ user }) {
           </button>
         )}
         {activeTab === 'audit' && (
-          <div style={{ display: 'flex', gap: '0.75rem' }}>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', rowGap: '0.5rem' }}>
             <button
-              onClick={() => alert('Exporting Audit Logs to Excel...')}
+              onClick={handleExportAuditExcel}
               style={{
                 padding: '0.55rem 1.1rem',
                 backgroundColor: 'var(--card-bg)',
@@ -233,7 +306,8 @@ export default function SettingsPage({ user }) {
                 cursor: 'pointer',
                 display: 'inline-flex',
                 alignItems: 'center',
-                gap: '0.4rem'
+                gap: '0.4rem',
+                whiteSpace: 'nowrap'
               }}
             >
               <Download size={15} />
@@ -241,7 +315,7 @@ export default function SettingsPage({ user }) {
             </button>
 
             <button
-              onClick={() => alert('Exporting Audit Logs to PDF...')}
+              onClick={handleExportAuditPDF}
               style={{
                 padding: '0.55rem 1.1rem',
                 backgroundColor: 'var(--card-bg)',
@@ -253,7 +327,8 @@ export default function SettingsPage({ user }) {
                 cursor: 'pointer',
                 display: 'inline-flex',
                 alignItems: 'center',
-                gap: '0.4rem'
+                gap: '0.4rem',
+                whiteSpace: 'nowrap'
               }}
             >
               <Download size={15} />
@@ -264,7 +339,7 @@ export default function SettingsPage({ user }) {
       </div>
 
       {/* Main Sub-Tabs */}
-      <div style={{ display: 'flex', gap: '0.5rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.5rem' }}>
+      <div style={{ display: 'flex', gap: '0.5rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.5rem', flexWrap: 'wrap' }}>
         {[
           { id: 'users', label: 'Users' },
           { id: 'audit', label: 'Audit Logs' }
@@ -273,7 +348,7 @@ export default function SettingsPage({ user }) {
           return (
             <button
               key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
+              onClick={() => handleTabChange(tab.id)}
               style={{
                 padding: '0.45rem 1.1rem',
                 borderRadius: '99px',
@@ -555,6 +630,7 @@ export default function SettingsPage({ user }) {
                       outline: 'none'
                     }}
                   >
+                    <option value="Super Admin">Super Admin</option>
                     <option value="Admin">Admin</option>
                     <option value="Change Manager">Change Manager</option>
                     <option value="CAB Approver">CAB Approver</option>
@@ -769,6 +845,7 @@ export default function SettingsPage({ user }) {
                       outline: 'none'
                     }}
                   >
+                    <option value="Super Admin">Super Admin</option>
                     <option value="Admin">Admin</option>
                     <option value="Change Manager">Change Manager</option>
                     <option value="CAB Approver">CAB Approver</option>

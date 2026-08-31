@@ -72,12 +72,12 @@ export default function Header({
     return () => clearInterval(interval);
   }, []);
 
-  // Mark all notifications as read without clearing the notification list history
+  // Mark all notifications as read and clear inbox history
   const handleMarkAllRead = async () => {
     try {
       const res = await apiFetch('/notifications/mark-all-read', { method: 'PATCH' });
       if (res.ok) {
-        setNotifications(prev => prev.map(n => ({ ...n, isRead: true })));
+        setNotifications([]);
         setUnreadCount(0);
       }
     } catch (err) {
@@ -225,6 +225,9 @@ export default function Header({
           <button
             type="button"
             onClick={() => {
+              if (showNotifMenu) {
+                handleMarkAllRead();
+              }
               setShowNotifMenu((prev) => !prev);
               setShowProfileMenu(false);
             }}

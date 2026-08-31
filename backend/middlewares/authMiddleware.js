@@ -61,11 +61,11 @@ export const requireRole = (allowedRoles = []) => {
   const rolesList = Array.isArray(allowedRoles) ? allowedRoles : [allowedRoles];
 
   return (req, res, next) => {
-    const userRole = req.user?.role || 'Change Manager';
+    const userRole = req.user?.role || '';
     const userRoleId = req.user?.roleId || '';
 
-    // Admin has superuser access to all routes
-    if (userRole === 'Admin' || userRoleId === 'role-1' || rolesList.includes(userRole) || rolesList.includes(userRoleId)) {
+    // Super Admin (role-1) has superuser access across ALL endpoints
+    if (userRole === 'Super Admin' || userRoleId === 'role-1' || rolesList.includes(userRole) || rolesList.includes(userRoleId)) {
       return next();
     }
 

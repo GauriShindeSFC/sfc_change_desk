@@ -7,6 +7,9 @@ if (!DATABASE_URI) {
   throw new Error('DATABASE_URI is not set. Add it to backend/.env (see .env.example).');
 }
 
+const maxPool = Number(process.env.DB_POOL_MAX) || 25;
+const minPool = Number(process.env.DB_POOL_MIN) || 5;
+
 export const sequelize = new Sequelize(DATABASE_URI, {
   dialect: 'postgres',
   logging: DB_LOGGING === 'true' ? (msg) => console.log(msg) : false,
@@ -14,7 +17,7 @@ export const sequelize = new Sequelize(DATABASE_URI, {
     underscored: true, // camelCase attributes -> snake_case columns
     freezeTableName: true // use the exact tableName we give each model
   },
-  pool: { max: 5, min: 0, acquire: 30000, idle: 10000 },
+  pool: { max: maxPool, min: minPool, acquire: 60000, idle: 10000 },
   dialectOptions: {
     // Supabase (and most managed Postgres) require TLS
     ssl: { require: true, rejectUnauthorized: false }

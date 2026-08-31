@@ -158,7 +158,7 @@ export default function DashboardPage({ onNavigate, user }) {
               {categoryData.map((cat, catIdx) => {
                 const labelText = cat.category || cat.label || cat.name || cat.title || `Category ${catIdx + 1}`;
                 return (
-                  <div key={labelText} style={{ display: 'grid', gridTemplateColumns: '175px 1fr 35px', alignItems: 'center', gap: '1rem' }}>
+                  <div key={labelText} style={{ display: 'grid', gridTemplateColumns: 'minmax(180px, max-content) 1fr 35px', alignItems: 'center', gap: '1rem' }}>
                     <span style={{
                       fontSize: '0.875rem',
                       fontWeight: 700,

@@ -7,6 +7,7 @@ import { requireAuth } from './middlewares/auth.js';
 import { errorHandler, notFoundHandler } from './middlewares/errorHandler.js';
 import { sequelize } from './models/index.js';
 import { verifyMailTransport } from './services/mailService.js';
+import { initScheduler } from './services/schedulerService.js';
 
 const app = express();
 const PORT = process.env.PORT || 5001;
@@ -20,7 +21,8 @@ const corsOptions =
     : { origin: rawOrigin.split(',').map((o) => o.trim()).filter(Boolean) };
 
 app.use(cors(corsOptions));
-app.use(express.json());
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
 // Health check
 app.get('/api/health', (req, res) => {
@@ -51,6 +53,7 @@ const start = async () => {
   }
 
   await verifyMailTransport();
+  initScheduler();
 
   app.listen(PORT, () => {
     console.log(`[ChangeDesk Backend] Server running at http://localhost:${PORT} (env: ${NODE_ENV})`);

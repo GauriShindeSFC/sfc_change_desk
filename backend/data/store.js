@@ -1,6 +1,6 @@
 // ────────────────────────────────────────────────────────────────
-//  Presentation helpers shared by the service/serializer layer.
-//  (Data now lives in Postgres — see ../models and ./seed.js)
+//  Presentation helpers & formatting utilities shared across UI/API.
+//  (Database persistence lives in PostgreSQL — see ../models and seed.js)
 // ────────────────────────────────────────────────────────────────
 
 export const RISK_STYLES = {

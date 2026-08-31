@@ -11,6 +11,11 @@ export default function MyWorklistPage({ onNavigate, searchQuery = '', user }) {
 
   const [items, setItems] = useState([]);
   const [selectedCr, setSelectedCr] = useState(null);
+  const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(5);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalItems, setTotalItems] = useState(0);
+
   const [metrics, setMetrics] = useState({
     pending: 0,
     approved: 0,
@@ -21,11 +26,13 @@ export default function MyWorklistPage({ onNavigate, searchQuery = '', user }) {
   useEffect(() => {
     const fetchWorklist = async () => {
       try {
-        const res = await apiFetch('/worklist');
+        const res = await apiFetch(`/worklist?page=${page}&limit=${limit}`);
         if (res.ok) {
           const body = await res.json();
           if (body.data && Array.isArray(body.data)) setItems(body.data);
           if (body.metrics) setMetrics(body.metrics);
+          if (body.totalPages !== undefined) setTotalPages(body.totalPages);
+          if (body.total !== undefined) setTotalItems(body.total);
         }
       } catch (err) {
         console.warn('Backend API offline, using default worklist data:', err);
@@ -35,7 +42,13 @@ export default function MyWorklistPage({ onNavigate, searchQuery = '', user }) {
     fetchWorklist();
     const interval = setInterval(fetchWorklist, 10000);
     return () => clearInterval(interval);
-  }, []);
+  }, [page, limit]);
+
+  useEffect(() => {
+    if (totalPages > 0 && page > totalPages) {
+      setPage(totalPages);
+    }
+  }, [totalPages, page]);
 
   const handleAction = async (id, action, rejectionReason = '') => {
     try {
@@ -242,6 +255,9 @@ export default function MyWorklistPage({ onNavigate, searchQuery = '', user }) {
                   const isItemApproved = status === 'approved' || item.myDecision === 'Approved';
                   const isItemRejected = status === 'rejected' || item.myDecision === 'Rejected';
 
+                  const isSelfRequest = (item.requesterId && user?.id && String(item.requesterId) === String(user.id)) || 
+                                        (item.employeeEmail && user?.email && item.employeeEmail.toLowerCase() === user.email.toLowerCase());
+
                   return (
                     <tr key={item.id} style={{ borderBottom: '1px solid var(--border-color)', transition: 'background-color 0.15s ease' }}>
                       <td style={{ padding: '1rem 1.1rem', fontWeight: 800, color: 'var(--text-primary)', fontFamily: 'var(--font-mono)', whiteSpace: 'nowrap' }}>
@@ -255,7 +271,7 @@ export default function MyWorklistPage({ onNavigate, searchQuery = '', user }) {
                         {item.subCategory && <div style={{ fontSize: '0.775rem', color: 'var(--text-secondary)' }}>{item.subCategory}</div>}
                       </td>
                       <td style={{ padding: '1rem 1.1rem', color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)', fontSize: '0.8rem' }}>
-                        {item.employeeEmail || item.managerEmail || 'priya.nair@sfc.com'}
+                        {item.employeeEmail || item.managerEmail || item.requesterEmail || '—'}
                       </td>
                       <td style={{ padding: '1rem 1.1rem', color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)', whiteSpace: 'nowrap' }}>
                         {item.raisedDate || '27 Aug'}
@@ -275,7 +291,7 @@ export default function MyWorklistPage({ onNavigate, searchQuery = '', user }) {
                           >
                             View
                           </button>
-                          {!isRequester && item.canAct !== false && status === 'pending' && item.myDecision === 'Pending' ? (
+                          {!isRequester && !isSelfRequest && item.canAct !== false && status === 'pending' && item.myDecision === 'Pending' ? (
                             <>
                               <button
                                 type="button"
@@ -319,6 +335,89 @@ export default function MyWorklistPage({ onNavigate, searchQuery = '', user }) {
             </tbody>
           </table>
         </div>
+
+        {/* Pagination Footer - Always Visible */}
+        {(() => {
+          const fromItem = totalItems === 0 ? 0 : (page - 1) * limit + 1;
+          const toItem = Math.min(page * limit, totalItems);
+          return (
+            <div style={{ padding: '0.85rem 1.25rem', borderTop: '1px solid var(--border-color)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', backgroundColor: 'var(--input-bg)', flexWrap: 'wrap', gap: '0.75rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '1.25rem', flexWrap: 'wrap' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.8rem', color: 'var(--text-secondary)', fontWeight: 600 }}>
+                  <span>Rows per page:</span>
+                  <select
+                    value={limit}
+                    onChange={(e) => {
+                      setLimit(Number(e.target.value));
+                      setPage(1);
+                    }}
+                    style={{
+                      padding: '0.25rem 0.5rem',
+                      backgroundColor: 'var(--card-bg)',
+                      color: 'var(--text-primary)',
+                      border: '1px solid var(--border-color)',
+                      borderRadius: '6px',
+                      fontSize: '0.8rem',
+                      fontWeight: 700,
+                      cursor: 'pointer'
+                    }}
+                  >
+                    <option value={5}>5</option>
+                    <option value={10}>10</option>
+                    <option value={25}>25</option>
+                    <option value={50}>50</option>
+                  </select>
+                </div>
+
+                <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', fontWeight: 600 }}>
+                  Showing <strong>{fromItem} – {toItem}</strong> of <strong>{totalItems}</strong> items
+                </span>
+              </div>
+
+              <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                <button
+                  type="button"
+                  disabled={page <= 1}
+                  onClick={() => setPage(prev => Math.max(1, prev - 1))}
+                  style={{
+                    padding: '0.4rem 0.85rem',
+                    backgroundColor: 'var(--card-bg)',
+                    color: page <= 1 ? 'var(--text-secondary)' : 'var(--text-primary)',
+                    border: '1px solid var(--border-color)',
+                    borderRadius: '6px',
+                    fontSize: '0.8rem',
+                    fontWeight: 600,
+                    cursor: page <= 1 ? 'not-allowed' : 'pointer',
+                    opacity: page <= 1 ? 0.5 : 1
+                  }}
+                >
+                  Previous
+                </button>
+                <span style={{ fontSize: '0.8rem', color: 'var(--text-primary)', fontWeight: 700, padding: '0 0.25rem' }}>
+                  {page} / {totalPages || 1}
+                </span>
+                <button
+                  type="button"
+                  disabled={page >= totalPages || totalPages === 0}
+                  onClick={() => setPage(prev => Math.min(totalPages, prev + 1))}
+                  style={{
+                    padding: '0.4rem 0.85rem',
+                    backgroundColor: 'var(--card-bg)',
+                    color: page >= totalPages || totalPages === 0 ? 'var(--text-secondary)' : 'var(--text-primary)',
+                    border: '1px solid var(--border-color)',
+                    borderRadius: '6px',
+                    fontSize: '0.8rem',
+                    fontWeight: 600,
+                    cursor: page >= totalPages || totalPages === 0 ? 'not-allowed' : 'pointer',
+                    opacity: page >= totalPages || totalPages === 0 ? 0.5 : 1
+                  }}
+                >
+                  Next
+                </button>
+              </div>
+            </div>
+          );
+        })()}
       </div>
 
       {/* Details Modal */}

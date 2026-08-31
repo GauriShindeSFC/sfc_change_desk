@@ -19,18 +19,19 @@ const hoursAgo = (n) => new Date(NOW - n * 3_600_000);
 
 // ---------- roles ------------------------------------------
 export const roles = [
-  { id: 'role-1', name: 'Admin', description: 'Full system administration access across all modules, catalog management, user management, and settings.', permissions: ['Manage users', 'Configure workflows', 'Override approvals', 'System audit access'] },
-  { id: 'role-2', name: 'Change Manager', description: 'Oversees the end to end change management lifecycle, reviews pending CRs, schedules deployment windows.', permissions: ['Create Change Requests', 'Manage Catalogue & Workflows', 'View all reports', 'Manage Users & Roles'] },
+  { id: 'role-1', name: 'Super Admin', description: 'Ultimate system control across all modules, role & permission management, system audit, database & user management.', permissions: ['Full System Control', 'Manage Roles & Permissions', 'Manage Users', 'View System Audit Logs', 'Override Approvals'] },
+  { id: 'role-2', name: 'Admin', description: 'System administration, workflow configuration, catalog management, and change lifecycle oversight.', permissions: ['Manage users', 'Configure workflows', 'Manage Catalogue', 'View all reports'] },
   { id: 'role-3', name: 'CAB Approver', description: 'Member of Change Advisory Board with authority to review, approve, reject, or request information on CRs.', permissions: ['Review assigned CRs', 'Approve/reject CRs', 'Request info (send back)', 'View reports'] },
   { id: 'role-4', name: 'Requester', description: 'Standard employee permission to raise change requests, track progress, and update own draft submissions.', permissions: ['Create change requests', 'View own requests', 'Save draft CRs'] }
 ];
 
 // ---------- users (roleId -> roles.id) --------------------
 export const users = [
+  { id: 'usr-0', name: 'Ashish', employeeId: 'EMP-10001', department: 'Executive Management', email: 'ashish.sfc@company.com', status: 'Active', roleId: 'role-1' },
   { id: 'usr-1', name: 'Gauri Shinde', employeeId: 'EMP-10432', department: 'IT Operations', email: 'gauri.shinde@company.com', status: 'Active', roleId: 'role-2' },
   { id: 'usr-2', name: 'Priya Nair', employeeId: 'EMP-10433', department: 'Software Engineering', email: 'priya.nair@company.com', status: 'Active', roleId: 'role-4' },
   { id: 'usr-3', name: 'Arjun Mehta', employeeId: 'EMP-10434', department: 'Cloud Infrastructure', email: 'arjun.mehta@company.com', status: 'Active', roleId: 'role-3' },
-  { id: 'usr-4', name: 'Sana Iqbal', employeeId: 'EMP-10435', department: 'Cybersecurity', email: 'sana.iqbal@company.com', status: 'Active', roleId: 'role-1' },
+  { id: 'usr-4', name: 'Sana Iqbal', employeeId: 'EMP-10435', department: 'Cybersecurity', email: 'sana.iqbal@company.com', status: 'Active', roleId: 'role-2' },
   { id: 'usr-5', name: 'Rahul Verma', employeeId: 'EMP-10436', department: 'Human Resources', email: 'rahul.verma@company.com', status: 'Inactive', roleId: 'role-4' }
 ].map((u) => ({ ...u, authProvider: 'local', passwordHash: DEV_PASSWORD_HASH }));
 
@@ -221,8 +222,11 @@ export const auditLogs = [
   { timestamp: '21 Aug 2026 18:10:05', actorId: 'usr-5', action: 'CR Sent Back', ref: 'CR-2042', detail: 'Requested additional information on network change justification.' },
   { timestamp: '22 Aug 2026 09:20:14', actorId: 'usr-1', action: 'Catalog Template Created', ref: 'CAT-09', detail: 'Added new template CAT-09 New Vendor Integration to Change Catalog.' },
   { timestamp: '23 Aug 2026 16:45:22', actorId: 'usr-3', action: 'CR Approved', ref: 'CR-2048', detail: 'Approved CR-2048 Apply Q3 security patch for prod DB cluster.' },
+  { timestamp: '24 Aug 2026 09:15:00', actorId: 'usr-4', action: 'CR Approved', ref: 'CR-2052', detail: 'Approved CR-2052 Rotate SSH keys all bastion hosts.' },
   { timestamp: '24 Aug 2026 11:15:00', actorId: 'usr-4', action: 'User Permission Updated', ref: 'EMP-10435', detail: 'Assigned Admin role permissions to Sana Iqbal.' },
-  { timestamp: '24 Aug 2026 14:32:10', actorId: 'usr-2', action: 'Created Change Request', ref: 'CR-2049', detail: 'Submitted CR-2049 Upgrade payment-gateway API to v4 for CAB review.' }
+  { timestamp: '24 Aug 2026 14:32:10', actorId: 'usr-2', action: 'Created Change Request', ref: 'CR-2049', detail: 'Submitted CR-2049 Upgrade payment-gateway API to v4 for CAB review.' },
+  { timestamp: '25 Aug 2026 14:47:00', actorId: 'usr-3', action: 'CR Rejected', ref: 'CR-2035', detail: 'Rejected CR-2035 Emergency rollback checkout service v2.3 due to incomplete test plan.' },
+  { timestamp: '26 Aug 2026 10:20:00', actorId: 'usr-4', action: 'CR Rejected', ref: 'CR-2039', detail: 'Rejected CR-2039 Firewall port unblock request due to security policy.' }
 ];
 
 // ---------- standalone analytics data ------------------

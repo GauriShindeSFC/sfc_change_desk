@@ -8,6 +8,9 @@ backend/node_modules/
 .env.*
 !.env.example
 
+# Temporary Scratch Files
+scratch/
+
 # Build & Dist Outputs
 dist/
 frontend/dist/

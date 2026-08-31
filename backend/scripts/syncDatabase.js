@@ -13,6 +13,13 @@ const args = process.argv.slice(2);
 const force = args.includes('--force');
 const alter = args.includes('--alter');
 
+// Production safety lock: prevent dropping tables in production environment
+if (force && (process.env.NODE_ENV === 'production' || process.env.NODE_ENV === 'prod')) {
+  console.error('\n❌ FATAL SAFETY ERROR: --force mode (DROP and recreate all tables) is STRICTLY PROHIBITED in production!');
+  console.error('Execution aborted to prevent accidental loss of production data.\n');
+  process.exit(1);
+}
+
 const run = async () => {
   console.log(`[db:sync] connecting to ${new URL(process.env.DATABASE_URI).host} ...`);
   await sequelize.authenticate();
