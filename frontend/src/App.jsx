@@ -14,9 +14,6 @@ export default function App() {
         const next = { ...getSession(), user };
         saveSession(next);
         setSession(next);
-      } else {
-        clearSession();
-        setSession(null);
       }
     });
     // run once on mount

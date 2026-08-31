@@ -32,6 +32,7 @@ export const publicUser = (row) => {
     email: u.email,
     department: u.department,
     role: u.role?.name ?? null,
+    roleId: u.roleId || u.role?.id || null,
     status: u.status,
     initials: initials(u.name)
   };

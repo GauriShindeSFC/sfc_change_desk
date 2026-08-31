@@ -63,7 +63,8 @@ export const getMyRequests = asyncHandler(async (req, res) => {
   const userId = req.user?.id;
   const page = req.query.page || 1;
   const limit = req.query.limit || 10;
-  const result = await filterChangeRequestsByCategoryService(req.query.category, userId, page, limit);
+  const filterVal = req.query.status || req.query.category;
+  const result = await filterChangeRequestsByCategoryService(filterVal, userId, page, limit, req.query.status);
   res.json({ success: true, ...result });
 });
 

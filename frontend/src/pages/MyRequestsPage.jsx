@@ -29,8 +29,8 @@ export default function MyRequestsPage({ onNavigate, searchQuery = '', initialDa
   useEffect(() => {
     const fetchRequests = async () => {
       try {
-        const catQuery = activeFilter !== 'All' ? `&category=${encodeURIComponent(activeFilter)}` : '';
-        const res = await apiFetch(`/my-requests?page=${page}&limit=${limit}${catQuery}`);
+        const statusQuery = activeFilter !== 'All' ? `&status=${encodeURIComponent(activeFilter)}` : '';
+        const res = await apiFetch(`/my-requests?page=${page}&limit=${limit}${statusQuery}`);
         if (res.ok) {
           const body = await res.json();
           if (body.data && Array.isArray(body.data)) {
@@ -58,11 +58,12 @@ export default function MyRequestsPage({ onNavigate, searchQuery = '', initialDa
     Approved: Array.isArray(requests) ? requests.filter(r => (r.status || '').toLowerCase() === 'approved').length : 0,
     'In progress': Array.isArray(requests) ? requests.filter(r => (r.status || '').toLowerCase() === 'in progress').length : 0,
     Rejected: Array.isArray(requests) ? requests.filter(r => (r.status || '').toLowerCase() === 'rejected').length : 0,
-    Draft: Array.isArray(requests) ? requests.filter(r => (r.status || '').toLowerCase() === 'draft').length : 0
+    Draft: Array.isArray(requests) ? requests.filter(r => (r.status || '').toLowerCase() === 'draft' || r.isDraft).length : 0
   };
 
   const filteredRequests = requests.filter(r => {
-    const matchesFilter = activeFilter === 'All' || (r.status || '').toLowerCase() === activeFilter.toLowerCase();
+    const isDraftMatch = activeFilter.toLowerCase() === 'draft' && (r.isDraft || (r.status || '').toLowerCase() === 'draft');
+    const matchesFilter = activeFilter === 'All' || isDraftMatch || (r.status || '').toLowerCase() === activeFilter.toLowerCase();
     const query = searchQuery.trim().toLowerCase();
     const matchesSearch = !query ||
       (r.id || '').toLowerCase().includes(query) ||
