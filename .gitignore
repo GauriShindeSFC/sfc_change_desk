@@ -5,8 +5,14 @@ backend/node_modules/
 
 # Environment Variables & Secrets
 .env
-.env.local
+.env.*
+!.env.example
 
+# Build & Dist Outputs
+dist/
+frontend/dist/
+backend/dist/
+.vite/
 
 # Logs
 *.log

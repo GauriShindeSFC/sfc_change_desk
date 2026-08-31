@@ -4,8 +4,6 @@ import ChangeRequestModal from '../components/ui/ChangeRequestModal';
 import { apiFetch } from '../lib/apiFetch';
 
 export default function MyRequestsPage({ onNavigate, searchQuery = '', initialData, user }) {
-  const defaultRequests = [];
-
   const [requests, setRequests] = useState([]);
   const [activeFilter, setActiveFilter] = useState(() => {
     if (initialData?.filter) return initialData.filter;

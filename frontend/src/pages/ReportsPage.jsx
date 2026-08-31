@@ -15,22 +15,8 @@ export default function ReportsPage() {
     incidentChange: '▼ 2 fewer than last month'
   });
 
-  const [monthlyData, setMonthlyData] = useState([
-    { month: 'Mar', count: 16, height: 40, color: '#2563EB' },
-    { month: 'Apr', count: 22, height: 55, color: '#2563EB' },
-    { month: 'May', count: 18, height: 45, color: '#2563EB' },
-    { month: 'Jun', count: 28, height: 70, color: '#0D9488' },
-    { month: 'Jul', count: 34, height: 85, color: '#0D9488' },
-    { month: 'Aug', count: 38, height: 95, color: '#0D9488' }
-  ]);
-
-  const [departmentData, setDepartmentData] = useState([
-    { name: 'IT Operations', count: 41, color: '#2563EB', percentage: 80 },
-    { name: 'Engineering', count: 33, color: '#0D9488', percentage: 65 },
-    { name: 'Finance', count: 19, color: '#7C3AED', percentage: 38 },
-    { name: 'HR', count: 11, color: '#D97706', percentage: 22 },
-    { name: 'Sales', count: 7, color: '#475569', percentage: 14 }
-  ]);
+  const [monthlyData, setMonthlyData] = useState([]);
+  const [departmentData, setDepartmentData] = useState([]);
 
   const [scheduledReports, setScheduledReports] = useState([
     {
@@ -103,11 +89,37 @@ export default function ReportsPage() {
         if (res.ok) {
           const body = await res.json();
           if (body.metrics) setMetrics(body.metrics);
-          if (body.monthly && Array.isArray(body.monthly)) setMonthlyData(body.monthly);
-          if (body.departments && Array.isArray(body.departments)) setDepartmentData(body.departments);
+          
+          if (body.monthlyData && Array.isArray(body.monthlyData)) {
+            const maxVal = Math.max(...body.monthlyData.map(m => Number(m.count) || 0), 1);
+            const palette = ['#2563EB', '#2563EB', '#2563EB', '#0D9488', '#0D9488', '#0D9488'];
+            const formattedMonthly = body.monthlyData.map((m, idx) => ({
+              month: m.month,
+              count: Number(m.count) || 0,
+              height: Math.max(15, Math.round(((Number(m.count) || 0) / maxVal) * 100)),
+              color: palette[idx % palette.length]
+            }));
+            setMonthlyData(formattedMonthly);
+          }
+          
+          if (body.departmentData && Array.isArray(body.departmentData)) {
+            const palette = ['#2563EB', '#0D9488', '#7C3AED', '#D97706', '#475569', '#DC2626'];
+            const maxDeptCount = Math.max(...body.departmentData.map(d => Number(d.count) || 0), 1);
+            const formattedDept = body.departmentData.map((d, idx) => {
+              const countVal = Number(d.count) || 0;
+              const calcPct = Math.round((countVal / maxDeptCount) * 100);
+              return {
+                name: d.name,
+                count: countVal,
+                percentage: Math.min(100, Math.max(10, calcPct)),
+                color: palette[idx % palette.length]
+              };
+            });
+            setDepartmentData(formattedDept);
+          }
         }
       } catch (err) {
-        console.warn('Backend API offline, using default reports data:', err);
+        console.warn('Failed to load live reports data:', err);
       }
     };
     fetchReports();

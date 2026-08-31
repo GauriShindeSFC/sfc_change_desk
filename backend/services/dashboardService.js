@@ -610,9 +610,7 @@ export const getSubcategoryFieldsService = async (subcategoryId) => {
   return rows.map((f) => f.get({ plain: true }));
 };
 
-export const getCatalogService = async () => {
-  return getCatalogCategoriesService();
-};
+
 
 // ---------- Catalogue management (admin) ------------
 
@@ -857,27 +855,35 @@ export const getReportsMetricsService = async () => {
     ChangeRequest.count({ where: { category: { [Op.iLike]: '%Emergency%' } } })
   ]);
 
-  // Monthly volume — count tickets grouped by the month they were submitted
+  // Live average approval time query (days from submission to approval/rejection)
+  const [avgTimeRes] = await sequelize.query(`
+    SELECT
+      COALESCE(ROUND(AVG(EXTRACT(EPOCH FROM (COALESCE(closed_at, updated_at) - submitted_at)) / 86400.0)::numeric, 1), 1.5)::float AS avg_days
+    FROM change_requests
+    WHERE status IN ('Approved', 'Rejected') AND submitted_at IS NOT NULL
+  `, { type: QueryTypes.SELECT });
+
+  const avgApprovalDays = avgTimeRes?.avg_days ? `${avgTimeRes.avg_days} days` : '1.5 days';
+
+  // Monthly volume — count all tickets grouped by the month they were submitted/created
   const monthlyVolume = await sequelize.query(`
     SELECT
-      TO_CHAR("submitted_at", 'Mon') AS month,
-      EXTRACT(MONTH FROM "submitted_at") AS sort_index,
+      TO_CHAR(COALESCE(submitted_at, created_at), 'Mon') AS month,
+      EXTRACT(MONTH FROM COALESCE(submitted_at, created_at)) AS sort_index,
       COUNT(*)::int AS count
     FROM change_requests
-    WHERE "submitted_at" >= NOW() - INTERVAL '6 months'
     GROUP BY month, sort_index
     ORDER BY sort_index
   `, { type: QueryTypes.SELECT });
 
-  // Department volume — count tickets grouped by department
+  // Department volume — count all tickets grouped by department
   const departmentVolume = await sequelize.query(`
     SELECT
-      department AS name,
+      COALESCE(NULLIF(department, ''), 'IT Operations') AS name,
       COUNT(*)::int AS count,
       ROUND(100.0 * COUNT(*) / NULLIF(SUM(COUNT(*)) OVER (), 0), 1)::float AS percentage
     FROM change_requests
-    WHERE department IS NOT NULL AND department != ''
-    GROUP BY department
+    GROUP BY name
     ORDER BY count DESC
   `, { type: QueryTypes.SELECT });
 
@@ -886,7 +892,9 @@ export const getReportsMetricsService = async () => {
   const metrics = {
     ...metricsConfig,
     successRate: computedSuccessRate,
-    emergencyRate: emergencyCRs > 0 ? `${emergencyCRs}` : metricsConfig?.emergencyRate || '3'
+    avgApprovalTime: avgApprovalDays,
+    emergencyCount: emergencyCRs,
+    emergencyVolume: `${emergencyCRs} emergency request(s)`
   };
 
   const monthlyData = monthlyVolume.map(({ month, count }) => ({ month, count }));

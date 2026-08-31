@@ -15,7 +15,6 @@ import {
   submitDraftChangeRequestService,
   getWorklistService,
   applyWorklistActionService,
-  getCatalogService,
   getCatalogCategoriesService,
   getCatalogSubcategoriesService,
   getSubcategoryFieldsService,
@@ -110,7 +109,7 @@ export const handleWorklistAction = asyncHandler(async (req, res) => {
 // ---------- Change catalog (browse) --------------------
 
 export const getCatalog = asyncHandler(async (req, res) => {
-  res.json({ success: true, data: await getCatalogService() });
+  res.json({ success: true, data: await getCatalogCategoriesService() });
 });
 
 export const getCatalogCategories = asyncHandler(async (req, res) => {
