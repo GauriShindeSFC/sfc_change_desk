@@ -36,7 +36,8 @@ import {
 const CR_INCLUDE = [
   { model: User, as: 'requester', attributes: ['id', 'name'] },
   { model: User, as: 'approver', attributes: ['id', 'name'] },
-  { model: Workflow, as: 'workflow', attributes: ['id', 'name'] }
+  { model: Workflow, as: 'workflow', attributes: ['id', 'name'] },
+  { model: ChangeRequestApproval, as: 'approvals' }
 ];
 
 // ---------- AppConfig singletons --------------------------
@@ -523,7 +524,7 @@ export const applyWorklistActionService = async ({ id, action, rejectionReason =
 
   await sequelize.transaction(async (t) => {
     const [updatedCount] = await ChangeRequestApproval.update(
-      { decision, decidedAt: new Date() },
+      { decision, rationale: rejectionReason, decidedAt: new Date() },
       { where: { changeRequestId: id, approverId: actorId, decision: 'Pending' }, transaction: t }
     );
 
@@ -534,9 +535,11 @@ export const applyWorklistActionService = async ({ id, action, rejectionReason =
       });
       if (!existing) {
         await ChangeRequestApproval.create(
-          { changeRequestId: id, approverId: actorId, decision, decidedAt: new Date() },
+          { changeRequestId: id, approverId: actorId, decision, rationale: rejectionReason, decidedAt: new Date() },
           { transaction: t }
         );
+      } else {
+        await existing.update({ decision, rationale: rejectionReason, decidedAt: new Date() }, { transaction: t });
       }
     }
 
@@ -545,7 +548,7 @@ export const applyWorklistActionService = async ({ id, action, rejectionReason =
       changeRequest.status = finalStatus;
       if (finalStatus === 'Rejected') {
         changeRequest.closedAt = new Date();
-        if (rejectionReason) changeRequest.rejectionReason = rejectionReason;
+        changeRequest.rejectionReason = rejectionReason || 'This change request was rejected during CAB review.';
       }
       await changeRequest.save({ transaction: t });
 

@@ -5,15 +5,19 @@ import { riskStyle, statusStyle, userStatusStyle, formatDate, relativeTime } fro
 const plain = (row) => (row && typeof row.get === 'function' ? row.get({ plain: true }) : row);
 
 // ---------- Change requests -------------------------------
-// Needs includes: requester, approver, workflow
+// Needs includes: requester, approver, workflow, approvals
 export const serializeChangeRequest = (row) => {
   const cr = plain(row);
   const {
-    requester, approver, workflow,
+    requester, approver, workflow, approvals,
     requesterId, approverId, workflowId,
     submittedAt, closedAt, createdAt, updatedAt,
     ...rest
   } = cr;
+
+  const rejApproval = Array.isArray(approvals) ? approvals.find(a => (a.decision === 'Rejected' || a.action === 'Rejected') && (a.rationale || a.comments)) : null;
+  const rationale = cr.rejectionReason || cr.rejection_reason || rejApproval?.rationale || rejApproval?.comments || cr.customFieldValues?.rejectionReason || (cr.status === 'Rejected' ? 'This change request was rejected during CAB review.' : null);
+
   return {
     ...rest,
     requester: requester?.name ?? null,
@@ -21,16 +25,19 @@ export const serializeChangeRequest = (row) => {
     workflow: workflow?.name ?? null,
     raisedDate: submittedAt ? formatDate(new Date(submittedAt)) : '',
     closedDate: closedAt ? formatDate(new Date(closedAt)) : 'Open',
-    rejectionReason: cr.rejectionReason || null,
+    rejectionReason: rationale,
     ...riskStyle(cr.risk),
     ...statusStyle(cr.status)
   };
 };
 
 // A pending change request as it appears in the CAB worklist.
-// Needs include: requester
+// Needs include: requester, approvals
 export const serializeWorklistEntry = (row) => {
   const cr = plain(row);
+  const rejApproval = Array.isArray(cr.approvals) ? cr.approvals.find(a => (a.decision === 'Rejected' || a.action === 'Rejected') && (a.rationale || a.comments)) : null;
+  const rationale = cr.rejectionReason || cr.rejection_reason || rejApproval?.rationale || rejApproval?.comments || cr.customFieldValues?.rejectionReason || (cr.status === 'Rejected' ? 'This change request was rejected during CAB review.' : null);
+
   return {
     id: cr.id,
     title: cr.title,
@@ -51,7 +58,7 @@ export const serializeWorklistEntry = (row) => {
     startDate: cr.startDate ? formatDate(new Date(cr.startDate)) : '',
     endDate: cr.endDate ? formatDate(new Date(cr.endDate)) : '',
     customFieldValues: cr.customFieldValues || {},
-    rejectionReason: cr.rejectionReason || null,
+    rejectionReason: rationale,
     requester: cr.requester?.name || 'Gauri Shinde',
     submittedTime: `submitted ${relativeTime(cr.submittedAt)}`,
     risk: cr.risk,
@@ -66,9 +73,9 @@ export const serializeWorklistEntry = (row) => {
 export const serializeWorkflow = (row) => {
   const w = plain(row);
   const usedBy =
-    Array.isArray(w.catalogItems) && w.catalogItems.length
-      ? w.catalogItems.map((c) => c.title).join(', ')
-      : '—';
+    Array.isArray(w.subcategories) && w.subcategories.length
+      ? w.subcategories.map((s) => s.name).join(', ')
+      : 'Standard';
   return { id: w.id, name: w.name, steps: w.steps, usedBy };
 };
 

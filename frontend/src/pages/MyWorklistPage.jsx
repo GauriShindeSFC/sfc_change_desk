@@ -327,7 +327,7 @@ export default function MyWorklistPage({ onNavigate, searchQuery = '', user }) {
           cr={selectedCr}
           onClose={() => setSelectedCr(null)}
           onApprove={isRequester ? null : (id) => handleAction(id, 'approve')}
-          onReject={isRequester ? null : (id) => handleAction(id, 'reject')}
+          onReject={isRequester ? null : (id, reason) => handleAction(id, 'reject', reason)}
           onSendBack={isRequester ? null : (id) => handleAction(id, 'sendback')}
         />
       )}
