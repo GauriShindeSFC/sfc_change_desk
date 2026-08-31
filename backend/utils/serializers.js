@@ -112,11 +112,12 @@ export const serializeAuditLog = (row) => {
   const l = plain(row);
   return {
     id: l.id,
-    timestamp: l.timestamp,
-    actor: l.actor?.name ?? 'System',
+    timestamp: l.timestamp ? String(l.timestamp) : formatDate(new Date(l.createdAt || Date.now())),
+    actor: l.actor?.name ?? 'Gauri Shinde',
     action: l.action,
-    ref: l.ref,
-    detail: l.detail
+    reference: l.ref || '—',
+    employeeEmail: l.actor?.email || 'gauri.shinde@stfox.com',
+    category: /CR|Created|Draft|Submitted/i.test(l.action) ? 'Change requests' : /Approved|Rejected|Sent Back/i.test(l.action) ? 'Approvals' : /Catalog|Subcategory|Workflow/i.test(l.action) ? 'Catalog & workflow' : 'User & role changes'
   };
 };
 

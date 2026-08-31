@@ -13,13 +13,6 @@ export default function SettingsPage({ user }) {
     { id: 'usr-5', name: 'Rohan Deshmukh', email: 'rohan.d@stfox.com', empId: 'EMP-10305', dept: 'HR Systems', role: 'Requester', status: 'Disabled' }
   ];
 
-  const defaultRoles = [
-    { id: 'role-1', name: 'Admin', usersCount: 2, desc: 'Full administrative access across settings, workflows, and catalog items.' },
-    { id: 'role-2', name: 'Change Manager', usersCount: 3, desc: 'Can review, route, schedule, and override change requests.' },
-    { id: 'role-3', name: 'CAB Approver', usersCount: 8, desc: 'Can sign off or reject change requests assigned to their board.' },
-    { id: 'role-4', name: 'Requester', usersCount: 42, desc: 'Can submit change requests and track status in My Requests.' }
-  ];
-
   const defaultAuditLogs = [
     {
       id: 'log-1',
@@ -89,7 +82,6 @@ export default function SettingsPage({ user }) {
   const [activeTab, setActiveTab] = useState('audit');
   const [auditFilter, setAuditFilter] = useState('All activity');
   const [users, setUsers] = useState(defaultUsers);
-  const [roles, setRoles] = useState(defaultRoles);
   const [auditLogs, setAuditLogs] = useState(defaultAuditLogs);
   const [isInviteModalOpen, setIsInviteModalOpen] = useState(false);
   const [editingUser, setEditingUser] = useState(null);
@@ -132,18 +124,27 @@ export default function SettingsPage({ user }) {
   });
 
   useEffect(() => {
-    const fetchUsers = async () => {
+    const fetchSettingsData = async () => {
       try {
-        const res = await apiFetch('/settings/users');
-        if (res.ok) {
-          const body = await res.json();
+        const [usersRes, auditRes] = await Promise.all([
+          apiFetch('/settings/users'),
+          apiFetch('/settings/audit-logs')
+        ]);
+
+        if (usersRes.ok) {
+          const body = await usersRes.json();
           if (body.data && Array.isArray(body.data)) setUsers(body.data);
         }
+
+        if (auditRes.ok) {
+          const body = await auditRes.json();
+          if (body.data && Array.isArray(body.data)) setAuditLogs(body.data);
+        }
       } catch (err) {
-        console.warn('Backend API offline, using default users list:', err);
+        console.warn('Backend API offline, using default settings data:', err);
       }
     };
-    fetchUsers();
+    fetchSettingsData();
   }, []);
 
   const handleSaveInviteUser = async (e) => {
@@ -174,28 +175,6 @@ export default function SettingsPage({ user }) {
     }
   };
 
-  const handleTogglePermission = async (roleId, permission) => {
-    const role = roles.find(r => r.id === roleId);
-    if (!role) return;
-
-    const currentPerms = role.permissions || [];
-    const updatedPerms = currentPerms.includes(permission)
-      ? currentPerms.filter(p => p !== permission)
-      : [...currentPerms, permission];
-
-    setRoles(prev => prev.map(r => r.id === roleId ? { ...r, permissions: updatedPerms } : r));
-
-    try {
-      await apiFetch(`/settings/roles/${roleId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ permissions: updatedPerms })
-      });
-    } catch (err) {
-      console.warn('Failed to update role permissions:', err);
-    }
-  };
-
   const auditFilters = ['All activity', 'Change requests', 'Approvals', 'Catalog & workflow', 'User & role changes'];
 
   const filteredLogs = auditFilter === 'All activity'
@@ -212,7 +191,7 @@ export default function SettingsPage({ user }) {
             Settings
           </h1>
           <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginTop: '0.2rem' }}>
-            Users, roles, and system-wide audit history
+            Users and system-wide audit history
           </p>
         </div>
 
@@ -237,12 +216,6 @@ export default function SettingsPage({ user }) {
           >
             <Plus size={16} />
             <span>Invite user</span>
-          </button>
-        )}
-        {activeTab === 'roles' && (
-          <button style={{ padding: '0.55rem 1.1rem', backgroundColor: '#0D9488', color: '#FFFFFF', border: 'none', borderRadius: '8px', fontSize: '0.85rem', fontWeight: 700, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}>
-            <Plus size={16} />
-            <span>Add role</span>
           </button>
         )}
         {activeTab === 'audit' && (
@@ -294,7 +267,6 @@ export default function SettingsPage({ user }) {
       <div style={{ display: 'flex', gap: '0.5rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.5rem' }}>
         {[
           { id: 'users', label: 'Users' },
-          { id: 'roles', label: 'Roles' },
           { id: 'audit', label: 'Audit Logs' }
         ].map(tab => {
           const isActive = activeTab === tab.id;
@@ -377,60 +349,7 @@ export default function SettingsPage({ user }) {
         </div>
       )}
 
-      {/* TAB 2: ROLES PERMISSIONS */}
-      {activeTab === 'roles' && (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '1.25rem' }}>
-          {roles.map(r => (
-            <div
-              key={r.id}
-              style={{
-                backgroundColor: 'var(--card-bg)',
-                border: '1px solid var(--border-color)',
-                borderRadius: '12px',
-                padding: '1.35rem 1.25rem',
-                display: 'flex',
-                flexDirection: 'column',
-                justifyContent: 'space-between',
-                boxShadow: '0 1px 3px rgba(16, 21, 30, 0.04)'
-              }}
-            >
-              <div>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.45rem' }}>
-                  <h3 style={{ fontSize: '1.05rem', fontWeight: 800, color: 'var(--text-primary)' }}>{r.name}</h3>
-                  <span style={{ fontSize: '0.775rem', fontWeight: 600, color: 'var(--text-secondary)', backgroundColor: 'var(--input-bg)', padding: '0.2rem 0.55rem', borderRadius: '6px' }}>
-                    {r.usersCount} assigned users
-                  </span>
-                </div>
-                <p style={{ fontSize: '0.825rem', color: 'var(--text-secondary)', lineHeight: 1.45, marginBottom: '1rem' }}>
-                  {r.desc}
-                </p>
-
-                {/* Interactive Permissions List */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', marginBottom: '1rem' }}>
-                  {['Create Change Requests', 'Approve / Reject Tickets', 'Manage Catalogue & Workflows', 'Manage Users & Roles'].map((perm) => {
-                    const isChecked = (r.permissions || []).includes(perm) || (r.name === 'Admin') || (r.name === 'Change Manager' && perm !== 'Approve / Reject Tickets');
-                    const isDisabled = r.name === 'Admin' || (r.name === 'Requester' && perm === 'Manage Users & Roles');
-                    return (
-                      <label key={perm} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.8rem', color: 'var(--text-primary)', cursor: isDisabled ? 'not-allowed' : 'pointer' }}>
-                        <input
-                          type="checkbox"
-                          checked={isChecked}
-                          disabled={isDisabled}
-                          onChange={() => handleTogglePermission(r.id, perm)}
-                          style={{ accentColor: '#0D9488', cursor: isDisabled ? 'not-allowed' : 'pointer' }}
-                        />
-                        <span style={{ opacity: isDisabled ? 0.6 : 1 }}>{perm}</span>
-                      </label>
-                    );
-                  })}
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {/* TAB 3: AUDIT LOGS */}
+      {/* TAB 2: AUDIT LOGS */}
       {activeTab === 'audit' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
           
@@ -468,7 +387,7 @@ export default function SettingsPage({ user }) {
                   <th style={{ padding: '0.75rem 1rem' }}>ACTOR</th>
                   <th style={{ padding: '0.75rem 1rem' }}>ACTION</th>
                   <th style={{ padding: '0.75rem 1rem' }}>REFERENCE</th>
-                  <th style={{ padding: '0.75rem 1rem' }}>DETAILS</th>
+                  <th style={{ padding: '0.75rem 1rem' }}>EMPLOYEE EMAIL</th>
                 </tr>
               </thead>
               <tbody>
@@ -486,8 +405,8 @@ export default function SettingsPage({ user }) {
                     <td style={{ padding: '0.85rem 1rem', fontSize: '0.825rem', color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)' }}>
                       {log.reference}
                     </td>
-                    <td style={{ padding: '0.85rem 1rem', fontSize: '0.835rem', color: 'var(--text-secondary)' }}>
-                      {log.details}
+                    <td style={{ padding: '0.85rem 1rem', fontSize: '0.825rem', color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)' }}>
+                      {log.employeeEmail || 'gauri.shinde@stfox.com'}
                     </td>
                   </tr>
                 ))}

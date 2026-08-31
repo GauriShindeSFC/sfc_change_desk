@@ -837,7 +837,7 @@ const AUDIT_FILTERS = {
 
 export const getSettingsAuditLogsService = async (filter = 'All activity') => {
   const rows = await AuditLog.findAll({
-    include: [{ model: User, as: 'actor', attributes: ['id', 'name'] }],
+    include: [{ model: User, as: 'actor', attributes: ['id', 'name', 'email'] }],
     order: [['id', 'DESC']]
   });
   const logs = rows.map(serializeAuditLog);
