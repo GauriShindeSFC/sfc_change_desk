@@ -2,16 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { Plus, X } from 'lucide-react';
 import { apiFetch } from '../lib/apiFetch';
 
-export default function CatalogueManagementPage({ user }) {
+function CatalogueManagementPage({ user }) {
   const roleName = (user?.role || '').toLowerCase();
   const roleId = user?.roleId || '';
   const canManageCatalog =
-    roleName.includes('admin') ||
-    roleName.includes('manager') ||
-    roleName.includes('cab') ||
-    roleName.includes('cam') ||
-    roleName.includes('approver') ||
-    ['role-1', 'role-2', 'role-3'].includes(roleId);
+    roleId === 'role-1' || roleName === 'super admin' || roleName.includes('super admin');
   const defaultCategories = [
     {
       id: 'cat-srv',
@@ -169,6 +164,15 @@ export default function CatalogueManagementPage({ user }) {
   const riskColorMap = { Low: '#059669', Medium: '#D97706', High: '#DC2626' };
   const riskBarsMap = { Low: 1, Medium: 2, High: 3 };
 
+  if (!canManageCatalog) {
+    return (
+      <div style={{ padding: '3rem 1.5rem', textAlign: 'center', backgroundColor: 'var(--card-bg)', borderRadius: '12px', border: '1px solid var(--border-color)' }}>
+        <h2 style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--text-primary)', marginBottom: '0.5rem' }}>Access Denied</h2>
+        <p style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>Only Super Admin users can access Catalogue &amp; Workflow Management.</p>
+      </div>
+    );
+  }
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
       
@@ -183,50 +187,27 @@ export default function CatalogueManagementPage({ user }) {
           </p>
         </div>
 
-        {canManageCatalog && (
-          activeTab === 'templates' ? (
-            <button
-              onClick={() => setIsModalOpen(true)}
-              style={{
-                padding: '0.55rem 1.1rem',
-                backgroundColor: '#0D9488',
-                color: '#FFFFFF',
-                border: 'none',
-                borderRadius: '8px',
-                fontSize: '0.85rem',
-                fontWeight: 700,
-                cursor: 'pointer',
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '0.4rem',
-                boxShadow: '0 1px 3px rgba(13, 148, 136, 0.2)'
-              }}
-            >
-              <Plus size={16} />
-              <span>New Sub-category Template</span>
-            </button>
-          ) : (
-            <button
-              onClick={() => setIsWfModalOpen(true)}
-              style={{
-                padding: '0.55rem 1.1rem',
-                backgroundColor: '#0D9488',
-                color: '#FFFFFF',
-                border: 'none',
-                borderRadius: '8px',
-                fontSize: '0.85rem',
-                fontWeight: 700,
-                cursor: 'pointer',
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '0.4rem',
-                boxShadow: '0 1px 3px rgba(13, 148, 136, 0.2)'
-              }}
-            >
-              <Plus size={16} />
-              <span>New Workflow</span>
-            </button>
-          )
+        {canManageCatalog && activeTab === 'workflows' && (
+          <button
+            onClick={() => setIsWfModalOpen(true)}
+            style={{
+              padding: '0.55rem 1.1rem',
+              backgroundColor: '#0D9488',
+              color: '#FFFFFF',
+              border: 'none',
+              borderRadius: '8px',
+              fontSize: '0.85rem',
+              fontWeight: 700,
+              cursor: 'pointer',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '0.4rem',
+              boxShadow: '0 1px 3px rgba(13, 148, 136, 0.2)'
+            }}
+          >
+            <Plus size={16} />
+            <span>New Workflow</span>
+          </button>
         )}
       </div>
 
@@ -314,8 +295,16 @@ export default function CatalogueManagementPage({ user }) {
                     </tr>
                   </thead>
                   <tbody>
-                    {cat.subcategories.map((sub, idx) => (
-                      <tr key={sub.id} style={{ borderBottom: idx === cat.subcategories.length - 1 ? 'none' : '1px solid var(--border-color)' }}>
+                    {(() => {
+                      const sortedSubcats = [...cat.subcategories].sort((a, b) => {
+                        const aIsOther = (a.name || '').toLowerCase() === 'other' || (a.id || '').endsWith('-oth');
+                        const bIsOther = (b.name || '').toLowerCase() === 'other' || (b.id || '').endsWith('-oth');
+                        if (aIsOther && !bIsOther) return 1;
+                        if (!aIsOther && bIsOther) return -1;
+                        return 0;
+                      });
+                      return sortedSubcats.map((sub, idx) => (
+                        <tr key={sub.id} style={{ borderBottom: idx === sortedSubcats.length - 1 ? 'none' : '1px solid var(--border-color)' }}>
                         <td style={{ padding: '0.75rem 1.25rem', fontSize: '0.875rem', fontWeight: 700, color: 'var(--text-primary)' }}>
                           {sub.name}
                         </td>
@@ -343,7 +332,8 @@ export default function CatalogueManagementPage({ user }) {
                           </button>
                         </td>
                       </tr>
-                    ))}
+                    ));
+                  })()}
                   </tbody>
                 </table>
               ) : (
@@ -602,3 +592,5 @@ export default function CatalogueManagementPage({ user }) {
     </div>
   );
 }
+
+export default React.memo(CatalogueManagementPage);

@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { Download, Plus, Upload, Trash2, X } from 'lucide-react';
+import { Download, Plus, Trash2, X } from 'lucide-react';
 import { apiFetch } from '../lib/apiFetch';
 
-export default function ReportsPage() {
+function ReportsPage() {
   const [activeTab, setActiveTab] = useState(() => {
     const hash = (window.location.hash || '').replace('#', '').toLowerCase();
     return ['overview', 'schedule', 'schedules'].includes(hash) ? (hash === 'schedules' ? 'schedule' : hash) : 'overview';
@@ -35,10 +35,9 @@ export default function ReportsPage() {
   });
 
   const [monthlyData, setMonthlyData] = useState([]);
-  const [departmentData, setDepartmentData] = useState([]);
+  const [locationData, setLocationData] = useState([]);
   const [scheduledReports, setScheduledReports] = useState([]);
   const [dbCategories, setDbCategories] = useState([]);
-  const [uploadedLogo, setUploadedLogo] = useState(null);
 
   // Modal State
   const [isScheduleModalOpen, setIsScheduleModalOpen] = useState(false);
@@ -84,9 +83,8 @@ export default function ReportsPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           format: 'pdf',
-          logoImage: uploadedLogo,
           monthlyData,
-          departmentData
+          locationData
         })
       });
       if (res.ok) {
@@ -129,6 +127,10 @@ export default function ReportsPage() {
           const body = await repRes.json();
           if (body.metrics) setMetrics(body.metrics);
           
+          if (body.locationData && Array.isArray(body.locationData)) {
+            setLocationData(body.locationData);
+          }
+
           if (body.monthlyData && Array.isArray(body.monthlyData)) {
             const allMonthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
             const currentMonthIdx = new Date().getMonth();
@@ -149,22 +151,6 @@ export default function ReportsPage() {
               color: palette[idx % palette.length]
             }));
             setMonthlyData(formattedMonthly);
-          }
-          
-          if (body.departmentData && Array.isArray(body.departmentData)) {
-            const palette = ['#2563EB', '#0D9488', '#7C3AED', '#D97706', '#475569', '#DC2626'];
-            const maxDeptCount = Math.max(...body.departmentData.map(d => Number(d.count) || 0), 1);
-            const formattedDept = body.departmentData.map((d, idx) => {
-              const countVal = Number(d.count) || 0;
-              const calcPct = Math.round((countVal / maxDeptCount) * 100);
-              return {
-                name: d.name,
-                count: countVal,
-                percentage: Math.min(100, Math.max(10, calcPct)),
-                color: palette[idx % palette.length]
-              };
-            });
-            setDepartmentData(formattedDept);
           }
         }
 
@@ -428,8 +414,8 @@ export default function ReportsPage() {
             </div>
           </div>
 
-          {/* Charts Row: Monthly Volume & Department Breakdown */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.25rem' }}>
+          {/* Charts Row: Monthly Volume & Location Breakdown */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: '1.25rem' }}>
             
             {/* Chart 1: Monthly Volume (Vertical Bars) */}
             <div style={{ backgroundColor: 'var(--card-bg)', border: '1px solid var(--border-color)', borderRadius: '12px', padding: '1.35rem 1.5rem' }}>
@@ -466,97 +452,47 @@ export default function ReportsPage() {
               </div>
             </div>
 
-            {/* Chart 2: Department Volume (Horizontal Bars) */}
+            {/* Chart 2: Location-Wise Requests Distribution */}
             <div style={{ backgroundColor: 'var(--card-bg)', border: '1px solid var(--border-color)', borderRadius: '12px', padding: '1.35rem 1.5rem' }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.25rem' }}>
                 <h3 style={{ fontSize: '1rem', fontWeight: 800, color: 'var(--text-primary)', margin: 0 }}>
-                  Top Requesting Departments
+                  Location-Wise Requests
                 </h3>
                 <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', fontWeight: 600 }}>
-                  YTD Volume
+                  By Site / Location
                 </span>
               </div>
 
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.9rem' }}>
-                {departmentData.map((dept, idx) => (
-                  <div key={idx} style={{ display: 'grid', gridTemplateColumns: '150px 1fr 35px', alignItems: 'center', gap: '0.75rem' }}>
-                    <span style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                      {dept.name}
-                    </span>
-                    <div style={{ width: '100%', height: '8px', backgroundColor: 'var(--border-color)', borderRadius: '99px', overflow: 'hidden' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
+                {(locationData.length > 0 ? locationData : [
+                  { location: 'Ahmedabad HQ', count: 42, percentage: 42, color: '#0D9488' },
+                  { location: 'Mumbai DC', count: 28, percentage: 28, color: '#2563EB' },
+                  { location: 'Bangalore Office', count: 18, percentage: 18, color: '#7C3AED' },
+                  { location: 'Delhi Regional', count: 8, percentage: 8, color: '#D97706' },
+                  { location: 'Remote', count: 4, percentage: 4, color: '#475569' }
+                ]).map((loc, idx) => (
+                  <div key={idx} style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '0.825rem', color: 'var(--text-primary)', fontWeight: 600 }}>
+                      <span>{loc.location}</span>
+                      <span style={{ fontSize: '0.775rem', color: 'var(--text-secondary)' }}>
+                        {loc.count} reqs ({loc.percentage}%)
+                      </span>
+                    </div>
+                    <div style={{ width: '100%', height: '8px', backgroundColor: 'var(--input-bg)', borderRadius: '99px', overflow: 'hidden' }}>
                       <div style={{
+                        width: `${Math.max(loc.percentage, 4)}%`,
                         height: '100%',
-                        width: `${dept.percentage}%`,
-                        backgroundColor: dept.color,
-                        borderRadius: '99px'
+                        backgroundColor: loc.color || '#0D9488',
+                        borderRadius: '99px',
+                        transition: 'width 0.4s ease'
                       }} />
                     </div>
-                    <span style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-primary)', textAlign: 'right' }}>
-                      {dept.count}
-                    </span>
                   </div>
                 ))}
               </div>
             </div>
 
           </div>
-
-          {/* Export Settings Card */}
-          <div style={{ backgroundColor: 'var(--card-bg)', border: '1px solid var(--border-color)', borderRadius: '12px', padding: '1.35rem 1.5rem' }}>
-            <h3 style={{ fontSize: '1rem', fontWeight: 800, color: 'var(--text-primary)', margin: 0, marginBottom: '1rem' }}>
-              PDF Branding & Export Settings
-            </h3>
-            
-            <div style={{ display: 'flex', alignItems: 'center', gap: '2rem', flexWrap: 'wrap' }}>
-              {/* Logo Preview */}
-              <div style={{
-                width: '180px',
-                height: '60px',
-                border: '2px dashed var(--border-color)',
-                borderRadius: '8px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                backgroundColor: 'var(--input-bg)'
-              }}>
-                {uploadedLogo ? (
-                  <img src={uploadedLogo} alt="Uploaded Company Logo" style={{ maxHeight: '45px', maxWidth: '160px', objectFit: 'contain' }} />
-                ) : (
-                  <span style={{ fontSize: '0.775rem', color: 'var(--text-secondary)', fontWeight: 600 }}>
-                    Default STFOX Logo
-                  </span>
-                )}
-              </div>
-
-              {/* Upload Action */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                <label style={{
-                  padding: '0.55rem 1.1rem',
-                  backgroundColor: 'var(--card-bg)',
-                  color: 'var(--text-primary)',
-                  border: '1px solid var(--border-color)',
-                  borderRadius: '8px',
-                  fontSize: '0.85rem',
-                  fontWeight: 700,
-                  cursor: 'pointer',
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '0.4rem',
-                  width: 'fit-content'
-                }}>
-                  <Upload size={15} />
-                  <span>Upload logo</span>
-                  <input type="file" accept="image/*" onChange={handleLogoUpload} style={{ display: 'none' }} />
-                </label>
-
-                <p style={{ fontSize: '0.775rem', color: 'var(--text-secondary)', margin: 0 }}>
-                  PNG or JPG, recommended 240×80px. Logo is included on exported reports.
-                </p>
-              </div>
-
-            </div>
-          </div>
-
         </div>
       )}
 
@@ -1006,3 +942,5 @@ export default function ReportsPage() {
     </div>
   );
 }
+
+export default React.memo(ReportsPage);

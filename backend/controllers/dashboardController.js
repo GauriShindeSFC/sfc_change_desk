@@ -11,6 +11,7 @@ import {
   getStatusBreakdownService,
   getChangeRequestsService,
   filterChangeRequestsByCategoryService,
+  getFilteredChangeRequests,
   createChangeRequestService,
   updateDraftChangeRequestService,
   submitDraftChangeRequestService,
@@ -24,6 +25,7 @@ import {
   createWorkflowService,
   getSettingsUsersService,
   createSettingsUserService,
+  updateSettingsUserService,
   getSettingsRolesService,
   updateRolePermissionsService,
   getSettingsAuditLogsService,
@@ -33,7 +35,9 @@ import {
   markAllNotificationsAsReadService,
   getScheduledReportsService,
   createScheduledReportService,
-  deleteScheduledReportService
+  deleteScheduledReportService,
+  getChangeManagerCategoriesService,
+  updateChangeManagerCategoriesService
 } from '../services/dashboardService.js';
 
 // ---------- Dashboard analytics ---------------------------
@@ -60,11 +64,22 @@ export const getRecentRequests = asyncHandler(async (req, res) => {
 });
 
 export const getMyRequests = asyncHandler(async (req, res) => {
-  const userId = req.user?.id;
+  const userId = req.user?.id || req.headers['x-user-id'] || 'usr-1';
   const page = req.query.page || 1;
   const limit = req.query.limit || 10;
-  const filterVal = req.query.status || req.query.category;
-  const result = await filterChangeRequestsByCategoryService(filterVal, userId, page, limit, req.query.status);
+  const status = req.query.status || null;
+  const dateFilter = req.query.dateFilter || null;
+  const searchQuery = req.query.search || req.query.searchQuery || null;
+
+  const result = await getFilteredChangeRequests({
+    userId,
+    isWorklist: false,
+    status,
+    dateFilter,
+    searchQuery,
+    page,
+    limit
+  });
   res.json({ success: true, ...result });
 });
 
@@ -100,10 +115,24 @@ export const submitDraftChangeRequest = asyncHandler(async (req, res) => {
 // ---------- CAB worklist --------------------------------
 
 export const getWorklist = asyncHandler(async (req, res) => {
-  const userId = req.user?.id || 'usr-1';
+  const userId = req.user?.id || req.headers['x-user-id'] || 'usr-1';
   const page = req.query.page || 1;
   const limit = req.query.limit || 10;
-  res.json({ success: true, ...(await getWorklistService(userId, page, limit)) });
+  const status = req.query.status || null;
+  const dateFilter = req.query.dateFilter || null;
+  const searchQuery = req.query.search || req.query.searchQuery || null;
+
+  const result = await getFilteredChangeRequests({
+    userId: null,
+    isWorklist: true,
+    actingUserId: userId,
+    status,
+    dateFilter,
+    searchQuery,
+    page,
+    limit
+  });
+  res.json({ success: true, ...result });
 });
 
 export const handleWorklistAction = asyncHandler(async (req, res) => {
@@ -181,6 +210,14 @@ export const createSettingsUser = asyncHandler(async (req, res) => {
   res.status(201).json({ success: true, message: 'User invited — a sign-in email has been sent', data: user });
 });
 
+export const updateSettingsUser = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  const user = await updateSettingsUserService(id, req.body || {}, {
+    actorId: req.user?.id
+  });
+  res.json({ success: true, message: 'User updated successfully', data: user });
+});
+
 export const getSettingsRoles = asyncHandler(async (req, res) => {
   res.json({ success: true, data: await getSettingsRolesService() });
 });
@@ -225,7 +262,8 @@ export const exportAuditLogs = asyncHandler(async (req, res) => {
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', 'attachment; filename="audit_logs_report.pdf"');
 
-    const doc = new PDFDocument({ margin: 40, size: 'A4' });
+    const PDFDoc = PDFDocument.default || PDFDocument;
+    const doc = new PDFDoc({ margin: 40, size: 'A4' });
     doc.pipe(res);
 
     // Title & Header
@@ -294,12 +332,13 @@ export const exportReport = asyncHandler(async (req, res) => {
   }
 
   if (format === 'pdf') {
-    const { logoImage, monthlyChartImage, departmentChartImage, monthlyData: payloadMonthly, departmentData: payloadDept } = req.body || {};
+    const { monthlyChartImage, monthlyData: payloadMonthly } = req.body || {};
 
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', 'attachment; filename="change_requests_report.pdf"');
 
-    const doc = new PDFDocument({ margin: 40, size: 'A4' });
+    const PDFDoc = PDFDocument.default || PDFDocument;
+    const doc = new PDFDoc({ margin: 40, size: 'A4' });
     doc.pipe(res);
 
     const decodeBase64Image = (dataUrl) => {
@@ -311,16 +350,6 @@ export const exportReport = asyncHandler(async (req, res) => {
         return null;
       }
     };
-
-    // Draw Uploaded Logo if available
-    const logoBuffer = decodeBase64Image(logoImage);
-    if (logoBuffer) {
-      try {
-        doc.image(logoBuffer, 430, 30, { fit: [120, 40] });
-      } catch (e) {
-        console.warn('Failed to render logo in PDF:', e.message);
-      }
-    }
 
     // Document Header
     doc.fontSize(20).fillColor('#0F172A').text('Change Requests Performance Report', { align: 'left' });
@@ -359,11 +388,6 @@ export const exportReport = asyncHandler(async (req, res) => {
 
     // New Page for Embedded Charts
     doc.addPage();
-    if (logoBuffer) {
-      try {
-        doc.image(logoBuffer, 430, 30, { fit: [120, 35] });
-      } catch (e) {}
-    }
 
     doc.fontSize(16).fillColor('#0F172A').text('Reports Analytics & Visual Charts', { align: 'left' });
     doc.moveDown(1.5);
@@ -394,29 +418,6 @@ export const exportReport = asyncHandler(async (req, res) => {
       doc.y = startY + chartHeight + 30;
     };
 
-    // Helper: Vector Department Horizontal Bar Chart
-    const renderDeptVectorChart = (dataList) => {
-      const depts = Array.isArray(dataList) && dataList.length > 0 ? dataList : [
-        { name: 'IT Operations', count: 45 },
-        { name: 'Cloud Infrastructure', count: 32 },
-        { name: 'Cybersecurity', count: 24 },
-        { name: 'Software Engineering', count: 18 }
-      ];
-      const maxVal = Math.max(...depts.map((d) => Number(d.count) || 0), 1);
-      let startY = doc.y + 10;
-
-      depts.slice(0, 5).forEach((d) => {
-        const count = Number(d.count) || 0;
-        const barW = Math.max(10, Math.round((count / maxVal) * 250));
-
-        doc.fontSize(8.5).fillColor('#1E293B').text(d.name || '', 50, startY, { width: 140 });
-        doc.rect(200, startY + 1, barW, 10).fill('#2563EB');
-        doc.fontSize(8).fillColor('#64748B').text(`${count} Change Requests`, 208 + barW, startY + 1);
-        startY += 18;
-      });
-      doc.y = startY + 10;
-    };
-
     // Monthly Volume Chart Section
     doc.fontSize(13).fillColor('#0F172A').text('Monthly Volume', { align: 'left' });
     doc.moveDown(0.5);
@@ -431,21 +432,42 @@ export const exportReport = asyncHandler(async (req, res) => {
       renderMonthlyVectorChart(payloadMonthly);
     }
 
-    doc.moveDown(1.5);
+    // Helper: Vector Location Distribution Progress Chart
+    const renderLocationVectorChart = (dataList) => {
+      const locations = Array.isArray(dataList) && dataList.length > 0 ? dataList : [
+        { location: 'Ahmedabad HQ', count: 12, pct: 40, department: 'IT Operations' },
+        { location: 'Mumbai Branch', count: 8, pct: 27, department: 'Infrastructure' },
+        { location: 'Delhi Office', count: 6, pct: 20, department: 'Security' },
+        { location: 'Bangalore Hub', count: 4, pct: 13, department: 'Collaboration' }
+      ];
 
-    // Top Requesting Departments Chart Section
-    doc.fontSize(13).fillColor('#0F172A').text('Top Requesting Departments', { align: 'left' });
-    doc.moveDown(0.5);
-    const deptImgBuffer = decodeBase64Image(departmentChartImage);
-    if (deptImgBuffer) {
-      try {
-        doc.image(deptImgBuffer, { fit: [470, 180], align: 'center' });
-      } catch (e) {
-        renderDeptVectorChart(payloadDept);
-      }
-    } else {
-      renderDeptVectorChart(payloadDept);
-    }
+      doc.addPage();
+      doc.fontSize(14).fillColor('#0F172A').text('Location-Wise Requests Distribution', { align: 'left' });
+      doc.fontSize(9).fillColor('#64748B').text('Distribution of change requests by location and department', { align: 'left' });
+      doc.moveDown(1);
+
+      const maxVal = Math.max(...locations.map((l) => Number(l.count) || 0), 1);
+
+      locations.forEach((loc) => {
+        if (doc.y > 720) {
+          doc.addPage();
+        }
+        const count = Number(loc.count) || 0;
+        const pct = loc.pct !== undefined ? loc.pct : Math.round((count / maxVal) * 100);
+
+        doc.fontSize(9.5).fillColor('#0F172A').text(`${loc.location || 'Location'}`, { inline: true });
+        doc.fontSize(8.5).fillColor('#475569').text(` (${loc.department || 'All Depts'})`, { inline: true });
+        doc.fontSize(8.5).fillColor('#0F172A').text(`${count} requests (${pct}%)`, 380, doc.y - 10, { width: 150, align: 'right' });
+        doc.moveDown(0.3);
+
+        const currentY = doc.y;
+        doc.rect(40, currentY, 490, 8).fill('#E2E8F0');
+        doc.rect(40, currentY, Math.min(490, Math.round((pct / 100) * 490)), 8).fill('#0D9488');
+        doc.y = currentY + 18;
+      });
+    };
+
+    renderLocationVectorChart(payloadLocation);
 
     doc.end();
     return;
@@ -490,4 +512,17 @@ export const deleteScheduledReport = asyncHandler(async (req, res) => {
   const { id } = req.params;
   await deleteScheduledReportService(id);
   res.json({ success: true, message: 'Scheduled report deleted successfully' });
+});
+
+export const getChangeManagerCategories = asyncHandler(async (req, res) => {
+  const { userId } = req.params;
+  const data = await getChangeManagerCategoriesService(userId);
+  res.json({ success: true, count: data.length, data });
+});
+
+export const updateChangeManagerCategories = asyncHandler(async (req, res) => {
+  const { userId } = req.params;
+  const { categoryIds } = req.body;
+  const data = await updateChangeManagerCategoriesService(userId, categoryIds || []);
+  res.json({ success: true, message: 'Change manager categories updated successfully', data });
 });

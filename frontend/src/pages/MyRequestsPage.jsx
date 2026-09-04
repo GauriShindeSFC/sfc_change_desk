@@ -1,14 +1,21 @@
 import React, { useState, useEffect } from 'react';
-import { Plus } from 'lucide-react';
+import { Plus, Calendar } from 'lucide-react';
 import ChangeRequestModal from '../components/ui/ChangeRequestModal';
 import { apiFetch } from '../lib/apiFetch';
 
-export default function MyRequestsPage({ onNavigate, searchQuery = '', initialData, user }) {
+function MyRequestsPage({ onNavigate, searchQuery = '', initialData, user }) {
   const [requests, setRequests] = useState([]);
-  const [page, setPage] = useState(1);
-  const [limit, setLimit] = useState(5);
-  const [totalPages, setTotalPages] = useState(1);
-  const [totalItems, setTotalItems] = useState(0);
+  const [dateFilter, setDateFilter] = useState('overall');
+  const [isLoading, setIsLoading] = useState(false);
+
+  const [statusCounts, setStatusCounts] = useState({
+    All: 0,
+    Pending: 0,
+    Approved: 0,
+    'In progress': 0,
+    Rejected: 0,
+    Draft: 0
+  });
 
   const [activeFilter, setActiveFilter] = useState(() => {
     if (initialData?.filter) return initialData.filter;
@@ -26,69 +33,38 @@ export default function MyRequestsPage({ onNavigate, searchQuery = '', initialDa
     }
   }, [initialData]);
 
+  // Server-Side Database Query Fetch
   useEffect(() => {
-    const fetchRequests = async () => {
+    const fetchData = async () => {
+      setIsLoading(true);
       try {
-        const statusQuery = activeFilter !== 'All' ? `&status=${encodeURIComponent(activeFilter)}` : '';
-        const res = await apiFetch(`/my-requests?page=${page}&limit=${limit}${statusQuery}`);
+        const params = new URLSearchParams({
+          ...(activeFilter !== 'All' && { status: activeFilter }),
+          ...(dateFilter !== 'overall' && { dateFilter }),
+          ...(searchQuery && { search: searchQuery })
+        });
+        const res = await apiFetch(`/my-requests?${params}`);
         if (res.ok) {
           const body = await res.json();
-          if (body.data && Array.isArray(body.data)) {
-            setRequests(body.data);
-          }
-          if (body.totalPages !== undefined) setTotalPages(body.totalPages);
-          if (body.total !== undefined) setTotalItems(body.total);
+          if (body.data && Array.isArray(body.data)) setRequests(body.data);
+          if (body.statusCounts) setStatusCounts(body.statusCounts);
         }
       } catch (err) {
         console.warn('Backend API offline, using default requests:', err);
+      } finally {
+        setIsLoading(false);
       }
     };
-    fetchRequests();
-  }, [user?.id, page, limit, activeFilter]);
-
-  useEffect(() => {
-    if (totalPages > 0 && page > totalPages) {
-      setPage(totalPages);
-    }
-  }, [totalPages, page]);
-
-  const filterCounts = {
-    All: Array.isArray(requests) ? requests.length : 0,
-    Pending: Array.isArray(requests) ? requests.filter(r => (r.status || '').toLowerCase() === 'pending').length : 0,
-    Approved: Array.isArray(requests) ? requests.filter(r => (r.status || '').toLowerCase() === 'approved').length : 0,
-    'In progress': Array.isArray(requests) ? requests.filter(r => (r.status || '').toLowerCase() === 'in progress').length : 0,
-    Rejected: Array.isArray(requests) ? requests.filter(r => (r.status || '').toLowerCase() === 'rejected').length : 0,
-    Draft: Array.isArray(requests) ? requests.filter(r => (r.status || '').toLowerCase() === 'draft' || r.isDraft).length : 0
-  };
-
-  const filteredRequests = requests.filter(r => {
-    const isDraftMatch = activeFilter.toLowerCase() === 'draft' && (r.isDraft || (r.status || '').toLowerCase() === 'draft');
-    const matchesFilter = activeFilter === 'All' || isDraftMatch || (r.status || '').toLowerCase() === activeFilter.toLowerCase();
-    const query = searchQuery.trim().toLowerCase();
-    const matchesSearch = !query ||
-      (r.id || '').toLowerCase().includes(query) ||
-      (r.title || '').toLowerCase().includes(query) ||
-      (r.category || '').toLowerCase().includes(query) ||
-      (r.requester || '').toLowerCase().includes(query);
-    return matchesFilter && matchesSearch;
-  });
-
-  const sortedRequests = [...filteredRequests].sort((a, b) => {
-    const numA = parseInt((a.id || '').replace(/\D/g, ''), 10) || 0;
-    const numB = parseInt((b.id || '').replace(/\D/g, ''), 10) || 0;
-    if (numA !== numB) return numB - numA;
-    const timeA = new Date(a.submittedAt || a.raisedDate || a.createdAt || 0).getTime();
-    const timeB = new Date(b.submittedAt || b.raisedDate || b.createdAt || 0).getTime();
-    return timeB - timeA;
-  });
+    fetchData();
+  }, [activeFilter, dateFilter, searchQuery, user?.id]);
 
   const filterTabs = [
-    { id: 'All', label: `All (${filterCounts.All})` },
-    { id: 'Pending', label: `Pending (${filterCounts.Pending})` },
-    { id: 'Approved', label: `Approved (${filterCounts.Approved})` },
-    { id: 'In progress', label: `In progress (${filterCounts['In progress']})` },
-    { id: 'Rejected', label: `Rejected (${filterCounts.Rejected})` },
-    { id: 'Draft', label: `Draft (${filterCounts.Draft})` }
+    { id: 'All', label: `All (${statusCounts.All || 0})` },
+    { id: 'Pending', label: `Pending (${statusCounts.Pending || 0})` },
+    { id: 'Approved', label: `Approved (${statusCounts.Approved || 0})` },
+    { id: 'In progress', label: `In progress (${statusCounts['In progress'] || 0})` },
+    { id: 'Rejected', label: `Rejected (${statusCounts.Rejected || 0})` },
+    { id: 'Draft', label: `Draft (${statusCounts.Draft || 0})` }
   ];
 
   const handleSubmitDraft = async (crId) => {
@@ -143,27 +119,56 @@ export default function MyRequestsPage({ onNavigate, searchQuery = '', initialDa
         </button>
       </div>
 
-      {/* Main Sub-Tabs / Status Filter */}
-      <div style={{ display: 'flex', gap: '0.5rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.5rem', flexWrap: 'wrap' }}>
-        {filterTabs.map(tab => (
-          <button
-            key={tab.id}
-            type="button"
-            onClick={() => setActiveFilter(tab.id)}
+      {/* Main Sub-Tabs / Status & Date Filter */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.5rem', flexWrap: 'wrap', gap: '0.75rem' }}>
+        <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
+          {filterTabs.map(tab => (
+            <button
+              key={tab.id}
+              type="button"
+              onClick={() => setActiveFilter(tab.id)}
+              style={{
+                padding: '0.45rem 0.95rem',
+                backgroundColor: activeFilter === tab.id ? '#0D9488' : 'transparent',
+                color: activeFilter === tab.id ? '#FFFFFF' : 'var(--text-secondary)',
+                border: activeFilter === tab.id ? 'none' : '1px solid var(--border-color)',
+                borderRadius: '99px',
+                fontSize: '0.825rem',
+                fontWeight: 700,
+                cursor: 'pointer'
+              }}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+
+        {/* Time Range Filter Dropdown */}
+        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', backgroundColor: 'var(--card-bg)', border: '1px solid var(--border-color)', borderRadius: '8px', padding: '0.25rem 0.65rem' }}>
+          <Calendar size={14} style={{ color: 'var(--text-secondary)' }} />
+          <select
+            value={dateFilter}
+            onChange={(e) => {
+              setDateFilter(e.target.value);
+              setPage(1);
+            }}
             style={{
-              padding: '0.45rem 0.95rem',
-              backgroundColor: activeFilter === tab.id ? '#0D9488' : 'transparent',
-              color: activeFilter === tab.id ? '#FFFFFF' : 'var(--text-secondary)',
-              border: activeFilter === tab.id ? 'none' : '1px solid var(--border-color)',
-              borderRadius: '99px',
-              fontSize: '0.825rem',
+              backgroundColor: 'var(--card-bg)',
+              color: 'var(--text-primary)',
+              border: 'none',
+              fontSize: '0.8rem',
               fontWeight: 700,
-              cursor: 'pointer'
+              cursor: 'pointer',
+              outline: 'none',
+              padding: '0.2rem'
             }}
           >
-            {tab.label}
-          </button>
-        ))}
+            <option value="overall" style={{ backgroundColor: 'var(--card-bg)', color: 'var(--text-primary)' }}>Overall Time</option>
+            <option value="last_7_days" style={{ backgroundColor: 'var(--card-bg)', color: 'var(--text-primary)' }}>Last 7 Days</option>
+            <option value="this_month" style={{ backgroundColor: 'var(--card-bg)', color: 'var(--text-primary)' }}>This Month</option>
+            <option value="last_month" style={{ backgroundColor: 'var(--card-bg)', color: 'var(--text-primary)' }}>Last Month</option>
+          </select>
+        </div>
       </div>
 
       {/* Requests Table */}
@@ -178,36 +183,36 @@ export default function MyRequestsPage({ onNavigate, searchQuery = '', initialDa
           <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.85rem' }}>
             <thead>
               <tr style={{ backgroundColor: 'var(--input-bg)', borderBottom: '1px solid var(--border-color)' }}>
-                <th style={{ padding: '0.75rem 1rem', fontWeight: 800, color: 'var(--text-secondary)', textTransform: 'uppercase', fontSize: '0.725rem', letterSpacing: '0.05em' }}>CR ID</th>
+                <th style={{ padding: '0.75rem 1rem', fontWeight: 800, color: 'var(--text-secondary)', textTransform: 'uppercase', fontSize: '0.725rem', letterSpacing: '0.05em', whiteSpace: 'nowrap' }}>CR ID</th>
                 <th style={{ padding: '0.75rem 1rem', fontWeight: 800, color: 'var(--text-secondary)', textTransform: 'uppercase', fontSize: '0.725rem', letterSpacing: '0.05em' }}>Title</th>
                 <th style={{ padding: '0.75rem 1rem', fontWeight: 800, color: 'var(--text-secondary)', textTransform: 'uppercase', fontSize: '0.725rem', letterSpacing: '0.05em' }}>Category</th>
-                <th style={{ padding: '0.75rem 1rem', fontWeight: 800, color: 'var(--text-secondary)', textTransform: 'uppercase', fontSize: '0.725rem', letterSpacing: '0.05em' }}>Risk</th>
-                <th style={{ padding: '0.75rem 1rem', fontWeight: 800, color: 'var(--text-secondary)', textTransform: 'uppercase', fontSize: '0.725rem', letterSpacing: '0.05em' }}>Raised Date</th>
-                <th style={{ padding: '0.75rem 1rem', fontWeight: 800, color: 'var(--text-secondary)', textTransform: 'uppercase', fontSize: '0.725rem', letterSpacing: '0.05em' }}>Closed Date</th>
-                <th style={{ padding: '0.75rem 1rem', fontWeight: 800, color: 'var(--text-secondary)', textTransform: 'uppercase', fontSize: '0.725rem', letterSpacing: '0.05em' }}>Status</th>
-                <th style={{ padding: '0.75rem 1rem', fontWeight: 800, color: 'var(--text-secondary)', textTransform: 'uppercase', fontSize: '0.725rem', letterSpacing: '0.05em', textAlign: 'right' }}>Actions</th>
+                <th style={{ padding: '0.75rem 1rem', fontWeight: 800, color: 'var(--text-secondary)', textTransform: 'uppercase', fontSize: '0.725rem', letterSpacing: '0.05em', whiteSpace: 'nowrap' }}>Risk</th>
+                <th style={{ padding: '0.75rem 1rem', fontWeight: 800, color: 'var(--text-secondary)', textTransform: 'uppercase', fontSize: '0.725rem', letterSpacing: '0.05em', whiteSpace: 'nowrap' }}>Raised Date</th>
+                <th style={{ padding: '0.75rem 1rem', fontWeight: 800, color: 'var(--text-secondary)', textTransform: 'uppercase', fontSize: '0.725rem', letterSpacing: '0.05em', whiteSpace: 'nowrap' }}>Closed Date</th>
+                <th style={{ padding: '0.75rem 1rem', fontWeight: 800, color: 'var(--text-secondary)', textTransform: 'uppercase', fontSize: '0.725rem', letterSpacing: '0.05em', whiteSpace: 'nowrap' }}>Status</th>
+                <th style={{ padding: '0.75rem 1rem', fontWeight: 800, color: 'var(--text-secondary)', textTransform: 'uppercase', fontSize: '0.725rem', letterSpacing: '0.05em', textAlign: 'right', whiteSpace: 'nowrap' }}>Actions</th>
               </tr>
             </thead>
             <tbody>
-              {sortedRequests.length > 0 ? (
-                sortedRequests.map(cr => (
+              {requests.length > 0 ? (
+                requests.map(cr => (
                   <tr key={cr.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
-                    <td style={{ padding: '0.85rem 1rem', fontWeight: 700, color: 'var(--text-primary)', fontFamily: 'var(--font-mono)' }}>{cr.id}</td>
-                    <td style={{ padding: '0.85rem 1rem', fontWeight: 700, color: 'var(--text-primary)' }}>{cr.title}</td>
-                    <td style={{ padding: '0.85rem 1rem', color: 'var(--text-secondary)' }}>{cr.category}</td>
-                    <td style={{ padding: '0.85rem 1rem' }}>
-                      <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}>
+                    <td style={{ padding: '0.85rem 1rem', fontWeight: 700, color: 'var(--text-primary)', fontFamily: 'var(--font-mono)', whiteSpace: 'nowrap' }}>{cr.id}</td>
+                    <td style={{ padding: '0.85rem 1rem', fontWeight: 700, color: 'var(--text-primary)', maxWidth: '280px', wordBreak: 'break-word' }}>{cr.title}</td>
+                    <td style={{ padding: '0.85rem 1rem', color: 'var(--text-secondary)', wordBreak: 'break-word' }}>{cr.category}</td>
+                    <td style={{ padding: '0.85rem 1rem', whiteSpace: 'nowrap' }}>
+                      <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', whiteSpace: 'nowrap' }}>
                         <div style={{ display: 'flex', gap: '2px', alignItems: 'center' }}>
                           {[1, 2, 3].map(bar => (
                             <div key={bar} style={{ width: '3px', height: '12px', borderRadius: '1px', backgroundColor: bar <= (cr.riskBars || 2) ? (cr.riskColor || '#D97706') : 'var(--border-color)' }} />
                           ))}
                         </div>
-                        <span style={{ fontWeight: 700, color: cr.riskColor || '#D97706', fontSize: '0.8rem' }}>{cr.risk || 'Medium'}</span>
+                        <span style={{ fontWeight: 700, color: cr.riskColor || '#D97706', fontSize: '0.8rem', whiteSpace: 'nowrap' }}>{cr.risk || 'Medium'}</span>
                       </div>
                     </td>
-                    <td style={{ padding: '0.85rem 1rem', color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)', fontSize: '0.8rem' }}>{cr.raisedDate}</td>
-                    <td style={{ padding: '0.85rem 1rem', color: 'var(--text-secondary)', fontSize: '0.8rem' }}>{cr.closedDate}</td>
-                    <td style={{ padding: '0.85rem 1rem' }}>
+                    <td style={{ padding: '0.85rem 1rem', color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)', fontSize: '0.8rem', whiteSpace: 'nowrap' }}>{cr.raisedDate}</td>
+                    <td style={{ padding: '0.85rem 1rem', color: 'var(--text-secondary)', fontSize: '0.8rem', whiteSpace: 'nowrap' }}>{cr.closedDate}</td>
+                    <td style={{ padding: '0.85rem 1rem', whiteSpace: 'nowrap' }}>
                       <div style={{
                         display: 'inline-flex',
                         alignItems: 'center',
@@ -217,13 +222,14 @@ export default function MyRequestsPage({ onNavigate, searchQuery = '', initialDa
                         backgroundColor: cr.statusBg || ((cr.status || '').toLowerCase() === 'draft' ? 'var(--input-bg)' : '#FEF3C7'),
                         color: cr.statusColor || ((cr.status || '').toLowerCase() === 'draft' ? 'var(--text-secondary)' : '#D97706'),
                         fontSize: '0.775rem',
-                        fontWeight: 700
+                        fontWeight: 700,
+                        whiteSpace: 'nowrap'
                       }}>
                         <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: cr.statusDot || ((cr.status || '').toLowerCase() === 'draft' ? '#94A0B0' : '#D97706') }} />
-                        <span>{cr.status}</span>
+                        <span style={{ whiteSpace: 'nowrap' }}>{cr.status}</span>
                       </div>
                     </td>
-                    <td style={{ padding: '0.85rem 1rem', textAlign: 'right' }}>
+                    <td style={{ padding: '0.85rem 1rem', textAlign: 'right', whiteSpace: 'nowrap' }}>
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '0.6rem' }}>
                         {(cr.status || '').toLowerCase() === 'draft' && (
                           <button
@@ -261,6 +267,15 @@ export default function MyRequestsPage({ onNavigate, searchQuery = '', initialDa
                     </td>
                   </tr>
                 ))
+              ) : isLoading ? (
+                <tr>
+                  <td colSpan={8} style={{ padding: '2.5rem', textAlign: 'center', color: 'var(--text-secondary)' }}>
+                    <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', fontWeight: 600, fontSize: '0.875rem' }}>
+                      <span style={{ display: 'inline-block', width: '16px', height: '16px', border: '2px solid var(--border-color)', borderTopColor: '#0D9488', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
+                      <span>Loading change requests...</span>
+                    </div>
+                  </td>
+                </tr>
               ) : (
                 <tr>
                   <td colSpan={8} style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-secondary)' }}>
@@ -271,96 +286,12 @@ export default function MyRequestsPage({ onNavigate, searchQuery = '', initialDa
             </tbody>
           </table>
         </div>
-
-        {/* Pagination Footer - Always Visible */}
-        {(() => {
-          const fromItem = totalItems === 0 ? 0 : (page - 1) * limit + 1;
-          const toItem = Math.min(page * limit, totalItems);
-          return (
-            <div style={{ padding: '0.85rem 1.25rem', borderTop: '1px solid var(--border-color)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', backgroundColor: 'var(--input-bg)', flexWrap: 'wrap', gap: '0.75rem' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '1.25rem', flexWrap: 'wrap' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.8rem', color: 'var(--text-secondary)', fontWeight: 600 }}>
-                  <span>Rows per page:</span>
-                  <select
-                    value={limit}
-                    onChange={(e) => {
-                      setLimit(Number(e.target.value));
-                      setPage(1);
-                    }}
-                    style={{
-                      padding: '0.25rem 0.5rem',
-                      backgroundColor: 'var(--card-bg)',
-                      color: 'var(--text-primary)',
-                      border: '1px solid var(--border-color)',
-                      borderRadius: '6px',
-                      fontSize: '0.8rem',
-                      fontWeight: 700,
-                      cursor: 'pointer'
-                    }}
-                  >
-                    <option value={5}>5</option>
-                    <option value={10}>10</option>
-                    <option value={25}>25</option>
-                    <option value={50}>50</option>
-                  </select>
-                </div>
-
-                <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', fontWeight: 600 }}>
-                  Showing <strong>{fromItem} – {toItem}</strong> of <strong>{totalItems}</strong> items
-                </span>
-              </div>
-
-              <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-                <button
-                  type="button"
-                  disabled={page <= 1}
-                  onClick={() => setPage(prev => Math.max(1, prev - 1))}
-                  style={{
-                    padding: '0.4rem 0.85rem',
-                    backgroundColor: 'var(--card-bg)',
-                    color: page <= 1 ? 'var(--text-secondary)' : 'var(--text-primary)',
-                    border: '1px solid var(--border-color)',
-                    borderRadius: '6px',
-                    fontSize: '0.8rem',
-                    fontWeight: 600,
-                    cursor: page <= 1 ? 'not-allowed' : 'pointer',
-                    opacity: page <= 1 ? 0.5 : 1
-                  }}
-                >
-                  Previous
-                </button>
-                <span style={{ fontSize: '0.8rem', color: 'var(--text-primary)', fontWeight: 700, padding: '0 0.25rem' }}>
-                  {page} / {totalPages || 1}
-                </span>
-                <button
-                  type="button"
-                  disabled={page >= totalPages || totalPages === 0}
-                  onClick={() => setPage(prev => Math.min(totalPages, prev + 1))}
-                  style={{
-                    padding: '0.4rem 0.85rem',
-                    backgroundColor: 'var(--card-bg)',
-                    color: page >= totalPages || totalPages === 0 ? 'var(--text-secondary)' : 'var(--text-primary)',
-                    border: '1px solid var(--border-color)',
-                    borderRadius: '6px',
-                    fontSize: '0.8rem',
-                    fontWeight: 600,
-                    cursor: page >= totalPages || totalPages === 0 ? 'not-allowed' : 'pointer',
-                    opacity: page >= totalPages || totalPages === 0 ? 0.5 : 1
-                  }}
-                >
-                  Next
-                </button>
-              </div>
-            </div>
-          );
-        })()}
       </div>
 
       {/* Change Request Details Modal */}
       {selectedRequest && (() => {
         const roleName = (user?.role || '').toLowerCase();
-        const roleId = user?.roleId || '';
-        const isApprover = roleName.includes('cab') || roleName.includes('manager') || roleName.includes('admin') || ['role-1', 'role-2', 'role-3'].includes(roleId);
+        const isApprover = (user?.roleId && ['role-1', 'role-2', 'role-3'].includes(user.roleId)) || roleName.includes('manager') || roleName.includes('admin');
         return (
           <ChangeRequestModal
             cr={selectedRequest}
@@ -376,3 +307,5 @@ export default function MyRequestsPage({ onNavigate, searchQuery = '', initialDa
     </div>
   );
 }
+
+export default React.memo(MyRequestsPage);

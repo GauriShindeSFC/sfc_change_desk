@@ -3,7 +3,7 @@ import { Send, ArrowLeft } from 'lucide-react';
 import { apiFetch } from '../lib/apiFetch';
 import { getSession } from '../lib/auth';
 
-export default function ChangeRequestFormPage({ onNavigate, initialData, user }) {
+function ChangeRequestFormPage({ onNavigate, initialData, user }) {
   const defaultCategories = [
     {
       id: 'cat-srv',
@@ -75,6 +75,7 @@ export default function ChangeRequestFormPage({ onNavigate, initialData, user })
   const [selectedSubcategoryId, setSelectedSubcategoryId] = useState(defaultCategories[0].subcategories[0].id);
   const [selectedSubcategory, setSelectedSubcategory] = useState(defaultCategories[0].subcategories[0]);
   const [fields, setFields] = useState([]);
+  const [fieldsLoading, setFieldsLoading] = useState(false);
   const [customFieldValues, setCustomFieldValues] = useState({});
 
   const isEditingDraft = Boolean(initialData?.id && initialData?.isDraft);
@@ -88,8 +89,8 @@ export default function ChangeRequestFormPage({ onNavigate, initialData, user })
     justification: initialData?.justification || initialData?.description || '',
     employeeName: initialData?.employeeName || activeSessionUser?.name || '',
     employeeEmail: initialData?.employeeEmail || activeSessionUser?.email || '',
+    employeeId: initialData?.employeeId || activeSessionUser?.employeeId || activeSessionUser?.empId || 'EMP-10432',
     location: initialData?.location || 'Ahmedabad HQ',
-    department: initialData?.department || 'IT Operations',
     managerEmail: initialData?.managerEmail || '',
     risk: initialData?.risk || 'Medium'
   }));
@@ -101,7 +102,8 @@ export default function ChangeRequestFormPage({ onNavigate, initialData, user })
       setFormData((prev) => ({
         ...prev,
         employeeName: prev.employeeName || currentUser.name || '',
-        employeeEmail: prev.employeeEmail || currentUser.email || ''
+        employeeEmail: prev.employeeEmail || currentUser.email || '',
+        employeeId: prev.employeeId || currentUser.employeeId || currentUser.empId || 'EMP-10432'
       }));
     }
   }, [user]);
@@ -173,6 +175,7 @@ export default function ChangeRequestFormPage({ onNavigate, initialData, user })
   useEffect(() => {
     if (!selectedSubcategoryId) return;
     const fetchFields = async () => {
+      setFieldsLoading(true);
       try {
         const res = await apiFetch(`/catalog/subcategories/${selectedSubcategoryId}/fields`);
         if (res.ok) {
@@ -180,10 +183,11 @@ export default function ChangeRequestFormPage({ onNavigate, initialData, user })
           if (body.data && Array.isArray(body.data)) {
             setFields(body.data);
             const initialVals = { ...(initialData?.customFieldValues || {}) };
+            const isOtherSubcat = selectedSubcategory?.name?.toLowerCase() === 'other' || selectedSubcategoryId?.endsWith('-oth');
             body.data.forEach((f) => {
               if (initialVals[f.fieldKey] === undefined || initialVals[f.fieldKey] === '') {
                 if (f.fieldType === 'dropdown' && f.options && f.options.length > 0) {
-                  initialVals[f.fieldKey] = f.options[0];
+                  initialVals[f.fieldKey] = isOtherSubcat && f.fieldKey === 'actionRequired' ? 'Other' : f.options[0];
                 } else if (f.fieldType === 'boolean') {
                   initialVals[f.fieldKey] = false;
                 } else {
@@ -191,11 +195,30 @@ export default function ChangeRequestFormPage({ onNavigate, initialData, user })
                 }
               }
             });
-            setCustomFieldValues(initialVals);
+            if (isOtherSubcat) {
+              initialVals.actionRequired = 'Other';
+            }
+            setCustomFieldValues(prev => {
+              const merged = { ...initialVals };
+              Object.keys(prev).forEach((key) => {
+                if (prev[key] === undefined || prev[key] === '') return;
+                const fieldDef = body.data.find(f => f.fieldKey === key);
+                const isValidDropdownValue =
+                  fieldDef?.fieldType === 'dropdown'
+                    ? (fieldDef.options?.includes(prev[key]) || (key === 'actionRequired' && prev[key] === 'Other'))
+                    : true;
+                if (isValidDropdownValue) {
+                  merged[key] = prev[key];
+                }
+              });
+              return merged;
+            });
           }
         }
       } catch (err) {
         console.warn('Failed to fetch subcategory fields:', err);
+      } finally {
+        setFieldsLoading(false);
       }
     };
     fetchFields();
@@ -329,7 +352,7 @@ export default function ChangeRequestFormPage({ onNavigate, initialData, user })
         <p style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', maxWidth: '460px', margin: '0 auto 1.75rem auto' }}>
           {isDraftSubmission
             ? 'Your request has been saved in your drafts. You can review and submit it anytime from My Requests.'
-            : 'Your change request has been routed to active CAB Approvers for quorum review.'}
+            : 'Your change request has been routed to Change Managers for review.'}
         </p>
 
         <div style={{ display: 'flex', justifyContent: 'center', gap: '0.75rem' }}>
@@ -561,35 +584,27 @@ export default function ChangeRequestFormPage({ onNavigate, initialData, user })
                   <label style={{ display: 'block', fontSize: '0.825rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '0.35rem' }}>
                     {field.fieldLabel} {field.isRequired ? '*' : ''}
                   </label>
-                  {field.fieldType === 'dropdown' ? (
-                    <div>
-                      <select
-                        value={customFieldValues[field.fieldKey] || ''}
-                        onChange={(e) => handleCustomFieldChange(field.fieldKey, e.target.value)}
-                        style={{
-                          width: '100%',
-                          padding: '0.65rem 0.85rem',
-                          backgroundColor: 'var(--card-bg)',
-                          border: '1px solid var(--border-color)',
-                          borderRadius: '8px',
-                          fontSize: '0.85rem',
-                          color: 'var(--text-primary)',
-                          outline: 'none'
-                        }}
-                      >
-                        {(() => {
-                          const opts = field.options ? [...field.options] : [];
-                          if (field.fieldKey === 'actionRequired' && !opts.includes('Other')) {
-                            opts.push('Other');
-                          }
-                          return opts.map((opt) => (
-                            <option key={opt} value={opt}>{opt}</option>
-                          ));
-                        })()}
-                      </select>
-
-                      {field.fieldKey === 'actionRequired' && customFieldValues.actionRequired === 'Other' && (
-                        <div style={{ marginTop: '0.65rem' }}>
+                  {(() => {
+                    const isOtherSubcat = selectedSubcategory?.name?.toLowerCase() === 'other' || selectedSubcategoryId?.endsWith('-oth');
+                    if (isOtherSubcat && field.fieldKey === 'actionRequired') {
+                      return (
+                        <div>
+                          <input
+                            type="text"
+                            disabled
+                            value="Other"
+                            style={{
+                              width: '100%',
+                              padding: '0.65rem 0.85rem',
+                              backgroundColor: 'var(--input-bg)',
+                              border: '1px solid var(--border-color)',
+                              borderRadius: '8px',
+                              fontSize: '0.85rem',
+                              color: 'var(--text-secondary)',
+                              outline: 'none',
+                              marginBottom: '0.65rem'
+                            }}
+                          />
                           <label style={{ display: 'block', fontSize: '0.825rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '0.35rem' }}>
                             Specify Other Action *
                           </label>
@@ -611,51 +626,125 @@ export default function ChangeRequestFormPage({ onNavigate, initialData, user })
                             }}
                           />
                         </div>
-                      )}
-                    </div>
-                  ) : field.fieldType === 'boolean' ? (
-                    <label style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
+                      );
+                    }
+
+                    if (field.fieldType === 'dropdown') {
+                      const isDisabled = fieldsLoading && field.fieldKey === 'actionRequired';
+                      return (
+                        <div>
+                          <select
+                            disabled={isDisabled}
+                            value={customFieldValues[field.fieldKey] || ''}
+                            onChange={(e) => handleCustomFieldChange(field.fieldKey, e.target.value)}
+                            style={{
+                              width: '100%',
+                              padding: '0.65rem 0.85rem',
+                              backgroundColor: isDisabled ? 'var(--input-bg)' : 'var(--card-bg)',
+                              border: '1px solid var(--border-color)',
+                              borderRadius: '8px',
+                              fontSize: '0.85rem',
+                              color: isDisabled ? 'var(--text-secondary)' : 'var(--text-primary)',
+                              outline: 'none',
+                              opacity: isDisabled ? 0.7 : 1,
+                              cursor: isDisabled ? 'not-allowed' : 'pointer'
+                            }}
+                          >
+                            {isDisabled ? (
+                              <option value="">Loading options...</option>
+                            ) : (
+                              (() => {
+                                const opts = field.options ? [...field.options] : [];
+                                if (field.fieldKey === 'actionRequired' && !opts.includes('Other')) {
+                                  opts.push('Other');
+                                }
+                                return opts.map((opt) => (
+                                  <option key={opt} value={opt}>{opt}</option>
+                                ));
+                              })()
+                            )}
+                          </select>
+
+                          {field.fieldKey === 'actionRequired' && customFieldValues.actionRequired === 'Other' && (
+                            <div style={{ marginTop: '0.65rem' }}>
+                              <label style={{ display: 'block', fontSize: '0.825rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '0.35rem' }}>
+                                Specify Other Action *
+                              </label>
+                              <input
+                                type="text"
+                                required
+                                placeholder="Enter custom action title / details..."
+                                value={customFieldValues.otherAction || ''}
+                                onChange={(e) => handleCustomFieldChange('otherAction', e.target.value)}
+                                style={{
+                                  width: '100%',
+                                  padding: '0.65rem 0.85rem',
+                                  backgroundColor: 'var(--card-bg)',
+                                  border: '1px solid var(--border-color)',
+                                  borderRadius: '8px',
+                                  fontSize: '0.85rem',
+                                  color: 'var(--text-primary)',
+                                  outline: 'none'
+                                }}
+                              />
+                            </div>
+                          )}
+                        </div>
+                      );
+                    }
+
+                    if (field.fieldType === 'boolean') {
+                      return (
+                        <label style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
+                          <input
+                            type="checkbox"
+                            checked={Boolean(customFieldValues[field.fieldKey])}
+                            onChange={(e) => handleCustomFieldChange(field.fieldKey, e.target.checked)}
+                          />
+                          <span style={{ fontSize: '0.85rem', color: 'var(--text-primary)' }}>Enable / Yes</span>
+                        </label>
+                      );
+                    }
+
+                    if (field.fieldType === 'date') {
+                      return (
+                        <input
+                          type="date"
+                          value={customFieldValues[field.fieldKey] || ''}
+                          onChange={(e) => handleCustomFieldChange(field.fieldKey, e.target.value)}
+                          style={{
+                            width: '100%',
+                            padding: '0.65rem 0.85rem',
+                            backgroundColor: 'var(--card-bg)',
+                            border: '1px solid var(--border-color)',
+                            borderRadius: '8px',
+                            fontSize: '0.85rem',
+                            color: 'var(--text-primary)',
+                            outline: 'none'
+                          }}
+                        />
+                      );
+                    }
+
+                    return (
                       <input
-                        type="checkbox"
-                        checked={Boolean(customFieldValues[field.fieldKey])}
-                        onChange={(e) => handleCustomFieldChange(field.fieldKey, e.target.checked)}
+                        type="text"
+                        placeholder={`Enter ${field.fieldLabel.toLowerCase()}`}
+                        value={customFieldValues[field.fieldKey] || ''}
+                        onChange={(e) => handleCustomFieldChange(field.fieldKey, e.target.value)}
+                        style={{
+                          width: '100%',
+                          padding: '0.65rem 0.85rem',
+                          backgroundColor: 'var(--card-bg)',
+                          border: '1px solid var(--border-color)',
+                          borderRadius: '8px',
+                          fontSize: '0.85rem',
+                          color: 'var(--text-primary)',
+                          outline: 'none'
+                        }}
                       />
-                      <span style={{ fontSize: '0.85rem', color: 'var(--text-primary)' }}>Enable / Yes</span>
-                    </label>
-                  ) : field.fieldType === 'date' ? (
-                    <input
-                      type="date"
-                      value={customFieldValues[field.fieldKey] || ''}
-                      onChange={(e) => handleCustomFieldChange(field.fieldKey, e.target.value)}
-                      style={{
-                        width: '100%',
-                        padding: '0.65rem 0.85rem',
-                        backgroundColor: 'var(--card-bg)',
-                        border: '1px solid var(--border-color)',
-                        borderRadius: '8px',
-                        fontSize: '0.85rem',
-                        color: 'var(--text-primary)',
-                        outline: 'none'
-                      }}
-                    />
-                  ) : (
-                    <input
-                      type="text"
-                      placeholder={`Enter ${field.fieldLabel.toLowerCase()}`}
-                      value={customFieldValues[field.fieldKey] || ''}
-                      onChange={(e) => handleCustomFieldChange(field.fieldKey, e.target.value)}
-                      style={{
-                        width: '100%',
-                        padding: '0.65rem 0.85rem',
-                        backgroundColor: 'var(--card-bg)',
-                        border: '1px solid var(--border-color)',
-                        borderRadius: '8px',
-                        fontSize: '0.85rem',
-                        color: 'var(--text-primary)',
-                        outline: 'none'
-                      }}
-                    />
-                  )}
+                    );
+                  })()}
                 </div>
               ))}
             </div>
@@ -706,27 +795,6 @@ export default function ChangeRequestFormPage({ onNavigate, initialData, user })
               }}
             />
           </div>
-
-          {/* Read-only Workflow Box */}
-          {selectedSubcategory && (
-            <div style={{
-              padding: '1rem',
-              backgroundColor: 'var(--input-bg)',
-              border: '1px solid var(--border-color)',
-              borderRadius: '8px'
-            }}>
-              <div style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase' }}>
-                Auto-Assigned Workflow (Read-Only)
-              </div>
-              <div style={{ fontSize: '0.9rem', fontWeight: 800, color: '#0D9488', marginTop: '0.2rem' }}>
-                {selectedSubcategory.workflow?.name || 'Standard Change Workflow'}
-              </div>
-              <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginTop: '0.2rem' }}>
-                {selectedSubcategory.workflow?.steps || 'Draft → Submitted → CAB Review → Approved → Closed'}
-              </div>
-            </div>
-          )}
-
         </div>
 
         {/* Section 2 Card: Employee Details */}
@@ -775,30 +843,23 @@ export default function ChangeRequestFormPage({ onNavigate, initialData, user })
             </div>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-            <div>
-              <label style={{ display: 'block', fontSize: '0.825rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '0.4rem' }}>
-                Department *
-              </label>
-              <select
-                value={formData.department}
-                onChange={(e) => handleInputChange('department', e.target.value)}
-                style={{ width: '100%', padding: '0.65rem 0.85rem', backgroundColor: 'var(--input-bg)', border: '1px solid var(--border-color)', borderRadius: '8px', fontSize: '0.85rem', color: 'var(--text-primary)', outline: 'none' }}
-              >
-                <option value="IT Operations">IT Operations</option>
-                <option value="DevOps & Infrastructure">DevOps & Infrastructure</option>
-                <option value="Cybersecurity">Cybersecurity</option>
-                <option value="Software Engineering">Software Engineering</option>
-                <option value="Enterprise Systems">Enterprise Systems</option>
-                <option value="Human Resources">Human Resources</option>
-                <option value="Finance & Accounts">Finance & Accounts</option>
-              </select>
-            </div>
+          <div style={{ marginBottom: '1rem' }}>
+            <label style={{ display: 'block', fontSize: '0.825rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '0.4rem' }}>
+              Employee ID
+            </label>
+            <input
+              type="text"
+              placeholder="e.g. EMP-10432"
+              value={formData.employeeId}
+              onChange={(e) => handleInputChange('employeeId', e.target.value)}
+              style={{ width: '100%', padding: '0.65rem 0.85rem', backgroundColor: 'var(--input-bg)', border: '1px solid var(--border-color)', borderRadius: '8px', fontSize: '0.85rem', color: 'var(--text-primary)', outline: 'none' }}
+            />
+          </div>
 
-            <div>
-              <label style={{ display: 'block', fontSize: '0.825rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '0.4rem' }}>
-                Location *
-              </label>
+          <div style={{ marginBottom: '1rem' }}>
+            <label style={{ display: 'block', fontSize: '0.825rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '0.4rem' }}>
+              Location *
+            </label>
               <select
                 value={formData.location}
                 onChange={(e) => handleInputChange('location', e.target.value)}
@@ -811,7 +872,6 @@ export default function ChangeRequestFormPage({ onNavigate, initialData, user })
                 <option value="Remote">Remote</option>
               </select>
             </div>
-          </div>
 
           <div>
             <label style={{ display: 'block', fontSize: '0.825rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '0.4rem' }}>
@@ -834,3 +894,5 @@ export default function ChangeRequestFormPage({ onNavigate, initialData, user })
     </form>
   );
 }
+
+export default React.memo(ChangeRequestFormPage);

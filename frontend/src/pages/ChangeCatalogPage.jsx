@@ -2,16 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { Plus, X, ArrowRight } from 'lucide-react';
 import { apiFetch } from '../lib/apiFetch';
 
-export default function ChangeCatalogPage({ onNavigate, searchQuery = '', user }) {
+function ChangeCatalogPage({ onNavigate, searchQuery = '', user }) {
   const roleName = (user?.role || '').toLowerCase();
   const roleId = user?.roleId || '';
   const canManageCatalog =
-    roleName.includes('admin') ||
-    roleName.includes('manager') ||
-    roleName.includes('cab') ||
-    roleName.includes('cam') ||
-    roleName.includes('approver') ||
-    ['role-1', 'role-2', 'role-3'].includes(roleId);
+    roleId === 'role-1' || roleName === 'super admin' || roleName.includes('super admin');
 
   const defaultItems = [
     // 1. Server & Infra
@@ -118,6 +113,12 @@ export default function ChangeCatalogPage({ onNavigate, searchQuery = '', user }
     'Security Tools & Policies'
   ];
 
+  const isOtherItem = (item) => {
+    const titleLower = (item.title || '').toLowerCase();
+    const idLower = (item.id || '').toLowerCase();
+    return titleLower === 'other' || titleLower.startsWith('other ') || titleLower.startsWith('other') || idLower.endsWith('-oth');
+  };
+
   const filteredItems = items.filter(item => {
     const matchesCat = activeCategory === 'All items' || (item.category && item.category.toLowerCase() === activeCategory.toLowerCase());
     const q = searchQuery.trim().toLowerCase();
@@ -126,6 +127,12 @@ export default function ChangeCatalogPage({ onNavigate, searchQuery = '', user }
       (item.category || '').toLowerCase().includes(q) ||
       (item.description || '').toLowerCase().includes(q);
     return matchesCat && matchesQuery;
+  }).sort((a, b) => {
+    const aIsOther = isOtherItem(a);
+    const bIsOther = isOtherItem(b);
+    if (aIsOther && !bIsOther) return 1;
+    if (!aIsOther && bIsOther) return -1;
+    return 0;
   });
 
   const handleSaveCatalogItem = async (e) => {
@@ -199,30 +206,6 @@ export default function ChangeCatalogPage({ onNavigate, searchQuery = '', user }
             Pre-approved templates for standardized changes · select a category to start your request
           </p>
         </div>
-
-        {canManageCatalog && (
-          <button
-            type="button"
-            onClick={() => setIsModalOpen(true)}
-            style={{
-              padding: '0.55rem 1.1rem',
-              backgroundColor: '#0D9488',
-              color: '#FFFFFF',
-              border: 'none',
-              borderRadius: '8px',
-              fontSize: '0.85rem',
-              fontWeight: 700,
-              cursor: 'pointer',
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '0.4rem',
-              boxShadow: '0 1px 3px rgba(13, 148, 136, 0.2)'
-            }}
-          >
-            <Plus size={16} />
-            <span>Add Catalog Item</span>
-          </button>
-        )}
       </div>
 
       {/* Load Failure Warning Banner */}
@@ -380,249 +363,8 @@ export default function ChangeCatalogPage({ onNavigate, searchQuery = '', user }
         ))}
       </div>
 
-      {/* Add Catalog Item Modal Dialog */}
-      {isModalOpen && (
-        <div style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          backgroundColor: 'rgba(0, 0, 0, 0.5)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          zIndex: 200,
-          padding: '1rem'
-        }}>
-          <div style={{
-            backgroundColor: 'var(--card-bg)',
-            border: '1px solid var(--border-color)',
-            borderRadius: '16px',
-            width: '100%',
-            maxWidth: '560px',
-            maxHeight: '90vh',
-            overflowY: 'auto',
-            boxShadow: '0 20px 40px rgba(0, 0, 0, 0.2)',
-            display: 'flex',
-            flexDirection: 'column'
-          }}>
-            
-            {/* Modal Header */}
-            <div style={{ padding: '1.5rem 1.75rem 1rem 1.75rem', display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', borderBottom: '1px solid var(--border-color)' }}>
-              <div>
-                <h2 style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--text-primary)', margin: 0, lineHeight: 1.3 }}>
-                  Add Catalog Item
-                </h2>
-                <p style={{ fontSize: '0.825rem', color: 'var(--text-secondary)', margin: 0, marginTop: '0.25rem' }}>
-                  This item will appear in the Change Catalog for requesters to select
-                </p>
-              </div>
-              <button onClick={() => setIsModalOpen(false)} style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', padding: '0.2rem' }}>
-                <X size={20} />
-              </button>
-            </div>
-
-            {/* Modal Form Body */}
-            <form onSubmit={handleSaveCatalogItem} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', padding: '1.5rem 1.75rem' }}>
-                           <div>
-                <label style={{ display: 'block', fontSize: '0.825rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '0.4rem' }}>
-                  Item name *
-                </label>
-                <input
-                  type="text"
-                  required
-                  placeholder="e.g. Database Schema Change"
-                  value={newItem.title}
-                  onChange={(e) => setNewItem(prev => ({ ...prev, title: e.target.value }))}
-                  style={{
-                    width: '100%',
-                    padding: '0.65rem 0.85rem',
-                    backgroundColor: 'var(--input-bg)',
-                    border: '1px solid var(--border-color)',
-                    borderRadius: '8px',
-                    fontSize: '0.85rem',
-                    color: 'var(--text-primary)',
-                    outline: 'none'
-                  }}
-                />
-              </div>
-
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.825rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '0.4rem' }}>
-                    Category *
-                  </label>
-                  <select
-                    value={newItem.category}
-                    onChange={(e) => setNewItem(prev => ({ ...prev, category: e.target.value }))}
-                    style={{
-                      width: '100%',
-                      padding: '0.65rem 0.85rem',
-                      backgroundColor: 'var(--input-bg)',
-                      border: '1px solid var(--border-color)',
-                      borderRadius: '8px',
-                      fontSize: '0.85rem',
-                      color: 'var(--text-primary)',
-                      outline: 'none'
-                    }}
-                  >
-                    <option value="Server & Infra">Server & Infra</option>
-                    <option value="Network & Connectivity">Network & Connectivity</option>
-                    <option value="Access & Security">Access & Security</option>
-                    <option value="IT Asset">IT Asset</option>
-                    <option value="Office 365 & Collaboration">Office 365 & Collaboration</option>
-                    <option value="Security Tools & Policies">Security Tools & Policies</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.825rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '0.4rem' }}>
-                    SLA
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="e.g. 3 business days"
-                    value={newItem.sla}
-                    onChange={(e) => setNewItem(prev => ({ ...prev, sla: e.target.value }))}
-                    style={{
-                      width: '100%',
-                      padding: '0.65rem 0.85rem',
-                      backgroundColor: 'var(--input-bg)',
-                      border: '1px solid var(--border-color)',
-                      borderRadius: '8px',
-                      fontSize: '0.85rem',
-                      color: 'var(--text-primary)',
-                      outline: 'none'
-                    }}
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label style={{ display: 'block', fontSize: '0.825rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '0.4rem' }}>
-                  Description *
-                </label>
-                <textarea
-                  rows={3}
-                  required
-                  placeholder="What this catalog item covers..."
-                  value={newItem.description}
-                  onChange={(e) => setNewItem(prev => ({ ...prev, description: e.target.value }))}
-                  style={{
-                    width: '100%',
-                    padding: '0.65rem 0.85rem',
-                    backgroundColor: 'var(--input-bg)',
-                    border: '1px solid var(--border-color)',
-                    borderRadius: '8px',
-                    fontSize: '0.85rem',
-                    color: 'var(--text-primary)',
-                    outline: 'none',
-                    resize: 'vertical'
-                  }}
-                />
-              </div>
-
-              {/* Risk Level Selector */}
-              <div>
-                <label style={{ display: 'block', fontSize: '0.825rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '0.4rem' }}>
-                  Risk level *
-                </label>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.75rem' }}>
-                  {['Low', 'Medium', 'High'].map(riskLevel => {
-                    const isSelected = newItem.risk === riskLevel;
-                    return (
-                      <button
-                        key={riskLevel}
-                        type="button"
-                        onClick={() => setNewItem(prev => ({ ...prev, risk: riskLevel }))}
-                        style={{
-                          padding: '0.6rem',
-                          borderRadius: '8px',
-                          border: isSelected ? '1px solid #0D9488' : '1px solid var(--border-color)',
-                          backgroundColor: isSelected ? '#E6F4F1' : 'var(--card-bg)',
-                          color: isSelected ? '#0D9488' : 'var(--text-primary)',
-                          fontSize: '0.85rem',
-                          fontWeight: isSelected ? 700 : 500,
-                          cursor: 'pointer'
-                        }}
-                      >
-                        {riskLevel}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* Approval Workflow Selector */}
-              <div>
-                <label style={{ display: 'block', fontSize: '0.825rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '0.4rem' }}>
-                  Approval workflow *
-                </label>
-                <select
-                  value={newItem.workflow}
-                  onChange={(e) => setNewItem(prev => ({ ...prev, workflow: e.target.value }))}
-                  style={{
-                    width: '100%',
-                    padding: '0.65rem 0.85rem',
-                    backgroundColor: 'var(--input-bg)',
-                    border: '1px solid var(--border-color)',
-                    borderRadius: '8px',
-                    fontSize: '0.85rem',
-                    color: 'var(--text-primary)',
-                    outline: 'none'
-                  }}
-                >
-                  <option value="Standard Change Workflow">Standard Change Workflow</option>
-                  <option value="Expedited Workflow">Expedited Workflow</option>
-                  <option value="Lightweight Access Workflow">Lightweight Access Workflow</option>
-                  <option value="Emergency Approval Flow">Emergency Approval Flow</option>
-                </select>
-              </div>
-
-              {/* Modal Footer Actions */}
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid var(--border-color)' }}>
-                <button
-                  type="button"
-                  onClick={() => setIsModalOpen(false)}
-                  style={{
-                    padding: '0.65rem 1.25rem',
-                    backgroundColor: 'var(--card-bg)',
-                    border: '1px solid var(--border-color)',
-                    borderRadius: '8px',
-                    fontSize: '0.85rem',
-                    fontWeight: 600,
-                    color: 'var(--text-primary)',
-                    cursor: 'pointer'
-                  }}
-                >
-                  Cancel
-                </button>
-
-                <button
-                  type="submit"
-                  style={{
-                    padding: '0.65rem 1.35rem',
-                    backgroundColor: '#0D9488',
-                    color: '#FFFFFF',
-                    border: 'none',
-                    borderRadius: '8px',
-                    fontSize: '0.85rem',
-                    fontWeight: 700,
-                    cursor: 'pointer',
-                    boxShadow: '0 1px 3px rgba(13, 148, 136, 0.2)'
-                  }}
-                >
-                  Save catalog item
-                </button>
-              </div>
-
-            </form>
-
-          </div>
-        </div>
-      )}
-
     </div>
   );
 }
+
+export default React.memo(ChangeCatalogPage);

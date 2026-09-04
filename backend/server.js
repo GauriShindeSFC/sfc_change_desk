@@ -5,7 +5,9 @@ import dashboardRoutes from './routes/dashboard.js';
 import authRoutes from './routes/auth.js';
 import { requireAuth } from './middlewares/auth.js';
 import { errorHandler, notFoundHandler } from './middlewares/errorHandler.js';
-import { sequelize } from './models/index.js';
+import { Op } from 'sequelize';
+import { sequelize, Role, User, ChangeManagerCategory } from './models/index.js';
+import { roles } from './data/seed.js';
 import { verifyMailTransport } from './services/mailService.js';
 import { initScheduler } from './services/schedulerService.js';
 
@@ -37,15 +39,44 @@ app.use('/api/dashboard', requireAuth, dashboardRoutes); // every dashboard rout
 app.use(notFoundHandler);
 app.use(errorHandler);
 
+const syncRolesInDb = async () => {
+  try {
+    // Delete any old/deprecated roles not matching our 4 active roles
+    const validRoleIds = roles.map((r) => r.id);
+    await Role.destroy({ where: { id: { [Op.notIn]: validRoleIds } } }).catch(() => {});
+
+    for (const r of roles) {
+      await Role.upsert(r).catch(() => {});
+    }
+
+    // Remap any orphaned users missing a roleId to role-4 (Requester - least privileged)
+    await User.update({ roleId: 'role-4' }, { where: { roleId: null } }).catch(() => {});
+
+    // Ensure default category assignments exist for Change Managers if empty
+    const cmCatCount = await ChangeManagerCategory.count().catch(() => 0);
+    if (cmCatCount === 0) {
+      const defaultAssignments = [
+        { id: 'cmc-usr-1-cat-srv', userId: 'usr-1', categoryId: 'cat-srv' },
+        { id: 'cmc-usr-1-cat-net', userId: 'usr-1', categoryId: 'cat-net' },
+        { id: 'cmc-usr-1-cat-acc', userId: 'usr-1', categoryId: 'cat-acc' },
+        { id: 'cmc-usr-1-cat-asset', userId: 'usr-1', categoryId: 'cat-asset' }
+      ];
+      for (const item of defaultAssignments) {
+        await ChangeManagerCategory.upsert(item).catch(() => {});
+      }
+    }
+    console.log('[ChangeDesk Backend] Synced 4 system roles and category assignments in database');
+  } catch (syncErr) {
+    console.warn('[ChangeDesk Backend] Role/Category sync notice:', syncErr.message);
+  }
+};
+
 const start = async () => {
   try {
     await sequelize.authenticate();
     console.log('[ChangeDesk Backend] Database connection established');
-    // Create any missing tables without touching existing data.
-    // Use `npm run db:sync` / `db:sync:force` for seeding or a full rebuild.
     if (process.env.DB_SYNC === 'true') {
       await sequelize.sync();
-      console.log('[ChangeDesk Backend] sequelize.sync() complete');
     }
   } catch (err) {
     console.error('[ChangeDesk Backend] Database connection FAILED:', err.message);

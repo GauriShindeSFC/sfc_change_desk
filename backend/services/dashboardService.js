@@ -17,7 +17,8 @@ import {
   AuditLog,
   Notification,
   AppConfig,
-  ScheduledReport
+  ScheduledReport,
+  ChangeManagerCategory
 } from '../models/index.js';
 import bcrypt from 'bcryptjs';
 import { formatTimestamp } from '../data/store.js';
@@ -184,39 +185,206 @@ export const getChangeRequestsService = async () => {
   return rows.map(serializeChangeRequest);
 };
 
-export const filterChangeRequestsByCategoryService = async (category, requesterId, page = 1, limit = 10, status = null) => {
+export const getFilteredChangeRequests = async ({
+  userId = null,
+  isWorklist = false,
+  actingUserId = null,
+  status = null,
+  dateFilter = null,
+  searchQuery = null,
+  page = 1,
+  limit = 10
+}) => {
   const p = Math.max(1, parseInt(page, 10) || 1);
-  const l = Math.max(1, parseInt(limit, 10) || 10);
+  const l = Math.max(1, Math.min(100, parseInt(limit, 10) || 10));
   const offset = (p - 1) * l;
 
-  const rawFilter = (status || category || '').toLowerCase();
-  const isStatusFilter = ['pending', 'approved', 'in progress', 'rejected', 'draft'].includes(rawFilter);
+  const baseWhere = {};
 
-  const where = {
-    ...(requesterId ? { requesterId } : {}),
-    ...(category && category.toLowerCase() !== 'all' && !isStatusFilter ? { category: { [Op.iLike]: `%${category}%` } } : {}),
-    ...(isStatusFilter
-      ? (rawFilter === 'draft'
-          ? { [Op.or]: [{ status: { [Op.iLike]: '%draft%' } }, { isDraft: true }] }
-          : { status: { [Op.iLike]: `%${rawFilter}%` } })
-      : {})
+  if (userId) {
+    baseWhere.requesterId = userId;
+  }
+
+  if (isWorklist) {
+    baseWhere.status = { [Op.ne]: 'Draft' };
+    baseWhere.isDraft = false;
+  }
+
+  if (dateFilter && dateFilter !== 'overall') {
+    const now = new Date();
+    if (dateFilter === 'last_7_days') {
+      const sevenDaysAgo = new Date();
+      sevenDaysAgo.setDate(now.getDate() - 7);
+      baseWhere.submittedAt = { [Op.gte]: sevenDaysAgo };
+    } else if (dateFilter === 'this_month') {
+      baseWhere.submittedAt = {
+        [Op.gte]: new Date(now.getFullYear(), now.getMonth(), 1),
+        [Op.lt]: new Date(now.getFullYear(), now.getMonth() + 1, 1)
+      };
+    } else if (dateFilter === 'last_month') {
+      baseWhere.submittedAt = {
+        [Op.gte]: new Date(now.getFullYear(), now.getMonth() - 1, 1),
+        [Op.lt]: new Date(now.getFullYear(), now.getMonth(), 1)
+      };
+    }
+  }
+
+  if (searchQuery && String(searchQuery).trim()) {
+    const query = String(searchQuery).trim();
+    baseWhere[Op.or] = [
+      { id: { [Op.iLike]: `%${query}%` } },
+      { title: { [Op.iLike]: `%${query}%` } },
+      { category: { [Op.iLike]: `%${query}%` } },
+      { subCategory: { [Op.iLike]: `%${query}%` } }
+    ];
+  }
+
+  // STEP 2: Compute Status Counts (Lightweight DB query over baseWhere)
+  const statusCounts = {
+    All: 0,
+    Pending: 0,
+    Approved: 0,
+    'In progress': 0,
+    Rejected: 0,
+    Draft: 0
   };
 
-  const { count: total, rows } = await ChangeRequest.findAndCountAll({
-    where,
-    include: CR_INCLUDE,
-    order: [['id', 'DESC'], ['submittedAt', 'DESC'], ['createdAt', 'DESC']],
-    limit: l,
-    offset
+  const countRows = await ChangeRequest.findAll({
+    where: baseWhere,
+    attributes: ['id', 'status', 'isDraft'],
+    raw: true
   });
 
+  for (const row of countRows) {
+    const st = (row.status || '').toLowerCase();
+
+    statusCounts.All += 1;
+
+    if (st === 'pending' || st === 'submitted') statusCounts.Pending += 1;
+    else if (st === 'approved') statusCounts.Approved += 1;
+    else if (st === 'in progress' || st === 'scheduled' || st === 'implemented') statusCounts['In progress'] += 1;
+    else if (st === 'rejected') statusCounts.Rejected += 1;
+    else if (st === 'draft' || row.isDraft) statusCounts.Draft += 1;
+  }
+
+  const queryWhere = { ...baseWhere };
+  if (status && status.toLowerCase() !== 'all') {
+    const stLower = status.toLowerCase();
+    if (stLower === 'pending') {
+      queryWhere.status = { [Op.iLike]: '%pending%' };
+    } else if (stLower === 'approved') {
+      queryWhere.status = 'Approved';
+    } else if (stLower === 'in progress') {
+      queryWhere.status = { [Op.or]: ['In progress', 'Scheduled', 'Implemented'] };
+    } else if (stLower === 'rejected') {
+      queryWhere.status = 'Rejected';
+    } else if (stLower === 'draft') {
+      queryWhere[Op.or] = [{ status: { [Op.iLike]: '%draft%' } }, { isDraft: true }];
+    }
+  }
+
+  const { count: total, rows } = await ChangeRequest.findAndCountAll({
+    where: queryWhere,
+    include: CR_INCLUDE,
+    order: [['submittedAt', 'DESC'], ['createdAt', 'DESC'], ['id', 'DESC']]
+  });
+
+  let userApprovalMap = new Map();
+  let decidedByMap = new Map();
+  let isSuperOrAdmin = true;
+  let isChangeManager = false;
+  let assignedCategoryIds = new Set();
+  let categoryNameToIdMap = new Map();
+
+  if (isWorklist && actingUserId) {
+    const userApprovals = await ChangeRequestApproval.findAll({
+      where: { approverId: actingUserId }
+    });
+    userApprovalMap = new Map(userApprovals.map((a) => [a.changeRequestId, a.decision]));
+
+    const allDecidedApprovals = await ChangeRequestApproval.findAll({
+      where: { decision: { [Op.ne]: 'Pending' } },
+      include: [{ model: User, as: 'approver', attributes: ['id', 'name'] }]
+    });
+    for (const a of allDecidedApprovals) {
+      if (a.approver?.name) decidedByMap.set(a.changeRequestId, a.approver.name);
+    }
+
+    const actingUser = await User.findByPk(actingUserId, {
+      include: [
+        { model: Role, as: 'role' },
+        { model: ChangeManagerCategory, as: 'categoryAssignments' }
+      ]
+    });
+
+    const roleName = (actingUser?.role?.name || '').toLowerCase();
+    const roleId = actingUser?.roleId || '';
+    isSuperOrAdmin = ['role-1', 'role-2'].includes(roleId) || roleName.includes('admin') || roleName.includes('super');
+    isChangeManager = roleId === 'role-3' || roleName.includes('manager');
+
+    assignedCategoryIds = new Set((actingUser?.categoryAssignments || []).map((c) => c.categoryId));
+
+    const allCategories = await CatalogCategory.findAll({ attributes: ['id', 'name'] });
+    for (const c of allCategories) {
+      categoryNameToIdMap.set(c.id, c.id);
+      if (c.name) categoryNameToIdMap.set(c.name.toLowerCase().trim(), c.id);
+    }
+  }
+
+  const data = rows.map((cr) => {
+    const serialized = isWorklist ? serializeWorklistEntry(cr) : serializeChangeRequest(cr);
+
+    if (isWorklist) {
+      const myDecision = userApprovalMap.get(cr.id) || 'Pending';
+
+      let isCategoryAssigned = true;
+      if (isChangeManager && !isSuperOrAdmin) {
+        const resolvedCategoryId = cr.categoryId || categoryNameToIdMap.get((cr.category || '').toLowerCase().trim());
+        isCategoryAssigned = resolvedCategoryId ? assignedCategoryIds.has(resolvedCategoryId) : false;
+      }
+
+      const canAct = isSuperOrAdmin
+        ? (myDecision === 'Pending' && cr.status === 'Pending')
+        : (isCategoryAssigned && myDecision === 'Pending' && cr.status === 'Pending');
+
+      const decidedBy = decidedByMap.get(cr.id) || (cr.status === 'Approved' || cr.status === 'Rejected' ? 'Gauri Shinde' : '—');
+      return {
+        ...serialized,
+        status: cr.status,
+        myDecision,
+        decidedBy,
+        canAct
+      };
+    }
+
+    return serialized;
+  });
+
+  const metrics = {
+    pending: statusCounts.Pending || 0,
+    approved: statusCounts.Approved || 0,
+    rejected: statusCounts.Rejected || 0,
+    sentBack: statusCounts.Draft || 0
+  };
+
   return {
-    data: rows.map(serializeChangeRequest),
+    data,
     total,
     page: p,
     limit: l,
-    totalPages: Math.max(1, Math.ceil(total / l))
+    totalPages: Math.max(1, Math.ceil(total / l)),
+    statusCounts,
+    metrics
   };
+};
+
+export const filterChangeRequestsByCategoryService = async (category, requesterId, page = 1, limit = 10, status = null) => {
+  return getFilteredChangeRequests({
+    userId: requesterId,
+    status: status || (category !== 'all' ? category : null),
+    page,
+    limit
+  });
 };
 
 const nextChangeRequestId = async (tx) => {
@@ -238,18 +406,49 @@ const nextChangeRequestId = async (tx) => {
   }
 };
 
-const createApprovalSnapshot = async (changeRequest, tx) => {
-  const activeApprovers = await User.findAll({
+export async function getVotersForCategory(categoryId, tx) {
+  // 1. All active Admins (roleId = 'role-2' or role name 'Admin')
+  const admins = await User.findAll({
     where: { status: 'Active' },
-    include: [{ model: Role, as: 'role', where: { name: 'CAB Approver' } }],
+    include: [{ model: Role, as: 'role', where: { [Op.or]: [{ id: 'role-2' }, { name: 'Admin' }] } }],
     transaction: tx
   });
 
-  if (activeApprovers.length > 0) {
+  // 2. Active Change Managers (roleId = 'role-3' or role name 'Change Manager') assigned to this category
+  const changeManagers = await User.findAll({
+    where: { status: 'Active' },
+    include: [
+      { model: Role, as: 'role', where: { [Op.or]: [{ id: 'role-3' }, { name: 'Change Manager' }] } },
+      {
+        model: ChangeManagerCategory,
+        as: 'categoryAssignments',
+        where: categoryId ? { categoryId } : {},
+        required: true
+      }
+    ],
+    transaction: tx
+  });
+
+  if (changeManagers.length === 0) {
+    console.warn(`[Quorum Warning] Category "${categoryId || 'Unspecified'}" has ZERO assigned Change Managers. Routing approval to Admins alone.`);
+  }
+
+  // Combine unique voters by user id
+  const voterMap = new Map();
+  for (const u of [...admins, ...changeManagers]) {
+    voterMap.set(u.id, u);
+  }
+  return Array.from(voterMap.values());
+}
+
+const createApprovalSnapshot = async (changeRequest, tx) => {
+  const voters = await getVotersForCategory(changeRequest.categoryId, tx);
+
+  if (voters.length > 0) {
     await ChangeRequestApproval.bulkCreate(
-      activeApprovers.map((a) => ({
+      voters.map((v) => ({
         changeRequestId: changeRequest.id,
-        approverId: a.id,
+        approverId: v.id,
         decision: 'Pending'
       })),
       { transaction: tx }
@@ -305,7 +504,6 @@ export const updateDraftChangeRequestService = async (id, actorId, payload = {})
   if (payload.hostname !== undefined) cr.hostname = payload.hostname;
   if (payload.location) cr.location = payload.location;
   if (payload.environment) cr.environment = payload.environment;
-  if (payload.department) cr.department = payload.department;
   if (payload.contactNumber !== undefined) cr.contactNumber = payload.contactNumber;
   if (payload.managerEmail !== undefined) cr.managerEmail = payload.managerEmail;
   if (payload.customFieldValues) cr.customFieldValues = payload.customFieldValues;
@@ -375,12 +573,12 @@ export const submitDraftChangeRequestService = async (id, actorId = 'usr-1') => 
   return serializeChangeRequest(updated);
 };
 
-// Emails of every active "CAB Approver" — the people who review new CRs.
+// Emails of active Change Managers, Admins & Super Admins.
 const getApproverEmails = async () => {
   const rows = await User.findAll({
     attributes: ['email'],
     where: { status: 'Active' },
-    include: [{ model: Role, as: 'role', attributes: [], where: { name: 'CAB Approver' } }],
+    include: [{ model: Role, as: 'role', attributes: [], where: { name: { [Op.in]: ['Change Manager', 'Admin', 'Super Admin'] } } }],
     raw: true
   });
   return rows.map((r) => r.email).filter(Boolean);
@@ -456,7 +654,7 @@ export const createChangeRequestService = async (payload = {}) => {
     title: payload.title || 'Untitled change request',
     category: categoryName,
     subCategory: subCategoryName,
-    department: payload.department || requesterUser?.department || '',
+    employeeId: payload.employeeId || requesterUser?.employeeId || '',
     contactNumber: payload.contactNumber || '',
     managerEmail: payload.managerEmail || '',
     hostname: payload.hostname || '',
@@ -523,68 +721,17 @@ export const createChangeRequestService = async (payload = {}) => {
 
 // ---------- CAB worklist ------------------------------
 
-export const getWorklistService = async (actingUserId = 'usr-1', page = 1, limit = 10) => {
-  const p = Math.max(1, parseInt(page, 10) || 1);
-  const l = Math.max(1, parseInt(limit, 10) || 10);
-  const offset = (p - 1) * l;
-
-  const { count: total, rows: allCRs } = await ChangeRequest.findAndCountAll({
-    include: CR_INCLUDE,
-    order: [['id', 'DESC'], ['submittedAt', 'DESC'], ['createdAt', 'DESC']],
-    limit: l,
-    offset
+export const getWorklistService = async (actingUserId = 'usr-1', page = 1, limit = 10, status = null, dateFilter = null, searchQuery = null) => {
+  return getFilteredChangeRequests({
+    userId: null,
+    isWorklist: true,
+    actingUserId,
+    status,
+    dateFilter,
+    searchQuery,
+    page,
+    limit
   });
-
-  const userApprovals = await ChangeRequestApproval.findAll({
-    where: { approverId: actingUserId }
-  });
-  const userApprovalMap = new Map(userApprovals.map((a) => [a.changeRequestId, a.decision]));
-
-  const allDecidedApprovals = await ChangeRequestApproval.findAll({
-    where: { decision: { [Op.ne]: 'Pending' } },
-    include: [{ model: User, as: 'approver', attributes: ['id', 'name'] }]
-  });
-  const decidedByMap = new Map();
-  for (const a of allDecidedApprovals) {
-    if (a.approver?.name) {
-      decidedByMap.set(a.changeRequestId, a.approver.name);
-    }
-  }
-
-  const data = allCRs.map((cr) => {
-    const serialized = serializeWorklistEntry(cr);
-    const myDecision = userApprovalMap.get(cr.id) || 'Pending';
-    const canAct = myDecision === 'Pending' && cr.status === 'Pending';
-    const decidedBy = decidedByMap.get(cr.id) || (cr.status === 'Approved' || cr.status === 'Rejected' ? 'Gauri Shinde' : '—');
-    return {
-      ...serialized,
-      status: cr.status,
-      myDecision,
-      decidedBy,
-      canAct
-    };
-  });
-
-  const pendingCount = await ChangeRequest.count({ where: { status: 'Pending' } });
-  const approvedCount = await ChangeRequest.count({ where: { status: 'Approved' } });
-  const rejectedCount = await ChangeRequest.count({ where: { status: 'Rejected' } });
-  const sentBackCount = await ChangeRequest.count({ where: { [Op.or]: [{ status: 'Draft' }, { isDraft: true }] } });
-
-  const dynamicMetrics = {
-    pending: pendingCount,
-    approved: approvedCount,
-    rejected: rejectedCount,
-    sentBack: sentBackCount
-  };
-
-  return {
-    data,
-    total,
-    page: p,
-    limit: l,
-    totalPages: Math.max(1, Math.ceil(total / l)),
-    metrics: dynamicMetrics
-  };
 };
 
 export const applyWorklistActionService = async ({ id, action, rejectionReason = '', actorId = 'usr-1' } = {}) => {
@@ -680,7 +827,19 @@ export const getCatalogCategoriesService = async () => {
     ],
     order: [['sortOrder', 'ASC']]
   });
-  return rows.map((c) => c.get({ plain: true }));
+  return rows.map((c) => {
+    const plain = c.get({ plain: true });
+    if (plain.subcategories && Array.isArray(plain.subcategories)) {
+      plain.subcategories.sort((a, b) => {
+        const aIsOther = (a.name || '').toLowerCase() === 'other' || (a.id || '').endsWith('-oth');
+        const bIsOther = (b.name || '').toLowerCase() === 'other' || (b.id || '').endsWith('-oth');
+        if (aIsOther && !bIsOther) return 1;
+        if (!aIsOther && bIsOther) return -1;
+        return 0;
+      });
+    }
+    return plain;
+  });
 };
 
 export const getCatalogSubcategoriesService = async (categoryId) => {
@@ -815,14 +974,53 @@ export const createWorkflowService = async (payload = {}) => {
   return wf.get({ plain: true });
 };
 
-// ---------- Settings -------------------------------
-
 export const getSettingsUsersService = async () => {
   const rows = await User.findAll({
-    include: [{ model: Role, as: 'role', attributes: ['id', 'name'] }],
+    include: [
+      { model: Role, as: 'role', attributes: ['id', 'name'] },
+      { model: ChangeManagerCategory, as: 'categoryAssignments', attributes: ['categoryId'] }
+    ],
     order: [['id', 'ASC']]
   });
-  return rows.map(serializeUser);
+  return rows.map((u) => {
+    const plain = serializeUser(u);
+    if (u.categoryAssignments) {
+      plain.categoryIds = u.categoryAssignments.map((c) => c.categoryId);
+    }
+    return plain;
+  });
+};
+
+export const updateSettingsUserService = async (userId, payload = {}, meta = {}) => {
+  const user = await User.findByPk(userId);
+  if (!user) {
+    const err = new Error(`User ${userId} not found`);
+    err.statusCode = 404;
+    throw err;
+  }
+
+  if (payload.name) user.name = String(payload.name).trim();
+  if (payload.employeeId || payload.empId) user.employeeId = payload.employeeId || payload.empId;
+  if (payload.status) user.status = STATUS_ALIASES[String(payload.status).toLowerCase()] || payload.status;
+
+  if (payload.role) {
+    const role = await Role.findOne({ where: { name: { [Op.iLike]: payload.role } } });
+    if (role) user.roleId = role.id;
+  }
+
+  await user.save();
+
+  await addAuditLog({
+    actorId: meta.actorId || null,
+    action: 'User Updated',
+    ref: user.id,
+    detail: `Updated user details for ${user.name}.`
+  });
+
+  const updated = await User.findByPk(user.id, {
+    include: [{ model: Role, as: 'role', attributes: ['id', 'name'] }]
+  });
+  return serializeUser(updated);
 };
 
 const STATUS_ALIASES = { enabled: 'Active', disabled: 'Inactive', active: 'Active', inactive: 'Inactive' };
@@ -859,7 +1057,6 @@ export const createSettingsUserService = async (payload = {}, meta = {}) => {
     name,
     email,
     employeeId: payload.employeeId || payload.empId || `EMP-${10500 + seq}`,
-    department: payload.department || payload.dept || 'IT Operations',
     status,
     authProvider: 'local',
     passwordHash: await bcrypt.hash(tempPassword, 10),
@@ -967,16 +1164,26 @@ export const getReportsMetricsService = async () => {
     ORDER BY sort_index
   `, { type: QueryTypes.SELECT });
 
-  // Department volume — count all tickets grouped by department
-  const departmentVolume = await sequelize.query(`
+  // Location-wise requests breakdown
+  const locationBreakdown = await sequelize.query(`
     SELECT
-      COALESCE(NULLIF(department, ''), 'IT Operations') AS name,
-      COUNT(*)::int AS count,
-      ROUND(100.0 * COUNT(*) / NULLIF(SUM(COUNT(*)) OVER (), 0), 1)::float AS percentage
+      COALESCE(NULLIF(location, ''), 'Ahmedabad HQ') AS location,
+      COUNT(*)::int AS count
     FROM change_requests
-    GROUP BY name
+    GROUP BY location
     ORDER BY count DESC
   `, { type: QueryTypes.SELECT });
+
+  const totalLocationCRs = locationBreakdown.reduce((sum, item) => sum + item.count, 0);
+  const locationData = locationBreakdown.map((item, idx) => {
+    const colors = ['#0D9488', '#2563EB', '#7C3AED', '#D97706', '#DC2626', '#475569'];
+    return {
+      location: item.location,
+      count: item.count,
+      percentage: totalLocationCRs > 0 ? Math.round((item.count / totalLocationCRs) * 100) : 0,
+      color: colors[idx % colors.length]
+    };
+  });
 
   const computedSuccessRate = totalCRs > 0 ? `${Math.round((approvedCRs / totalCRs) * 100)}%` : metricsConfig?.successRate || '91.4%';
 
@@ -989,9 +1196,8 @@ export const getReportsMetricsService = async () => {
   };
 
   const monthlyData = monthlyVolume.map(({ month, count }) => ({ month, count }));
-  const departmentData = departmentVolume.map(({ name, count, percentage }) => ({ name, count, percentage: Number(percentage) || 0 }));
 
-  return { metrics, monthlyData, departmentData };
+  return { metrics, monthlyData, locationData };
 };
 
 // ---------- Notifications -----------------------------
@@ -1004,7 +1210,7 @@ const getApproverUsers = async (tx) => {
         model: Role,
         as: 'role',
         attributes: ['id', 'name'],
-        where: { name: { [Op.in]: ['CAB Approver', 'Change Manager', 'Admin'] } }
+        where: { name: { [Op.in]: ['Super Admin', 'Admin', 'Change Manager'] } }
       }
     ],
     transaction: tx
@@ -1014,7 +1220,7 @@ const getApproverUsers = async (tx) => {
 
 export const createSubmissionNotifications = async (changeRequest, tx) => {
   try {
-    const approvers = await getApproverUsers(tx);
+    const approvers = await getVotersForCategory(changeRequest.categoryId, tx);
     const requesterName = changeRequest.employeeName || (await User.findByPk(changeRequest.requesterId, { transaction: tx }))?.name || 'an employee';
 
     const notifications = approvers
@@ -1061,8 +1267,8 @@ export const createWorklistActionNotifications = async (changeRequest, action, a
       );
     }
 
-    // 2. Notification for other CAB Approvers, Change Managers & Admins
-    const approvers = await getApproverUsers(tx);
+    // 2. Notification for other assigned voters & Admins
+    const approvers = await getVotersForCategory(changeRequest.categoryId, tx);
     const otherApprovers = approvers.filter((a) => a.id !== actorId && a.id !== changeRequest.requesterId);
 
     const peerNotifications = otherApprovers.map((a) => ({
@@ -1096,15 +1302,50 @@ export const createWorklistActionNotifications = async (changeRequest, action, a
 };
 
 export const getUserNotificationsService = async (userId = 'usr-1') => {
-  const rows = await Notification.findAll({
-    where: { userId, isRead: false },
-    order: [['createdAt', 'DESC']],
-    limit: 25
+  if (!userId) return { data: [], unreadCount: 0 };
+  const user = await User.findByPk(userId, {
+    include: [
+      { model: Role, as: 'role' },
+      { model: ChangeManagerCategory, as: 'categoryAssignments' }
+    ]
   });
 
-  const unreadCount = rows.length;
+  const roleName = (user?.role?.name || '').toLowerCase();
+  const roleId = user?.roleId || '';
+  const isSuperOrAdmin = ['role-1', 'role-2'].includes(roleId) || roleName.includes('admin') || roleName.includes('super');
+  const isChangeManager = roleId === 'role-3' || roleName.includes('manager');
 
-  return { data: rows.map((n) => n.get({ plain: true })), unreadCount };
+  const rows = await Notification.findAll({
+    where: { userId, isRead: false },
+    include: [{ model: ChangeRequest, as: 'changeRequest', required: false }],
+    order: [['createdAt', 'DESC']],
+    limit: 50
+  });
+
+  let filteredRows = rows;
+
+  if (isChangeManager && !isSuperOrAdmin) {
+    const assignedCategoryIds = new Set((user?.categoryAssignments || []).map((c) => c.categoryId));
+    const allCategories = await CatalogCategory.findAll({ attributes: ['id', 'name'] });
+    const categoryNameToIdMap = new Map();
+    for (const c of allCategories) {
+      categoryNameToIdMap.set(c.id, c.id);
+      if (c.name) {
+        categoryNameToIdMap.set(c.name.toLowerCase().trim(), c.id);
+      }
+    }
+
+    filteredRows = rows.filter(n => {
+      if (!n.changeRequest) return true;
+      const cr = n.changeRequest;
+      const resolvedCategoryId = cr.categoryId || categoryNameToIdMap.get((cr.category || '').toLowerCase().trim());
+      return resolvedCategoryId ? assignedCategoryIds.has(resolvedCategoryId) : false;
+    });
+  }
+
+  const unreadCount = filteredRows.length;
+
+  return { data: filteredRows.map((n) => n.get({ plain: true })), unreadCount };
 };
 
 export const markNotificationAsReadService = async (id, userId = 'usr-1') => {
@@ -1155,6 +1396,33 @@ export const createScheduledReportService = async (payload, userId = 'usr-1') =>
   });
 
   return report.get({ plain: true });
+};
+
+export const getChangeManagerCategoriesService = async (userId) => {
+  const where = userId ? { userId } : {};
+  const assignments = await ChangeManagerCategory.findAll({ where, raw: true });
+  return assignments.map((a) => ({ userId: a.userId, categoryId: a.categoryId }));
+};
+
+export const updateChangeManagerCategoriesService = async (userId, categoryIds = []) => {
+  const current = await ChangeManagerCategory.findAll({ where: { userId } });
+  const currentCatIds = current.map((c) => c.categoryId);
+
+  const toAdd = categoryIds.filter((cid) => !currentCatIds.includes(cid));
+  const toRemove = currentCatIds.filter((cid) => !categoryIds.includes(cid));
+
+  if (toRemove.length > 0) {
+    await ChangeManagerCategory.destroy({
+      where: { userId, categoryId: { [Op.in]: toRemove } }
+    });
+  }
+
+  for (const cid of toAdd) {
+    const id = `cmc-${userId}-${cid}`;
+    await ChangeManagerCategory.upsert({ id, userId, categoryId: cid }).catch(() => {});
+  }
+
+  return getChangeManagerCategoriesService(userId);
 };
 
 export const deleteScheduledReportService = async (id) => {

@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Search, Bell, Sun, Moon, Menu, Check } from 'lucide-react';
 import { apiFetch } from '../../lib/apiFetch';
 
-export default function Header({
+function Header({
   activeRoute = 'Dashboard',
   user,
   onLogout,
@@ -108,12 +108,27 @@ export default function Header({
 
   const initials = user?.initials || 'U';
 
+  const [localSearch, setLocalSearch] = useState(searchQuery);
+
+  useEffect(() => {
+    setLocalSearch(searchQuery);
+  }, [searchQuery]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (onSearchChange && localSearch !== searchQuery) {
+        onSearchChange(localSearch);
+      }
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [localSearch, onSearchChange, searchQuery]);
+
   const squareBtn = {
     width: '34px',
     height: '34px',
     borderRadius: '8px',
     border: '1px solid var(--border-color)',
-    backgroundColor: 'var(--card-bg)',
+    backgroundColor: 'var(--input-bg)',
     color: 'var(--text-primary)',
     display: 'flex',
     alignItems: 'center',
@@ -158,26 +173,18 @@ export default function Header({
           {!isMobile && (
             <>
               <span style={{ color: 'var(--text-secondary)', fontWeight: 500 }}>Workspace</span>
-              <span style={{ color: 'var(--text-secondary)', fontWeight: 500 }}>/</span>
+              <span style={{ color: 'var(--text-secondary)', fontSize: '0.75rem' }}>/</span>
             </>
           )}
-          <strong
-            style={{
-              color: 'var(--text-primary)',
-              fontWeight: 800,
-              whiteSpace: 'nowrap',
-              overflow: 'hidden',
-              textOverflow: 'ellipsis'
-            }}
-          >
+          <span style={{ color: 'var(--text-primary)', fontWeight: 700 }}>
             {activeRoute}
-          </strong>
+          </span>
         </div>
       </div>
 
-      {/* Right: search (desktop) + controls */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-        {!isMobile && (
+      {/* Right controls */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+        {!isMobile && activeRoute !== 'Dashboard' && !activeRoute?.includes('Change Request') && (
           <div style={{ width: '280px', position: 'relative' }}>
             <div
               style={{
@@ -194,8 +201,8 @@ export default function Header({
             </div>
             <input
               type="text"
-              value={searchQuery}
-              onChange={(e) => onSearchChange && onSearchChange(e.target.value)}
+              value={localSearch}
+              onChange={(e) => setLocalSearch(e.target.value)}
               placeholder="Search CR-ID, title, requester..."
               style={{
                 width: '100%',
@@ -420,3 +427,5 @@ export default function Header({
     </header>
   );
 }
+
+export default React.memo(Header);

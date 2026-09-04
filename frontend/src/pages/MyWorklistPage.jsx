@@ -1,20 +1,17 @@
 import React, { useState, useEffect } from 'react';
-import { Clock, Check, X, ChevronLeft } from 'lucide-react';
+import { Clock, Check, X, ChevronLeft, Calendar } from 'lucide-react';
 import ChangeRequestModal from '../components/ui/ChangeRequestModal';
 import { apiFetch } from '../lib/apiFetch';
 
-export default function MyWorklistPage({ onNavigate, searchQuery = '', user }) {
+function MyWorklistPage({ onNavigate, searchQuery = '', user }) {
   const roleName = (user?.role || '').toLowerCase();
-  const roleId = user?.roleId || '';
-  const isApprover = roleName.includes('cab') || roleName.includes('manager') || roleName.includes('admin') || ['role-1', 'role-2', 'role-3'].includes(roleId);
+  const isApprover = (user?.roleId && ['role-1', 'role-2', 'role-3'].includes(user.roleId)) || roleName.includes('manager') || roleName.includes('admin');
   const isRequester = !isApprover;
 
   const [items, setItems] = useState([]);
   const [selectedCr, setSelectedCr] = useState(null);
-  const [page, setPage] = useState(1);
-  const [limit, setLimit] = useState(5);
-  const [totalPages, setTotalPages] = useState(1);
-  const [totalItems, setTotalItems] = useState(0);
+  const [dateFilter, setDateFilter] = useState('overall');
+  const [isLoading, setIsLoading] = useState(false);
 
   const [metrics, setMetrics] = useState({
     pending: 0,
@@ -22,33 +19,6 @@ export default function MyWorklistPage({ onNavigate, searchQuery = '', user }) {
     rejected: 0,
     sentBack: 0
   });
-
-  useEffect(() => {
-    const fetchWorklist = async () => {
-      try {
-        const res = await apiFetch(`/worklist?page=${page}&limit=${limit}`);
-        if (res.ok) {
-          const body = await res.json();
-          if (body.data && Array.isArray(body.data)) setItems(body.data);
-          if (body.metrics) setMetrics(body.metrics);
-          if (body.totalPages !== undefined) setTotalPages(body.totalPages);
-          if (body.total !== undefined) setTotalItems(body.total);
-        }
-      } catch (err) {
-        console.warn('Backend API offline, using default worklist data:', err);
-      }
-    };
-
-    fetchWorklist();
-    const interval = setInterval(fetchWorklist, 10000);
-    return () => clearInterval(interval);
-  }, [page, limit]);
-
-  useEffect(() => {
-    if (totalPages > 0 && page > totalPages) {
-      setPage(totalPages);
-    }
-  }, [totalPages, page]);
 
   const handleAction = async (id, action, rejectionReason = '') => {
     try {
@@ -103,66 +73,60 @@ export default function MyWorklistPage({ onNavigate, searchQuery = '', user }) {
   };
 
   const [activeFilter, setActiveFilter] = useState('All');
+  const [statusCounts, setStatusCounts] = useState({
+    All: 0,
+    Pending: 0,
+    Approved: 0,
+    'In progress': 0,
+    Rejected: 0
+  });
 
-  const getStatus = (r) => (r.status || r.myDecision || 'Pending').toLowerCase();
+  // Server-Side Database Query Fetch with date & search filter support
+  useEffect(() => {
+    const fetchData = async () => {
+      setIsLoading(true);
+      try {
+        const params = new URLSearchParams({
+          ...(activeFilter !== 'All' && { status: activeFilter }),
+          ...(dateFilter !== 'overall' && { dateFilter }),
+          ...(searchQuery && { search: searchQuery })
+        });
+        const res = await apiFetch(`/worklist?${params}`);
+        if (res.ok) {
+          const body = await res.json();
+          if (body.data && Array.isArray(body.data)) setItems(body.data);
+          if (body.statusCounts) setStatusCounts(body.statusCounts);
+          if (body.metrics) setMetrics(body.metrics);
+        }
+      } catch (err) {
+        console.warn('Backend API offline, using default worklist data:', err);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    fetchData();
+  }, [activeFilter, dateFilter, searchQuery, user?.id]);
 
-  const filterCounts = {
-    All: items.length,
-    Pending: items.filter(r => getStatus(r) === 'pending').length,
-    Approved: items.filter(r => getStatus(r) === 'approved').length,
-    'In progress': items.filter(r => getStatus(r) === 'in progress' || getStatus(r) === 'scheduled').length,
-    Rejected: items.filter(r => getStatus(r) === 'rejected').length,
-    Draft: items.filter(r => getStatus(r) === 'draft' || r.isDraft).length
-  };
+  const getStatus = (r) => (r.status || 'Pending').toLowerCase();
 
   const filterTabs = [
-    { id: 'All', label: `All (${filterCounts.All})` },
-    { id: 'Pending', label: `Pending (${filterCounts.Pending})` },
-    { id: 'Approved', label: `Approved (${filterCounts.Approved})` },
-    { id: 'In progress', label: `In progress (${filterCounts['In progress']})` },
-    { id: 'Rejected', label: `Rejected (${filterCounts.Rejected})` },
-    { id: 'Draft', label: `Draft (${filterCounts.Draft})` }
+    { id: 'All', label: `All (${statusCounts.All || 0})` },
+    { id: 'Pending', label: `Pending (${statusCounts.Pending || 0})` },
+    { id: 'Approved', label: `Approved (${statusCounts.Approved || 0})` },
+    { id: 'In progress', label: `In progress (${statusCounts['In progress'] || 0})` },
+    { id: 'Rejected', label: `Rejected (${statusCounts.Rejected || 0})` }
   ];
 
-  const filteredItems = items.filter(item => {
-    const status = getStatus(item);
-    let matchesFilter = true;
-
-    if (activeFilter === 'Pending') matchesFilter = status === 'pending';
-    else if (activeFilter === 'Approved') matchesFilter = status === 'approved';
-    else if (activeFilter === 'In progress') matchesFilter = status === 'in progress' || status === 'scheduled';
-    else if (activeFilter === 'Rejected') matchesFilter = status === 'rejected';
-    else if (activeFilter === 'Draft') matchesFilter = status === 'draft' || item.isDraft;
-
-    const query = (searchQuery || '').toLowerCase().trim();
-    const matchesSearch = !query || 
-      (item.id || '').toLowerCase().includes(query) ||
-      (item.title || '').toLowerCase().includes(query) ||
-      (item.category || '').toLowerCase().includes(query) ||
-      (item.requester || '').toLowerCase().includes(query);
-
-    return matchesFilter && matchesSearch;
-  });
-
-  const sortedItems = [...filteredItems].sort((a, b) => {
-    const numA = parseInt((a.id || '').replace(/\D/g, ''), 10) || 0;
-    const numB = parseInt((b.id || '').replace(/\D/g, ''), 10) || 0;
-    if (numA !== numB) return numB - numA;
-    const timeA = new Date(a.submittedAt || a.raisedDate || a.createdAt || 0).getTime();
-    const timeB = new Date(b.submittedAt || b.raisedDate || b.createdAt || 0).getTime();
-    return timeB - timeA;
-  });
-
   const metricCards = [
-    { id: 'pending', title: 'Pending review', count: metrics.pending, subtext: 'In queue right now', subtextColor: 'var(--text-secondary)', icon: Clock, iconBg: '#FEF3C7', iconColor: '#D97706' },
-    { id: 'approved', title: 'Approved', count: metrics.approved, subtext: 'Last 30 days', subtextColor: '#059669', icon: Check, iconBg: '#D1FAE5', iconColor: '#059669' },
-    { id: 'rejected', title: 'Rejected', count: metrics.rejected, subtext: 'Last 30 days', subtextColor: 'var(--text-secondary)', icon: X, iconBg: '#FEE2E2', iconColor: '#DC2626' },
-    { id: 'sentback', title: 'Sent back', count: metrics.sentBack, subtext: 'Last 30 days', subtextColor: 'var(--text-secondary)', icon: ChevronLeft, iconBg: '#F3E8FF', iconColor: '#7C3AED' }
+    { id: 'pending', title: 'Pending review', count: metrics?.pending ?? statusCounts.Pending ?? 0, subtext: 'In queue right now', subtextColor: 'var(--text-secondary)', icon: Clock, iconBg: '#FEF3C7', iconColor: '#D97706' },
+    { id: 'approved', title: 'Approved', count: metrics?.approved ?? statusCounts.Approved ?? 0, subtext: 'Last 30 days', subtextColor: '#059669', icon: Check, iconBg: '#D1FAE5', iconColor: '#059669' },
+    { id: 'rejected', title: 'Rejected', count: metrics?.rejected ?? statusCounts.Rejected ?? 0, subtext: 'Last 30 days', subtextColor: 'var(--text-secondary)', icon: X, iconBg: '#FEE2E2', iconColor: '#DC2626' },
+    { id: 'sentback', title: 'Sent back', count: metrics?.sentBack ?? statusCounts.Draft ?? 0, subtext: 'Last 30 days', subtextColor: 'var(--text-secondary)', icon: ChevronLeft, iconBg: '#F3E8FF', iconColor: '#7C3AED' }
   ];
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-      
+
       {/* Header Row */}
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: '1rem' }}>
         <div>
@@ -175,7 +139,7 @@ export default function MyWorklistPage({ onNavigate, searchQuery = '', user }) {
         </div>
 
         <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-secondary)' }}>
-          {filteredItems.length} total request{filteredItems.length !== 1 ? 's' : ''}
+          {items.length} total request{items.length !== 1 ? 's' : ''}
         </span>
       </div>
 
@@ -208,69 +172,98 @@ export default function MyWorklistPage({ onNavigate, searchQuery = '', user }) {
         })}
       </div>
 
-      {/* Status Filter Pills (Under Metrics) */}
-      <div style={{ display: 'flex', gap: '0.5rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.75rem', flexWrap: 'wrap', marginTop: '0.25rem' }}>
-        {filterTabs.map(tab => (
-          <button
-            key={tab.id}
-            type="button"
-            onClick={() => setActiveFilter(tab.id)}
+      {/* Status & Date Filter Pills (Under Metrics) */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.75rem', flexWrap: 'wrap', marginTop: '0.25rem', gap: '0.75rem' }}>
+        <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
+          {filterTabs.map(tab => (
+            <button
+              key={tab.id}
+              type="button"
+              onClick={() => setActiveFilter(tab.id)}
+              style={{
+                padding: '0.45rem 0.95rem',
+                backgroundColor: activeFilter === tab.id ? '#0D9488' : 'transparent',
+                color: activeFilter === tab.id ? '#FFFFFF' : 'var(--text-secondary)',
+                border: activeFilter === tab.id ? 'none' : '1px solid var(--border-color)',
+                borderRadius: '99px',
+                fontSize: '0.825rem',
+                fontWeight: 700,
+                cursor: 'pointer',
+                transition: 'all 0.15s ease'
+              }}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+
+        {/* Time Range Filter Dropdown */}
+        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', backgroundColor: 'var(--card-bg)', border: '1px solid var(--border-color)', borderRadius: '8px', padding: '0.25rem 0.65rem' }}>
+          <Calendar size={14} style={{ color: 'var(--text-secondary)' }} />
+          <select
+            value={dateFilter}
+            onChange={(e) => {
+              setDateFilter(e.target.value);
+              setPage(1);
+            }}
             style={{
-              padding: '0.45rem 0.95rem',
-              backgroundColor: activeFilter === tab.id ? '#0D9488' : 'transparent',
-              color: activeFilter === tab.id ? '#FFFFFF' : 'var(--text-secondary)',
-              border: activeFilter === tab.id ? 'none' : '1px solid var(--border-color)',
-              borderRadius: '99px',
-              fontSize: '0.825rem',
+              backgroundColor: 'var(--card-bg)',
+              color: 'var(--text-primary)',
+              border: 'none',
+              fontSize: '0.8rem',
               fontWeight: 700,
               cursor: 'pointer',
-              transition: 'all 0.15s ease'
+              outline: 'none',
+              padding: '0.2rem'
             }}
           >
-            {tab.label}
-          </button>
-        ))}
+            <option value="overall" style={{ backgroundColor: 'var(--card-bg)', color: 'var(--text-primary)' }}>Overall Time</option>
+            <option value="last_7_days" style={{ backgroundColor: 'var(--card-bg)', color: 'var(--text-primary)' }}>Last 7 Days</option>
+            <option value="this_month" style={{ backgroundColor: 'var(--card-bg)', color: 'var(--text-primary)' }}>This Month</option>
+            <option value="last_month" style={{ backgroundColor: 'var(--card-bg)', color: 'var(--text-primary)' }}>Last Month</option>
+          </select>
+        </div>
       </div>
 
       {/* Worklist Table */}
       <div style={{ backgroundColor: 'var(--card-bg)', border: '1px solid var(--border-color)', borderRadius: '12px', overflow: 'hidden', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
         <div style={{ overflowX: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.85rem' }}>
+          <table style={{ width: '100%', minWidth: '1100px', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.85rem' }}>
             <thead>
               <tr style={{ backgroundColor: 'var(--input-bg)', borderBottom: '1px solid var(--border-color)', color: 'var(--text-secondary)', fontSize: '0.75rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                <th style={{ padding: '0.9rem 1.1rem' }}>CR ID</th>
-                <th style={{ padding: '0.9rem 1.1rem' }}>Title</th>
-                <th style={{ padding: '0.9rem 1.1rem' }}>Category</th>
-                <th style={{ padding: '0.9rem 1.1rem' }}>Employee Email</th>
-                <th style={{ padding: '0.9rem 1.1rem' }}>Raised Date</th>
-                <th style={{ padding: '0.9rem 1.1rem' }}>Closed Date</th>
-                <th style={{ padding: '0.9rem 1.1rem' }}>Approved By</th>
-                <th style={{ padding: '0.9rem 1.1rem', textAlign: 'right' }}>Actions</th>
+                <th style={{ padding: '0.9rem 1.1rem', minWidth: '100px', whiteSpace: 'nowrap' }}>CR ID</th>
+                <th style={{ padding: '0.9rem 1.1rem', minWidth: '280px' }}>Title</th>
+                <th style={{ padding: '0.9rem 1.1rem', minWidth: '180px' }}>Category</th>
+                <th style={{ padding: '0.9rem 1.1rem', minWidth: '180px', whiteSpace: 'nowrap' }}>Employee Email</th>
+                <th style={{ padding: '0.9rem 1.1rem', minWidth: '120px', whiteSpace: 'nowrap' }}>Raised Date</th>
+                <th style={{ padding: '0.9rem 1.1rem', minWidth: '120px', whiteSpace: 'nowrap' }}>Closed Date</th>
+                <th style={{ padding: '0.9rem 1.1rem', minWidth: '130px', whiteSpace: 'nowrap' }}>Approved By</th>
+                <th style={{ padding: '0.9rem 1.1rem', minWidth: '160px', textAlign: 'right', whiteSpace: 'nowrap' }}>Actions</th>
               </tr>
             </thead>
             <tbody>
-              {sortedItems.length > 0 ? (
-                sortedItems.map(item => {
+              {items.length > 0 ? (
+                items.map(item => {
                   const status = getStatus(item);
                   const isItemApproved = status === 'approved' || item.myDecision === 'Approved';
                   const isItemRejected = status === 'rejected' || item.myDecision === 'Rejected';
 
-                  const isSelfRequest = (item.requesterId && user?.id && String(item.requesterId) === String(user.id)) || 
-                                        (item.employeeEmail && user?.email && item.employeeEmail.toLowerCase() === user.email.toLowerCase());
+                  const isSelfRequest = (item.requesterId && user?.id && String(item.requesterId) === String(user.id)) ||
+                    (item.employeeEmail && user?.email && item.employeeEmail.toLowerCase() === user.email.toLowerCase());
 
                   return (
                     <tr key={item.id} style={{ borderBottom: '1px solid var(--border-color)', transition: 'background-color 0.15s ease' }}>
                       <td style={{ padding: '1rem 1.1rem', fontWeight: 800, color: 'var(--text-primary)', fontFamily: 'var(--font-mono)', whiteSpace: 'nowrap' }}>
                         {item.id}
                       </td>
-                      <td style={{ padding: '1rem 1.1rem', fontWeight: 700, color: 'var(--text-primary)', maxWidth: '240px' }}>
-                        <span style={{ lineHeight: 1.35 }}>{item.title}</span>
+                      <td style={{ padding: '1rem 1.1rem', fontWeight: 700, color: 'var(--text-primary)', minWidth: '280px' }}>
+                        <span style={{ lineHeight: 1.4, color: 'var(--text-primary)', display: 'block' }}>{item.title}</span>
                       </td>
-                      <td style={{ padding: '1rem 1.1rem', color: 'var(--text-secondary)' }}>
+                      <td style={{ padding: '1rem 1.1rem', color: 'var(--text-secondary)', minWidth: '180px' }}>
                         <div style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{item.category}</div>
                         {item.subCategory && <div style={{ fontSize: '0.775rem', color: 'var(--text-secondary)' }}>{item.subCategory}</div>}
                       </td>
-                      <td style={{ padding: '1rem 1.1rem', color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)', fontSize: '0.8rem' }}>
+                      <td style={{ padding: '1rem 1.1rem', color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)', fontSize: '0.8rem', whiteSpace: 'nowrap' }}>
                         {item.employeeEmail || item.managerEmail || item.requesterEmail || '—'}
                       </td>
                       <td style={{ padding: '1rem 1.1rem', color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)', whiteSpace: 'nowrap' }}>
@@ -279,7 +272,7 @@ export default function MyWorklistPage({ onNavigate, searchQuery = '', user }) {
                       <td style={{ padding: '1rem 1.1rem', color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)', whiteSpace: 'nowrap' }}>
                         {item.closedDate || (isItemApproved || isItemRejected ? '28 Aug' : 'Open')}
                       </td>
-                      <td style={{ padding: '1rem 1.1rem', color: 'var(--text-primary)', fontWeight: 600 }}>
+                      <td style={{ padding: '1rem 1.1rem', color: 'var(--text-primary)', fontWeight: 600, whiteSpace: 'nowrap' }}>
                         {item.decidedBy || (isItemApproved || isItemRejected ? (user?.name || 'Gauri Shinde') : '—')}
                       </td>
                       <td style={{ padding: '1rem 1.1rem', textAlign: 'right', whiteSpace: 'nowrap' }}>
@@ -325,6 +318,15 @@ export default function MyWorklistPage({ onNavigate, searchQuery = '', user }) {
                     </tr>
                   );
                 })
+              ) : isLoading ? (
+                <tr>
+                  <td colSpan={8} style={{ padding: '2.5rem', textAlign: 'center', color: 'var(--text-secondary)' }}>
+                    <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', fontWeight: 600, fontSize: '0.875rem' }}>
+                      <span style={{ display: 'inline-block', width: '16px', height: '16px', border: '2px solid var(--border-color)', borderTopColor: '#0D9488', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
+                      <span>Loading worklist change requests...</span>
+                    </div>
+                  </td>
+                </tr>
               ) : (
                 <tr>
                   <td colSpan={8} style={{ padding: '2.5rem', textAlign: 'center', color: 'var(--text-secondary)' }}>
@@ -335,89 +337,6 @@ export default function MyWorklistPage({ onNavigate, searchQuery = '', user }) {
             </tbody>
           </table>
         </div>
-
-        {/* Pagination Footer - Always Visible */}
-        {(() => {
-          const fromItem = totalItems === 0 ? 0 : (page - 1) * limit + 1;
-          const toItem = Math.min(page * limit, totalItems);
-          return (
-            <div style={{ padding: '0.85rem 1.25rem', borderTop: '1px solid var(--border-color)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', backgroundColor: 'var(--input-bg)', flexWrap: 'wrap', gap: '0.75rem' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '1.25rem', flexWrap: 'wrap' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.8rem', color: 'var(--text-secondary)', fontWeight: 600 }}>
-                  <span>Rows per page:</span>
-                  <select
-                    value={limit}
-                    onChange={(e) => {
-                      setLimit(Number(e.target.value));
-                      setPage(1);
-                    }}
-                    style={{
-                      padding: '0.25rem 0.5rem',
-                      backgroundColor: 'var(--card-bg)',
-                      color: 'var(--text-primary)',
-                      border: '1px solid var(--border-color)',
-                      borderRadius: '6px',
-                      fontSize: '0.8rem',
-                      fontWeight: 700,
-                      cursor: 'pointer'
-                    }}
-                  >
-                    <option value={5}>5</option>
-                    <option value={10}>10</option>
-                    <option value={25}>25</option>
-                    <option value={50}>50</option>
-                  </select>
-                </div>
-
-                <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', fontWeight: 600 }}>
-                  Showing <strong>{fromItem} – {toItem}</strong> of <strong>{totalItems}</strong> items
-                </span>
-              </div>
-
-              <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-                <button
-                  type="button"
-                  disabled={page <= 1}
-                  onClick={() => setPage(prev => Math.max(1, prev - 1))}
-                  style={{
-                    padding: '0.4rem 0.85rem',
-                    backgroundColor: 'var(--card-bg)',
-                    color: page <= 1 ? 'var(--text-secondary)' : 'var(--text-primary)',
-                    border: '1px solid var(--border-color)',
-                    borderRadius: '6px',
-                    fontSize: '0.8rem',
-                    fontWeight: 600,
-                    cursor: page <= 1 ? 'not-allowed' : 'pointer',
-                    opacity: page <= 1 ? 0.5 : 1
-                  }}
-                >
-                  Previous
-                </button>
-                <span style={{ fontSize: '0.8rem', color: 'var(--text-primary)', fontWeight: 700, padding: '0 0.25rem' }}>
-                  {page} / {totalPages || 1}
-                </span>
-                <button
-                  type="button"
-                  disabled={page >= totalPages || totalPages === 0}
-                  onClick={() => setPage(prev => Math.min(totalPages, prev + 1))}
-                  style={{
-                    padding: '0.4rem 0.85rem',
-                    backgroundColor: 'var(--card-bg)',
-                    color: page >= totalPages || totalPages === 0 ? 'var(--text-secondary)' : 'var(--text-primary)',
-                    border: '1px solid var(--border-color)',
-                    borderRadius: '6px',
-                    fontSize: '0.8rem',
-                    fontWeight: 600,
-                    cursor: page >= totalPages || totalPages === 0 ? 'not-allowed' : 'pointer',
-                    opacity: page >= totalPages || totalPages === 0 ? 0.5 : 1
-                  }}
-                >
-                  Next
-                </button>
-              </div>
-            </div>
-          );
-        })()}
       </div>
 
       {/* Details Modal */}
@@ -434,3 +353,5 @@ export default function MyWorklistPage({ onNavigate, searchQuery = '', user }) {
     </div>
   );
 }
+
+export default React.memo(MyWorklistPage);

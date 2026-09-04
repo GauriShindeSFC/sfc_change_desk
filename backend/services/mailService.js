@@ -284,8 +284,7 @@ export const sendUserInviteEmail = async ({ user, tempPassword, invitedByName })
 
   const rows = [
     ['Email', user.email],
-    ['Role', user.role || 'Requester'],
-    ['Department', user.department || '—']
+    ['Role', user.role || 'Requester']
   ];
   if (tempPassword) rows.push(['Temporary password', tempPassword]);
 

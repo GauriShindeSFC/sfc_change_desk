@@ -3,7 +3,7 @@ import { FileText, Clock, CheckCircle2, RotateCw, XCircle } from 'lucide-react';
 import RecentChangeRequests from '../components/ui/RecentChangeRequests';
 import { apiFetch } from '../lib/apiFetch';
 
-export default function DashboardPage({ onNavigate, user }) {
+function DashboardPage({ onNavigate, user }) {
   const [metrics, setMetrics] = useState([]);
   const [categoryData, setCategoryData] = useState([]);
   const [statusBreakdown, setStatusBreakdown] = useState([]);
@@ -276,3 +276,5 @@ export default function DashboardPage({ onNavigate, user }) {
     </div>
   );
 }
+
+export default React.memo(DashboardPage);

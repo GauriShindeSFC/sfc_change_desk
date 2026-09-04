@@ -28,7 +28,6 @@ export const User = sequelize.define(
     id: { type: DataTypes.STRING, primaryKey: true },
     name: { type: DataTypes.STRING, allowNull: false },
     employeeId: { type: DataTypes.STRING },
-    department: { type: DataTypes.STRING },
     email: { type: DataTypes.STRING, unique: true },
     status: { type: DataTypes.STRING, defaultValue: 'Active' },
     passwordHash: { type: DataTypes.STRING, allowNull: true }, // null for SSO-only accounts
@@ -57,7 +56,7 @@ export const ChangeRequest = sequelize.define(
     title: { type: DataTypes.STRING, allowNull: false },
     category: { type: DataTypes.STRING, allowNull: false },
     subCategory: { type: DataTypes.STRING, defaultValue: '' },
-    department: { type: DataTypes.STRING, defaultValue: '' },
+    employeeId: { type: DataTypes.STRING, defaultValue: '' },
     contactNumber: { type: DataTypes.STRING, defaultValue: '' },
     managerEmail: { type: DataTypes.STRING, defaultValue: '' },
     hostname: { type: DataTypes.STRING, defaultValue: '' },
@@ -149,6 +148,8 @@ AuditLog.belongsTo(User, { as: 'actor', foreignKey: 'actorId', onDelete: 'SET NU
 
 User.hasMany(Notification, { as: 'notifications', foreignKey: 'userId' });
 Notification.belongsTo(User, { as: 'recipient', foreignKey: 'userId', onDelete: 'CASCADE', onUpdate: 'CASCADE' });
+ChangeRequest.hasMany(Notification, { as: 'notifications', foreignKey: 'changeRequestId' });
+Notification.belongsTo(ChangeRequest, { as: 'changeRequest', foreignKey: 'changeRequestId', onDelete: 'SET NULL', onUpdate: 'CASCADE' });
 
 import { ChangeRequestApproval } from './ChangeRequestApproval.js';
 import { CatalogCategory } from './CatalogCategory.js';
@@ -171,6 +172,31 @@ CatalogSubcategory.belongsTo(Workflow, { as: 'workflow', foreignKey: 'workflowId
 User.hasMany(ScheduledReport, { foreignKey: 'createdBy' });
 ScheduledReport.belongsTo(User, { foreignKey: 'createdBy', as: 'creator' });
 
+export const ChangeManagerCategory = sequelize.define(
+  'ChangeManagerCategory',
+  {
+    id: { type: DataTypes.STRING, primaryKey: true },
+    userId: { type: DataTypes.STRING, allowNull: false, references: { model: 'users', key: 'id' }, onDelete: 'CASCADE' },
+    categoryId: { type: DataTypes.STRING, allowNull: false, references: { model: 'catalog_categories', key: 'id' }, onDelete: 'CASCADE' }
+  },
+  {
+    tableName: 'change_manager_categories',
+    timestamps: false,
+    indexes: [
+      {
+        unique: true,
+        fields: ['userId', 'categoryId']
+      }
+    ]
+  }
+);
+
+User.hasMany(ChangeManagerCategory, { foreignKey: 'userId', as: 'categoryAssignments' });
+ChangeManagerCategory.belongsTo(User, { foreignKey: 'userId' });
+
+CatalogCategory.hasMany(ChangeManagerCategory, { foreignKey: 'categoryId', as: 'assignedManagers' });
+ChangeManagerCategory.belongsTo(CatalogCategory, { foreignKey: 'categoryId' });
+
 export const models = {
   Role,
   User,
@@ -183,7 +209,8 @@ export const models = {
   AuditLog,
   Notification,
   AppConfig,
-  ScheduledReport
+  ScheduledReport,
+  ChangeManagerCategory
 };
 
 export { sequelize };

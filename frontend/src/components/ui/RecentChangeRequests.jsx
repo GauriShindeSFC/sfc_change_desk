@@ -8,8 +8,7 @@ export default function RecentChangeRequests({ onNavigate, user }) {
   const [changeRequests, setChangeRequests] = useState([]);
 
   const roleName = (user?.role || '').toLowerCase();
-  const roleId = user?.roleId || '';
-  const isApprover = roleName.includes('cab') || roleName.includes('manager') || roleName.includes('admin') || ['role-1', 'role-2', 'role-3'].includes(roleId);
+  const isApprover = (user?.roleId && ['role-1', 'role-2', 'role-3'].includes(user.roleId)) || roleName.includes('manager') || roleName.includes('admin');
 
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(5);
@@ -116,20 +115,20 @@ export default function RecentChangeRequests({ onNavigate, user }) {
                   {cr.id}
                 </td>
 
-                <td style={{ padding: '0.85rem 0.85rem' }}>
-                  <div style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-primary)', lineHeight: 1.3 }}>
+                <td style={{ padding: '0.85rem 0.85rem', maxWidth: '240px', wordBreak: 'break-word', overflowWrap: 'anywhere' }}>
+                  <div style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-primary)', lineHeight: 1.3, wordBreak: 'break-word', overflowWrap: 'anywhere' }}>
                     {cr.title}
                   </div>
-                  <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '0.15rem' }}>
+                  <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '0.15rem', wordBreak: 'break-word' }}>
                     {cr.category}
                   </div>
                 </td>
 
-                <td style={{ padding: '0.85rem 0.85rem', fontSize: '0.825rem', color: 'var(--text-primary)', fontWeight: 600 }}>
+                <td style={{ padding: '0.85rem 0.85rem', fontSize: '0.825rem', color: 'var(--text-primary)', fontWeight: 600, wordBreak: 'break-word', overflowWrap: 'anywhere' }}>
                   {cr.requester}
                 </td>
 
-                <td style={{ padding: '0.85rem 0.85rem', fontSize: '0.825rem', color: 'var(--text-primary)' }}>
+                <td style={{ padding: '0.85rem 0.85rem', fontSize: '0.825rem', color: 'var(--text-primary)', wordBreak: 'break-word' }}>
                   {cr.category}
                 </td>
 

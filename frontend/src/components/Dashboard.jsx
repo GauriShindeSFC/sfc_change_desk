@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import Sidebar from './layout/Sidebar';
 import Header from './layout/Header';
 import DashboardPage from '../pages/DashboardPage';
@@ -98,10 +98,22 @@ export default function Dashboard({ user, onLogout }) {
     }
   }, [activeItem, user?.id]);
 
-  const handleNavigate = (page, payload = null) => {
+  const handleNavigate = useCallback((page, payload = null) => {
     setActiveItem(page);
     setNavigationPayload(payload);
-  };
+  }, []);
+
+  const handleToggleCollapse = useCallback(() => {
+    setCollapsed((c) => !c);
+  }, []);
+
+  const handleCloseMobile = useCallback(() => {
+    setMobileOpen(false);
+  }, []);
+
+  const handleOpenMobile = useCallback(() => {
+    setMobileOpen(true);
+  }, []);
 
   const pages = {
     Dashboard: DashboardPage,
@@ -123,9 +135,10 @@ export default function Dashboard({ user, onLogout }) {
         user={user}
         isMobile={isMobile}
         collapsed={!isMobile && collapsed}
-        onToggleCollapse={() => setCollapsed((c) => !c)}
+        onToggleCollapse={handleToggleCollapse}
         mobileOpen={mobileOpen}
-        onCloseMobile={() => setMobileOpen(false)}
+        onCloseMobile={handleCloseMobile}
+        onLogout={onLogout}
         myRequestsCount={visitedSections['My Requests'] ? 0 : myRequestsCount}
         worklistCount={visitedSections['Organization worklist'] ? 0 : worklistCount}
       />
@@ -143,7 +156,7 @@ export default function Dashboard({ user, onLogout }) {
           user={user}
           onLogout={onLogout}
           isMobile={isMobile}
-          onMenuClick={() => setMobileOpen(true)}
+          onMenuClick={handleOpenMobile}
           onNavigate={handleNavigate}
           searchQuery={searchQuery}
           onSearchChange={setSearchQuery}

@@ -39,19 +39,19 @@ export const authenticateUser = async (req, res, next) => {
     });
     req.user = {
       id: user?.id || targetId,
-      name: user?.name || 'Gauri Shinde',
-      role: user?.role?.name || 'Change Manager',
-      roleId: user?.roleId || 'role-2',
-      employeeId: user?.employeeId || 'EMP-10432'
+      name: user?.name || 'User',
+      role: user?.role?.name || 'Requester',
+      roleId: user?.roleId || 'role-4',
+      employeeId: user?.employeeId || 'EMP-10000'
     };
     next();
   } catch (err) {
     req.user = {
-      id: 'usr-1',
-      name: 'Gauri Shinde',
-      role: 'Change Manager',
-      roleId: 'role-2',
-      employeeId: 'EMP-10432'
+      id: targetId || 'usr-2',
+      name: 'Requester User',
+      role: 'Requester',
+      roleId: 'role-4',
+      employeeId: 'EMP-10000'
     };
     next();
   }

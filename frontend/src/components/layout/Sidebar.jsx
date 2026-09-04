@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   LayoutGrid,
   Menu,
@@ -26,7 +26,7 @@ const MANAGEMENT_NAV = [
   { id: 'Settings', label: 'Settings', icon: Sun }
 ];
 
-export default function Sidebar({
+function Sidebar({
   activeItem,
   onItemSelect,
   user,
@@ -35,9 +35,22 @@ export default function Sidebar({
   onToggleCollapse,
   mobileOpen = false,
   onCloseMobile,
+  onLogout,
   myRequestsCount = 6,
   worklistCount = 4
 }) {
+  const [showProfileMenu, setShowProfileMenu] = useState(false);
+  const profileRef = useRef(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (profileRef.current && !profileRef.current.contains(event.target)) {
+        setShowProfileMenu(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
   const topNavItems = [
     { id: 'Dashboard', label: 'Dashboard', icon: LayoutGrid },
     { id: 'Change Catalog', label: 'Change Catalog', icon: Menu },
@@ -136,7 +149,7 @@ export default function Sidebar({
         transition: 'transform 0.22s ease, width 0.16s ease',
         overflowX: 'hidden',
         overflowY: 'auto',
-        padding: mini ? '1.25rem 0.6rem' : '1.25rem 0.85rem',
+        padding: mini ? '1.25rem 0' : '1.25rem 0.85rem',
         flexShrink: 0,
         userSelect: 'none',
         borderRight: '1px solid #1E293B'
@@ -147,12 +160,13 @@ export default function Sidebar({
         style={{
           display: 'flex',
           alignItems: 'center',
-          gap: '0.5rem',
-          padding: mini ? '0.25rem 0 1.5rem 0' : '0.25rem 0.2rem 1.5rem 0.4rem',
-          justifyContent: mini ? 'center' : 'space-between'
+          gap: mini ? 0 : '0.5rem',
+          padding: mini ? '0.25rem 0 1.25rem 0' : '0.25rem 0.2rem 1.5rem 0.4rem',
+          justifyContent: mini ? 'center' : 'space-between',
+          width: '100%'
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flex: 1, minWidth: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: mini ? 'center' : 'flex-start', width: mini ? '100%' : 'auto', flex: mini ? 'none' : 1, minWidth: 0 }}>
           <img
             src="/images/white-favicon.png"
             alt="Logo"
@@ -160,7 +174,7 @@ export default function Sidebar({
               e.target.onerror = null;
               e.target.src = '/images/Favicon.png';
             }}
-            style={{ width: '32px', height: '32px', objectFit: 'contain', display: 'block', flexShrink: 0 }}
+            style={{ width: '32px', height: '32px', objectFit: 'contain', display: 'block', flexShrink: 0, margin: mini ? '0 auto' : undefined }}
           />
           {!mini && (
             <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minWidth: 0 }}>
@@ -224,7 +238,7 @@ export default function Sidebar({
           onClick={onToggleCollapse}
           aria-label="Expand sidebar"
           title="Expand sidebar"
-          style={{ ...iconBtnStyle, alignSelf: 'center', marginBottom: '0.75rem' }}
+          style={{ ...iconBtnStyle, alignSelf: 'center', margin: '0 auto 1rem auto' }}
         >
           <ChevronRight size={16} />
         </button>
@@ -238,73 +252,155 @@ export default function Sidebar({
       </nav>
 
       {/* Management section */}
-      <div
-        style={{
-          fontSize: '0.6875rem',
-          fontWeight: 700,
-          color: '#475569',
-          letterSpacing: '0.08em',
-          textTransform: 'uppercase',
-          margin: mini ? '1.25rem 0 0.5rem 0' : '1.5rem 0 0.5rem 0.85rem',
-          textAlign: mini ? 'center' : 'left'
-        }}
-      >
-        {mini ? '•••' : 'MANAGEMENT'}
-      </div>
+      {(() => {
+        const roleName = (user?.role || '').toLowerCase();
+        const roleId = user?.roleId || '';
+        const isChangeManagerOrRequester = roleId === 'role-3' || roleId === 'role-4' || roleName === 'change manager' || roleName === 'requester';
+        if (isChangeManagerOrRequester) return null;
 
-      <nav style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', flex: 1 }}>
-        {MANAGEMENT_NAV.map((item) => (
-          <NavButton key={item.id} item={item} />
-        ))}
-      </nav>
+        const isSuperAdmin = roleId === 'role-1' || roleName.includes('super');
+
+        const visibleMgmtItems = MANAGEMENT_NAV.filter((item) => {
+          if (item.id === 'Catalogue Management' || item.id === 'Settings') {
+            return isSuperAdmin;
+          }
+          return true;
+        });
+
+        if (visibleMgmtItems.length === 0) return null;
+
+        return (
+          <>
+            <div
+              style={{
+                fontSize: '0.6875rem',
+                fontWeight: 700,
+                color: '#475569',
+                letterSpacing: '0.08em',
+                textTransform: 'uppercase',
+                margin: mini ? '1.25rem 0 0.5rem 0' : '1.5rem 0 0.5rem 0.85rem',
+                textAlign: mini ? 'center' : 'left'
+              }}
+            >
+              {mini ? '•••' : 'MANAGEMENT'}
+            </div>
+
+            <nav style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', flex: 1 }}>
+              {visibleMgmtItems.map((item) => (
+                <NavButton key={item.id} item={item} />
+              ))}
+            </nav>
+          </>
+        );
+      })()}
 
       {/* User footer */}
       <div
+        ref={profileRef}
         style={{
           marginTop: 'auto',
-          paddingTop: '1rem',
+          paddingTop: '0.85rem',
           borderTop: '1px solid #1E293B',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '0.75rem',
-          justifyContent: mini ? 'center' : 'flex-start',
-          paddingLeft: mini ? 0 : '0.35rem'
+          position: 'relative',
+          width: '100%'
         }}
       >
         <div
+          onClick={() => setShowProfileMenu((prev) => !prev)}
+          title={mini ? `${user?.name || 'User'} (${user?.role || ''}) - Click for options` : undefined}
           style={{
-            width: '34px',
-            height: '34px',
-            borderRadius: '50%',
-            backgroundColor: '#27354A',
-            color: '#FFFFFF',
             display: 'flex',
             alignItems: 'center',
-            justifyContent: 'center',
-            fontSize: '0.75rem',
-            fontWeight: 700,
-            flexShrink: 0
+            gap: '0.75rem',
+            justifyContent: mini ? 'center' : 'flex-start',
+            padding: mini ? '0.4rem 0' : '0.4rem 0.5rem',
+            cursor: 'pointer',
+            borderRadius: '8px',
+            backgroundColor: showProfileMenu ? '#1E293B' : 'transparent',
+            transition: 'background-color 0.15s ease'
           }}
         >
-          {user?.initials || 'U'}
+          <div
+            style={{
+              width: '34px',
+              height: '34px',
+              borderRadius: '50%',
+              backgroundColor: '#27354A',
+              color: '#FFFFFF',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: '0.75rem',
+              fontWeight: 700,
+              flexShrink: 0
+            }}
+          >
+            {user?.initials || 'U'}
+          </div>
+          {!mini && (
+            <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0, flex: 1 }}>
+              <span
+                style={{
+                  fontSize: '0.8rem',
+                  fontWeight: 700,
+                  color: '#F1F5F9',
+                  whiteSpace: 'nowrap',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis'
+                }}
+              >
+                {user?.name || 'Unknown user'}
+              </span>
+              <span style={{ fontSize: '0.7rem', color: '#64748B' }}>
+                {user?.role || '—'}
+              </span>
+            </div>
+          )}
         </div>
-        {!mini && (
-          <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
-            <span
+
+        {showProfileMenu && (
+          <div
+            style={{
+              position: 'fixed',
+              bottom: mini ? '16px' : '65px',
+              left: mini ? '76px' : '16px',
+              width: mini ? '210px' : '218px',
+              backgroundColor: '#1E293B',
+              border: '1px solid #334155',
+              borderRadius: '10px',
+              boxShadow: '0 8px 24px rgba(0,0,0,0.5)',
+              padding: '0.5rem 0',
+              zIndex: 9999
+            }}
+          >
+            <div style={{ padding: '0.6rem 1rem', borderBottom: '1px solid #334155' }}>
+              <strong style={{ display: 'block', fontSize: '0.85rem', color: '#FFFFFF' }}>
+                {user?.name || 'Unknown user'}
+              </strong>
+              <span style={{ fontSize: '0.725rem', color: '#94A3B8' }}>
+                {user?.role || user?.email || '—'}
+              </span>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                setShowProfileMenu(false);
+                onLogout?.();
+              }}
               style={{
-                fontSize: '0.8rem',
+                width: '100%',
+                textAlign: 'left',
+                padding: '0.6rem 1rem',
+                border: 'none',
+                backgroundColor: 'transparent',
+                color: '#EF4444',
+                fontSize: '0.825rem',
                 fontWeight: 700,
-                color: '#F1F5F9',
-                whiteSpace: 'nowrap',
-                overflow: 'hidden',
-                textOverflow: 'ellipsis'
+                cursor: 'pointer'
               }}
             >
-              {user?.name || 'Unknown user'}
-            </span>
-            <span style={{ fontSize: '0.7rem', color: '#64748B' }}>
-              {user?.role || user?.department || '—'}
-            </span>
+              Sign out
+            </button>
           </div>
         )}
       </div>
@@ -339,3 +435,5 @@ const iconBtnStyle = {
   cursor: 'pointer',
   flexShrink: 0
 };
+
+export default React.memo(Sidebar);

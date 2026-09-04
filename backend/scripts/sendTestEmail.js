@@ -69,8 +69,7 @@ const run = async () => {
       user: {
         name: 'Gautam Shah',
         email: to,
-        role: 'CAB Approver',
-        department: 'IT Operations'
+        role: 'CAB Approver'
       },
       tempPassword: 'Fox-4821',
       invitedByName: 'Gauri Shinde'

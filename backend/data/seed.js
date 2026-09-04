@@ -20,19 +20,19 @@ const hoursAgo = (n) => new Date(NOW - n * 3_600_000);
 // ---------- roles ------------------------------------------
 export const roles = [
   { id: 'role-1', name: 'Super Admin', description: 'Ultimate system control across all modules, role & permission management, system audit, database & user management.', permissions: ['Full System Control', 'Manage Roles & Permissions', 'Manage Users', 'View System Audit Logs', 'Override Approvals'] },
-  { id: 'role-2', name: 'Admin', description: 'System administration, workflow configuration, catalog management, and change lifecycle oversight.', permissions: ['Manage users', 'Configure workflows', 'Manage Catalogue', 'View all reports'] },
-  { id: 'role-3', name: 'CAB Approver', description: 'Member of Change Advisory Board with authority to review, approve, reject, or request information on CRs.', permissions: ['Review assigned CRs', 'Approve/reject CRs', 'Request info (send back)', 'View reports'] },
+  { id: 'role-2', name: 'Admin', description: 'System administration, workflow configuration, catalog management, user onboarding, and system reporting.', permissions: ['Manage Users', 'Configure Workflows', 'Manage Catalog', 'Export Reports', 'System Settings'] },
+  { id: 'role-3', name: 'Change Manager', description: 'Full lifecycle oversight: review, approve, reject, or request information on change requests.', permissions: ['Approve / Reject CRs', 'Lifecycle Oversight', 'Request Info (Send Back)', 'View Worklist & Metrics'] },
   { id: 'role-4', name: 'Requester', description: 'Standard employee permission to raise change requests, track progress, and update own draft submissions.', permissions: ['Create change requests', 'View own requests', 'Save draft CRs'] }
 ];
 
 // ---------- users (roleId -> roles.id) --------------------
 export const users = [
-  { id: 'usr-0', name: 'Ashish', employeeId: 'EMP-10001', department: 'Executive Management', email: 'ashish.sfc@company.com', status: 'Active', roleId: 'role-1' },
-  { id: 'usr-1', name: 'Gauri Shinde', employeeId: 'EMP-10432', department: 'IT Operations', email: 'gauri.shinde@company.com', status: 'Active', roleId: 'role-2' },
-  { id: 'usr-2', name: 'Priya Nair', employeeId: 'EMP-10433', department: 'Software Engineering', email: 'priya.nair@company.com', status: 'Active', roleId: 'role-4' },
-  { id: 'usr-3', name: 'Arjun Mehta', employeeId: 'EMP-10434', department: 'Cloud Infrastructure', email: 'arjun.mehta@company.com', status: 'Active', roleId: 'role-3' },
-  { id: 'usr-4', name: 'Sana Iqbal', employeeId: 'EMP-10435', department: 'Cybersecurity', email: 'sana.iqbal@company.com', status: 'Active', roleId: 'role-2' },
-  { id: 'usr-5', name: 'Rahul Verma', employeeId: 'EMP-10436', department: 'Human Resources', email: 'rahul.verma@company.com', status: 'Inactive', roleId: 'role-4' }
+  { id: 'usr-0', name: 'Ashish', employeeId: 'EMP-10001', email: 'ashish.sfc@company.com', status: 'Active', roleId: 'role-1' },
+  { id: 'usr-1', name: 'Gauri Shinde', employeeId: 'EMP-10432', email: 'gauri.shinde@company.com', status: 'Active', roleId: 'role-3' },
+  { id: 'usr-2', name: 'Priya Nair', employeeId: 'EMP-10433', email: 'priya.nair@company.com', status: 'Active', roleId: 'role-4' },
+  { id: 'usr-3', name: 'Arjun Mehta', employeeId: 'EMP-10434', email: 'arjun.mehta@company.com', status: 'Active', roleId: 'role-2' },
+  { id: 'usr-4', name: 'Sana Iqbal', employeeId: 'EMP-10435', email: 'sana.iqbal@company.com', status: 'Active', roleId: 'role-1' },
+  { id: 'usr-5', name: 'Rahul Verma', employeeId: 'EMP-10436', email: 'rahul.verma@company.com', status: 'Inactive', roleId: 'role-4' }
 ].map((u) => ({ ...u, authProvider: 'local', passwordHash: DEV_PASSWORD_HASH }));
 
 // ---------- workflows ------------------------------------
@@ -257,14 +257,6 @@ export const monthlyVolume = [
   { month: 'Aug', count: 76, barHeight: '95%' }
 ].map((row, i) => ({ ...row, sortIndex: i }));
 
-export const departmentVolume = [
-  { name: 'Software Engineering', count: 48, percentage: 38, color: '#2563EB' },
-  { name: 'Cloud Infrastructure', count: 32, percentage: 25, color: '#0D9488' },
-  { name: 'Network Operations', count: 22, percentage: 17, color: '#7C3AED' },
-  { name: 'Human Resources & Security', count: 15, percentage: 12, color: '#B45309' },
-  { name: 'Finance & Analytics', count: 11, percentage: 8, color: '#475569' }
-].map((row, i) => ({ ...row, sortIndex: i }));
-
 export const appConfig = [
   { key: 'dashboard_stats', value: { total: 128, pending: 17, approved: 76, inProgress: 21, rejected: 14 } },
   { key: 'worklist_metrics', value: { pending: 4, approved: 32, rejected: 6, sentBack: 3 } },
@@ -307,7 +299,7 @@ export const catalogSubcategories = [
 
   // 4. IT Asset
   { id: 'subcat-asset-dev', categoryId: 'cat-asset', name: 'Laptop / Desktop', sla: '5 business days', risk: 'Low', workflowId: 'wf-1', status: 'Active' },
-  { id: 'subcat-asset-hw', categoryId: 'cat-asset', name: 'Other IT Hardware', sla: '5 business days', risk: 'Low', workflowId: 'wf-1', status: 'Active' },
+  { id: 'subcat-asset-hw', categoryId: 'cat-asset', name: 'Hardware Accessories', sla: '5 business days', risk: 'Low', workflowId: 'wf-1', status: 'Active' },
   { id: 'subcat-asset-sw', categoryId: 'cat-asset', name: 'Software', sla: '3 business days', risk: 'Medium', workflowId: 'wf-1', status: 'Active' },
   { id: 'subcat-asset-lic', categoryId: 'cat-asset', name: 'License', sla: '2 business days', risk: 'Low', workflowId: 'wf-3', status: 'Active' },
   { id: 'subcat-asset-oth', categoryId: 'cat-asset', name: 'Other', sla: '3 business days', risk: 'Low', workflowId: 'wf-1', status: 'Active' },
@@ -485,7 +477,7 @@ export const catalogSubcategoryFields = [
 export async function seedDatabase({ force = false } = {}) {
   const {
     Role, User, Workflow, CatalogCategory, CatalogSubcategory, CatalogSubcategoryField,
-    ChangeRequest, ChangeRequestApproval, AuditLog, AppConfig
+    ChangeRequest, ChangeRequestApproval, AuditLog, AppConfig, ChangeManagerCategory
   } = models;
 
   const fill = async (Model, rows) => {
@@ -534,6 +526,14 @@ export async function seedDatabase({ force = false } = {}) {
     { id: 'appr-2055', changeRequestId: 'CR-2055', approverId: 'usr-1', decision: 'Pending' }
   ];
   results.push(await fill(ChangeRequestApproval, sampleApprovals));
+
+  const sampleCmCategories = [
+    { id: 'cmc-usr-1-cat-srv', userId: 'usr-1', categoryId: 'cat-srv' },
+    { id: 'cmc-usr-1-cat-net', userId: 'usr-1', categoryId: 'cat-net' },
+    { id: 'cmc-usr-1-cat-acc', userId: 'usr-1', categoryId: 'cat-acc' },
+    { id: 'cmc-usr-1-cat-asset', userId: 'usr-1', categoryId: 'cat-asset' }
+  ];
+  results.push(await fill(ChangeManagerCategory, sampleCmCategories));
 
   results.push(await fill(AuditLog, auditLogs));
   results.push(await fill(AppConfig, appConfig));

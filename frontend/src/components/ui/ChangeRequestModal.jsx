@@ -25,22 +25,20 @@ export default function ChangeRequestModal({ cr, onClose, onApprove, onReject, o
   const statusDot = isRejected ? '#DC2626' : isApproved ? '#059669' : isDraft ? '#94A0B0' : '#D97706';
 
   const steps = isRejected
-    ? ['Draft', 'Submitted', 'CAB Review', 'Rejected']
-    : ['Draft', 'Submitted', 'CAB Review', 'Approved', 'Scheduled', 'Implemented', 'Closed'];
+    ? ['Draft', 'CAB Review', 'Rejected']
+    : ['Draft', 'CAB Review', 'Approved', 'Scheduled', 'Implemented', 'Closed'];
 
-  const currentStepIdx = isRejected ? 3
-    : isApproved ? 3
-    : statusLower === 'draft' ? 0
-    : statusLower === 'in progress' || statusLower === 'scheduled' ? 4
-    : statusLower === 'implemented' ? 5
-    : statusLower === 'closed' ? 6
-    : 2;
+  const currentStepIdx = isRejected ? 2
+    : isApproved ? 2
+    : isDraft ? 0
+    : statusLower === 'in progress' || statusLower === 'scheduled' ? 3
+    : statusLower === 'implemented' ? 4
+    : statusLower === 'closed' ? 5
+    : 1;
 
-  const progressPercent = isRejected
-    ? 100
-    : Math.min(100, Math.max(0, (currentStepIdx / (steps.length - 1)) * 100));
+  const progressPercent = Math.min(100, Math.max(0, (currentStepIdx / (steps.length - 1)) * 100));
 
-  const activeColor = isRejected ? '#DC2626' : '#0D9488';
+  const activeColor = isRejected ? '#DC2626' : isDraft ? '#7C3AED' : '#0D9488';
 
   const canAct = cr.canAct !== false && !isApproved && !isRejected && !isDraft;
 
@@ -155,13 +153,13 @@ export default function ChangeRequestModal({ cr, onClose, onApprove, onReject, o
             <div style={{ position: 'absolute', top: '10px', left: '20px', width: `${progressPercent}%`, height: '2px', backgroundColor: activeColor, zIndex: 2, transition: 'width 0.3s ease' }} />
 
             {steps.map((step, idx) => {
-              const isCompleted = idx < currentStepIdx;
               const isCurrent = idx === currentStepIdx;
+              const isReached = idx <= currentStepIdx;
               const isStepRejected = isRejected && isCurrent;
 
-              const circleBorder = isStepRejected ? '3px solid #DC2626' : isCurrent ? `3px solid ${activeColor}` : isCompleted ? `2px solid ${activeColor}` : '2px solid var(--border-color)';
-              const circleBg = isStepRejected ? '#FEF2F2' : isCurrent ? 'var(--card-bg)' : isCompleted ? activeColor : 'var(--card-bg)';
-              const textColor = isStepRejected ? '#DC2626' : isCurrent ? activeColor : isCompleted ? 'var(--text-primary)' : 'var(--text-secondary)';
+              const circleBorder = isStepRejected ? '3px solid #DC2626' : isReached ? `2px solid ${activeColor}` : '2px solid var(--border-color)';
+              const circleBg = isStepRejected ? '#DC2626' : isReached ? activeColor : 'var(--card-bg)';
+              const textColor = isStepRejected ? '#DC2626' : isCurrent ? activeColor : isReached ? 'var(--text-primary)' : 'var(--text-secondary)';
 
               return (
                 <div key={step} style={{ position: 'relative', zIndex: 3, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.4rem' }}>
@@ -175,8 +173,7 @@ export default function ChangeRequestModal({ cr, onClose, onApprove, onReject, o
                     alignItems: 'center',
                     justifyContent: 'center'
                   }}>
-                    {isCompleted && <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: activeColor }} />}
-                    {isStepRejected && <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: '#DC2626' }} />}
+                    {isReached && !isStepRejected && <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: '#FFFFFF' }} />}
                   </div>
                   <span style={{ fontSize: '0.725rem', fontWeight: isCurrent ? 800 : 500, color: textColor }}>
                     {step}
@@ -257,11 +254,11 @@ export default function ChangeRequestModal({ cr, onClose, onApprove, onReject, o
 
         {/* Employee & Asset Details */}
         <div style={{ padding: '1.25rem 1.75rem', borderTop: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-          <h3 style={{ fontSize: '0.9rem', fontWeight: 800, color: 'var(--text-primary)', margin: 0 }}>Employee & Asset Details</h3>
+          <h3 style={{ fontSize: '0.9rem', fontWeight: 800, color: 'var(--text-primary)', margin: 0 }}>Employee Details</h3>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '1rem' }}>
             <div>
-              <div style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '0.25rem' }}>Requester</div>
-              <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>{cr.requester || 'Priya Nair'}</div>
+              <div style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '0.25rem' }}>Requester / Employee</div>
+              <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>{cr.employeeName || cr.requester || 'Requester'}</div>
             </div>
             <div>
               <div style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '0.25rem' }}>
@@ -272,20 +269,16 @@ export default function ChangeRequestModal({ cr, onClose, onApprove, onReject, o
               </div>
             </div>
             <div>
-              <div style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '0.25rem' }}>Department</div>
-              <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>{cr.department || 'IT Operations'}</div>
+              <div style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '0.25rem' }}>Employee ID</div>
+              <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)' }}>{cr.employeeId || cr.empId || 'N/A'}</div>
             </div>
             <div>
-              <div style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '0.25rem' }}>Hostname / Asset</div>
-              <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)' }}>{cr.hostname || 'N/A'}</div>
-            </div>
-            <div>
-              <div style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '0.25rem' }}>Environment</div>
-              <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>{cr.environment || 'Production'}</div>
+              <div style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '0.25rem' }}>Employee Email</div>
+              <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>{cr.employeeEmail || cr.requesterEmail || 'N/A'}</div>
             </div>
             <div>
               <div style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '0.25rem' }}>Location</div>
-              <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>{cr.location || 'Ahmedabad HQ'}</div>
+              <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>{cr.location || 'N/A'}</div>
             </div>
             <div>
               <div style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '0.25rem' }}>Manager Email</div>

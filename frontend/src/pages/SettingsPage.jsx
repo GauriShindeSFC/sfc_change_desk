@@ -2,16 +2,17 @@ import React, { useState, useEffect } from 'react';
 import { Plus, X, Download } from 'lucide-react';
 import { apiFetch } from '../lib/apiFetch';
 
-export default function SettingsPage({ user }) {
+function SettingsPage({ user }) {
   const isSuperAdmin = user?.roleId === 'role-1' || (user?.role || '').toLowerCase() === 'super admin';
   const isRequester = !isSuperAdmin && (user?.roleId === 'role-4' || user?.role === 'Requester');
 
   const defaultUsers = [
-    { id: 'usr-1', name: 'Gauri Shinde', email: 'gauri.shinde@stfox.com', empId: 'EMP-10432', dept: 'IT Operations', role: 'Change Manager', status: 'Enabled' },
-    { id: 'usr-2', name: 'Aashini Shah', email: 'aashini.shah@stfox.com', empId: 'EMP-10433', dept: 'Development', role: 'Requester', status: 'Enabled' },
-    { id: 'usr-3', name: 'Priya Nair', email: 'priya.nair@stfox.com', empId: 'EMP-10214', dept: 'Product Engineering', role: 'CAB Approver', status: 'Enabled' },
-    { id: 'usr-4', name: 'Arjun Mehta', email: 'arjun.mehta@stfox.com', empId: 'EMP-10892', dept: 'Infrastructure', role: 'CAB Approver', status: 'Enabled' },
-    { id: 'usr-5', name: 'Rohan Deshmukh', email: 'rohan.d@stfox.com', empId: 'EMP-10305', dept: 'HR Systems', role: 'Requester', status: 'Disabled' }
+    { id: 'usr-0', name: 'Ashish SFC', email: 'ashish.sfc@company.com', empId: 'EMP-10001', role: 'Super Admin', status: 'Enabled' },
+    { id: 'usr-1', name: 'Gauri Shinde', email: 'gauri.shinde@company.com', empId: 'EMP-10432', role: 'Change Manager', status: 'Enabled' },
+    { id: 'usr-2', name: 'Priya Nair', email: 'priya.nair@company.com', empId: 'EMP-10433', role: 'Requester', status: 'Enabled' },
+    { id: 'usr-3', name: 'Arjun Mehta', email: 'arjun.mehta@company.com', empId: 'EMP-10434', role: 'Admin', status: 'Enabled' },
+    { id: 'usr-4', name: 'Sana Iqbal', email: 'sana.iqbal@company.com', empId: 'EMP-10435', role: 'Super Admin', status: 'Enabled' },
+    { id: 'usr-5', name: 'Rahul Verma', email: 'rahul.verma@company.com', empId: 'EMP-10436', role: 'Requester', status: 'Disabled' }
   ];
 
   const defaultAuditLogs = [
@@ -82,7 +83,7 @@ export default function SettingsPage({ user }) {
 
   const [activeTab, setActiveTab] = useState(() => {
     const hash = (window.location.hash || '').replace('#', '').toLowerCase();
-    return ['users', 'audit'].includes(hash) ? hash : 'audit';
+    return ['users', 'audit'].includes(hash) ? hash : 'users';
   });
 
   useEffect(() => {
@@ -106,30 +107,86 @@ export default function SettingsPage({ user }) {
   const [isInviteModalOpen, setIsInviteModalOpen] = useState(false);
   const [editingUser, setEditingUser] = useState(null);
 
-  const handleOpenManageUser = (targetUser) => {
+  const [categories, setCategories] = useState([
+    { id: 'cat-srv', name: 'Server & Infra' },
+    { id: 'cat-net', name: 'Network & Connectivity' },
+    { id: 'cat-acc', name: 'Access & Security' },
+    { id: 'cat-asset', name: 'IT Asset' }
+  ]);
+  const [newUserCategories, setNewUserCategories] = useState([]);
+  const [editingUserCategories, setEditingUserCategories] = useState([]);
+
+  useEffect(() => {
+    const fetchCatalogCategories = async () => {
+      try {
+        const res = await apiFetch('/catalog/categories');
+        if (res.ok) {
+          const body = await res.json();
+          if (body.data && Array.isArray(body.data)) setCategories(body.data);
+        }
+      } catch (err) {
+        console.warn('Failed to load categories:', err);
+      }
+    };
+    fetchCatalogCategories();
+  }, []);
+
+  const handleOpenManageUser = async (targetUser) => {
     if (isRequester) return; // Block role-4 Requester from opening Manage User modal
+    const initialCats = targetUser.categoryIds || [];
     setEditingUser({
       id: targetUser.id,
       name: targetUser.name || '',
       empId: targetUser.empId || targetUser.employeeId || 'EMP-10432',
-      dept: targetUser.dept || targetUser.department || 'IT Operations',
       role: targetUser.role || 'Change Manager',
       status: targetUser.status || 'Enabled'
     });
+    setEditingUserCategories(initialCats);
+    try {
+      const res = await apiFetch(`/settings/change-manager-categories/${targetUser.id}`);
+      if (res.ok) {
+        const body = await res.json();
+        if (body.data && Array.isArray(body.data)) {
+          setEditingUserCategories(body.data.map(d => d.categoryId));
+        }
+      }
+    } catch (err) {
+      console.warn('Failed to fetch user categories:', err);
+    }
   };
 
-  const handleSaveManageUser = (e) => {
+  const handleSaveManageUser = async (e) => {
     if (e) e.preventDefault();
     if (!editingUser) return;
 
-    setUsers(prev => prev.map(u => u.id === editingUser.id ? {
-      ...u,
+    const updatedUserObj = {
       name: editingUser.name,
       empId: editingUser.empId,
-      dept: editingUser.dept,
       role: editingUser.role,
       status: editingUser.status
-    } : u));
+    };
+
+    try {
+      await apiFetch(`/settings/users/${editingUser.id}`, {
+        method: 'PATCH',
+        body: JSON.stringify(updatedUserObj)
+      });
+
+      if (editingUser.role === 'Change Manager') {
+        await apiFetch(`/settings/change-manager-categories/${editingUser.id}`, {
+          method: 'PUT',
+          body: JSON.stringify({ categoryIds: editingUserCategories })
+        });
+      }
+
+      const usersRes = await apiFetch('/settings/users');
+      if (usersRes.ok) {
+        const body = await usersRes.json();
+        if (body.data && Array.isArray(body.data)) setUsers(body.data);
+      }
+    } catch (err) {
+      console.warn('Failed to update user via API:', err);
+    }
 
     setEditingUser(null);
   };
@@ -138,7 +195,7 @@ export default function SettingsPage({ user }) {
   const [newUser, setNewUser] = useState({
     name: '',
     email: '',
-    department: '',
+    empId: '',
     role: 'Admin',
     status: 'Enabled'
   });
@@ -179,27 +236,47 @@ export default function SettingsPage({ user }) {
     if (!newUser.name || !newUser.email) return;
 
     const createdUser = {
-      id: `usr-${users.length + 1}`,
+      id: `usr-${Date.now()}`,
       name: newUser.name,
       email: newUser.email,
-      empId: `EMP-${10500 + users.length}`,
-      dept: newUser.department || 'IT Operations',
+      empId: newUser.empId || `EMP-${10500 + users.length}`,
+      employeeId: newUser.empId || `EMP-${10500 + users.length}`,
       role: newUser.role,
       status: newUser.status
     };
 
-    setUsers(prev => [createdUser, ...prev]);
-    setIsInviteModalOpen(false);
-    setNewUser({ name: '', email: '', department: '', role: 'Admin', status: 'Enabled' });
-
     try {
-      await apiFetch('/settings/users', {
+      const res = await apiFetch('/settings/users', {
         method: 'POST',
         body: JSON.stringify(createdUser)
       });
+
+      let savedUserId = createdUser.id;
+      if (res.ok) {
+        const body = await res.json();
+        if (body.data && body.data.id) savedUserId = body.data.id;
+      }
+
+      if (newUser.role === 'Change Manager') {
+        await apiFetch(`/settings/change-manager-categories/${savedUserId}`, {
+          method: 'PUT',
+          body: JSON.stringify({ categoryIds: newUserCategories })
+        });
+      }
+
+      const usersRes = await apiFetch('/settings/users');
+      if (usersRes.ok) {
+        const body = await usersRes.json();
+        if (body.data && Array.isArray(body.data)) setUsers(body.data);
+      }
     } catch (err) {
       console.warn('Failed to post invited user to backend:', err);
+      setUsers(prev => [createdUser, ...prev]);
     }
+
+    setIsInviteModalOpen(false);
+    setNewUser({ name: '', email: '', empId: '', role: 'Admin', status: 'Enabled' });
+    setNewUserCategories([]);
   };
 
   const handleExportAuditExcel = async () => {
@@ -253,6 +330,15 @@ export default function SettingsPage({ user }) {
   const filteredLogs = auditFilter === 'All activity'
     ? auditLogs
     : auditLogs.filter(log => log.category === auditFilter);
+
+  if (!isSuperAdmin) {
+    return (
+      <div style={{ padding: '2rem', textAlign: 'center', backgroundColor: 'var(--card-bg)', border: '1px solid var(--border-color)', borderRadius: '12px' }}>
+        <h2 style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--text-primary)', marginBottom: '0.5rem' }}>Access Restricted</h2>
+        <p style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>Settings and user management are accessible to Super Admin users only.</p>
+      </div>
+    );
+  }
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
@@ -374,7 +460,6 @@ export default function SettingsPage({ user }) {
               <tr style={{ backgroundColor: 'var(--input-bg)', color: 'var(--text-secondary)', fontSize: '0.6875rem', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', borderBottom: '1px solid var(--border-color)' }}>
                 <th style={{ padding: '0.75rem 0.85rem' }}>USER</th>
                 <th style={{ padding: '0.75rem 0.85rem' }}>EMAIL ID</th>
-                <th style={{ padding: '0.75rem 0.85rem' }}>DEPARTMENT</th>
                 <th style={{ padding: '0.75rem 0.85rem' }}>ROLE</th>
                 <th style={{ padding: '0.75rem 0.85rem' }}>STATUS</th>
                 <th style={{ padding: '0.75rem 0.85rem', textAlign: 'right' }}>ACTIONS</th>
@@ -385,7 +470,6 @@ export default function SettingsPage({ user }) {
                 <tr key={u.id} style={{ borderBottom: idx === users.length - 1 ? 'none' : '1px solid var(--border-color)' }}>
                   <td style={{ padding: '0.75rem 0.85rem', fontSize: '0.875rem', fontWeight: 700, color: 'var(--text-primary)' }}>{u.name}</td>
                   <td style={{ padding: '0.75rem 0.85rem', fontSize: '0.825rem', color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)' }}>{u.email}</td>
-                  <td style={{ padding: '0.75rem 0.85rem', fontSize: '0.825rem', color: 'var(--text-primary)' }}>{u.dept}</td>
                   <td style={{ padding: '0.75rem 0.85rem', fontSize: '0.825rem', color: 'var(--text-primary)', fontWeight: 600 }}>{u.role}</td>
                   <td style={{ padding: '0.75rem 0.85rem' }}>
                     <span style={{
@@ -513,13 +597,15 @@ export default function SettingsPage({ user }) {
             borderRadius: '16px',
             width: '100%',
             maxWidth: '560px',
+            maxHeight: '90vh',
             boxShadow: '0 20px 40px rgba(0, 0, 0, 0.2)',
             display: 'flex',
-            flexDirection: 'column'
+            flexDirection: 'column',
+            overflow: 'hidden'
           }}>
             
             {/* Modal Header */}
-            <div style={{ padding: '1.5rem 1.75rem 1rem 1.75rem', display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', borderBottom: '1px solid var(--border-color)' }}>
+            <div style={{ padding: '1.25rem 1.75rem 0.75rem 1.75rem', display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', borderBottom: '1px solid var(--border-color)' }}>
               <div>
                 <h2 style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--text-primary)', margin: 0, lineHeight: 1.3 }}>
                   Invite User
@@ -534,7 +620,7 @@ export default function SettingsPage({ user }) {
             </div>
 
             {/* Modal Form Body */}
-            <form onSubmit={handleSaveInviteUser} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', padding: '1.5rem 1.75rem' }}>
+            <form onSubmit={handleSaveInviteUser} style={{ display: 'flex', flexDirection: 'column', gap: '1rem', padding: '1.25rem 1.75rem', overflowY: 'auto', flex: 1 }}>
               
               {/* Full name & Email ID 2-Col Grid */}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
@@ -585,31 +671,31 @@ export default function SettingsPage({ user }) {
                 </div>
               </div>
 
-              {/* Department & Role 2-Col Grid */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.825rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '0.4rem' }}>
-                    Department
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="e.g. IT Operations"
-                    value={newUser.department}
-                    onChange={(e) => setNewUser(prev => ({ ...prev, department: e.target.value }))}
-                    style={{
-                      width: '100%',
-                      padding: '0.65rem 0.85rem',
-                      backgroundColor: 'var(--input-bg)',
-                      border: '1px solid var(--border-color)',
-                      borderRadius: '8px',
-                      fontSize: '0.85rem',
-                      color: 'var(--text-primary)',
-                      outline: 'none'
-                    }}
-                  />
-                </div>
+              {/* Employee ID Input */}
+              <div style={{ marginBottom: '1.25rem' }}>
+                <label style={{ display: 'block', fontSize: '0.825rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '0.4rem' }}>
+                  Employee ID
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. EMP-10550"
+                  value={newUser.empId}
+                  onChange={(e) => setNewUser(prev => ({ ...prev, empId: e.target.value }))}
+                  style={{
+                    width: '100%',
+                    padding: '0.65rem 0.85rem',
+                    backgroundColor: 'var(--input-bg)',
+                    border: '1px solid var(--border-color)',
+                    borderRadius: '8px',
+                    fontSize: '0.85rem',
+                    color: 'var(--text-primary)',
+                    outline: 'none'
+                  }}
+                />
+              </div>
 
-                <div>
+              {/* Role Select */}
+              <div style={{ marginBottom: '1.25rem' }}>
                   <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.35rem', marginBottom: '0.4rem' }}>
                     <label style={{ fontSize: '0.825rem', fontWeight: 700, color: 'var(--text-primary)' }}>
                       Role
@@ -633,11 +719,39 @@ export default function SettingsPage({ user }) {
                     <option value="Super Admin">Super Admin</option>
                     <option value="Admin">Admin</option>
                     <option value="Change Manager">Change Manager</option>
-                    <option value="CAB Approver">CAB Approver</option>
                     <option value="Requester">Requester</option>
                   </select>
                 </div>
-              </div>
+
+              {/* Dynamic Category Assignment Dropdown for Change Manager */}
+              {newUser.role === 'Change Manager' && (
+                <div style={{ marginBottom: '1.25rem' }}>
+                  <label style={{ display: 'block', fontSize: '0.825rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '0.4rem' }}>
+                    Appointed Categories (Change Manager) *
+                  </label>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem', backgroundColor: 'var(--input-bg)', padding: '0.75rem', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
+                    {categories.map((cat) => {
+                      const isChecked = newUserCategories.includes(cat.id);
+                      return (
+                        <label key={cat.id} style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.825rem', color: 'var(--text-primary)', cursor: 'pointer' }}>
+                          <input
+                            type="checkbox"
+                            checked={isChecked}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setNewUserCategories(prev => [...prev, cat.id]);
+                              } else {
+                                setNewUserCategories(prev => prev.filter(c => c !== cat.id));
+                              }
+                            }}
+                          />
+                          <span>{cat.name}</span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
 
               {/* Status Selector */}
               <div>
@@ -734,14 +848,14 @@ export default function SettingsPage({ user }) {
             borderRadius: '16px',
             width: '100%',
             maxWidth: '540px',
-            padding: '1.75rem 2rem',
+            maxHeight: '90vh',
             boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
             display: 'flex',
             flexDirection: 'column',
-            gap: '1.25rem'
+            overflow: 'hidden'
           }}>
             {/* Header */}
-            <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
+            <div style={{ padding: '1.25rem 1.75rem 0.75rem 1.75rem', display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', borderBottom: '1px solid var(--border-color)' }}>
               <div>
                 <h2 style={{ fontSize: '1.35rem', fontWeight: 800, color: 'var(--text-primary)', margin: 0 }}>
                   Edit User
@@ -759,7 +873,7 @@ export default function SettingsPage({ user }) {
               </button>
             </div>
 
-            <form onSubmit={handleSaveManageUser} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+            <form onSubmit={handleSaveManageUser} style={{ display: 'flex', flexDirection: 'column', gap: '1rem', padding: '1.25rem 1.75rem', overflowY: 'auto', flex: 1 }}>
               {/* Row 1: Full name & Employee ID */}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                 <div>
@@ -804,33 +918,12 @@ export default function SettingsPage({ user }) {
                 </div>
               </div>
 
-              {/* Row 2: Department & Role */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.825rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '0.4rem' }}>
-                    Department
-                  </label>
-                  <input
-                    type="text"
-                    value={editingUser.dept}
-                    onChange={(e) => setEditingUser(prev => ({ ...prev, dept: e.target.value }))}
-                    style={{
-                      width: '100%',
-                      padding: '0.65rem 0.85rem',
-                      backgroundColor: 'var(--input-bg)',
-                      border: '1px solid var(--border-color)',
-                      borderRadius: '8px',
-                      fontSize: '0.85rem',
-                      color: 'var(--text-primary)',
-                      outline: 'none'
-                    }}
-                  />
+              {/* Role Select */}
+              <div style={{ marginBottom: '1.25rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.4rem' }}>
+                  <label style={{ fontSize: '0.825rem', fontWeight: 700, color: 'var(--text-primary)' }}>Role</label>
+                  <span style={{ fontSize: '0.725rem', color: 'var(--text-secondary)' }}>defined under Roles</span>
                 </div>
-                <div>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.4rem' }}>
-                    <label style={{ fontSize: '0.825rem', fontWeight: 700, color: 'var(--text-primary)' }}>Role</label>
-                    <span style={{ fontSize: '0.725rem', color: 'var(--text-secondary)' }}>defined under Roles</span>
-                  </div>
                   <select
                     value={editingUser.role}
                     onChange={(e) => setEditingUser(prev => ({ ...prev, role: e.target.value }))}
@@ -848,11 +941,39 @@ export default function SettingsPage({ user }) {
                     <option value="Super Admin">Super Admin</option>
                     <option value="Admin">Admin</option>
                     <option value="Change Manager">Change Manager</option>
-                    <option value="CAB Approver">CAB Approver</option>
                     <option value="Requester">Requester</option>
                   </select>
                 </div>
-              </div>
+
+              {/* Dynamic Category Assignment Dropdown for Change Manager */}
+              {editingUser.role === 'Change Manager' && (
+                <div style={{ marginBottom: '1.25rem' }}>
+                  <label style={{ display: 'block', fontSize: '0.825rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '0.4rem' }}>
+                    Appointed Categories (Change Manager) *
+                  </label>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem', backgroundColor: 'var(--input-bg)', padding: '0.75rem', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
+                    {categories.map((cat) => {
+                      const isChecked = editingUserCategories.includes(cat.id);
+                      return (
+                        <label key={cat.id} style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.825rem', color: 'var(--text-primary)', cursor: 'pointer' }}>
+                          <input
+                            type="checkbox"
+                            checked={isChecked}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setEditingUserCategories(prev => [...prev, cat.id]);
+                              } else {
+                                setEditingUserCategories(prev => prev.filter(c => c !== cat.id));
+                              }
+                            }}
+                          />
+                          <span>{cat.name}</span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
 
               {/* Status Section */}
               <div>
@@ -937,3 +1058,5 @@ export default function SettingsPage({ user }) {
     </div>
   );
 }
+
+export default React.memo(SettingsPage);

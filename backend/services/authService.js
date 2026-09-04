@@ -30,7 +30,6 @@ export const publicUser = (row) => {
     id: u.id,
     name: u.name,
     email: u.email,
-    department: u.department,
     role: u.role?.name ?? null,
     roleId: u.roleId || u.role?.id || null,
     status: u.status,
