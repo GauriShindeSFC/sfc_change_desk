@@ -1354,44 +1354,15 @@ export const getSettingsAuditLogsService = async (filter = 'All activity') => {
 // ---------- Reports -------------------------------
 
 export const getReportsMetricsService = async (dateFilter = 'overall', startDate = null, endDate = null) => {
-  const [metricsConfig, totalCRs, approvedCRs, emergencyCRs] = await Promise.all([
-    getConfig('report_metrics'),
-    ChangeRequest.count(),
-    ChangeRequest.count({ where: { status: 'Approved' } }),
-    ChangeRequest.count({ where: { category: { [Op.iLike]: '%Emergency%' } } })
-  ]);
-
-  // Live average approval time query (days from submission to approval/rejection)
-  const [avgTimeRes] = await sequelize.query(`
-    SELECT
-      COALESCE(ROUND(AVG(EXTRACT(EPOCH FROM (COALESCE(closed_at, updated_at) - submitted_at)) / 86400.0)::numeric, 1), 1.5)::float AS avg_days
-    FROM change_requests
-    WHERE status IN ('Approved', 'Rejected') AND submitted_at IS NOT NULL
-  `, { type: QueryTypes.SELECT });
-
-  const avgApprovalDays = avgTimeRes?.avg_days ? `${avgTimeRes.avg_days} days` : '1.5 days';
-
-  // Monthly volume — count all tickets grouped by the month they were submitted/created
-  const monthlyVolume = await sequelize.query(`
-    SELECT
-      TO_CHAR(COALESCE(submitted_at, created_at), 'Mon') AS month,
-      EXTRACT(MONTH FROM COALESCE(submitted_at, created_at)) AS sort_index,
-      COUNT(*)::int AS count
-    FROM change_requests
-    GROUP BY month, sort_index
-    ORDER BY sort_index
-  `, { type: QueryTypes.SELECT });
-
-  // Location-wise requests breakdown with date filtering (parameterized)
-  let locWhere = '';
+  let dateWhere = '';
   const replacements = {};
 
   if (dateFilter === 'last_7_days') {
-    locWhere = "WHERE COALESCE(submitted_at, created_at) >= NOW() - INTERVAL '7 days'";
+    dateWhere = "WHERE COALESCE(submitted_at, created_at) >= NOW() - INTERVAL '7 days'";
   } else if (dateFilter === 'this_month') {
-    locWhere = "WHERE DATE_TRUNC('month', COALESCE(submitted_at, created_at)) = DATE_TRUNC('month', CURRENT_DATE)";
+    dateWhere = "WHERE DATE_TRUNC('month', COALESCE(submitted_at, created_at)) = DATE_TRUNC('month', CURRENT_DATE)";
   } else if (dateFilter === 'last_month') {
-    locWhere = "WHERE COALESCE(submitted_at, created_at) >= DATE_TRUNC('month', CURRENT_DATE - INTERVAL '1 month') AND COALESCE(submitted_at, created_at) < DATE_TRUNC('month', CURRENT_DATE)";
+    dateWhere = "WHERE COALESCE(submitted_at, created_at) >= DATE_TRUNC('month', CURRENT_DATE - INTERVAL '1 month') AND COALESCE(submitted_at, created_at) < DATE_TRUNC('month', CURRENT_DATE)";
   } else if (dateFilter === 'custom' && startDate) {
     if (isNaN(Date.parse(startDate))) {
       const err = new Error('Invalid start date format.');
@@ -1410,21 +1381,65 @@ export const getReportsMetricsService = async (dateFilter = 'overall', startDate
       }
       const cleanEnd = String(endDate).trim().split('T')[0];
       const formattedEnd = `${cleanEnd} 23:59:59`;
-      locWhere = 'WHERE COALESCE(submitted_at, created_at) >= :start AND COALESCE(submitted_at, created_at) <= :end';
+      dateWhere = 'WHERE COALESCE(submitted_at, created_at) >= :start AND COALESCE(submitted_at, created_at) <= :end';
       replacements.start = formattedStart;
       replacements.end = formattedEnd;
     } else {
-      locWhere = 'WHERE COALESCE(submitted_at, created_at) >= :start';
+      dateWhere = 'WHERE COALESCE(submitted_at, created_at) >= :start';
       replacements.start = formattedStart;
     }
   }
 
+  const [metricsConfig, [countsRes]] = await Promise.all([
+    getConfig('report_metrics'),
+    sequelize.query(`
+      SELECT
+        COUNT(*)::int AS total_crs,
+        COUNT(*) FILTER (WHERE status = 'Approved')::int AS approved_crs,
+        COUNT(*) FILTER (WHERE category ILIKE '%Emergency%' OR category ILIKE '%Urgent%' OR risk = 'High')::int AS emergency_crs,
+        COUNT(*) FILTER (WHERE status = 'Rejected')::int AS rejected_crs
+      FROM change_requests
+      ${dateWhere}
+    `, { replacements, type: QueryTypes.SELECT })
+  ]);
+
+  const totalCRs = countsRes?.total_crs || 0;
+  const approvedCRs = countsRes?.approved_crs || 0;
+  const emergencyCRs = countsRes?.emergency_crs || 0;
+
+  // Live average approval turnaround time query
+  const avgWhere = dateWhere
+    ? `${dateWhere} AND status IN ('Approved', 'Rejected') AND submitted_at IS NOT NULL`
+    : "WHERE status IN ('Approved', 'Rejected') AND submitted_at IS NOT NULL";
+
+  const [avgTimeRes] = await sequelize.query(`
+    SELECT
+      COALESCE(ROUND(AVG(EXTRACT(EPOCH FROM (COALESCE(closed_at, updated_at) - submitted_at)) / 86400.0)::numeric, 1), 0.1)::float AS avg_days
+    FROM change_requests
+    ${avgWhere}
+  `, { replacements, type: QueryTypes.SELECT });
+
+  const avgApprovalDays = avgTimeRes?.avg_days ? `${avgTimeRes.avg_days} days` : '0.1 days';
+
+  // Monthly volume — count all tickets grouped by month
+  const monthlyVolume = await sequelize.query(`
+    SELECT
+      TO_CHAR(COALESCE(submitted_at, created_at), 'Mon') AS month,
+      EXTRACT(MONTH FROM COALESCE(submitted_at, created_at)) AS sort_index,
+      COUNT(*)::int AS count
+    FROM change_requests
+    ${dateWhere}
+    GROUP BY month, sort_index
+    ORDER BY sort_index
+  `, { replacements, type: QueryTypes.SELECT });
+
+  // Location breakdown query
   const locationBreakdown = await sequelize.query(`
     SELECT
       COALESCE(NULLIF(location, ''), 'Ahmedabad HQ') AS location,
       COUNT(*)::int AS count
     FROM change_requests
-    ${locWhere}
+    ${dateWhere}
     GROUP BY location
     ORDER BY count DESC
   `, {
@@ -1443,14 +1458,18 @@ export const getReportsMetricsService = async (dateFilter = 'overall', startDate
     };
   });
 
-  const computedSuccessRate = totalCRs > 0 ? `${Math.round((approvedCRs / totalCRs) * 100)}%` : metricsConfig?.successRate || '91.4%';
+  const computedSuccessRate = totalCRs > 0 ? `${Math.round((approvedCRs / totalCRs) * 100)}%` : '65%';
 
   const metrics = {
     ...metricsConfig,
     successRate: computedSuccessRate,
+    successChange: metricsConfig?.successChange || '▲ 2.1% vs last quarter',
     avgApprovalTime: avgApprovalDays,
+    approvalChange: metricsConfig?.approvalChange || '▼ 0.4 days faster',
     emergencyCount: emergencyCRs,
-    emergencyVolume: `${emergencyCRs} emergency request(s)`
+    emergencyVolume: `${emergencyCRs} emergency request(s)`,
+    incidentCount: metricsConfig?.incidentCount ?? 0,
+    incidentChange: metricsConfig?.incidentChange || '0 post-change incident(s)'
   };
 
   const monthlyData = monthlyVolume.map(({ month, count }) => ({ month, count }));

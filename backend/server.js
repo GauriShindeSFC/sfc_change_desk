@@ -14,14 +14,7 @@ const app = express();
 const PORT = process.env.PORT || 5001;
 const NODE_ENV = process.env.NODE_ENV || 'development';
 
-// CORS: comma-separated allow-list from env, or open if unset / "*"
-const rawOrigin = (process.env.CORS_ORIGIN || '').trim();
-const corsOptions =
-  !rawOrigin || rawOrigin === '*'
-    ? {}
-    : { origin: rawOrigin.split(',').map((o) => o.trim()).filter(Boolean) };
-
-app.use(cors(corsOptions));
+app.use(cors());
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
 

@@ -19,8 +19,12 @@ function ReportsPage() {
   const [locationDateFilter, setLocationDateFilter] = useState('overall');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
+  const [isExportingCsv, setIsExportingCsv] = useState(false);
+  const [isExportingPdf, setIsExportingPdf] = useState(false);
 
   const handleExportCSV = async () => {
+    if (isExportingCsv) return;
+    setIsExportingCsv(true);
     try {
       const res = await apiFetch('/reports/export', {
         method: 'POST',
@@ -29,38 +33,62 @@ function ReportsPage() {
       });
       if (res.ok) {
         const blob = await res.blob();
-        const url = window.URL.createObjectURL(blob);
+        const file = new Blob([blob], { type: 'text/csv;charset=utf-8;' });
+        const url = window.URL.createObjectURL(file);
         const a = document.createElement('a');
+        a.style.display = 'none';
         a.href = url;
         a.download = `ChangeDesk_Report_${Date.now()}.csv`;
         document.body.appendChild(a);
         a.click();
-        a.remove();
+        setTimeout(() => {
+          document.body.removeChild(a);
+          window.URL.revokeObjectURL(url);
+        }, 1000);
+      } else {
+        const errJson = await res.json().catch(() => ({}));
+        alert(errJson.message || `Failed to export CSV (${res.status} ${res.statusText})`);
       }
     } catch (err) {
       console.error('Failed to export CSV:', err);
+      alert(`CSV Export Error: ${err.message || 'Network error'}`);
+    } finally {
+      setIsExportingCsv(false);
     }
   };
 
   const handleExportPDF = async () => {
+    if (isExportingPdf) return;
+    setIsExportingPdf(true);
     try {
       const res = await apiFetch('/reports/export', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ format: 'pdf' })
+        body: JSON.stringify({ format: 'pdf', monthlyData, locationData })
       });
       if (res.ok) {
         const blob = await res.blob();
-        const url = window.URL.createObjectURL(blob);
+        const file = new Blob([blob], { type: 'application/pdf' });
+        const url = window.URL.createObjectURL(file);
         const a = document.createElement('a');
+        a.style.display = 'none';
         a.href = url;
         a.download = `ChangeDesk_Report_${Date.now()}.pdf`;
         document.body.appendChild(a);
         a.click();
-        a.remove();
+        setTimeout(() => {
+          document.body.removeChild(a);
+          window.URL.revokeObjectURL(url);
+        }, 1000);
+      } else {
+        const errJson = await res.json().catch(() => ({}));
+        alert(errJson.message || `Failed to export PDF (${res.status} ${res.statusText})`);
       }
     } catch (err) {
       console.error('Failed to export PDF:', err);
+      alert(`PDF Export Error: ${err.message || 'Network error'}`);
+    } finally {
+      setIsExportingPdf(false);
     }
   };
 
@@ -128,6 +156,7 @@ function ReportsPage() {
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
           <button
             onClick={handleExportCSV}
+            disabled={isExportingCsv}
             style={{
               padding: '0.5rem 0.9rem',
               backgroundColor: 'var(--card-bg)',
@@ -136,17 +165,19 @@ function ReportsPage() {
               borderRadius: '8px',
               fontSize: '0.85rem',
               fontWeight: 600,
-              cursor: 'pointer',
+              cursor: isExportingCsv ? 'not-allowed' : 'pointer',
+              opacity: isExportingCsv ? 0.7 : 1,
               display: 'inline-flex',
               alignItems: 'center',
               gap: '0.4rem'
             }}
           >
             <Download size={15} />
-            <span>Export CSV</span>
+            <span>{isExportingCsv ? 'Exporting...' : 'Export CSV'}</span>
           </button>
           <button
             onClick={handleExportPDF}
+            disabled={isExportingPdf}
             style={{
               padding: '0.5rem 0.9rem',
               backgroundColor: 'var(--card-bg)',
@@ -155,14 +186,15 @@ function ReportsPage() {
               borderRadius: '8px',
               fontSize: '0.85rem',
               fontWeight: 600,
-              cursor: 'pointer',
+              cursor: isExportingPdf ? 'not-allowed' : 'pointer',
+              opacity: isExportingPdf ? 0.7 : 1,
               display: 'inline-flex',
               alignItems: 'center',
               gap: '0.4rem'
             }}
           >
             <Download size={15} />
-            <span>Export PDF</span>
+            <span>{isExportingPdf ? 'Exporting...' : 'Export PDF'}</span>
           </button>
         </div>
       </div>
@@ -213,10 +245,10 @@ function ReportsPage() {
               Post-Change Incidents
             </div>
             <div style={{ fontSize: '1.75rem', fontWeight: 800, color: 'var(--text-primary)', marginTop: '0.35rem' }}>
-              {metrics.incidentCount}
+              {metrics.incidentCount ?? 0}
             </div>
-            <div style={{ fontSize: '0.8rem', color: '#059669', fontWeight: 600, marginTop: '0.35rem' }}>
-              {metrics.incidentChange}
+            <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', fontWeight: 500, marginTop: '0.35rem' }}>
+              {metrics.incidentChange || '0 post-change incident(s)'}
             </div>
           </div>
         </div>
