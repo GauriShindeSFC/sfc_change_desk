@@ -15,13 +15,12 @@ import {
 const TOP_NAV = [
   { id: 'Dashboard', label: 'Dashboard', icon: LayoutGrid },
   { id: 'Change Catalog', label: 'Change Catalog', icon: Menu },
-  { id: 'Change Request', label: 'Change Request', icon: Plus },
-  { id: 'My Requests', label: 'My Requests', icon: FileText, badge: 6 },
-  { id: 'Organization worklist', label: 'Organization worklist', icon: CheckCircle2, badge: 4 }
+  { id: 'My Requests', label: 'My Requests', icon: FileText, badge: 6 }
 ];
 
 const MANAGEMENT_NAV = [
-  { id: 'Catalogue Management', label: 'Catalogue Management', icon: Menu },
+  { id: 'Organization Dashboard', label: 'Organization Dashboard', icon: LayoutGrid },
+  { id: 'Organization worklist', label: 'Organization worklist', icon: CheckCircle2, badge: 4 },
   { id: 'Reports', label: 'Reports', icon: TrendingUp },
   { id: 'Settings', label: 'Settings', icon: Sun }
 ];
@@ -51,13 +50,24 @@ function Sidebar({
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
+
+  const roleName = (user?.role || '').toLowerCase();
+  const roleId = user?.roleId || '';
+  
+  const isSuperAdmin = roleId === 'role-1' || roleName.includes('super');
+  const isAdmin = isSuperAdmin || roleId === 'role-2' || roleName.includes('admin');
+  const isChangeManager = roleId === 'role-3' || roleName.includes('manager');
+
   const topNavItems = [
     { id: 'Dashboard', label: 'Dashboard', icon: LayoutGrid },
     { id: 'Change Catalog', label: 'Change Catalog', icon: Menu },
-    { id: 'Change Request', label: 'Change Request', icon: Plus },
-    { id: 'My Requests', label: 'My Requests', icon: FileText, badge: myRequestsCount },
-    { id: 'Organization worklist', label: 'Organization worklist', icon: CheckCircle2, badge: worklistCount }
+    { id: 'My Requests', label: 'My Requests', icon: FileText, badge: myRequestsCount }
   ];
+
+  if (isChangeManager || isAdmin) {
+    topNavItems.push({ id: 'My Worklist', label: 'My Worklist', icon: CheckCircle2, badge: worklistCount });
+  }
+
   // On mobile the rail is always full width; it just slides in/out.
   const mini = collapsed && !isMobile;
   const width = isMobile ? 250 : mini ? 68 : 250;
@@ -251,23 +261,19 @@ function Sidebar({
         ))}
       </nav>
 
-      {/* Management section */}
+      {/* Management section (Only visible to Admin / Super Admin) */}
       {(() => {
-        const roleName = (user?.role || '').toLowerCase();
-        const roleId = user?.roleId || '';
-        const isChangeManagerOrRequester = roleId === 'role-3' || roleId === 'role-4' || roleName === 'change manager' || roleName === 'requester';
-        if (isChangeManagerOrRequester) return null;
+        if (!isAdmin) return null;
 
-        const isSuperAdmin = roleId === 'role-1' || roleName.includes('super');
+        const visibleMgmtItems = [
+          { id: 'Organization Dashboard', label: 'Organization Dashboard', icon: LayoutGrid },
+          { id: 'Org Worklist', label: 'Org Worklist', icon: CheckCircle2, badge: worklistCount },
+          { id: 'Reports', label: 'Reports', icon: TrendingUp }
+        ];
 
-        const visibleMgmtItems = MANAGEMENT_NAV.filter((item) => {
-          if (item.id === 'Catalogue Management' || item.id === 'Settings') {
-            return isSuperAdmin;
-          }
-          return true;
-        });
-
-        if (visibleMgmtItems.length === 0) return null;
+        if (isSuperAdmin) {
+          visibleMgmtItems.push({ id: 'Settings', label: 'Settings', icon: Sun });
+        }
 
         return (
           <>

@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Plus, X, ArrowRight } from 'lucide-react';
 import { apiFetch } from '../lib/apiFetch';
 
-function ChangeCatalogPage({ onNavigate, searchQuery = '', user }) {
+function ChangeCatalogPage({ onNavigate, searchQuery = '', user, initialData }) {
   const roleName = (user?.role || '').toLowerCase();
   const roleId = user?.roleId || '';
   const canManageCatalog =
@@ -43,9 +43,17 @@ function ChangeCatalogPage({ onNavigate, searchQuery = '', user }) {
   ];
 
   const [items, setItems] = useState(defaultItems);
-  const [activeCategory, setActiveCategory] = useState('All items');
+  const [activeCategory, setActiveCategory] = useState(initialData?.activeCategory || initialData?.category || 'Server & Infra');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [loadFailed, setLoadFailed] = useState(false);
+
+  useEffect(() => {
+    if (initialData?.activeCategory) {
+      setActiveCategory(initialData.activeCategory);
+    } else if (initialData?.category) {
+      setActiveCategory(initialData.category);
+    }
+  }, [initialData]);
 
   // New Catalog Item Modal Form State
   const [newItem, setNewItem] = useState({
@@ -104,7 +112,6 @@ function ChangeCatalogPage({ onNavigate, searchQuery = '', user }) {
   }, []);
 
   const categories = [
-    'All items',
     'Server & Infra',
     'Network & Connectivity',
     'Access & Security',
@@ -120,7 +127,7 @@ function ChangeCatalogPage({ onNavigate, searchQuery = '', user }) {
   };
 
   const filteredItems = items.filter(item => {
-    const matchesCat = activeCategory === 'All items' || (item.category && item.category.toLowerCase() === activeCategory.toLowerCase());
+    const matchesCat = !activeCategory || activeCategory === 'All items' || (item.category && item.category.toLowerCase() === activeCategory.toLowerCase());
     const q = searchQuery.trim().toLowerCase();
     const matchesQuery = !q ||
       (item.title || '').toLowerCase().includes(q) ||
@@ -340,7 +347,7 @@ function ChangeCatalogPage({ onNavigate, searchQuery = '', user }) {
               {/* Bottom Teal Start Request Link */}
               <button
                 type="button"
-                onClick={() => onNavigate && onNavigate('Change Request', { category: item.category, subCategory: item.title, subcategoryId: item.id })}
+                onClick={() => onNavigate && onNavigate('Change Request', { category: item.category, subCategory: item.title, subcategoryId: item.id, fromCategory: activeCategory, activeCategory })}
                 style={{
                   background: 'none',
                   border: 'none',

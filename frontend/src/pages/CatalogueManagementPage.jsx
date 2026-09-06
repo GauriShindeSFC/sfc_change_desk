@@ -88,7 +88,7 @@ function CatalogueManagementPage({ user }) {
 
   const [newWf, setNewWf] = useState({
     name: '',
-    steps: 'Draft → Submitted → CAB Review → Approved → Closed'
+    steps: 'Draft → Change Manager Review → Approved → Implemented'
   });
 
   const fetchHierarchy = async () => {
@@ -154,7 +154,7 @@ function CatalogueManagementPage({ user }) {
       if (res.ok) {
         await fetchHierarchy();
         setIsWfModalOpen(false);
-        setNewWf({ name: '', steps: 'Draft → Submitted → CAB Review → Approved → Closed' });
+        setNewWf({ name: '', steps: 'Draft → Change Manager Review → Approved → Implemented' });
       }
     } catch (err) {
       console.warn('Failed to save workflow:', err);

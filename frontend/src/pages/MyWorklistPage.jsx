@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Clock, Check, X, ChevronLeft, Calendar } from 'lucide-react';
+import { Clock, Check, X, RotateCw, Calendar } from 'lucide-react';
 import ChangeRequestModal from '../components/ui/ChangeRequestModal';
 import { apiFetch } from '../lib/apiFetch';
 
@@ -11,13 +11,15 @@ function MyWorklistPage({ onNavigate, searchQuery = '', user }) {
   const [items, setItems] = useState([]);
   const [selectedCr, setSelectedCr] = useState(null);
   const [dateFilter, setDateFilter] = useState('overall');
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
   const [metrics, setMetrics] = useState({
     pending: 0,
     approved: 0,
     rejected: 0,
-    sentBack: 0
+    implemented: 0
   });
 
   const handleAction = async (id, action, rejectionReason = '') => {
@@ -28,8 +30,9 @@ function MyWorklistPage({ onNavigate, searchQuery = '', user }) {
         body: JSON.stringify({ id, action, rejectionReason })
       });
       if (res.ok) {
-        const decision = action === 'approve' ? 'Approved' : action === 'reject' ? 'Rejected' : 'Draft';
-        const newStatus = action === 'approve' ? 'Approved' : action === 'reject' ? 'Rejected' : 'Pending';
+        const decision = action === 'approve' ? 'Approved' : action === 'reject' ? 'Rejected' : action === 'implement' ? 'Implemented' : 'Draft';
+        const newStatus = action === 'approve' ? 'Approved' : action === 'reject' ? 'Rejected' : action === 'implement' ? 'Implemented' : 'Pending';
+        const closedDate = action === 'implement' ? new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : null;
 
         setItems(prev => prev.map(item => {
           if (item.id === id) {
@@ -39,6 +42,7 @@ function MyWorklistPage({ onNavigate, searchQuery = '', user }) {
               myDecision: decision,
               decidedBy: user?.name || 'Gauri Shinde',
               rejectionReason: action === 'reject' ? rejectionReason : item.rejectionReason,
+              closedDate: closedDate || item.closedDate,
               canAct: false
             };
           }
@@ -53,6 +57,7 @@ function MyWorklistPage({ onNavigate, searchQuery = '', user }) {
               myDecision: decision,
               decidedBy: user?.name || 'Gauri Shinde',
               rejectionReason: action === 'reject' ? rejectionReason : prev.rejectionReason,
+              closedDate: closedDate || prev.closedDate,
               canAct: false
             };
           }
@@ -64,11 +69,16 @@ function MyWorklistPage({ onNavigate, searchQuery = '', user }) {
           pending: Math.max(0, prev.pending - 1),
           approved: action === 'approve' ? prev.approved + 1 : prev.approved,
           rejected: action === 'reject' ? prev.rejected + 1 : prev.rejected,
-          sentBack: action === 'sendback' ? prev.sentBack + 1 : prev.sentBack
+          implemented: action === 'implement' ? (prev.implemented || 0) + 1 : prev.implemented
         }));
+      } else {
+        const errData = await res.json().catch(() => ({}));
+        console.warn('Backend action request failed:', errData.message || res.statusText);
+        alert(errData.message || `Failed to perform ${action} action.`);
       }
     } catch (err) {
       console.warn('Backend action request failed:', err);
+      alert(err.message || `Failed to perform ${action} action.`);
     }
   };
 
@@ -77,6 +87,7 @@ function MyWorklistPage({ onNavigate, searchQuery = '', user }) {
     All: 0,
     Pending: 0,
     Approved: 0,
+    Implemented: 0,
     'In progress': 0,
     Rejected: 0
   });
@@ -89,6 +100,8 @@ function MyWorklistPage({ onNavigate, searchQuery = '', user }) {
         const params = new URLSearchParams({
           ...(activeFilter !== 'All' && { status: activeFilter }),
           ...(dateFilter !== 'overall' && { dateFilter }),
+          ...(dateFilter === 'custom' && startDate && { startDate }),
+          ...(dateFilter === 'custom' && endDate && { endDate }),
           ...(searchQuery && { search: searchQuery })
         });
         const res = await apiFetch(`/worklist?${params}`);
@@ -105,7 +118,7 @@ function MyWorklistPage({ onNavigate, searchQuery = '', user }) {
       }
     };
     fetchData();
-  }, [activeFilter, dateFilter, searchQuery, user?.id]);
+  }, [activeFilter, dateFilter, startDate, endDate, searchQuery, user?.id]);
 
   const getStatus = (r) => (r.status || 'Pending').toLowerCase();
 
@@ -113,15 +126,15 @@ function MyWorklistPage({ onNavigate, searchQuery = '', user }) {
     { id: 'All', label: `All (${statusCounts.All || 0})` },
     { id: 'Pending', label: `Pending (${statusCounts.Pending || 0})` },
     { id: 'Approved', label: `Approved (${statusCounts.Approved || 0})` },
-    { id: 'In progress', label: `In progress (${statusCounts['In progress'] || 0})` },
+    { id: 'Implemented', label: `Implemented (${statusCounts.Implemented || statusCounts['In progress'] || statusCounts['In Progress'] || 0})` },
     { id: 'Rejected', label: `Rejected (${statusCounts.Rejected || 0})` }
   ];
 
   const metricCards = [
-    { id: 'pending', title: 'Pending review', count: metrics?.pending ?? statusCounts.Pending ?? 0, subtext: 'In queue right now', subtextColor: 'var(--text-secondary)', icon: Clock, iconBg: '#FEF3C7', iconColor: '#D97706' },
-    { id: 'approved', title: 'Approved', count: metrics?.approved ?? statusCounts.Approved ?? 0, subtext: 'Last 30 days', subtextColor: '#059669', icon: Check, iconBg: '#D1FAE5', iconColor: '#059669' },
-    { id: 'rejected', title: 'Rejected', count: metrics?.rejected ?? statusCounts.Rejected ?? 0, subtext: 'Last 30 days', subtextColor: 'var(--text-secondary)', icon: X, iconBg: '#FEE2E2', iconColor: '#DC2626' },
-    { id: 'sentback', title: 'Sent back', count: metrics?.sentBack ?? statusCounts.Draft ?? 0, subtext: 'Last 30 days', subtextColor: 'var(--text-secondary)', icon: ChevronLeft, iconBg: '#F3E8FF', iconColor: '#7C3AED' }
+    { id: 'pending', title: 'Pending Review', count: metrics?.pending ?? statusCounts.Pending ?? 0, subtext: 'In Queue Right Now', subtextColor: 'var(--text-secondary)', icon: Clock, iconBg: '#FEF3C7', iconColor: '#D97706' },
+    { id: 'approved', title: 'Approved', count: metrics?.approved ?? statusCounts.Approved ?? 0, subtext: 'Last 30 Days', subtextColor: '#059669', icon: Check, iconBg: '#D1FAE5', iconColor: '#059669' },
+    { id: 'rejected', title: 'Rejected', count: metrics?.rejected ?? statusCounts.Rejected ?? 0, subtext: 'Last 30 Days', subtextColor: 'var(--text-secondary)', icon: X, iconBg: '#FEE2E2', iconColor: '#DC2626' },
+    { id: 'implemented', title: 'Implemented', count: metrics?.implemented ?? statusCounts.Implemented ?? statusCounts['In progress'] ?? 0, subtext: 'Last 30 Days', subtextColor: 'var(--text-secondary)', icon: RotateCw, iconBg: '#F3E8FF', iconColor: '#7C3AED' }
   ];
 
   return (
@@ -131,7 +144,7 @@ function MyWorklistPage({ onNavigate, searchQuery = '', user }) {
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: '1rem' }}>
         <div>
           <h1 style={{ fontSize: '1.45rem', fontWeight: 800, color: 'var(--text-primary)', lineHeight: 1.2 }}>
-            Organization worklist
+            {roleName.includes('admin') ? 'Organization worklist' : 'My Worklist'}
           </h1>
           <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginTop: '0.2rem' }}>
             {isApprover ? 'Change requests awaiting CAB & manager sign-off' : 'All change requests across the organization'}
@@ -198,30 +211,85 @@ function MyWorklistPage({ onNavigate, searchQuery = '', user }) {
         </div>
 
         {/* Time Range Filter Dropdown */}
-        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', backgroundColor: 'var(--card-bg)', border: '1px solid var(--border-color)', borderRadius: '8px', padding: '0.25rem 0.65rem' }}>
-          <Calendar size={14} style={{ color: 'var(--text-secondary)' }} />
-          <select
-            value={dateFilter}
-            onChange={(e) => {
-              setDateFilter(e.target.value);
-              setPage(1);
-            }}
-            style={{
-              backgroundColor: 'var(--card-bg)',
-              color: 'var(--text-primary)',
-              border: 'none',
-              fontSize: '0.8rem',
-              fontWeight: 700,
-              cursor: 'pointer',
-              outline: 'none',
-              padding: '0.2rem'
-            }}
-          >
-            <option value="overall" style={{ backgroundColor: 'var(--card-bg)', color: 'var(--text-primary)' }}>Overall Time</option>
-            <option value="last_7_days" style={{ backgroundColor: 'var(--card-bg)', color: 'var(--text-primary)' }}>Last 7 Days</option>
-            <option value="this_month" style={{ backgroundColor: 'var(--card-bg)', color: 'var(--text-primary)' }}>This Month</option>
-            <option value="last_month" style={{ backgroundColor: 'var(--card-bg)', color: 'var(--text-primary)' }}>Last Month</option>
-          </select>
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '0.4rem' }}>
+          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', backgroundColor: 'var(--card-bg)', border: '1px solid var(--border-color)', borderRadius: '8px', padding: '0.25rem 0.65rem' }}>
+            <Calendar size={14} style={{ color: 'var(--text-secondary)' }} />
+            <select
+              value={dateFilter}
+              onChange={(e) => {
+                const val = e.target.value;
+                setDateFilter(val);
+                if (val === 'custom') {
+                  const formatDate = (d) =>
+                    d.getFullYear() +
+                    '-' +
+                    String(d.getMonth() + 1).padStart(2, '0') +
+                    '-' +
+                    String(d.getDate()).padStart(2, '0');
+
+                  if (!startDate) {
+                    const d = new Date();
+                    d.setDate(d.getDate() - 7);
+                    setStartDate(formatDate(d));
+                  }
+                  if (!endDate) {
+                    setEndDate(formatDate(new Date()));
+                  }
+                }
+                setPage(1);
+              }}
+              style={{
+                backgroundColor: 'var(--card-bg)',
+                color: 'var(--text-primary)',
+                border: 'none',
+                fontSize: '0.8rem',
+                fontWeight: 700,
+                cursor: 'pointer',
+                outline: 'none',
+                padding: '0.2rem'
+              }}
+            >
+              <option value="overall" style={{ backgroundColor: 'var(--card-bg)', color: 'var(--text-primary)' }}>Overall</option>
+              <option value="last_7_days" style={{ backgroundColor: 'var(--card-bg)', color: 'var(--text-primary)' }}>7 Days</option>
+              <option value="this_month" style={{ backgroundColor: 'var(--card-bg)', color: 'var(--text-primary)' }}>This Month</option>
+              <option value="last_month" style={{ backgroundColor: 'var(--card-bg)', color: 'var(--text-primary)' }}>Last Month</option>
+              <option value="custom" style={{ backgroundColor: 'var(--card-bg)', color: 'var(--text-primary)' }}>Custom</option>
+            </select>
+          </div>
+
+          {dateFilter === 'custom' && (
+            <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}>
+              <input
+                type="date"
+                value={startDate}
+                onChange={(e) => { setStartDate(e.target.value); setPage(1); }}
+                style={{
+                  backgroundColor: 'var(--card-bg)',
+                  border: '1px solid var(--border-color)',
+                  borderRadius: '8px',
+                  padding: '0.25rem 0.5rem',
+                  fontSize: '0.775rem',
+                  color: 'var(--text-primary)',
+                  outline: 'none'
+                }}
+              />
+              <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>to</span>
+              <input
+                type="date"
+                value={endDate}
+                onChange={(e) => { setEndDate(e.target.value); setPage(1); }}
+                style={{
+                  backgroundColor: 'var(--card-bg)',
+                  border: '1px solid var(--border-color)',
+                  borderRadius: '8px',
+                  padding: '0.25rem 0.5rem',
+                  fontSize: '0.775rem',
+                  color: 'var(--text-primary)',
+                  outline: 'none'
+                }}
+              />
+            </div>
+          )}
         </div>
       </div>
 
@@ -234,7 +302,7 @@ function MyWorklistPage({ onNavigate, searchQuery = '', user }) {
                 <th style={{ padding: '0.9rem 1.1rem', minWidth: '100px', whiteSpace: 'nowrap' }}>CR ID</th>
                 <th style={{ padding: '0.9rem 1.1rem', minWidth: '280px' }}>Title</th>
                 <th style={{ padding: '0.9rem 1.1rem', minWidth: '180px' }}>Category</th>
-                <th style={{ padding: '0.9rem 1.1rem', minWidth: '180px', whiteSpace: 'nowrap' }}>Employee Email</th>
+                <th style={{ padding: '0.9rem 1.1rem', minWidth: '180px', whiteSpace: 'nowrap' }}>Employee Details</th>
                 <th style={{ padding: '0.9rem 1.1rem', minWidth: '120px', whiteSpace: 'nowrap' }}>Raised Date</th>
                 <th style={{ padding: '0.9rem 1.1rem', minWidth: '120px', whiteSpace: 'nowrap' }}>Closed Date</th>
                 <th style={{ padding: '0.9rem 1.1rem', minWidth: '130px', whiteSpace: 'nowrap' }}>Approved By</th>
@@ -251,6 +319,9 @@ function MyWorklistPage({ onNavigate, searchQuery = '', user }) {
                   const isSelfRequest = (item.requesterId && user?.id && String(item.requesterId) === String(user.id)) ||
                     (item.employeeEmail && user?.email && item.employeeEmail.toLowerCase() === user.email.toLowerCase());
 
+                  const emailVal = item.employeeEmail || item.managerEmail || item.requesterEmail || '';
+                  const displayName = item.employeeName || item.requester || item.requesterName || (emailVal ? emailVal.split('@')[0].replace(/[\._]/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) : '—');
+
                   return (
                     <tr key={item.id} style={{ borderBottom: '1px solid var(--border-color)', transition: 'background-color 0.15s ease' }}>
                       <td style={{ padding: '1rem 1.1rem', fontWeight: 800, color: 'var(--text-primary)', fontFamily: 'var(--font-mono)', whiteSpace: 'nowrap' }}>
@@ -263,14 +334,21 @@ function MyWorklistPage({ onNavigate, searchQuery = '', user }) {
                         <div style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{item.category}</div>
                         {item.subCategory && <div style={{ fontSize: '0.775rem', color: 'var(--text-secondary)' }}>{item.subCategory}</div>}
                       </td>
-                      <td style={{ padding: '1rem 1.1rem', color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)', fontSize: '0.8rem', whiteSpace: 'nowrap' }}>
-                        {item.employeeEmail || item.managerEmail || item.requesterEmail || '—'}
+                      <td style={{ padding: '1rem 1.1rem', color: 'var(--text-primary)', whiteSpace: 'nowrap' }}>
+                        <div style={{ fontWeight: 700, fontSize: '0.85rem', color: 'var(--text-primary)' }}>
+                          {displayName}
+                        </div>
+                        {emailVal && (
+                          <div style={{ fontSize: '0.775rem', color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)', marginTop: '0.15rem' }}>
+                            {emailVal}
+                          </div>
+                        )}
                       </td>
                       <td style={{ padding: '1rem 1.1rem', color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)', whiteSpace: 'nowrap' }}>
-                        {item.raisedDate || '27 Aug'}
+                        {item.raisedDate || (item.submittedAt ? new Date(item.submittedAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '—')}
                       </td>
                       <td style={{ padding: '1rem 1.1rem', color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)', whiteSpace: 'nowrap' }}>
-                        {item.closedDate || (isItemApproved || isItemRejected ? '28 Aug' : 'Open')}
+                        {item.closedDate || (item.closedAt ? new Date(item.closedAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : (isItemApproved || isItemRejected ? 'Closed' : 'Open'))}
                       </td>
                       <td style={{ padding: '1rem 1.1rem', color: 'var(--text-primary)', fontWeight: 600, whiteSpace: 'nowrap' }}>
                         {item.decidedBy || (isItemApproved || isItemRejected ? (user?.name || 'Gauri Shinde') : '—')}
@@ -343,10 +421,12 @@ function MyWorklistPage({ onNavigate, searchQuery = '', user }) {
       {selectedCr && (
         <ChangeRequestModal
           cr={selectedCr}
+          user={user}
           onClose={() => setSelectedCr(null)}
           onApprove={isRequester ? null : (id) => handleAction(id, 'approve')}
           onReject={isRequester ? null : (id, reason) => handleAction(id, 'reject', reason)}
           onSendBack={isRequester ? null : (id) => handleAction(id, 'sendback')}
+          onImplement={(id) => handleAction(id, 'implement')}
         />
       )}
 

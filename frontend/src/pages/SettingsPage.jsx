@@ -12,7 +12,7 @@ function SettingsPage({ user }) {
     { id: 'usr-2', name: 'Priya Nair', email: 'priya.nair@company.com', empId: 'EMP-10433', role: 'Requester', status: 'Enabled' },
     { id: 'usr-3', name: 'Arjun Mehta', email: 'arjun.mehta@company.com', empId: 'EMP-10434', role: 'Admin', status: 'Enabled' },
     { id: 'usr-4', name: 'Sana Iqbal', email: 'sana.iqbal@company.com', empId: 'EMP-10435', role: 'Super Admin', status: 'Enabled' },
-    { id: 'usr-5', name: 'Rahul Verma', email: 'rahul.verma@company.com', empId: 'EMP-10436', role: 'Requester', status: 'Disabled' }
+    { id: 'usr-5', name: 'Rahul Verma', email: 'rahul.verma@company.com', empId: 'EMP-10436', role: 'Change Manager', status: 'Enabled' }
   ];
 
   const defaultAuditLogs = [
@@ -719,7 +719,6 @@ function SettingsPage({ user }) {
                     <option value="Super Admin">Super Admin</option>
                     <option value="Admin">Admin</option>
                     <option value="Change Manager">Change Manager</option>
-                    <option value="Requester">Requester</option>
                   </select>
                 </div>
 

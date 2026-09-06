@@ -155,9 +155,8 @@ import { ChangeRequestApproval } from './ChangeRequestApproval.js';
 import { CatalogCategory } from './CatalogCategory.js';
 import { CatalogSubcategory } from './CatalogSubcategory.js';
 import { CatalogSubcategoryField } from './CatalogSubcategoryField.js';
-import { ScheduledReport } from './ScheduledReport.js';
 
-export { ChangeRequestApproval, CatalogCategory, CatalogSubcategory, CatalogSubcategoryField, ScheduledReport };
+export { ChangeRequestApproval, CatalogCategory, CatalogSubcategory, CatalogSubcategoryField };
 
 ChangeRequestApproval.belongsTo(ChangeRequest, { foreignKey: 'changeRequestId', onDelete: 'CASCADE', onUpdate: 'CASCADE' });
 ChangeRequestApproval.belongsTo(User, { as: 'approver', foreignKey: 'approverId', onDelete: 'CASCADE', onUpdate: 'CASCADE' });
@@ -169,8 +168,6 @@ CatalogSubcategory.hasMany(CatalogSubcategoryField, { as: 'fields', foreignKey: 
 CatalogSubcategoryField.belongsTo(CatalogSubcategory, { as: 'subcategory', foreignKey: 'subcategoryId' });
 CatalogSubcategory.belongsTo(Workflow, { as: 'workflow', foreignKey: 'workflowId' });
 
-User.hasMany(ScheduledReport, { foreignKey: 'createdBy' });
-ScheduledReport.belongsTo(User, { foreignKey: 'createdBy', as: 'creator' });
 
 export const ChangeManagerCategory = sequelize.define(
   'ChangeManagerCategory',
@@ -209,7 +206,6 @@ export const models = {
   AuditLog,
   Notification,
   AppConfig,
-  ScheduledReport,
   ChangeManagerCategory
 };
 

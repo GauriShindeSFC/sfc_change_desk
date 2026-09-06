@@ -1,46 +1,95 @@
 import React, { useState } from 'react';
-import { X } from 'lucide-react';
+import { X, MessageSquare } from 'lucide-react';
+import { apiFetch } from '../../lib/apiFetch';
 
-export default function ChangeRequestModal({ cr, onClose, onApprove, onReject, onSendBack, onSubmitForApproval }) {
+export default function ChangeRequestModal({ cr, onClose, onApprove, onReject, onSendBack, onSubmitForApproval, onImplement, onAddComment, user }) {
   if (!cr) return null;
+
+  const currentUser = user || JSON.parse(localStorage.getItem('sfc_user') || '{}');
+  const userRoleName = (currentUser?.role || '').toLowerCase();
+  const userRoleId = currentUser?.roleId || '';
+  const isAdminOrSuperAdmin = ['role-1', 'role-2'].includes(userRoleId) || userRoleName.includes('admin') || userRoleName.includes('super');
 
   const [showRejectPrompt, setShowRejectPrompt] = useState(false);
   const [rejectReasonInput, setRejectReasonInput] = useState('');
   const [rejectReasonError, setRejectReasonError] = useState('');
 
+  const initialComments = Array.isArray(cr.comments)
+    ? cr.comments
+    : Array.isArray(cr.customFieldValues?.comments)
+    ? cr.customFieldValues.comments
+    : [];
+  const [commentsList, setCommentsList] = useState(initialComments);
+  const [commentInput, setCommentInput] = useState('');
+  const [isPostingComment, setIsPostingComment] = useState(false);
+  const [commentError, setCommentError] = useState('');
+
+  const handlePostComment = async () => {
+    if (!commentInput.trim()) return;
+    setIsPostingComment(true);
+    setCommentError('');
+    try {
+      if (onAddComment) {
+        await onAddComment(cr.id, commentInput.trim());
+      } else {
+        const res = await apiFetch('/worklist/comment', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id: cr.id, text: commentInput.trim() })
+        });
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}));
+          throw new Error(data.message || 'Failed to post comment');
+        }
+      }
+      const newCommentObj = {
+        id: `cmt-${Date.now()}`,
+        authorName: currentUser.name || 'Admin User',
+        authorRole: currentUser.role || 'Admin',
+        text: commentInput.trim(),
+        createdAt: new Date().toISOString()
+      };
+      setCommentsList(prev => [...prev, newCommentObj]);
+      setCommentInput('');
+    } catch (err) {
+      setCommentError(err.message || 'Error posting comment');
+    } finally {
+      setIsPostingComment(false);
+    }
+  };
+
   const customFields = cr.customFieldValues && typeof cr.customFieldValues === 'object'
-    ? Object.entries(cr.customFieldValues).filter(([_, val]) => val !== undefined && val !== null && val !== '')
+    ? Object.entries(cr.customFieldValues).filter(([key, val]) => val !== undefined && val !== null && val !== '' && key !== 'comments')
     : [];
 
   const statusLower = (cr.status || '').toLowerCase();
   const decisionLower = (cr.myDecision || '').toLowerCase();
 
+  const isImplemented = statusLower === 'implemented';
   const isRejected = statusLower === 'rejected' || decisionLower === 'rejected';
-  const isApproved = statusLower === 'approved' || decisionLower === 'approved';
+  const isApproved = (statusLower === 'approved' || decisionLower === 'approved') && !isImplemented;
   const isDraft = statusLower === 'draft';
 
-  const statusLabel = isRejected ? 'Rejected' : isApproved ? 'Approved' : isDraft ? 'Draft' : (cr.status || 'Pending');
-  const statusBg = isRejected ? '#FEE2E2' : isApproved ? '#D1FAE5' : isDraft ? 'var(--input-bg)' : '#FEF3C7';
-  const statusColor = isRejected ? '#DC2626' : isApproved ? '#059669' : isDraft ? 'var(--text-secondary)' : '#D97706';
-  const statusDot = isRejected ? '#DC2626' : isApproved ? '#059669' : isDraft ? '#94A0B0' : '#D97706';
+  const statusLabel = isImplemented ? 'Implemented' : isRejected ? 'Rejected' : isApproved ? 'Approved' : isDraft ? 'Draft' : (cr.status || 'Pending');
+  const statusBg = isImplemented ? '#E0F2FE' : isRejected ? '#FEE2E2' : isApproved ? '#D1FAE5' : isDraft ? 'var(--input-bg)' : '#FEF3C7';
+  const statusColor = isImplemented ? '#0284C7' : isRejected ? '#DC2626' : isApproved ? '#059669' : isDraft ? 'var(--text-secondary)' : '#D97706';
+  const statusDot = isImplemented ? '#0284C7' : isRejected ? '#DC2626' : isApproved ? '#059669' : isDraft ? '#94A0B0' : '#D97706';
 
   const steps = isRejected
-    ? ['Draft', 'CAB Review', 'Rejected']
-    : ['Draft', 'CAB Review', 'Approved', 'Scheduled', 'Implemented', 'Closed'];
+    ? ['Draft', 'Change Manager Review', 'Rejected']
+    : ['Draft', 'Change Manager Review', 'Approved', 'Implemented'];
 
   const currentStepIdx = isRejected ? 2
+    : isImplemented ? 3
     : isApproved ? 2
     : isDraft ? 0
-    : statusLower === 'in progress' || statusLower === 'scheduled' ? 3
-    : statusLower === 'implemented' ? 4
-    : statusLower === 'closed' ? 5
     : 1;
 
   const progressPercent = Math.min(100, Math.max(0, (currentStepIdx / (steps.length - 1)) * 100));
 
-  const activeColor = isRejected ? '#DC2626' : isDraft ? '#7C3AED' : '#0D9488';
+  const activeColor = isRejected ? '#DC2626' : isImplemented ? '#0284C7' : isDraft ? '#7C3AED' : '#0D9488';
 
-  const canAct = cr.canAct !== false && !isApproved && !isRejected && !isDraft;
+  const canAct = cr.canAct !== false && !isApproved && !isRejected && !isDraft && !isImplemented;
 
   return (
     <div style={{
@@ -184,6 +233,48 @@ export default function ChangeRequestModal({ cr, onClose, onApprove, onReject, o
           </div>
         </div>
 
+        {/* Section 1: Employee Details */}
+        <div style={{ padding: '1.25rem 1.75rem', borderBottom: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <h3 style={{ fontSize: '0.9rem', fontWeight: 800, color: 'var(--text-primary)', margin: 0 }}>Section 1: Employee Details</h3>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '1rem' }}>
+            <div>
+              <div style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '0.25rem' }}>Requester / Employee</div>
+              <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>{cr.employeeName || cr.requester || 'Requester'}</div>
+            </div>
+            <div>
+              <div style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '0.25rem' }}>
+                {isRejected ? 'Rejected By' : isApproved || isImplemented ? 'Approved By' : 'Approver'}
+              </div>
+              <div style={{ fontSize: '0.85rem', fontWeight: 700, color: isRejected ? '#DC2626' : isApproved || isImplemented ? '#059669' : 'var(--text-secondary)' }}>
+                {cr.decidedBy || cr.approver || (isApproved || isImplemented || isRejected ? 'Gauri Shinde' : '—')}
+              </div>
+            </div>
+            <div>
+              <div style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '0.25rem' }}>Employee ID</div>
+              <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)' }}>{cr.employeeId || cr.empId || 'N/A'}</div>
+            </div>
+            <div>
+              <div style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '0.25rem' }}>Employee Email</div>
+              <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>{cr.employeeEmail || cr.requesterEmail || 'N/A'}</div>
+            </div>
+            <div>
+              <div style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '0.25rem' }}>Location</div>
+              <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>{cr.location || 'N/A'}</div>
+            </div>
+            <div>
+              <div style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '0.25rem' }}>Manager Email</div>
+              <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>{cr.managerEmail || 'N/A'}</div>
+            </div>
+          </div>
+        </div>
+
+        {/* Section 2: Change Details */}
+        <div style={{ padding: '1.25rem 1.75rem 0.5rem 1.75rem' }}>
+          <h3 style={{ fontSize: '0.9rem', fontWeight: 800, color: 'var(--text-primary)', margin: '0 0 1rem 0' }}>Section 2: Change Details</h3>
+        </div>
+
         {/* Dynamic Sub-category Attributes Block */}
         {customFields.length > 0 && (
           <div style={{ padding: '0 1.75rem 1.25rem 1.75rem' }}>
@@ -228,7 +319,7 @@ export default function ChangeRequestModal({ cr, onClose, onApprove, onReject, o
           </div>
           <div>
             <div style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '0.25rem' }}>Closed date</div>
-            <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>{cr.closedDate || 'Open'}</div>
+            <div style={{ fontSize: '0.85rem', color: isImplemented ? '#0284C7' : 'var(--text-secondary)', fontWeight: isImplemented ? 700 : 400 }}>{cr.closedDate || (isImplemented ? 'Today' : 'Open')}</div>
           </div>
           <div>
             <div style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '0.25rem' }}>Start date</div>
@@ -252,39 +343,90 @@ export default function ChangeRequestModal({ cr, onClose, onApprove, onReject, o
           </div>
         </div>
 
-        {/* Employee & Asset Details */}
+        {/* Comments / Admin Notes Section */}
         <div style={{ padding: '1.25rem 1.75rem', borderTop: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-          <h3 style={{ fontSize: '0.9rem', fontWeight: 800, color: 'var(--text-primary)', margin: 0 }}>Employee Details</h3>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '1rem' }}>
-            <div>
-              <div style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '0.25rem' }}>Requester / Employee</div>
-              <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>{cr.employeeName || cr.requester || 'Requester'}</div>
-            </div>
-            <div>
-              <div style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '0.25rem' }}>
-                {isRejected ? 'Rejected By' : isApproved ? 'Approved By' : 'Approver'}
-              </div>
-              <div style={{ fontSize: '0.85rem', fontWeight: 700, color: isRejected ? '#DC2626' : isApproved ? '#059669' : 'var(--text-secondary)' }}>
-                {cr.decidedBy || cr.approver || (isApproved || isRejected ? 'Gauri Shinde' : '—')}
-              </div>
-            </div>
-            <div>
-              <div style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '0.25rem' }}>Employee ID</div>
-              <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)' }}>{cr.employeeId || cr.empId || 'N/A'}</div>
-            </div>
-            <div>
-              <div style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '0.25rem' }}>Employee Email</div>
-              <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>{cr.employeeEmail || cr.requesterEmail || 'N/A'}</div>
-            </div>
-            <div>
-              <div style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '0.25rem' }}>Location</div>
-              <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>{cr.location || 'N/A'}</div>
-            </div>
-            <div>
-              <div style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '0.25rem' }}>Manager Email</div>
-              <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>{cr.managerEmail || 'N/A'}</div>
-            </div>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <h3 style={{ fontSize: '0.9rem', fontWeight: 800, color: 'var(--text-primary)', margin: 0, display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+              <MessageSquare size={16} color="#0D9488" />
+              <span>Comments & Admin Notes</span>
+            </h3>
+            <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-secondary)' }}>
+              {commentsList.length} {commentsList.length === 1 ? 'comment' : 'comments'}
+            </span>
           </div>
+
+          {/* Existing comments list */}
+          {commentsList.length > 0 ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+              {commentsList.map((cmt, idx) => (
+                <div key={cmt.id || idx} style={{ padding: '0.85rem 1rem', backgroundColor: 'var(--input-bg)', borderRadius: '10px', border: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+                      <span style={{ fontSize: '0.825rem', fontWeight: 800, color: 'var(--text-primary)' }}>{cmt.authorName || 'Admin'}</span>
+                      <span style={{ fontSize: '0.7rem', fontWeight: 700, padding: '0.15rem 0.45rem', borderRadius: '4px', backgroundColor: '#EDE9FE', color: '#6D28D9' }}>{cmt.authorRole || 'Admin'}</span>
+                    </div>
+                    <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)' }}>
+                      {cmt.createdAt ? new Date(cmt.createdAt).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' }) : ''}
+                    </span>
+                  </div>
+                  <p style={{ fontSize: '0.85rem', color: 'var(--text-primary)', margin: 0, lineHeight: 1.45, whiteSpace: 'pre-wrap' }}>
+                    {cmt.text}
+                  </p>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', fontStyle: 'italic' }}>
+              No comments posted yet.
+            </div>
+          )}
+
+          {/* Composer */}
+          {isAdminOrSuperAdmin ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginTop: '0.25rem' }}>
+              <textarea
+                rows={2}
+                placeholder="Add an admin note or implementation comment..."
+                value={commentInput}
+                onChange={(e) => setCommentInput(e.target.value)}
+                style={{
+                  width: '100%',
+                  padding: '0.65rem 0.85rem',
+                  backgroundColor: 'var(--input-bg)',
+                  border: '1px solid var(--border-color)',
+                  borderRadius: '8px',
+                  fontSize: '0.85rem',
+                  color: 'var(--text-primary)',
+                  outline: 'none',
+                  resize: 'vertical'
+                }}
+              />
+              {commentError && <span style={{ fontSize: '0.775rem', fontWeight: 700, color: '#DC2626' }}>{commentError}</span>}
+              <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                <button
+                  type="button"
+                  onClick={handlePostComment}
+                  disabled={isPostingComment || !commentInput.trim()}
+                  style={{
+                    padding: '0.45rem 1rem',
+                    backgroundColor: isPostingComment || !commentInput.trim() ? 'var(--border-color)' : '#0D9488',
+                    color: '#FFFFFF',
+                    border: 'none',
+                    borderRadius: '6px',
+                    fontSize: '0.8rem',
+                    fontWeight: 700,
+                    cursor: isPostingComment || !commentInput.trim() ? 'not-allowed' : 'pointer'
+                  }}
+                >
+                  {isPostingComment ? 'Posting...' : 'Post Comment'}
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', fontStyle: 'italic', padding: '0.5rem', backgroundColor: 'var(--input-bg)', borderRadius: '6px' }}>
+              🔒 Only Admins and Super Admins can add comments to this change request.
+            </div>
+          )}
         </div>
 
         {/* Rejection Prompt Form Overlay */}
@@ -385,16 +527,36 @@ export default function ChangeRequestModal({ cr, onClose, onApprove, onReject, o
                   <button onClick={() => { onApprove(cr.id); onClose(); }} style={{ padding: '0.55rem 1.25rem', backgroundColor: '#0D9488', color: '#FFFFFF', border: 'none', borderRadius: '8px', fontSize: '0.825rem', fontWeight: 700, cursor: 'pointer', boxShadow: '0 1px 3px rgba(13, 148, 136, 0.2)' }}>Approve</button>
                 )}
               </>
+            ) : isApproved && isAdminOrSuperAdmin ? (
+              <button
+                onClick={() => {
+                  if (onImplement) onImplement(cr.id);
+                  onClose();
+                }}
+                style={{
+                  padding: '0.55rem 1.25rem',
+                  backgroundColor: '#0284C7',
+                  color: '#FFFFFF',
+                  border: 'none',
+                  borderRadius: '8px',
+                  fontSize: '0.825rem',
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  boxShadow: '0 1px 3px rgba(2, 132, 199, 0.2)'
+                }}
+              >
+                Mark as Implemented
+              </button>
             ) : (
               <span style={{
                 padding: '0.4rem 0.9rem',
                 borderRadius: '99px',
                 fontSize: '0.8rem',
                 fontWeight: 700,
-                backgroundColor: isRejected ? '#FEE2E2' : '#D1FAE5',
-                color: isRejected ? '#DC2626' : '#059669'
+                backgroundColor: isImplemented ? '#E0F2FE' : isRejected ? '#FEE2E2' : '#D1FAE5',
+                color: isImplemented ? '#0284C7' : isRejected ? '#DC2626' : '#059669'
               }}>
-                {decisionLower === 'approved' ? '✓ You approved' : decisionLower === 'rejected' ? '✕ You rejected' : isApproved ? '✓ Approved' : '✕ Rejected'}
+                {isImplemented ? '✓ Implemented' : decisionLower === 'approved' ? '✓ You approved' : decisionLower === 'rejected' ? '✕ You rejected' : isApproved ? '✓ Approved' : '✕ Rejected'}
               </span>
             )}
           </div>

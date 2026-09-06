@@ -5,7 +5,9 @@ import { apiFetch } from '../lib/apiFetch';
 
 function MyRequestsPage({ onNavigate, searchQuery = '', initialData, user }) {
   const [requests, setRequests] = useState([]);
-  const [dateFilter, setDateFilter] = useState('overall');
+  const [dateFilter, setDateFilter] = useState('last_7_days');
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
   const [statusCounts, setStatusCounts] = useState({
@@ -41,6 +43,8 @@ function MyRequestsPage({ onNavigate, searchQuery = '', initialData, user }) {
         const params = new URLSearchParams({
           ...(activeFilter !== 'All' && { status: activeFilter }),
           ...(dateFilter !== 'overall' && { dateFilter }),
+          ...(dateFilter === 'custom' && startDate && { startDate }),
+          ...(dateFilter === 'custom' && endDate && { endDate }),
           ...(searchQuery && { search: searchQuery })
         });
         const res = await apiFetch(`/my-requests?${params}`);
@@ -56,13 +60,13 @@ function MyRequestsPage({ onNavigate, searchQuery = '', initialData, user }) {
       }
     };
     fetchData();
-  }, [activeFilter, dateFilter, searchQuery, user?.id]);
+  }, [activeFilter, dateFilter, startDate, endDate, searchQuery, user?.id]);
 
   const filterTabs = [
     { id: 'All', label: `All (${statusCounts.All || 0})` },
     { id: 'Pending', label: `Pending (${statusCounts.Pending || 0})` },
     { id: 'Approved', label: `Approved (${statusCounts.Approved || 0})` },
-    { id: 'In progress', label: `In progress (${statusCounts['In progress'] || 0})` },
+    { id: 'In progress', label: `In Progress (${statusCounts['In progress'] || statusCounts['In Progress'] || 0})` },
     { id: 'Rejected', label: `Rejected (${statusCounts.Rejected || 0})` },
     { id: 'Draft', label: `Draft (${statusCounts.Draft || 0})` }
   ];
@@ -98,7 +102,7 @@ function MyRequestsPage({ onNavigate, searchQuery = '', initialData, user }) {
 
         <button
           type="button"
-          onClick={() => onNavigate && onNavigate('Change Request')}
+          onClick={() => onNavigate && onNavigate('Change Catalog')}
           style={{
             padding: '0.55rem 1.1rem',
             backgroundColor: '#0D9488',
@@ -144,30 +148,85 @@ function MyRequestsPage({ onNavigate, searchQuery = '', initialData, user }) {
         </div>
 
         {/* Time Range Filter Dropdown */}
-        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', backgroundColor: 'var(--card-bg)', border: '1px solid var(--border-color)', borderRadius: '8px', padding: '0.25rem 0.65rem' }}>
-          <Calendar size={14} style={{ color: 'var(--text-secondary)' }} />
-          <select
-            value={dateFilter}
-            onChange={(e) => {
-              setDateFilter(e.target.value);
-              setPage(1);
-            }}
-            style={{
-              backgroundColor: 'var(--card-bg)',
-              color: 'var(--text-primary)',
-              border: 'none',
-              fontSize: '0.8rem',
-              fontWeight: 700,
-              cursor: 'pointer',
-              outline: 'none',
-              padding: '0.2rem'
-            }}
-          >
-            <option value="overall" style={{ backgroundColor: 'var(--card-bg)', color: 'var(--text-primary)' }}>Overall Time</option>
-            <option value="last_7_days" style={{ backgroundColor: 'var(--card-bg)', color: 'var(--text-primary)' }}>Last 7 Days</option>
-            <option value="this_month" style={{ backgroundColor: 'var(--card-bg)', color: 'var(--text-primary)' }}>This Month</option>
-            <option value="last_month" style={{ backgroundColor: 'var(--card-bg)', color: 'var(--text-primary)' }}>Last Month</option>
-          </select>
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '0.4rem' }}>
+          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', backgroundColor: 'var(--card-bg)', border: '1px solid var(--border-color)', borderRadius: '8px', padding: '0.25rem 0.65rem' }}>
+            <Calendar size={14} style={{ color: 'var(--text-secondary)' }} />
+            <select
+              value={dateFilter}
+              onChange={(e) => {
+                const val = e.target.value;
+                setDateFilter(val);
+                if (val === 'custom') {
+                  const formatDate = (d) =>
+                    d.getFullYear() +
+                    '-' +
+                    String(d.getMonth() + 1).padStart(2, '0') +
+                    '-' +
+                    String(d.getDate()).padStart(2, '0');
+
+                  if (!startDate) {
+                    const d = new Date();
+                    d.setDate(d.getDate() - 7);
+                    setStartDate(formatDate(d));
+                  }
+                  if (!endDate) {
+                    setEndDate(formatDate(new Date()));
+                  }
+                }
+                setPage(1);
+              }}
+              style={{
+                backgroundColor: 'var(--card-bg)',
+                color: 'var(--text-primary)',
+                border: 'none',
+                fontSize: '0.8rem',
+                fontWeight: 700,
+                cursor: 'pointer',
+                outline: 'none',
+                padding: '0.2rem'
+              }}
+            >
+              <option value="overall" style={{ backgroundColor: 'var(--card-bg)', color: 'var(--text-primary)' }}>Overall</option>
+              <option value="last_7_days" style={{ backgroundColor: 'var(--card-bg)', color: 'var(--text-primary)' }}>7 Days</option>
+              <option value="this_month" style={{ backgroundColor: 'var(--card-bg)', color: 'var(--text-primary)' }}>This Month</option>
+              <option value="last_month" style={{ backgroundColor: 'var(--card-bg)', color: 'var(--text-primary)' }}>Last Month</option>
+              <option value="custom" style={{ backgroundColor: 'var(--card-bg)', color: 'var(--text-primary)' }}>Custom</option>
+            </select>
+          </div>
+
+          {dateFilter === 'custom' && (
+            <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}>
+              <input
+                type="date"
+                value={startDate}
+                onChange={(e) => setStartDate(e.target.value)}
+                style={{
+                  backgroundColor: 'var(--card-bg)',
+                  border: '1px solid var(--border-color)',
+                  borderRadius: '8px',
+                  padding: '0.25rem 0.5rem',
+                  fontSize: '0.775rem',
+                  color: 'var(--text-primary)',
+                  outline: 'none'
+                }}
+              />
+              <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>to</span>
+              <input
+                type="date"
+                value={endDate}
+                onChange={(e) => setEndDate(e.target.value)}
+                style={{
+                  backgroundColor: 'var(--card-bg)',
+                  border: '1px solid var(--border-color)',
+                  borderRadius: '8px',
+                  padding: '0.25rem 0.5rem',
+                  fontSize: '0.775rem',
+                  color: 'var(--text-primary)',
+                  outline: 'none'
+                }}
+              />
+            </div>
+          )}
         </div>
       </div>
 
@@ -295,11 +354,33 @@ function MyRequestsPage({ onNavigate, searchQuery = '', initialData, user }) {
         return (
           <ChangeRequestModal
             cr={selectedRequest}
+            user={user}
             onClose={() => setSelectedRequest(null)}
             onApprove={isApprover ? () => setSelectedRequest(null) : null}
             onReject={isApprover ? () => setSelectedRequest(null) : null}
             onSendBack={isApprover ? () => setSelectedRequest(null) : null}
             onSubmitForApproval={handleSubmitDraft}
+            onImplement={async (id) => {
+              try {
+                const res = await apiFetch('/worklist/action', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ id, action: 'implement' })
+                });
+                if (res.ok) {
+                  const closedDateStr = new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+                  setRequests(prev => prev.map(r => r.id === id ? { ...r, status: 'Implemented', closedDate: closedDateStr } : r));
+                  setSelectedRequest(null);
+                } else {
+                  const data = await res.json().catch(() => ({}));
+                  console.warn('Failed to mark as implemented:', data.message || res.statusText);
+                  alert(data.message || 'Failed to mark as implemented');
+                }
+              } catch (err) {
+                console.error('Failed to mark as implemented:', err);
+                alert(err.message || 'Failed to mark as implemented');
+              }
+            }}
           />
         );
       })()}

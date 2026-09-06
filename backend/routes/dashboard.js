@@ -2,8 +2,7 @@ import express from 'express';
 import {
   getMetrics,
   getCategories,
-  getStatusBreakdown,
-  getRecentRequests
+  getStatusBreakdown
 } from '../controllers/dashboardController.js';
 import { authenticateUser } from '../middlewares/authMiddleware.js';
 
@@ -23,7 +22,6 @@ router.use(authenticateUser);
 router.get('/metrics', getMetrics);
 router.get('/categories', getCategories);
 router.get('/status-breakdown', getStatusBreakdown);
-router.get('/change-requests/recent', getRecentRequests);
 
 // Modular Domain Routers
 router.use('/', changeRequestsRouter);

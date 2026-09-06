@@ -10,13 +10,13 @@ import {
   getCategoryMetricsService,
   getStatusBreakdownService,
   getChangeRequestsService,
-  filterChangeRequestsByCategoryService,
   getFilteredChangeRequests,
   createChangeRequestService,
   updateDraftChangeRequestService,
   submitDraftChangeRequestService,
   getWorklistService,
   applyWorklistActionService,
+  addChangeRequestCommentService,
   getCatalogCategoriesService,
   getCatalogSubcategoriesService,
   getSubcategoryFieldsService,
@@ -33,9 +33,6 @@ import {
   getUserNotificationsService,
   markNotificationAsReadService,
   markAllNotificationsAsReadService,
-  getScheduledReportsService,
-  createScheduledReportService,
-  deleteScheduledReportService,
   getChangeManagerCategoriesService,
   updateChangeManagerCategoriesService
 } from '../services/dashboardService.js';
@@ -43,25 +40,24 @@ import {
 // ---------- Dashboard analytics ---------------------------
 
 export const getMetrics = asyncHandler(async (req, res) => {
-  res.json({ success: true, data: await getMetricsService() });
+  const isOrgScope = req.query.scope === 'organization' || req.query.scope === 'org';
+  const userId = isOrgScope ? null : (req.user?.id || req.query.userId || null);
+  res.json({ success: true, data: await getMetricsService(userId) });
 });
 
 export const getCategories = asyncHandler(async (req, res) => {
-  res.json({ success: true, data: await getCategoryMetricsService() });
+  const isOrgScope = req.query.scope === 'organization' || req.query.scope === 'org';
+  const userId = isOrgScope ? null : (req.user?.id || req.query.userId || null);
+  res.json({ success: true, data: await getCategoryMetricsService(userId) });
 });
 
 export const getStatusBreakdown = asyncHandler(async (req, res) => {
-  res.json({ success: true, data: await getStatusBreakdownService() });
+  const isOrgScope = req.query.scope === 'organization' || req.query.scope === 'org';
+  const userId = isOrgScope ? null : (req.user?.id || req.query.userId || null);
+  res.json({ success: true, data: await getStatusBreakdownService(userId) });
 });
 
 // ---------- Change requests -------------------------------
-
-export const getRecentRequests = asyncHandler(async (req, res) => {
-  const page = req.query.page || 1;
-  const limit = req.query.limit || 5;
-  const result = await filterChangeRequestsByCategoryService('all', null, page, limit);
-  res.json({ success: true, ...result });
-});
 
 export const getMyRequests = asyncHandler(async (req, res) => {
   const userId = req.user?.id || req.headers['x-user-id'] || 'usr-1';
@@ -69,6 +65,8 @@ export const getMyRequests = asyncHandler(async (req, res) => {
   const limit = req.query.limit || 10;
   const status = req.query.status || null;
   const dateFilter = req.query.dateFilter || null;
+  const startDate = req.query.startDate || null;
+  const endDate = req.query.endDate || null;
   const searchQuery = req.query.search || req.query.searchQuery || null;
 
   const result = await getFilteredChangeRequests({
@@ -76,6 +74,8 @@ export const getMyRequests = asyncHandler(async (req, res) => {
     isWorklist: false,
     status,
     dateFilter,
+    startDate,
+    endDate,
     searchQuery,
     page,
     limit
@@ -120,6 +120,8 @@ export const getWorklist = asyncHandler(async (req, res) => {
   const limit = req.query.limit || 10;
   const status = req.query.status || null;
   const dateFilter = req.query.dateFilter || null;
+  const startDate = req.query.startDate || null;
+  const endDate = req.query.endDate || null;
   const searchQuery = req.query.search || req.query.searchQuery || null;
 
   const result = await getFilteredChangeRequests({
@@ -128,6 +130,8 @@ export const getWorklist = asyncHandler(async (req, res) => {
     actingUserId: userId,
     status,
     dateFilter,
+    startDate,
+    endDate,
     searchQuery,
     page,
     limit
@@ -142,6 +146,16 @@ export const handleWorklistAction = asyncHandler(async (req, res) => {
   }
   const result = await applyWorklistActionService({ id, action, rejectionReason, actorId: req.user?.id });
   res.json({ success: true, message: `Action "${action}" processed for ${id}`, data: result });
+});
+
+export const addChangeRequestComment = asyncHandler(async (req, res) => {
+  const { id, text, commentText } = req.body || {};
+  const content = text || commentText;
+  if (!id || !content) {
+    return res.status(400).json({ success: false, message: 'Both "id" and comment text are required' });
+  }
+  const result = await addChangeRequestCommentService({ id, commentText: content, actorId: req.user?.id });
+  res.json({ success: true, message: 'Comment posted successfully', data: result });
 });
 
 // ---------- Change catalog (browse) --------------------
@@ -307,7 +321,8 @@ export const exportAuditLogs = asyncHandler(async (req, res) => {
 // ---------- Reports ----------------------------------
 
 export const getReportsMetrics = asyncHandler(async (req, res) => {
-  res.json({ success: true, ...(await getReportsMetricsService()) });
+  const { dateFilter, startDate, endDate } = req.query;
+  res.json({ success: true, ...(await getReportsMetricsService(dateFilter, startDate, endDate)) });
 });
 
 export const exportReport = asyncHandler(async (req, res) => {
@@ -497,22 +512,6 @@ export const markAllNotificationsAsRead = asyncHandler(async (req, res) => {
   res.json({ success: true, ...result });
 });
 
-export const getScheduledReports = asyncHandler(async (req, res) => {
-  const data = await getScheduledReportsService();
-  res.json({ success: true, count: data.length, data });
-});
-
-export const createScheduledReport = asyncHandler(async (req, res) => {
-  const userId = req.user?.id || 'usr-1';
-  const report = await createScheduledReportService(req.body, userId);
-  res.status(201).json({ success: true, message: 'Scheduled report created successfully', data: report });
-});
-
-export const deleteScheduledReport = asyncHandler(async (req, res) => {
-  const { id } = req.params;
-  await deleteScheduledReportService(id);
-  res.json({ success: true, message: 'Scheduled report deleted successfully' });
-});
 
 export const getChangeManagerCategories = asyncHandler(async (req, res) => {
   const { userId } = req.params;

@@ -115,17 +115,37 @@ export default function Dashboard({ user, onLogout }) {
     setMobileOpen(true);
   }, []);
 
+  const roleName = (user?.role || '').toLowerCase();
+  const roleId = user?.roleId || '';
+  const isSuperAdmin = roleId === 'role-1' || roleName.includes('super');
+  const isAdmin = isSuperAdmin || roleId === 'role-2' || roleName.includes('admin');
+  const isChangeManager = roleId === 'role-3' || roleName.includes('manager');
+
+  let currentItem = activeItem;
+  if (!isAdmin && !isChangeManager && (currentItem === 'My Worklist' || currentItem === 'Org Worklist' || currentItem === 'Organization worklist')) {
+    currentItem = 'Dashboard';
+  }
+  if (!isAdmin && (currentItem === 'Org Worklist' || currentItem === 'Organization worklist' || currentItem === 'Organization Dashboard' || currentItem === 'Reports')) {
+    currentItem = 'Dashboard';
+  }
+  if (!isSuperAdmin && currentItem === 'Settings') {
+    currentItem = 'Dashboard';
+  }
+
   const pages = {
     Dashboard: DashboardPage,
+    'Organization Dashboard': DashboardPage,
     'My Requests': MyRequestsPage,
     'Change Catalog': ChangeCatalogPage,
     'Change Request': ChangeRequestFormPage,
+    'My Worklist': MyWorklistPage,
+    'Org Worklist': MyWorklistPage,
     'Organization worklist': MyWorklistPage,
     Settings: SettingsPage,
     'Catalogue Management': CatalogueManagementPage,
     Reports: ReportsPage
   };
-  const ActivePage = pages[activeItem];
+  const ActivePage = pages[currentItem];
 
   return (
     <div style={{ display: 'flex', minHeight: '100vh', backgroundColor: 'var(--page-bg)', width: '100%' }}>
@@ -165,7 +185,7 @@ export default function Dashboard({ user, onLogout }) {
         {/* Workspace Content Canvas */}
         <main style={{ flex: 1, padding: isMobile ? '1rem' : '1.25rem 1.5rem' }}>
           {ActivePage ? (
-            <ActivePage onNavigate={handleNavigate} initialData={navigationPayload} searchQuery={searchQuery} user={user} />
+            <ActivePage onNavigate={handleNavigate} initialData={navigationPayload} searchQuery={searchQuery} user={user} isOrgDashboard={activeItem === 'Organization Dashboard'} />
           ) : (
             <div
               style={{

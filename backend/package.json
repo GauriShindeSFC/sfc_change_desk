@@ -7,8 +7,7 @@
     "start": "node server.js",
     "dev": "node server.js",
     "db:sync": "node scripts/syncDatabase.js",
-    "db:sync:force": "node scripts/syncDatabase.js --force",
-    "mail:test": "node scripts/sendTestEmail.js"
+    "db:sync:force": "node scripts/syncDatabase.js --force"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",

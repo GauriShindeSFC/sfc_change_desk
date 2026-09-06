@@ -32,6 +32,7 @@ export const serializeChangeRequest = (row) => {
     workflow: workflow?.name ?? null,
     raisedDate: submittedAt ? formatDate(new Date(submittedAt)) : '',
     closedDate: closedAt ? formatDate(new Date(closedAt)) : 'Open',
+    comments: cr.comments || cr.customFieldValues?.comments || [],
     rejectionReason: rationale,
     ...riskStyle(cr.risk),
     ...statusStyle(cr.status)
@@ -54,19 +55,16 @@ export const serializeWorklistEntry = (row) => {
     isDraft: cr.isDraft || false,
     justification: cr.justification,
     hostname: cr.hostname,
-    subCategory: cr.subCategory,
-    status: cr.status || 'Pending',
-    isDraft: cr.isDraft || false,
-    justification: cr.justification,
-    hostname: cr.hostname,
     location: cr.location,
     environment: cr.environment,
     contactNumber: cr.contactNumber,
     managerEmail: cr.managerEmail,
     employeeId: cr.employeeId || cr.requester?.employeeId || cr.customFieldValues?.employeeId || '',
+    employeeName: cr.employeeName || cr.requester?.name || cr.customFieldValues?.employeeName || cr.requesterName || '',
     employeeEmail: cr.customFieldValues?.employeeEmail || cr.requester?.email || cr.employeeEmail || '',
     raisedDate: cr.submittedAt ? formatDate(new Date(cr.submittedAt)) : '',
     closedDate: cr.closedAt ? formatDate(new Date(cr.closedAt)) : 'Open',
+    comments: cr.comments || cr.customFieldValues?.comments || [],
     startDate: cr.startDate ? formatDate(new Date(cr.startDate)) : '',
     endDate: cr.endDate ? formatDate(new Date(cr.endDate)) : '',
     customFieldValues: cr.customFieldValues || {},
@@ -145,11 +143,11 @@ export const serializeAuditLog = (row) => {
 
 // ---------- Dashboard metric cards ----------------------
 const METRIC_CARD_META = {
-  total: { title: 'Total Change Requests', subtext: '▲ 12 this month', subtextColor: '#10B981', iconBg: '#EBF5FF', iconColor: '#00A4EF' },
-  pending: { title: 'Pending Approval', subtext: 'CAB review pending', subtextColor: 'var(--text-secondary)', iconBg: '#FEF3C7', iconColor: '#D97706' },
-  approved: { title: 'Approved', subtext: '▲ 59% of total', subtextColor: '#10B981', iconBg: '#D1FAE5', iconColor: '#059669' },
-  'in-progress': { title: 'In Progress', subtext: 'Scheduled this week: 6', subtextColor: 'var(--text-secondary)', iconBg: '#F3E8FF', iconColor: '#7C3AED' },
-  rejected: { title: 'Rejected', subtext: '▼ 3 this month', subtextColor: '#DC2626', iconBg: '#FEE2E2', iconColor: '#DC2626' }
+  total: { title: 'Total Change Requests', subtext: '▲ 12 This Month', subtextColor: '#10B981', iconBg: '#EBF5FF', iconColor: '#00A4EF' },
+  pending: { title: 'Pending Approval', subtext: 'CAB Review Pending', subtextColor: 'var(--text-secondary)', iconBg: '#FEF3C7', iconColor: '#D97706' },
+  approved: { title: 'Approved', subtext: '▲ 59% Of Total', subtextColor: '#10B981', iconBg: '#D1FAE5', iconColor: '#059669' },
+  'in-progress': { title: 'Implemented', subtext: 'Scheduled This Week: 6', subtextColor: 'var(--text-secondary)', iconBg: '#F3E8FF', iconColor: '#7C3AED' },
+  rejected: { title: 'Rejected', subtext: '▼ 3 This Month', subtextColor: '#DC2626', iconBg: '#FEE2E2', iconColor: '#DC2626' }
 };
 
 export const serializeMetricCards = (stats = {}) => {

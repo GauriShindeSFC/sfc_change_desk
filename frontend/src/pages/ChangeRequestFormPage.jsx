@@ -386,75 +386,15 @@ function ChangeRequestFormPage({ onNavigate, initialData, user }) {
   return (
     <form onSubmit={(e) => handleSubmit(e, false)} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
       
-      {/* Top Action Header */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '1rem' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-          <button
-            type="button"
-            onClick={() => onNavigate('Change Catalog')}
-            style={{
-              background: 'none',
-              border: '1px solid var(--border-color)',
-              borderRadius: '8px',
-              padding: '0.45rem',
-              color: 'var(--text-secondary)',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center'
-            }}
-          >
-            <ArrowLeft size={18} />
-          </button>
-          <div>
-            <h1 style={{ fontSize: '1.45rem', fontWeight: 800, color: 'var(--text-primary)', lineHeight: 1.2 }}>
-              Create Change Request
-            </h1>
-            <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginTop: '0.15rem' }}>
-              Fill in the change details and submit for CAB quorum approval
-            </p>
-          </div>
-        </div>
-
-        <div style={{ display: 'flex', gap: '0.75rem' }}>
-          <button
-            type="button"
-            onClick={(e) => handleSubmit(e, true)}
-            disabled={isSubmitting}
-            style={{
-              padding: '0.6rem 1.25rem',
-              backgroundColor: 'var(--card-bg)',
-              color: 'var(--text-primary)',
-              border: '1px solid var(--border-color)',
-              borderRadius: '8px',
-              fontSize: '0.85rem',
-              fontWeight: 600,
-              cursor: 'pointer'
-            }}
-          >
-            Save as draft
-          </button>
-          <button
-            type="submit"
-            disabled={isSubmitting}
-            style={{
-              padding: '0.6rem 1.35rem',
-              backgroundColor: '#0D9488',
-              color: '#FFFFFF',
-              border: 'none',
-              borderRadius: '8px',
-              fontSize: '0.85rem',
-              fontWeight: 700,
-              cursor: 'pointer',
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '0.45rem',
-              boxShadow: '0 1px 3px rgba(13, 148, 136, 0.2)'
-            }}
-          >
-            <Send size={16} />
-            <span>{isSubmitting ? 'Submitting...' : 'Submit for approval'}</span>
-          </button>
+      {/* Top Header */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+        <div>
+          <h1 style={{ fontSize: '1.45rem', fontWeight: 800, color: 'var(--text-primary)', lineHeight: 1.2 }}>
+            Create Change Request
+          </h1>
+          <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginTop: '0.15rem' }}>
+            Fill in employee and change details, then submit for CAB approval
+          </p>
         </div>
       </div>
 
@@ -472,54 +412,137 @@ function ChangeRequestFormPage({ onNavigate, initialData, user }) {
         </div>
       )}
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.25rem', alignItems: 'start' }}>
+      {/* Single Main Card wrapping both sections */}
+      <div style={{
+        backgroundColor: 'var(--card-bg)',
+        border: '1px solid var(--border-color)',
+        borderRadius: '12px',
+        padding: '1.75rem',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '1.75rem',
+        boxShadow: '0 1px 3px rgba(16, 21, 30, 0.04)'
+      }}>
         
-        {/* Section 1 Card: Change Details */}
-        <div style={{
-          backgroundColor: 'var(--card-bg)',
-          border: '1px solid var(--border-color)',
-          borderRadius: '12px',
-          padding: '1.5rem',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: '1.25rem',
-          boxShadow: '0 1px 3px rgba(16, 21, 30, 0.04)'
-        }}>
+        {/* Section 1: Employee Details */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <h3 style={{ fontSize: '1rem', fontWeight: 800, color: 'var(--text-primary)', margin: 0 }}>
-              Change Details
+              Employee Details
             </h3>
             <span style={{ fontSize: '0.775rem', fontWeight: 600, color: 'var(--text-secondary)' }}>
               Section 1 of 2
             </span>
           </div>
 
-          {/* Change Title */}
-          <div>
-            <label style={{ display: 'block', fontSize: '0.825rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '0.4rem' }}>
-              Change title *
-            </label>
-            <input
-              type="text"
-              required
-              placeholder="e.g. Upgrade payment-gateway API to v4"
-              value={formData.title}
-              onChange={(e) => handleInputChange('title', e.target.value)}
-              style={{
-                width: '100%',
-                padding: '0.65rem 0.85rem',
-                backgroundColor: 'var(--input-bg)',
-                border: '1px solid var(--border-color)',
-                borderRadius: '8px',
-                fontSize: '0.85rem',
-                color: 'var(--text-primary)',
-                outline: 'none'
-              }}
-            />
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1.25rem' }}>
+            <div>
+              <label style={{ display: 'block', fontSize: '0.825rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '0.4rem' }}>
+                Employee name
+              </label>
+              <input
+                type="text"
+                value={formData.employeeName}
+                onChange={(e) => handleInputChange('employeeName', e.target.value)}
+                style={{ width: '100%', padding: '0.65rem 0.85rem', backgroundColor: 'var(--input-bg)', border: '1px solid var(--border-color)', borderRadius: '8px', fontSize: '0.85rem', color: 'var(--text-primary)', outline: 'none' }}
+              />
+            </div>
+            <div>
+              <label style={{ display: 'block', fontSize: '0.825rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '0.4rem' }}>
+                Employee email
+              </label>
+              <input
+                type="email"
+                placeholder="e.g. employee@company.com"
+                value={formData.employeeEmail}
+                onChange={(e) => handleInputChange('employeeEmail', e.target.value)}
+                style={{ width: '100%', padding: '0.65rem 0.85rem', backgroundColor: 'var(--input-bg)', border: '1px solid var(--border-color)', borderRadius: '8px', fontSize: '0.85rem', color: 'var(--text-primary)', outline: 'none' }}
+              />
+            </div>
+            <div>
+              <label style={{ display: 'block', fontSize: '0.825rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '0.4rem' }}>
+                Employee ID
+              </label>
+              <input
+                type="text"
+                placeholder="e.g. EMP-10432"
+                value={formData.employeeId}
+                onChange={(e) => handleInputChange('employeeId', e.target.value)}
+                style={{ width: '100%', padding: '0.65rem 0.85rem', backgroundColor: 'var(--input-bg)', border: '1px solid var(--border-color)', borderRadius: '8px', fontSize: '0.85rem', color: 'var(--text-primary)', outline: 'none' }}
+              />
+            </div>
+            <div>
+              <label style={{ display: 'block', fontSize: '0.825rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '0.4rem' }}>
+                Location *
+              </label>
+              <select
+                value={formData.location}
+                onChange={(e) => handleInputChange('location', e.target.value)}
+                style={{ width: '100%', padding: '0.65rem 0.85rem', backgroundColor: 'var(--input-bg)', border: '1px solid var(--border-color)', borderRadius: '8px', fontSize: '0.85rem', color: 'var(--text-primary)', outline: 'none' }}
+              >
+                <option value="Ahmedabad HQ">Ahmedabad HQ</option>
+                <option value="Mumbai DC">Mumbai DC</option>
+                <option value="Bangalore Office">Bangalore Office</option>
+                <option value="Delhi Regional">Delhi Regional</option>
+                <option value="Remote">Remote</option>
+              </select>
+            </div>
+            <div>
+              <label style={{ display: 'block', fontSize: '0.825rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '0.4rem' }}>
+                Manager Email *
+              </label>
+              <input
+                type="email"
+                required
+                placeholder="e.g. manager@company.com"
+                value={formData.managerEmail}
+                onChange={(e) => handleInputChange('managerEmail', e.target.value)}
+                style={{ width: '100%', padding: '0.65rem 0.85rem', backgroundColor: 'var(--input-bg)', border: '1px solid var(--border-color)', borderRadius: '8px', fontSize: '0.85rem', color: 'var(--text-primary)', outline: 'none' }}
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Section Divider Line */}
+        <div style={{ borderTop: '1px solid var(--border-color)', width: '100%' }} />
+
+        {/* Section 2: Change Details */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <h3 style={{ fontSize: '1rem', fontWeight: 800, color: 'var(--text-primary)', margin: 0 }}>
+              Change Details
+            </h3>
+            <span style={{ fontSize: '0.775rem', fontWeight: 600, color: 'var(--text-secondary)' }}>
+              Section 2 of 2
+            </span>
           </div>
 
-          {/* Category & Sub-category Grid */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1.25rem' }}>
+            {/* Change Title */}
+            <div>
+              <label style={{ display: 'block', fontSize: '0.825rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '0.4rem' }}>
+                Change title *
+              </label>
+              <input
+                type="text"
+                required
+                placeholder="e.g. Upgrade payment-gateway API to v4"
+                value={formData.title}
+                onChange={(e) => handleInputChange('title', e.target.value)}
+                style={{
+                  width: '100%',
+                  padding: '0.65rem 0.85rem',
+                  backgroundColor: 'var(--input-bg)',
+                  border: '1px solid var(--border-color)',
+                  borderRadius: '8px',
+                  fontSize: '0.85rem',
+                  color: 'var(--text-primary)',
+                  outline: 'none'
+                }}
+              />
+            </div>
+
+            {/* Category Dropdown */}
             <div>
               <label style={{ display: 'block', fontSize: '0.825rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '0.4rem' }}>
                 Category *
@@ -546,6 +569,7 @@ function ChangeRequestFormPage({ onNavigate, initialData, user }) {
               </select>
             </div>
 
+            {/* Sub-Category Dropdown */}
             <div>
               <label style={{ display: 'block', fontSize: '0.825rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '0.4rem' }}>
                 Sub-category *
@@ -571,111 +595,216 @@ function ChangeRequestFormPage({ onNavigate, initialData, user }) {
                 ))}
               </select>
             </div>
-          </div>
 
-          {/* Dynamic Fields Renderer */}
-          {visibleFields.length > 0 && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', padding: '1rem', backgroundColor: 'var(--input-bg)', borderRadius: '10px', border: '1px solid var(--border-color)' }}>
-              <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#0D9488', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                Sub-category Dynamic Attributes
-              </span>
-              {visibleFields.map((field) => (
-                <div key={field.id || field.fieldKey}>
-                  <label style={{ display: 'block', fontSize: '0.825rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '0.35rem' }}>
-                    {field.fieldLabel} {field.isRequired ? '*' : ''}
-                  </label>
-                  {(() => {
+            {/* Preferred Change Date */}
+            <div>
+              <label style={{ display: 'block', fontSize: '0.825rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '0.4rem' }}>
+                Preferred Change Date (Start Date)
+              </label>
+              <input
+                type="date"
+                value={formData.startDate}
+                onChange={(e) => handleInputChange('startDate', e.target.value)}
+                style={{
+                  width: '100%',
+                  padding: '0.65rem 0.85rem',
+                  backgroundColor: 'var(--input-bg)',
+                  border: '1px solid var(--border-color)',
+                  borderRadius: '8px',
+                  fontSize: '0.85rem',
+                  color: 'var(--text-primary)',
+                  outline: 'none'
+                }}
+              />
+            </div>
+
+            {/* Dynamic Fields Renderer */}
+            {visibleFields.length > 0 && (
+              <div style={{ gridColumn: '1 / -1', display: 'flex', flexDirection: 'column', gap: '1rem', padding: '1rem', backgroundColor: 'var(--input-bg)', borderRadius: '10px', border: '1px solid var(--border-color)' }}>
+                <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#0D9488', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                  Sub-category Dynamic Attributes
+                </span>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1rem' }}>
+                  {visibleFields.map((field) => {
+                    const isActionRequiredOther = field.fieldKey === 'actionRequired' && customFieldValues.actionRequired === 'Other';
                     const isOtherSubcat = selectedSubcategory?.name?.toLowerCase() === 'other' || selectedSubcategoryId?.endsWith('-oth');
+
                     if (isOtherSubcat && field.fieldKey === 'actionRequired') {
                       return (
-                        <div>
-                          <input
-                            type="text"
-                            disabled
-                            value="Other"
-                            style={{
-                              width: '100%',
-                              padding: '0.65rem 0.85rem',
-                              backgroundColor: 'var(--input-bg)',
-                              border: '1px solid var(--border-color)',
-                              borderRadius: '8px',
-                              fontSize: '0.85rem',
-                              color: 'var(--text-secondary)',
-                              outline: 'none',
-                              marginBottom: '0.65rem'
-                            }}
-                          />
-                          <label style={{ display: 'block', fontSize: '0.825rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '0.35rem' }}>
-                            Specify Other Action *
-                          </label>
-                          <input
-                            type="text"
-                            required
-                            placeholder="Enter custom action title / details..."
-                            value={customFieldValues.otherAction || ''}
-                            onChange={(e) => handleCustomFieldChange('otherAction', e.target.value)}
-                            style={{
-                              width: '100%',
-                              padding: '0.65rem 0.85rem',
-                              backgroundColor: 'var(--card-bg)',
-                              border: '1px solid var(--border-color)',
-                              borderRadius: '8px',
-                              fontSize: '0.85rem',
-                              color: 'var(--text-primary)',
-                              outline: 'none'
-                            }}
-                          />
+                        <div key={field.id || field.fieldKey} style={{ gridColumn: 'span 2', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                          <div>
+                            <label style={{ display: 'block', fontSize: '0.825rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '0.35rem' }}>
+                              Action Required *
+                            </label>
+                            <input
+                              type="text"
+                              disabled
+                              value="Other"
+                              style={{
+                                width: '100%',
+                                padding: '0.65rem 0.85rem',
+                                backgroundColor: 'var(--input-bg)',
+                                border: '1px solid var(--border-color)',
+                                borderRadius: '8px',
+                                fontSize: '0.85rem',
+                                color: 'var(--text-secondary)',
+                                outline: 'none'
+                              }}
+                            />
+                          </div>
+                          <div>
+                            <label style={{ display: 'block', fontSize: '0.825rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '0.35rem' }}>
+                              Specify Other Action *
+                            </label>
+                            <input
+                              type="text"
+                              required
+                              placeholder="Enter custom action title / details..."
+                              value={customFieldValues.otherAction || ''}
+                              onChange={(e) => handleCustomFieldChange('otherAction', e.target.value)}
+                              style={{
+                                width: '100%',
+                                padding: '0.65rem 0.85rem',
+                                backgroundColor: 'var(--card-bg)',
+                                border: '1px solid var(--border-color)',
+                                borderRadius: '8px',
+                                fontSize: '0.85rem',
+                                color: 'var(--text-primary)',
+                                outline: 'none'
+                              }}
+                            />
+                          </div>
                         </div>
                       );
                     }
 
-                    if (field.fieldType === 'dropdown') {
+                    if (field.fieldType === 'dropdown' && isActionRequiredOther) {
                       const isDisabled = fieldsLoading && field.fieldKey === 'actionRequired';
                       return (
-                        <div>
-                          <select
-                            disabled={isDisabled}
-                            value={customFieldValues[field.fieldKey] || ''}
-                            onChange={(e) => handleCustomFieldChange(field.fieldKey, e.target.value)}
-                            style={{
-                              width: '100%',
-                              padding: '0.65rem 0.85rem',
-                              backgroundColor: isDisabled ? 'var(--input-bg)' : 'var(--card-bg)',
-                              border: '1px solid var(--border-color)',
-                              borderRadius: '8px',
-                              fontSize: '0.85rem',
-                              color: isDisabled ? 'var(--text-secondary)' : 'var(--text-primary)',
-                              outline: 'none',
-                              opacity: isDisabled ? 0.7 : 1,
-                              cursor: isDisabled ? 'not-allowed' : 'pointer'
-                            }}
-                          >
-                            {isDisabled ? (
-                              <option value="">Loading options...</option>
-                            ) : (
-                              (() => {
-                                const opts = field.options ? [...field.options] : [];
-                                if (field.fieldKey === 'actionRequired' && !opts.includes('Other')) {
-                                  opts.push('Other');
-                                }
-                                return opts.map((opt) => (
-                                  <option key={opt} value={opt}>{opt}</option>
-                                ));
-                              })()
-                            )}
-                          </select>
+                        <div key={field.id || field.fieldKey} style={{ gridColumn: 'span 2', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                          <div>
+                            <label style={{ display: 'block', fontSize: '0.825rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '0.35rem' }}>
+                              {field.fieldLabel} {field.isRequired ? '*' : ''}
+                            </label>
+                            <select
+                              disabled={isDisabled}
+                              value={customFieldValues[field.fieldKey] || ''}
+                              onChange={(e) => handleCustomFieldChange(field.fieldKey, e.target.value)}
+                              style={{
+                                width: '100%',
+                                padding: '0.65rem 0.85rem',
+                                backgroundColor: isDisabled ? 'var(--input-bg)' : 'var(--card-bg)',
+                                border: '1px solid var(--border-color)',
+                                borderRadius: '8px',
+                                fontSize: '0.85rem',
+                                color: isDisabled ? 'var(--text-secondary)' : 'var(--text-primary)',
+                                outline: 'none',
+                                opacity: isDisabled ? 0.7 : 1,
+                                cursor: isDisabled ? 'not-allowed' : 'pointer'
+                              }}
+                            >
+                              {isDisabled ? (
+                                <option value="">Loading options...</option>
+                              ) : (
+                                (() => {
+                                  const opts = field.options ? [...field.options] : [];
+                                  if (field.fieldKey === 'actionRequired' && !opts.includes('Other')) {
+                                    opts.push('Other');
+                                  }
+                                  return opts.map((opt) => (
+                                    <option key={opt} value={opt}>{opt}</option>
+                                  ));
+                                })()
+                              )}
+                            </select>
+                          </div>
 
-                          {field.fieldKey === 'actionRequired' && customFieldValues.actionRequired === 'Other' && (
-                            <div style={{ marginTop: '0.65rem' }}>
-                              <label style={{ display: 'block', fontSize: '0.825rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '0.35rem' }}>
-                                Specify Other Action *
+                          <div>
+                            <label style={{ display: 'block', fontSize: '0.825rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '0.35rem' }}>
+                              Specify Other Action *
+                            </label>
+                            <input
+                              type="text"
+                              required
+                              placeholder="Enter custom action title / details..."
+                              value={customFieldValues.otherAction || ''}
+                              onChange={(e) => handleCustomFieldChange('otherAction', e.target.value)}
+                              style={{
+                                width: '100%',
+                                padding: '0.65rem 0.85rem',
+                                backgroundColor: 'var(--card-bg)',
+                                border: '1px solid var(--border-color)',
+                                borderRadius: '8px',
+                                fontSize: '0.85rem',
+                                color: 'var(--text-primary)',
+                                outline: 'none'
+                              }}
+                            />
+                          </div>
+                        </div>
+                      );
+                    }                    return (
+                      <div key={field.id || field.fieldKey}>
+                        <label style={{ display: 'block', fontSize: '0.825rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '0.35rem' }}>
+                          {field.fieldLabel} {field.isRequired ? '*' : ''}
+                        </label>
+                        {(() => {
+                          if (field.fieldType === 'dropdown') {
+                            const isDisabled = fieldsLoading && field.fieldKey === 'actionRequired';
+                            return (
+                              <select
+                                disabled={isDisabled}
+                                value={customFieldValues[field.fieldKey] || ''}
+                                onChange={(e) => handleCustomFieldChange(field.fieldKey, e.target.value)}
+                                style={{
+                                  width: '100%',
+                                  padding: '0.65rem 0.85rem',
+                                  backgroundColor: isDisabled ? 'var(--input-bg)' : 'var(--card-bg)',
+                                  border: '1px solid var(--border-color)',
+                                  borderRadius: '8px',
+                                  fontSize: '0.85rem',
+                                  color: isDisabled ? 'var(--text-secondary)' : 'var(--text-primary)',
+                                  outline: 'none',
+                                  opacity: isDisabled ? 0.7 : 1,
+                                  cursor: isDisabled ? 'not-allowed' : 'pointer'
+                                }}
+                              >
+                                {isDisabled ? (
+                                  <option value="">Loading options...</option>
+                                ) : (
+                                  (() => {
+                                    const opts = field.options ? [...field.options] : [];
+                                    if (field.fieldKey === 'actionRequired' && !opts.includes('Other')) {
+                                      opts.push('Other');
+                                    }
+                                    return opts.map((opt) => (
+                                      <option key={opt} value={opt}>{opt}</option>
+                                    ));
+                                  })()
+                                )}
+                              </select>
+                            );
+                          }
+
+                          if (field.fieldType === 'boolean') {
+                            return (
+                              <label style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
+                                <input
+                                  type="checkbox"
+                                  checked={Boolean(customFieldValues[field.fieldKey])}
+                                  onChange={(e) => handleCustomFieldChange(field.fieldKey, e.target.checked)}
+                                />
+                                <span style={{ fontSize: '0.85rem', color: 'var(--text-primary)' }}>Enable / Yes</span>
                               </label>
+                            );
+                          }
+
+                          if (field.fieldType === 'date') {
+                            return (
                               <input
-                                type="text"
-                                required
-                                placeholder="Enter custom action title / details..."
-                                value={customFieldValues.otherAction || ''}
-                                onChange={(e) => handleCustomFieldChange('otherAction', e.target.value)}
+                                type="date"
+                                value={customFieldValues[field.fieldKey] || ''}
+                                onChange={(e) => handleCustomFieldChange(field.fieldKey, e.target.value)}
                                 style={{
                                   width: '100%',
                                   padding: '0.65rem 0.85rem',
@@ -687,208 +816,120 @@ function ChangeRequestFormPage({ onNavigate, initialData, user }) {
                                   outline: 'none'
                                 }}
                               />
-                            </div>
-                          )}
-                        </div>
-                      );
-                    }
+                            );
+                          }
 
-                    if (field.fieldType === 'boolean') {
-                      return (
-                        <label style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
-                          <input
-                            type="checkbox"
-                            checked={Boolean(customFieldValues[field.fieldKey])}
-                            onChange={(e) => handleCustomFieldChange(field.fieldKey, e.target.checked)}
-                          />
-                          <span style={{ fontSize: '0.85rem', color: 'var(--text-primary)' }}>Enable / Yes</span>
-                        </label>
-                      );
-                    }
-
-                    if (field.fieldType === 'date') {
-                      return (
-                        <input
-                          type="date"
-                          value={customFieldValues[field.fieldKey] || ''}
-                          onChange={(e) => handleCustomFieldChange(field.fieldKey, e.target.value)}
-                          style={{
-                            width: '100%',
-                            padding: '0.65rem 0.85rem',
-                            backgroundColor: 'var(--card-bg)',
-                            border: '1px solid var(--border-color)',
-                            borderRadius: '8px',
-                            fontSize: '0.85rem',
-                            color: 'var(--text-primary)',
-                            outline: 'none'
-                          }}
-                        />
-                      );
-                    }
-
-                    return (
-                      <input
-                        type="text"
-                        placeholder={`Enter ${field.fieldLabel.toLowerCase()}`}
-                        value={customFieldValues[field.fieldKey] || ''}
-                        onChange={(e) => handleCustomFieldChange(field.fieldKey, e.target.value)}
-                        style={{
-                          width: '100%',
-                          padding: '0.65rem 0.85rem',
-                          backgroundColor: 'var(--card-bg)',
-                          border: '1px solid var(--border-color)',
-                          borderRadius: '8px',
-                          fontSize: '0.85rem',
-                          color: 'var(--text-primary)',
-                          outline: 'none'
-                        }}
-                      />
+                          return (
+                            <input
+                              type="text"
+                              placeholder={`Enter ${field.fieldLabel.toLowerCase()}`}
+                              value={customFieldValues[field.fieldKey] || ''}
+                              onChange={(e) => handleCustomFieldChange(field.fieldKey, e.target.value)}
+                              style={{
+                                width: '100%',
+                                padding: '0.65rem 0.85rem',
+                                backgroundColor: 'var(--card-bg)',
+                                border: '1px solid var(--border-color)',
+                                borderRadius: '8px',
+                                fontSize: '0.85rem',
+                                color: 'var(--text-primary)',
+                                outline: 'none'
+                              }}
+                            />
+                          );
+                        })()}
+                      </div>
                     );
-                  })()}
+                  })}
                 </div>
-              ))}
-            </div>
-          )}
+              </div>
+            )}
 
-          {/* Preferred Change Date & Justification */}
-          <div>
-            <label style={{ display: 'block', fontSize: '0.825rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '0.4rem' }}>
-              Preferred Change Date (Start Date)
-            </label>
-            <input
-              type="date"
-              value={formData.startDate}
-              onChange={(e) => handleInputChange('startDate', e.target.value)}
-              style={{
-                width: '100%',
-                padding: '0.65rem 0.85rem',
-                backgroundColor: 'var(--input-bg)',
-                border: '1px solid var(--border-color)',
-                borderRadius: '8px',
-                fontSize: '0.85rem',
-                color: 'var(--text-primary)',
-                outline: 'none'
-              }}
-            />
-          </div>
-
-          <div>
-            <label style={{ display: 'block', fontSize: '0.825rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '0.4rem' }}>
-              Business justification *
-            </label>
-            <textarea
-              rows={4}
-              required
-              placeholder="Explain why this change is required and the business impact of not implementing it..."
-              value={formData.justification}
-              onChange={(e) => handleInputChange('justification', e.target.value)}
-              style={{
-                width: '100%',
-                padding: '0.65rem 0.85rem',
-                backgroundColor: 'var(--input-bg)',
-                border: '1px solid var(--border-color)',
-                borderRadius: '8px',
-                fontSize: '0.85rem',
-                color: 'var(--text-primary)',
-                outline: 'none',
-                resize: 'vertical'
-              }}
-            />
-          </div>
-        </div>
-
-        {/* Section 2 Card: Employee Details */}
-        <div style={{
-          backgroundColor: 'var(--card-bg)',
-          border: '1px solid var(--border-color)',
-          borderRadius: '12px',
-          padding: '1.5rem',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: '1.25rem',
-          boxShadow: '0 1px 3px rgba(16, 21, 30, 0.04)'
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <h3 style={{ fontSize: '1rem', fontWeight: 800, color: 'var(--text-primary)', margin: 0 }}>
-              Employee Details
-            </h3>
-            <span style={{ fontSize: '0.775rem', fontWeight: 600, color: 'var(--text-secondary)' }}>
-              Section 2 of 2
-            </span>
-          </div>
-
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-            <div>
+            {/* Business justification */}
+            <div style={{ gridColumn: '1 / -1' }}>
               <label style={{ display: 'block', fontSize: '0.825rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '0.4rem' }}>
-                Employee name
+                Business justification *
               </label>
-              <input
-                type="text"
-                value={formData.employeeName}
-                onChange={(e) => handleInputChange('employeeName', e.target.value)}
-                style={{ width: '100%', padding: '0.65rem 0.85rem', backgroundColor: 'var(--input-bg)', border: '1px solid var(--border-color)', borderRadius: '8px', fontSize: '0.85rem', color: 'var(--text-primary)', outline: 'none' }}
-              />
-            </div>
-            <div>
-              <label style={{ display: 'block', fontSize: '0.825rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '0.4rem' }}>
-                Employee email
-              </label>
-              <input
-                type="email"
-                placeholder="e.g. employee@company.com"
-                value={formData.employeeEmail}
-                onChange={(e) => handleInputChange('employeeEmail', e.target.value)}
-                style={{ width: '100%', padding: '0.65rem 0.85rem', backgroundColor: 'var(--input-bg)', border: '1px solid var(--border-color)', borderRadius: '8px', fontSize: '0.85rem', color: 'var(--text-primary)', outline: 'none' }}
+              <textarea
+                rows={4}
+                required
+                placeholder="Explain why this change is required and the business impact of not implementing it..."
+                value={formData.justification}
+                onChange={(e) => handleInputChange('justification', e.target.value)}
+                style={{
+                  width: '100%',
+                  padding: '0.65rem 0.85rem',
+                  backgroundColor: 'var(--input-bg)',
+                  border: '1px solid var(--border-color)',
+                  borderRadius: '8px',
+                  fontSize: '0.85rem',
+                  color: 'var(--text-primary)',
+                  outline: 'none',
+                  resize: 'vertical'
+                }}
               />
             </div>
           </div>
-
-          <div style={{ marginBottom: '1rem' }}>
-            <label style={{ display: 'block', fontSize: '0.825rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '0.4rem' }}>
-              Employee ID
-            </label>
-            <input
-              type="text"
-              placeholder="e.g. EMP-10432"
-              value={formData.employeeId}
-              onChange={(e) => handleInputChange('employeeId', e.target.value)}
-              style={{ width: '100%', padding: '0.65rem 0.85rem', backgroundColor: 'var(--input-bg)', border: '1px solid var(--border-color)', borderRadius: '8px', fontSize: '0.85rem', color: 'var(--text-primary)', outline: 'none' }}
-            />
-          </div>
-
-          <div style={{ marginBottom: '1rem' }}>
-            <label style={{ display: 'block', fontSize: '0.825rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '0.4rem' }}>
-              Location *
-            </label>
-              <select
-                value={formData.location}
-                onChange={(e) => handleInputChange('location', e.target.value)}
-                style={{ width: '100%', padding: '0.65rem 0.85rem', backgroundColor: 'var(--input-bg)', border: '1px solid var(--border-color)', borderRadius: '8px', fontSize: '0.85rem', color: 'var(--text-primary)', outline: 'none' }}
-              >
-                <option value="Ahmedabad HQ">Ahmedabad HQ</option>
-                <option value="Mumbai DC">Mumbai DC</option>
-                <option value="Bangalore Office">Bangalore Office</option>
-                <option value="Delhi Regional">Delhi Regional</option>
-                <option value="Remote">Remote</option>
-              </select>
-            </div>
-
-          <div>
-            <label style={{ display: 'block', fontSize: '0.825rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '0.4rem' }}>
-              Manager Email *
-            </label>
-            <input
-              type="email"
-              required
-              placeholder="e.g. manager@company.com"
-              value={formData.managerEmail}
-              onChange={(e) => handleInputChange('managerEmail', e.target.value)}
-              style={{ width: '100%', padding: '0.65rem 0.85rem', backgroundColor: 'var(--input-bg)', border: '1px solid var(--border-color)', borderRadius: '8px', fontSize: '0.85rem', color: 'var(--text-primary)', outline: 'none' }}
-            />
-          </div>
-
         </div>
 
+      </div>
+
+      {/* Bottom Action Footer */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '0.5rem', paddingTop: '1.25rem', borderTop: '1px solid var(--border-color)' }}>
+        <button
+          type="button"
+          onClick={() => onNavigate('Change Catalog', { activeCategory: initialData?.fromCategory || initialData?.activeCategory || initialData?.category || 'Server & Infra' })}
+          style={{
+            padding: '0.6rem 1.25rem',
+            backgroundColor: 'var(--card-bg)',
+            color: 'var(--text-secondary)',
+            border: '1px solid var(--border-color)',
+            borderRadius: '8px',
+            fontSize: '0.85rem',
+            fontWeight: 600,
+            cursor: 'pointer'
+          }}
+        >
+          Cancel
+        </button>
+        <button
+          type="button"
+          onClick={(e) => handleSubmit(e, true)}
+          disabled={isSubmitting}
+          style={{
+            padding: '0.6rem 1.25rem',
+            backgroundColor: 'var(--card-bg)',
+            color: 'var(--text-primary)',
+            border: '1px solid var(--border-color)',
+            borderRadius: '8px',
+            fontSize: '0.85rem',
+            fontWeight: 600,
+            cursor: 'pointer'
+          }}
+        >
+          Save as draft
+        </button>
+        <button
+          type="submit"
+          disabled={isSubmitting}
+          style={{
+            padding: '0.6rem 1.35rem',
+            backgroundColor: '#0D9488',
+            color: '#FFFFFF',
+            border: 'none',
+            borderRadius: '8px',
+            fontSize: '0.85rem',
+            fontWeight: 700,
+            cursor: 'pointer',
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '0.45rem',
+            boxShadow: '0 1px 3px rgba(13, 148, 136, 0.2)'
+          }}
+        >
+          <Send size={16} />
+          <span>{isSubmitting ? 'Submitting...' : 'Submit for approval'}</span>
+        </button>
       </div>
 
     </form>

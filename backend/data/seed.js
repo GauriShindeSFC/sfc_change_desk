@@ -32,14 +32,14 @@ export const users = [
   { id: 'usr-2', name: 'Priya Nair', employeeId: 'EMP-10433', email: 'priya.nair@company.com', status: 'Active', roleId: 'role-4' },
   { id: 'usr-3', name: 'Arjun Mehta', employeeId: 'EMP-10434', email: 'arjun.mehta@company.com', status: 'Active', roleId: 'role-2' },
   { id: 'usr-4', name: 'Sana Iqbal', employeeId: 'EMP-10435', email: 'sana.iqbal@company.com', status: 'Active', roleId: 'role-1' },
-  { id: 'usr-5', name: 'Rahul Verma', employeeId: 'EMP-10436', email: 'rahul.verma@company.com', status: 'Inactive', roleId: 'role-4' }
+  { id: 'usr-5', name: 'Rahul Verma', employeeId: 'EMP-10436', email: 'rahul.verma@company.com', status: 'Active', roleId: 'role-3' }
 ].map((u) => ({ ...u, authProvider: 'local', passwordHash: DEV_PASSWORD_HASH }));
 
 // ---------- workflows ------------------------------------
 export const workflows = [
-  { id: 'wf-1', name: 'Standard Change Workflow', steps: 'Draft → Submitted → CAB Review → Approved → Scheduled → Implemented → Closed' },
-  { id: 'wf-2', name: 'Expedited Workflow', steps: 'Draft → Submitted → CAB Review (4hr SLA) → Approved → Implemented → Closed' },
-  { id: 'wf-3', name: 'Lightweight Access Workflow', steps: 'Draft → Submitted → Manager Approval → Implemented → Closed' }
+  { id: 'wf-1', name: 'Standard Change Workflow', steps: 'Draft → Change Manager Review → Approved → Implemented' },
+  { id: 'wf-2', name: 'Expedited Workflow', steps: 'Draft → Change Manager Review → Approved → Implemented' },
+  { id: 'wf-3', name: 'Lightweight Access Workflow', steps: 'Draft → Change Manager Review → Approved → Implemented' }
 ];
 
 // ---------- catalog items (workflowId -> workflows.id) --
@@ -242,7 +242,7 @@ export const categoryBreakdown = [
 export const statusBreakdown = [
   { label: 'Approved', count: 76, color: '#0D9488' },
   { label: 'Pending', count: 17, color: '#D97706' },
-  { label: 'In progress', count: 21, color: '#7C3AED' },
+  { label: 'In Progress', count: 21, color: '#7C3AED' },
   { label: 'Rejected', count: 14, color: '#DC2626' }
 ];
 
@@ -259,7 +259,7 @@ export const monthlyVolume = [
 
 export const appConfig = [
   { key: 'dashboard_stats', value: { total: 128, pending: 17, approved: 76, inProgress: 21, rejected: 14 } },
-  { key: 'worklist_metrics', value: { pending: 4, approved: 32, rejected: 6, sentBack: 3 } },
+  { key: 'worklist_metrics', value: { pending: 4, approved: 32, rejected: 6, implemented: 3 } },
   {
     key: 'report_metrics',
     value: { approvalRate: '94.2%', avgLeadTime: '2.4 days', emergencyCount: 4, complianceScore: '99.1%' }
@@ -284,34 +284,34 @@ export const catalogSubcategories = [
   // 1. Server & Infra
   { id: 'subcat-srv-lc', categoryId: 'cat-srv', name: 'Server Lifecycle', sla: '3 business days', risk: 'Medium', workflowId: 'wf-1', status: 'Active' },
   { id: 'subcat-srv-patch', categoryId: 'cat-srv', name: 'OS / Patching', sla: '5 business days', risk: 'High', workflowId: 'wf-2', status: 'Active' },
-  { id: 'subcat-srv-oth', categoryId: 'cat-srv', name: 'Other', sla: '3 business days', risk: 'Medium', workflowId: 'wf-1', status: 'Active' },
+  { id: 'subcat-srv-oth', categoryId: 'cat-srv', name: 'Other Server Changes', sla: '3 business days', risk: 'Medium', workflowId: 'wf-1', status: 'Active' },
 
   // 2. Network & Connectivity
   { id: 'subcat-net-fw', categoryId: 'cat-net', name: 'Firewall / Port', sla: '2 business days', risk: 'Medium', workflowId: 'wf-1', status: 'Active' },
   { id: 'subcat-net-proxy', categoryId: 'cat-net', name: 'Proxy / URL Access', sla: '1 business day', risk: 'Low', workflowId: 'wf-3', status: 'Active' },
   { id: 'subcat-net-vpn', categoryId: 'cat-net', name: 'VPN', sla: '2 business days', risk: 'Medium', workflowId: 'wf-1', status: 'Active' },
-  { id: 'subcat-net-oth', categoryId: 'cat-net', name: 'Other', sla: '3 business days', risk: 'Medium', workflowId: 'wf-1', status: 'Active' },
+  { id: 'subcat-net-oth', categoryId: 'cat-net', name: 'Other Network Changes', sla: '3 business days', risk: 'Medium', workflowId: 'wf-1', status: 'Active' },
 
   // 3. Access & Security
   { id: 'subcat-acc-app', categoryId: 'cat-acc', name: 'Application Access', sla: '1 business day', risk: 'Low', workflowId: 'wf-3', status: 'Active' },
   { id: 'subcat-acc-phys', categoryId: 'cat-acc', name: 'Physical Access', sla: '1 business day', risk: 'Low', workflowId: 'wf-3', status: 'Active' },
-  { id: 'subcat-acc-oth', categoryId: 'cat-acc', name: 'Other', sla: '2 business days', risk: 'Medium', workflowId: 'wf-1', status: 'Active' },
+  { id: 'subcat-acc-oth', categoryId: 'cat-acc', name: 'Other Access Requests', sla: '2 business days', risk: 'Medium', workflowId: 'wf-1', status: 'Active' },
 
   // 4. IT Asset
   { id: 'subcat-asset-dev', categoryId: 'cat-asset', name: 'Laptop / Desktop', sla: '5 business days', risk: 'Low', workflowId: 'wf-1', status: 'Active' },
   { id: 'subcat-asset-hw', categoryId: 'cat-asset', name: 'Hardware Accessories', sla: '5 business days', risk: 'Low', workflowId: 'wf-1', status: 'Active' },
   { id: 'subcat-asset-sw', categoryId: 'cat-asset', name: 'Software', sla: '3 business days', risk: 'Medium', workflowId: 'wf-1', status: 'Active' },
   { id: 'subcat-asset-lic', categoryId: 'cat-asset', name: 'License', sla: '2 business days', risk: 'Low', workflowId: 'wf-3', status: 'Active' },
-  { id: 'subcat-asset-oth', categoryId: 'cat-asset', name: 'Other', sla: '3 business days', risk: 'Low', workflowId: 'wf-1', status: 'Active' },
+  { id: 'subcat-asset-oth', categoryId: 'cat-asset', name: 'Other IT Asset Requests', sla: '3 business days', risk: 'Low', workflowId: 'wf-1', status: 'Active' },
 
   // 5. Office 365 & Collaboration
   { id: 'subcat-o365-mb', categoryId: 'cat-o365', name: 'Mailbox', sla: '1 business day', risk: 'Low', workflowId: 'wf-3', status: 'Active' },
   { id: 'subcat-o365-lic', categoryId: 'cat-o365', name: 'M365 License', sla: '1 business day', risk: 'Low', workflowId: 'wf-3', status: 'Active' },
-  { id: 'subcat-o365-oth', categoryId: 'cat-o365', name: 'Other', sla: '2 business days', risk: 'Low', workflowId: 'wf-3', status: 'Active' },
+  { id: 'subcat-o365-oth', categoryId: 'cat-o365', name: 'Other Email / M365 Requests', sla: '2 business days', risk: 'Low', workflowId: 'wf-3', status: 'Active' },
 
   // 6. Security Tools & Policies
   { id: 'subcat-sec-ep', categoryId: 'cat-sec', name: 'End Point Agent', sla: '2 business days', risk: 'High', workflowId: 'wf-2', status: 'Active' },
-  { id: 'subcat-sec-oth', categoryId: 'cat-sec', name: 'Other', sla: '3 business days', risk: 'High', workflowId: 'wf-2', status: 'Active' }
+  { id: 'subcat-sec-oth', categoryId: 'cat-sec', name: 'Other Security Changes', sla: '3 business days', risk: 'High', workflowId: 'wf-2', status: 'Active' }
 ];
 
 export const catalogSubcategoryFields = [
@@ -327,32 +327,32 @@ export const catalogSubcategoryFields = [
   { id: 'f-srv-backup', subcategoryId: 'subcat-srv-lc', fieldKey: 'backupRequired', fieldLabel: 'Backup Required?', fieldType: 'dropdown', isRequired: true, sortOrder: 8, appliesToActions: ['Create a New Server', 'Change / Modify an Existing Server'], options: ['Yes', 'No'] },
   { id: 'f-srv-name', subcategoryId: 'subcat-srv-lc', fieldKey: 'serverName', fieldLabel: 'Server Name', fieldType: 'text', isRequired: true, sortOrder: 9, appliesToActions: ['Change / Modify an Existing Server', 'Migrate a Server', 'Decommission a Server'], options: null },
   { id: 'f-srv-ip', subcategoryId: 'subcat-srv-lc', fieldKey: 'ipAddress', fieldLabel: 'IP Address', fieldType: 'text', isRequired: true, sortOrder: 10, appliesToActions: ['Change / Modify an Existing Server', 'Migrate a Server', 'Decommission a Server'], options: null },
-  { id: 'f-srv-reason', subcategoryId: 'subcat-srv-lc', fieldKey: 'purposeReason', fieldLabel: 'Purpose/Reason', fieldType: 'text', isRequired: true, sortOrder: 11, appliesToActions: ['Change / Modify an Existing Server', 'Migrate a Server', 'Decommission a Server'], options: null },
+  { id: 'f-srv-reason', subcategoryId: 'subcat-srv-lc', fieldKey: 'purposeReason', fieldLabel: 'Purpose / Reason', fieldType: 'text', isRequired: true, sortOrder: 11, appliesToActions: ['Change / Modify an Existing Server', 'Migrate a Server', 'Decommission a Server'], options: null },
 
   // ── 2. OS / Patching ──
   { id: 'f-patch-act', subcategoryId: 'subcat-srv-patch', fieldKey: 'actionRequired', fieldLabel: 'Action Required', fieldType: 'dropdown', isRequired: true, sortOrder: 0, appliesToActions: null, options: ['Upgrade / Patch Server OS', 'Other'] },
   { id: 'f-patch-srvname', subcategoryId: 'subcat-srv-patch', fieldKey: 'serverName', fieldLabel: 'Server Name', fieldType: 'text', isRequired: true, sortOrder: 1, appliesToActions: ['Upgrade / Patch Server OS'], options: null },
   { id: 'f-patch-ip', subcategoryId: 'subcat-srv-patch', fieldKey: 'ipAddress', fieldLabel: 'IP Address', fieldType: 'text', isRequired: true, sortOrder: 2, appliesToActions: ['Upgrade / Patch Server OS'], options: null },
-  { id: 'f-patch-curos', subcategoryId: 'subcat-srv-patch', fieldKey: 'currentOsVersion', fieldLabel: 'Current OS/Version', fieldType: 'text', isRequired: true, sortOrder: 3, appliesToActions: ['Upgrade / Patch Server OS'], options: null },
-  { id: 'f-patch-tgtos', subcategoryId: 'subcat-srv-patch', fieldKey: 'targetVersionPatch', fieldLabel: 'Target Version/Patch', fieldType: 'text', isRequired: true, sortOrder: 4, appliesToActions: ['Upgrade / Patch Server OS'], options: null },
-  { id: 'f-patch-cve', subcategoryId: 'subcat-srv-patch', fieldKey: 'kbCve', fieldLabel: 'KB/CVE (If Applicable)', fieldType: 'text', isRequired: false, sortOrder: 5, appliesToActions: ['Upgrade / Patch Server OS'], options: null },
+  { id: 'f-patch-curos', subcategoryId: 'subcat-srv-patch', fieldKey: 'currentOsVersion', fieldLabel: 'Current OS / Version', fieldType: 'text', isRequired: true, sortOrder: 3, appliesToActions: ['Upgrade / Patch Server OS'], options: null },
+  { id: 'f-patch-tgtos', subcategoryId: 'subcat-srv-patch', fieldKey: 'targetVersionPatch', fieldLabel: 'Target Version / Patch', fieldType: 'text', isRequired: true, sortOrder: 4, appliesToActions: ['Upgrade / Patch Server OS'], options: null },
+  { id: 'f-patch-cve', subcategoryId: 'subcat-srv-patch', fieldKey: 'kbCve', fieldLabel: 'KB / CVE (If Applicable)', fieldType: 'text', isRequired: false, sortOrder: 5, appliesToActions: ['Upgrade / Patch Server OS'], options: null },
   { id: 'f-patch-reboot', subcategoryId: 'subcat-srv-patch', fieldKey: 'rebootRequired', fieldLabel: 'Reboot Required?', fieldType: 'dropdown', isRequired: true, sortOrder: 6, appliesToActions: ['Upgrade / Patch Server OS'], options: ['Yes', 'No'] },
-  { id: 'f-patch-reason', subcategoryId: 'subcat-srv-patch', fieldKey: 'purposeReason', fieldLabel: 'Purpose/Reason', fieldType: 'text', isRequired: true, sortOrder: 7, appliesToActions: ['Upgrade / Patch Server OS'], options: null },
+  { id: 'f-patch-reason', subcategoryId: 'subcat-srv-patch', fieldKey: 'purposeReason', fieldLabel: 'Purpose / Reason', fieldType: 'text', isRequired: true, sortOrder: 7, appliesToActions: ['Upgrade / Patch Server OS'], options: null },
 
   // ── 3. Server Other ──
-  { id: 'f-srvoth-act', subcategoryId: 'subcat-srv-oth', fieldKey: 'actionRequired', fieldLabel: 'Action Required', fieldType: 'dropdown', isRequired: true, sortOrder: 0, appliesToActions: null, options: ['Any other changes related to server', 'Other'] },
-  { id: 'f-srvoth-desc', subcategoryId: 'subcat-srv-oth', fieldKey: 'description', fieldLabel: 'Description', fieldType: 'textarea', isRequired: true, sortOrder: 1, appliesToActions: ['Any other changes related to server'], options: null },
+  { id: 'f-srvoth-act', subcategoryId: 'subcat-srv-oth', fieldKey: 'actionRequired', fieldLabel: 'Action Required', fieldType: 'dropdown', isRequired: true, sortOrder: 0, appliesToActions: null, options: ['Any Other Changes Related to Server', 'Other'] },
+  { id: 'f-srvoth-desc', subcategoryId: 'subcat-srv-oth', fieldKey: 'description', fieldLabel: 'Description', fieldType: 'textarea', isRequired: true, sortOrder: 1, appliesToActions: ['Any Other Changes Related to Server'], options: null },
 
   // ── 4. Firewall / Port ──
-  { id: 'f-fw-act', subcategoryId: 'subcat-net-fw', fieldKey: 'actionRequired', fieldLabel: 'Action Required', fieldType: 'dropdown', isRequired: true, sortOrder: 0, appliesToActions: null, options: ['Open a Firewall Port / Allow Traffic', 'Modify existing Firewall Rule', 'Close Firewall Port / Remove Rule', 'Other'] },
-  { id: 'f-fw-src', subcategoryId: 'subcat-net-fw', fieldKey: 'sourceIpSubnet', fieldLabel: 'Source IP/ Subnet', fieldType: 'text', isRequired: true, sortOrder: 1, appliesToActions: ['Open a Firewall Port / Allow Traffic', 'Modify existing Firewall Rule', 'Close Firewall Port / Remove Rule'], options: null },
-  { id: 'f-fw-dst', subcategoryId: 'subcat-net-fw', fieldKey: 'destinationIpSubnet', fieldLabel: 'Destination IP / Subnet', fieldType: 'text', isRequired: true, sortOrder: 2, appliesToActions: ['Open a Firewall Port / Allow Traffic', 'Modify existing Firewall Rule', 'Close Firewall Port / Remove Rule'], options: null },
-  { id: 'f-fw-proto', subcategoryId: 'subcat-net-fw', fieldKey: 'protocol', fieldLabel: 'Protocol', fieldType: 'dropdown', isRequired: true, sortOrder: 3, appliesToActions: ['Open a Firewall Port / Allow Traffic', 'Modify existing Firewall Rule'], options: ['TCP', 'UDP', 'ICMP', 'ANY'] },
-  { id: 'f-fw-port', subcategoryId: 'subcat-net-fw', fieldKey: 'port', fieldLabel: 'Port', fieldType: 'text', isRequired: true, sortOrder: 4, appliesToActions: ['Open a Firewall Port / Allow Traffic', 'Modify existing Firewall Rule', 'Close Firewall Port / Remove Rule'], options: null },
-  { id: 'f-fw-dir', subcategoryId: 'subcat-net-fw', fieldKey: 'direction', fieldLabel: 'Direction', fieldType: 'dropdown', isRequired: true, sortOrder: 5, appliesToActions: ['Open a Firewall Port / Allow Traffic', 'Modify existing Firewall Rule'], options: ['Inbound', 'Outbound', 'Bi-directional'] },
-  { id: 'f-fw-app', subcategoryId: 'subcat-net-fw', fieldKey: 'applicationService', fieldLabel: 'Application / Service', fieldType: 'text', isRequired: true, sortOrder: 6, appliesToActions: ['Open a Firewall Port / Allow Traffic', 'Modify existing Firewall Rule'], options: null },
-  { id: 'f-fw-internet', subcategoryId: 'subcat-net-fw', fieldKey: 'internetFacing', fieldLabel: 'Internet Facing (Y/N)', fieldType: 'dropdown', isRequired: true, sortOrder: 7, appliesToActions: ['Open a Firewall Port / Allow Traffic', 'Modify existing Firewall Rule'], options: ['Yes', 'No'] },
-  { id: 'f-fw-reason', subcategoryId: 'subcat-net-fw', fieldKey: 'purposeReason', fieldLabel: 'Purpose / Reason', fieldType: 'text', isRequired: true, sortOrder: 8, appliesToActions: ['Open a Firewall Port / Allow Traffic', 'Modify existing Firewall Rule', 'Close Firewall Port / Remove Rule'], options: null },
+  { id: 'f-fw-act', subcategoryId: 'subcat-net-fw', fieldKey: 'actionRequired', fieldLabel: 'Action Required', fieldType: 'dropdown', isRequired: true, sortOrder: 0, appliesToActions: null, options: ['Open a Firewall Port / Allow Traffic', 'Modify Existing Firewall Rule', 'Close Firewall Port / Remove Rule', 'Other'] },
+  { id: 'f-fw-src', subcategoryId: 'subcat-net-fw', fieldKey: 'sourceIpSubnet', fieldLabel: 'Source IP / Subnet', fieldType: 'text', isRequired: true, sortOrder: 1, appliesToActions: ['Open a Firewall Port / Allow Traffic', 'Modify Existing Firewall Rule', 'Close Firewall Port / Remove Rule'], options: null },
+  { id: 'f-fw-dst', subcategoryId: 'subcat-net-fw', fieldKey: 'destinationIpSubnet', fieldLabel: 'Destination IP / Subnet', fieldType: 'text', isRequired: true, sortOrder: 2, appliesToActions: ['Open a Firewall Port / Allow Traffic', 'Modify Existing Firewall Rule', 'Close Firewall Port / Remove Rule'], options: null },
+  { id: 'f-fw-proto', subcategoryId: 'subcat-net-fw', fieldKey: 'protocol', fieldLabel: 'Protocol', fieldType: 'dropdown', isRequired: true, sortOrder: 3, appliesToActions: ['Open a Firewall Port / Allow Traffic', 'Modify Existing Firewall Rule'], options: ['TCP', 'UDP', 'ICMP', 'ANY'] },
+  { id: 'f-fw-port', subcategoryId: 'subcat-net-fw', fieldKey: 'port', fieldLabel: 'Port', fieldType: 'text', isRequired: true, sortOrder: 4, appliesToActions: ['Open a Firewall Port / Allow Traffic', 'Modify Existing Firewall Rule', 'Close Firewall Port / Remove Rule'], options: null },
+  { id: 'f-fw-dir', subcategoryId: 'subcat-net-fw', fieldKey: 'direction', fieldLabel: 'Direction', fieldType: 'dropdown', isRequired: true, sortOrder: 5, appliesToActions: ['Open a Firewall Port / Allow Traffic', 'Modify Existing Firewall Rule'], options: ['Inbound', 'Outbound', 'Bi-directional'] },
+  { id: 'f-fw-app', subcategoryId: 'subcat-net-fw', fieldKey: 'applicationService', fieldLabel: 'Application / Service', fieldType: 'text', isRequired: true, sortOrder: 6, appliesToActions: ['Open a Firewall Port / Allow Traffic', 'Modify Existing Firewall Rule'], options: null },
+  { id: 'f-fw-internet', subcategoryId: 'subcat-net-fw', fieldKey: 'internetFacing', fieldLabel: 'Internet Facing (Y/N)', fieldType: 'dropdown', isRequired: true, sortOrder: 7, appliesToActions: ['Open a Firewall Port / Allow Traffic', 'Modify Existing Firewall Rule'], options: ['Yes', 'No'] },
+  { id: 'f-fw-reason', subcategoryId: 'subcat-net-fw', fieldKey: 'purposeReason', fieldLabel: 'Purpose / Reason', fieldType: 'text', isRequired: true, sortOrder: 8, appliesToActions: ['Open a Firewall Port / Allow Traffic', 'Modify Existing Firewall Rule', 'Close Firewall Port / Remove Rule'], options: null },
 
   // ── 5. Proxy / URL Access ──
   { id: 'f-proxy-act', subcategoryId: 'subcat-net-proxy', fieldKey: 'actionRequired', fieldLabel: 'Action Required', fieldType: 'dropdown', isRequired: true, sortOrder: 0, appliesToActions: null, options: ['Allow Website / URL', 'Block Website / URL', 'Other'] },
@@ -364,11 +364,11 @@ export const catalogSubcategoryFields = [
   { id: 'f-vpn-act', subcategoryId: 'subcat-net-vpn', fieldKey: 'actionRequired', fieldLabel: 'Action Required', fieldType: 'dropdown', isRequired: true, sortOrder: 0, appliesToActions: null, options: ['Request VPN Access', 'Modify / Revoke VPN Access', 'Other'] },
   { id: 'f-vpn-type', subcategoryId: 'subcat-net-vpn', fieldKey: 'vpnType', fieldLabel: 'VPN Type', fieldType: 'dropdown', isRequired: true, sortOrder: 1, appliesToActions: ['Request VPN Access', 'Modify / Revoke VPN Access'], options: ['User VPN (SSL)', 'Site-to-Site IPsec', 'IPsec Client'] },
   { id: 'f-vpn-src', subcategoryId: 'subcat-net-vpn', fieldKey: 'sourceNetwork', fieldLabel: 'Source Network', fieldType: 'text', isRequired: true, sortOrder: 2, appliesToActions: ['Request VPN Access', 'Modify / Revoke VPN Access'], options: null },
-  { id: 'f-vpn-dst', subcategoryId: 'subcat-net-vpn', fieldKey: 'destinationNetworkApp', fieldLabel: 'Destination Network/Application', fieldType: 'text', isRequired: true, sortOrder: 3, appliesToActions: ['Request VPN Access', 'Modify / Revoke VPN Access'], options: null },
+  { id: 'f-vpn-dst', subcategoryId: 'subcat-net-vpn', fieldKey: 'destinationNetworkApp', fieldLabel: 'Destination Network / Application', fieldType: 'text', isRequired: true, sortOrder: 3, appliesToActions: ['Request VPN Access', 'Modify / Revoke VPN Access'], options: null },
 
   // ── 7. Network Other ──
-  { id: 'f-netoth-act', subcategoryId: 'subcat-net-oth', fieldKey: 'actionRequired', fieldLabel: 'Action Required', fieldType: 'dropdown', isRequired: true, sortOrder: 0, appliesToActions: null, options: ['Other Network related change', 'Other'] },
-  { id: 'f-netoth-desc', subcategoryId: 'subcat-net-oth', fieldKey: 'description', fieldLabel: 'Description', fieldType: 'textarea', isRequired: true, sortOrder: 1, appliesToActions: ['Other Network related change'], options: null },
+  { id: 'f-netoth-act', subcategoryId: 'subcat-net-oth', fieldKey: 'actionRequired', fieldLabel: 'Action Required', fieldType: 'dropdown', isRequired: true, sortOrder: 0, appliesToActions: null, options: ['Other Network Related Change', 'Other'] },
+  { id: 'f-netoth-desc', subcategoryId: 'subcat-net-oth', fieldKey: 'description', fieldLabel: 'Description', fieldType: 'textarea', isRequired: true, sortOrder: 1, appliesToActions: ['Other Network Related Change'], options: null },
 
   // ── 8. Application Access ──
   { id: 'f-appacc-act', subcategoryId: 'subcat-acc-app', fieldKey: 'actionRequired', fieldLabel: 'Action Required', fieldType: 'dropdown', isRequired: true, sortOrder: 0, appliesToActions: null, options: ['Request Application Access', 'Change Existing Access', 'Revoke Application Access', 'Other'] },
@@ -387,45 +387,45 @@ export const catalogSubcategoryFields = [
   { id: 'f-physacc-reason', subcategoryId: 'subcat-acc-phys', fieldKey: 'purposeReason', fieldLabel: 'Purpose / Reason', fieldType: 'text', isRequired: true, sortOrder: 5, appliesToActions: ['Request Physical Access', 'Modify Physical Access', 'Revoke Physical Access'], options: null },
 
   // ── 10. Access Other ──
-  { id: 'f-accoth-act', subcategoryId: 'subcat-acc-oth', fieldKey: 'actionRequired', fieldLabel: 'Action Required', fieldType: 'dropdown', isRequired: true, sortOrder: 0, appliesToActions: null, options: ['Other Access & Security related request', 'Other'] },
-  { id: 'f-accoth-desc', subcategoryId: 'subcat-acc-oth', fieldKey: 'description', fieldLabel: 'Description', fieldType: 'textarea', isRequired: true, sortOrder: 1, appliesToActions: ['Other Access & Security related request'], options: null },
+  { id: 'f-accoth-act', subcategoryId: 'subcat-acc-oth', fieldKey: 'actionRequired', fieldLabel: 'Action Required', fieldType: 'dropdown', isRequired: true, sortOrder: 0, appliesToActions: null, options: ['Other Access & Security Related Request', 'Other'] },
+  { id: 'f-accoth-desc', subcategoryId: 'subcat-acc-oth', fieldKey: 'description', fieldLabel: 'Description', fieldType: 'textarea', isRequired: true, sortOrder: 1, appliesToActions: ['Other Access & Security Related Request'], options: null },
 
   // ── 11. Laptop / Desktop ──
-  { id: 'f-dev-act', subcategoryId: 'subcat-asset-dev', fieldKey: 'actionRequired', fieldLabel: 'Action Required', fieldType: 'dropdown', isRequired: true, sortOrder: 0, appliesToActions: null, options: ['Request for Procurement of Laptop / Desktop', 'Replace Exisitng Laptop / Desktop', 'Repair Request', 'Dispose Request', 'Other'] },
+  { id: 'f-dev-act', subcategoryId: 'subcat-asset-dev', fieldKey: 'actionRequired', fieldLabel: 'Action Required', fieldType: 'dropdown', isRequired: true, sortOrder: 0, appliesToActions: null, options: ['Request for Procurement of Laptop / Desktop', 'Replace Existing Laptop / Desktop', 'Repair Request', 'Dispose Request', 'Other'] },
   { id: 'f-dev-assettype', subcategoryId: 'subcat-asset-dev', fieldKey: 'assetType', fieldLabel: 'Asset Type', fieldType: 'dropdown', isRequired: true, sortOrder: 1, appliesToActions: ['Request for Procurement of Laptop / Desktop'], options: ['Laptop', 'Desktop', 'Workstation'] },
-  { id: 'f-dev-reqcfg', subcategoryId: 'subcat-asset-dev', fieldKey: 'requestedConfiguration', fieldLabel: 'Requested Configuration', fieldType: 'text', isRequired: true, sortOrder: 2, appliesToActions: ['Request for Procurement of Laptop / Desktop', 'Replace Exisitng Laptop / Desktop'], options: null },
+  { id: 'f-dev-reqcfg', subcategoryId: 'subcat-asset-dev', fieldKey: 'requestedConfiguration', fieldLabel: 'Requested Configuration', fieldType: 'text', isRequired: true, sortOrder: 2, appliesToActions: ['Request for Procurement of Laptop / Desktop', 'Replace Existing Laptop / Desktop'], options: null },
   { id: 'f-dev-qty', subcategoryId: 'subcat-asset-dev', fieldKey: 'qtyRequired', fieldLabel: 'Qty Required', fieldType: 'text', isRequired: true, sortOrder: 3, appliesToActions: ['Request for Procurement of Laptop / Desktop'], options: null },
   { id: 'f-dev-loc', subcategoryId: 'subcat-asset-dev', fieldKey: 'location', fieldLabel: 'Location', fieldType: 'text', isRequired: true, sortOrder: 4, appliesToActions: ['Request for Procurement of Laptop / Desktop'], options: null },
   { id: 'f-dev-stock', subcategoryId: 'subcat-asset-dev', fieldKey: 'currentQtyInStock', fieldLabel: 'Current Qty in Stock', fieldType: 'text', isRequired: true, sortOrder: 5, appliesToActions: ['Request for Procurement of Laptop / Desktop'], options: null },
-  { id: 'f-dev-replreason', subcategoryId: 'subcat-asset-dev', fieldKey: 'replacementPurposeReason', fieldLabel: 'Replacement Purpose / Reason', fieldType: 'text', isRequired: true, sortOrder: 6, appliesToActions: ['Replace Exisitng Laptop / Desktop'], options: null },
-  { id: 'f-dev-curcfg', subcategoryId: 'subcat-asset-dev', fieldKey: 'currentConfiguration', fieldLabel: 'Current Congfiguraiton', fieldType: 'text', isRequired: true, sortOrder: 7, appliesToActions: ['Replace Exisitng Laptop / Desktop'], options: null },
-  { id: 'f-dev-assetid', subcategoryId: 'subcat-asset-dev', fieldKey: 'existingAssetId', fieldLabel: 'Existing Asset ID', fieldType: 'text', isRequired: true, sortOrder: 8, appliesToActions: ['Replace Exisitng Laptop / Desktop', 'Repair Request', 'Dispose Request'], options: null },
-  { id: 'f-dev-repairreason', subcategoryId: 'subcat-asset-dev', fieldKey: 'purposeReason', fieldLabel: 'purpose / Reason', fieldType: 'text', isRequired: true, sortOrder: 9, appliesToActions: ['Repair Request'], options: null },
+  { id: 'f-dev-replreason', subcategoryId: 'subcat-asset-dev', fieldKey: 'replacementPurposeReason', fieldLabel: 'Replacement Purpose / Reason', fieldType: 'text', isRequired: true, sortOrder: 6, appliesToActions: ['Replace Existing Laptop / Desktop'], options: null },
+  { id: 'f-dev-curcfg', subcategoryId: 'subcat-asset-dev', fieldKey: 'currentConfiguration', fieldLabel: 'Current Configuration', fieldType: 'text', isRequired: true, sortOrder: 7, appliesToActions: ['Replace Existing Laptop / Desktop'], options: null },
+  { id: 'f-dev-assetid', subcategoryId: 'subcat-asset-dev', fieldKey: 'existingAssetId', fieldLabel: 'Existing Asset ID', fieldType: 'text', isRequired: true, sortOrder: 8, appliesToActions: ['Replace Existing Laptop / Desktop', 'Repair Request', 'Dispose Request'], options: null },
+  { id: 'f-dev-repairreason', subcategoryId: 'subcat-asset-dev', fieldKey: 'purposeReason', fieldLabel: 'Purpose / Reason', fieldType: 'text', isRequired: true, sortOrder: 9, appliesToActions: ['Repair Request'], options: null },
   { id: 'f-dev-purchdate', subcategoryId: 'subcat-asset-dev', fieldKey: 'dateOfPurchase', fieldLabel: 'Date of Purchase', fieldType: 'text', isRequired: true, sortOrder: 10, appliesToActions: ['Dispose Request'], options: null },
   { id: 'f-dev-dispreason', subcategoryId: 'subcat-asset-dev', fieldKey: 'disposalReason', fieldLabel: 'Disposal Reason', fieldType: 'text', isRequired: true, sortOrder: 11, appliesToActions: ['Dispose Request'], options: null },
 
   // ── 12. Other IT Hardware ──
-  { id: 'f-hw-act', subcategoryId: 'subcat-asset-hw', fieldKey: 'actionRequired', fieldLabel: 'Action Required', fieldType: 'dropdown', isRequired: true, sortOrder: 0, appliesToActions: null, options: ['Request for procurement of IT Hardware / Accessories', 'Request for allotment of IT Hardware / Accessories', 'Return IT Asset', 'Repair Request', 'Dispose Request', 'Other'] },
-  { id: 'f-hw-assettype', subcategoryId: 'subcat-asset-hw', fieldKey: 'assetType', fieldLabel: 'Asset Type', fieldType: 'text', isRequired: true, sortOrder: 1, appliesToActions: ['Request for procurement of IT Hardware / Accessories', 'Request for allotment of IT Hardware / Accessories', 'Return IT Asset'], options: null },
-  { id: 'f-hw-reqcfg', subcategoryId: 'subcat-asset-hw', fieldKey: 'requestedConfiguration', fieldLabel: 'Requested Configuration', fieldType: 'text', isRequired: true, sortOrder: 2, appliesToActions: ['Request for procurement of IT Hardware / Accessories', 'Request for allotment of IT Hardware / Accessories'], options: null },
-  { id: 'f-hw-qty', subcategoryId: 'subcat-asset-hw', fieldKey: 'qtyRequired', fieldLabel: 'Qty Required', fieldType: 'text', isRequired: true, sortOrder: 3, appliesToActions: ['Request for procurement of IT Hardware / Accessories'], options: null },
-  { id: 'f-hw-loc', subcategoryId: 'subcat-asset-hw', fieldKey: 'location', fieldLabel: 'Location', fieldType: 'text', isRequired: true, sortOrder: 4, appliesToActions: ['Request for procurement of IT Hardware / Accessories'], options: null },
-  { id: 'f-hw-stock', subcategoryId: 'subcat-asset-hw', fieldKey: 'currentQtyInStock', fieldLabel: 'Current Qty in Stock', fieldType: 'text', isRequired: true, sortOrder: 5, appliesToActions: ['Request for procurement of IT Hardware / Accessories'], options: null },
-  { id: 'f-hw-reason', subcategoryId: 'subcat-asset-hw', fieldKey: 'purposeReason', fieldLabel: 'Purpose / Reason', fieldType: 'text', isRequired: true, sortOrder: 6, appliesToActions: ['Request for allotment of IT Hardware / Accessories', 'Return IT Asset', 'Repair Request'], options: null },
+  { id: 'f-hw-act', subcategoryId: 'subcat-asset-hw', fieldKey: 'actionRequired', fieldLabel: 'Action Required', fieldType: 'dropdown', isRequired: true, sortOrder: 0, appliesToActions: null, options: ['Request for Procurement of IT Hardware / Accessories', 'Request for Allotment of IT Hardware / Accessories', 'Return IT Asset', 'Repair Request', 'Dispose Request', 'Other'] },
+  { id: 'f-hw-assettype', subcategoryId: 'subcat-asset-hw', fieldKey: 'assetType', fieldLabel: 'Asset Type', fieldType: 'text', isRequired: true, sortOrder: 1, appliesToActions: ['Request for Procurement of IT Hardware / Accessories', 'Request for Allotment of IT Hardware / Accessories', 'Return IT Asset'], options: null },
+  { id: 'f-hw-reqcfg', subcategoryId: 'subcat-asset-hw', fieldKey: 'requestedConfiguration', fieldLabel: 'Requested Configuration', fieldType: 'text', isRequired: true, sortOrder: 2, appliesToActions: ['Request for Procurement of IT Hardware / Accessories', 'Request for Allotment of IT Hardware / Accessories'], options: null },
+  { id: 'f-hw-qty', subcategoryId: 'subcat-asset-hw', fieldKey: 'qtyRequired', fieldLabel: 'Qty Required', fieldType: 'text', isRequired: true, sortOrder: 3, appliesToActions: ['Request for Procurement of IT Hardware / Accessories'], options: null },
+  { id: 'f-hw-loc', subcategoryId: 'subcat-asset-hw', fieldKey: 'location', fieldLabel: 'Location', fieldType: 'text', isRequired: true, sortOrder: 4, appliesToActions: ['Request for Procurement of IT Hardware / Accessories'], options: null },
+  { id: 'f-hw-stock', subcategoryId: 'subcat-asset-hw', fieldKey: 'currentQtyInStock', fieldLabel: 'Current Qty in Stock', fieldType: 'text', isRequired: true, sortOrder: 5, appliesToActions: ['Request for Procurement of IT Hardware / Accessories'], options: null },
+  { id: 'f-hw-reason', subcategoryId: 'subcat-asset-hw', fieldKey: 'purposeReason', fieldLabel: 'Purpose / Reason', fieldType: 'text', isRequired: true, sortOrder: 6, appliesToActions: ['Request for Allotment of IT Hardware / Accessories', 'Return IT Asset', 'Repair Request'], options: null },
   { id: 'f-hw-returncfg', subcategoryId: 'subcat-asset-hw', fieldKey: 'returnAssetConfiguration', fieldLabel: 'Return Asset Configuration', fieldType: 'text', isRequired: true, sortOrder: 7, appliesToActions: ['Return IT Asset'], options: null },
   { id: 'f-hw-assetid', subcategoryId: 'subcat-asset-hw', fieldKey: 'assetId', fieldLabel: 'Asset ID', fieldType: 'text', isRequired: true, sortOrder: 8, appliesToActions: ['Repair Request', 'Dispose Request'], options: null },
   { id: 'f-hw-purchdate', subcategoryId: 'subcat-asset-hw', fieldKey: 'dateOfPurchase', fieldLabel: 'Date of Purchase', fieldType: 'text', isRequired: true, sortOrder: 9, appliesToActions: ['Dispose Request'], options: null },
   { id: 'f-hw-dispreason', subcategoryId: 'subcat-asset-hw', fieldKey: 'disposalReason', fieldLabel: 'Disposal Reason', fieldType: 'text', isRequired: true, sortOrder: 10, appliesToActions: ['Dispose Request'], options: null },
 
   // ── 13. Software ──
-  { id: 'f-sw-act', subcategoryId: 'subcat-asset-sw', fieldKey: 'actionRequired', fieldLabel: 'Action Required', fieldType: 'dropdown', isRequired: true, sortOrder: 0, appliesToActions: null, options: ['Install / Upgrade a Software', 'Other'] },
-  { id: 'f-sw-devid', subcategoryId: 'subcat-asset-sw', fieldKey: 'deviceId', fieldLabel: 'Device ID', fieldType: 'text', isRequired: true, sortOrder: 1, appliesToActions: ['Install / Upgrade a Software'], options: null },
-  { id: 'f-sw-host', subcategoryId: 'subcat-asset-sw', fieldKey: 'hostName', fieldLabel: 'Host Name', fieldType: 'text', isRequired: true, sortOrder: 2, appliesToActions: ['Install / Upgrade a Software'], options: null },
-  { id: 'f-sw-name', subcategoryId: 'subcat-asset-sw', fieldKey: 'softwareName', fieldLabel: 'Software Name', fieldType: 'text', isRequired: true, sortOrder: 3, appliesToActions: ['Install / Upgrade a Software'], options: null },
-  { id: 'f-sw-reqver', subcategoryId: 'subcat-asset-sw', fieldKey: 'requestedVersion', fieldLabel: 'Requested Version', fieldType: 'text', isRequired: true, sortOrder: 4, appliesToActions: ['Install / Upgrade a Software'], options: null },
-  { id: 'f-sw-curver', subcategoryId: 'subcat-asset-sw', fieldKey: 'currentVersion', fieldLabel: 'Current Version', fieldType: 'text', isRequired: false, sortOrder: 5, appliesToActions: ['Install / Upgrade a Software'], options: null },
-  { id: 'f-sw-licensed', subcategoryId: 'subcat-asset-sw', fieldKey: 'licensedYn', fieldLabel: 'Licensed? (Y/N)', fieldType: 'dropdown', isRequired: true, sortOrder: 6, appliesToActions: ['Install / Upgrade a Software'], options: ['Yes', 'No'] },
-  { id: 'f-sw-reason', subcategoryId: 'subcat-asset-sw', fieldKey: 'purposeReason', fieldLabel: 'Purpose / Reason', fieldType: 'text', isRequired: true, sortOrder: 7, appliesToActions: ['Install / Upgrade a Software'], options: null },
+  { id: 'f-sw-act', subcategoryId: 'subcat-asset-sw', fieldKey: 'actionRequired', fieldLabel: 'Action Required', fieldType: 'dropdown', isRequired: true, sortOrder: 0, appliesToActions: null, options: ['Install / Upgrade Software', 'Other'] },
+  { id: 'f-sw-devid', subcategoryId: 'subcat-asset-sw', fieldKey: 'deviceId', fieldLabel: 'Device ID', fieldType: 'text', isRequired: true, sortOrder: 1, appliesToActions: ['Install / Upgrade Software'], options: null },
+  { id: 'f-sw-host', subcategoryId: 'subcat-asset-sw', fieldKey: 'hostName', fieldLabel: 'Host Name', fieldType: 'text', isRequired: true, sortOrder: 2, appliesToActions: ['Install / Upgrade Software'], options: null },
+  { id: 'f-sw-name', subcategoryId: 'subcat-asset-sw', fieldKey: 'softwareName', fieldLabel: 'Software Name', fieldType: 'text', isRequired: true, sortOrder: 3, appliesToActions: ['Install / Upgrade Software'], options: null },
+  { id: 'f-sw-reqver', subcategoryId: 'subcat-asset-sw', fieldKey: 'requestedVersion', fieldLabel: 'Requested Version', fieldType: 'text', isRequired: true, sortOrder: 4, appliesToActions: ['Install / Upgrade Software'], options: null },
+  { id: 'f-sw-curver', subcategoryId: 'subcat-asset-sw', fieldKey: 'currentVersion', fieldLabel: 'Current Version', fieldType: 'text', isRequired: false, sortOrder: 5, appliesToActions: ['Install / Upgrade Software'], options: null },
+  { id: 'f-sw-licensed', subcategoryId: 'subcat-asset-sw', fieldKey: 'licensedYn', fieldLabel: 'Licensed? (Y/N)', fieldType: 'dropdown', isRequired: true, sortOrder: 6, appliesToActions: ['Install / Upgrade Software'], options: ['Yes', 'No'] },
+  { id: 'f-sw-reason', subcategoryId: 'subcat-asset-sw', fieldKey: 'purposeReason', fieldLabel: 'Purpose / Reason', fieldType: 'text', isRequired: true, sortOrder: 7, appliesToActions: ['Install / Upgrade Software'], options: null },
 
   // ── 14. License ──
   { id: 'f-lic-act', subcategoryId: 'subcat-asset-lic', fieldKey: 'actionRequired', fieldLabel: 'Action Required', fieldType: 'dropdown', isRequired: true, sortOrder: 0, appliesToActions: null, options: ['Procure / Renew Software License', 'Other'] },
@@ -435,8 +435,8 @@ export const catalogSubcategoryFields = [
   { id: 'f-lic-reason', subcategoryId: 'subcat-asset-lic', fieldKey: 'purposeReason', fieldLabel: 'Purpose / Reason', fieldType: 'text', isRequired: true, sortOrder: 4, appliesToActions: ['Procure / Renew Software License'], options: null },
 
   // ── 15. IT Asset Other ──
-  { id: 'f-assetoth-act', subcategoryId: 'subcat-asset-oth', fieldKey: 'actionRequired', fieldLabel: 'Action Required', fieldType: 'dropdown', isRequired: true, sortOrder: 0, appliesToActions: null, options: ['Other IT Asset related request', 'Other'] },
-  { id: 'f-assetoth-desc', subcategoryId: 'subcat-asset-oth', fieldKey: 'description', fieldLabel: 'Description', fieldType: 'textarea', isRequired: true, sortOrder: 1, appliesToActions: ['Other IT Asset related request'], options: null },
+  { id: 'f-assetoth-act', subcategoryId: 'subcat-asset-oth', fieldKey: 'actionRequired', fieldLabel: 'Action Required', fieldType: 'dropdown', isRequired: true, sortOrder: 0, appliesToActions: null, options: ['Other IT Asset Related Request', 'Other'] },
+  { id: 'f-assetoth-desc', subcategoryId: 'subcat-asset-oth', fieldKey: 'description', fieldLabel: 'Description', fieldType: 'textarea', isRequired: true, sortOrder: 1, appliesToActions: ['Other IT Asset Related Request'], options: null },
 
   // ── 16. Mailbox ──
   { id: 'f-mb-act', subcategoryId: 'subcat-o365-mb', fieldKey: 'actionRequired', fieldLabel: 'Action Required', fieldType: 'dropdown', isRequired: true, sortOrder: 0, appliesToActions: null, options: ['Create an Email ID', 'Add Email Alias', 'Disable / Revoke Mailbox', 'Other'] },
@@ -531,7 +531,12 @@ export async function seedDatabase({ force = false } = {}) {
     { id: 'cmc-usr-1-cat-srv', userId: 'usr-1', categoryId: 'cat-srv' },
     { id: 'cmc-usr-1-cat-net', userId: 'usr-1', categoryId: 'cat-net' },
     { id: 'cmc-usr-1-cat-acc', userId: 'usr-1', categoryId: 'cat-acc' },
-    { id: 'cmc-usr-1-cat-asset', userId: 'usr-1', categoryId: 'cat-asset' }
+    { id: 'cmc-usr-1-cat-asset', userId: 'usr-1', categoryId: 'cat-asset' },
+    { id: 'cmc-usr-5-cat-srv', userId: 'usr-5', categoryId: 'cat-srv' },
+    { id: 'cmc-usr-5-cat-net', userId: 'usr-5', categoryId: 'cat-net' },
+    { id: 'cmc-usr-5-cat-acc', userId: 'usr-5', categoryId: 'cat-acc' },
+    { id: 'cmc-usr-5-cat-sec', userId: 'usr-5', categoryId: 'cat-sec' },
+    { id: 'cmc-usr-5-cat-asset', userId: 'usr-5', categoryId: 'cat-asset' }
   ];
   results.push(await fill(ChangeManagerCategory, sampleCmCategories));
 

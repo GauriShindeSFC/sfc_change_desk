@@ -7,8 +7,8 @@ if (!DATABASE_URI) {
   throw new Error('DATABASE_URI is not set. Add it to backend/.env (see .env.example).');
 }
 
-const maxPool = Number(process.env.DB_POOL_MAX) || 10;
-const minPool = Number(process.env.DB_POOL_MIN) || 2;
+const maxPool = Number(process.env.DB_POOL_MAX) || 5;
+const minPool = Number(process.env.DB_POOL_MIN) || 0;
 
 export const sequelize = new Sequelize(DATABASE_URI, {
   dialect: 'postgres',

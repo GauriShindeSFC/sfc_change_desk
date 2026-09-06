@@ -1,9 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { FileText, Clock, CheckCircle2, RotateCw, XCircle } from 'lucide-react';
-import RecentChangeRequests from '../components/ui/RecentChangeRequests';
 import { apiFetch } from '../lib/apiFetch';
 
-function DashboardPage({ onNavigate, user }) {
+function DashboardPage({ onNavigate, user, isOrgDashboard }) {
   const [metrics, setMetrics] = useState([]);
   const [categoryData, setCategoryData] = useState([]);
   const [statusBreakdown, setStatusBreakdown] = useState([]);
@@ -11,10 +10,11 @@ function DashboardPage({ onNavigate, user }) {
   useEffect(() => {
     const fetchDashboardData = async () => {
       try {
+        const query = isOrgDashboard ? '?scope=organization' : '';
         const [mRes, cRes, sRes] = await Promise.all([
-          apiFetch('/metrics'),
-          apiFetch('/categories'),
-          apiFetch('/status-breakdown')
+          apiFetch(`/metrics${query}`),
+          apiFetch(`/categories${query}`),
+          apiFetch(`/status-breakdown${query}`)
         ]);
         if (mRes.ok) {
           const mData = await mRes.json();
@@ -33,13 +33,15 @@ function DashboardPage({ onNavigate, user }) {
       }
     };
     fetchDashboardData();
-  }, []);
+    const interval = setInterval(fetchDashboardData, 10000);
+    return () => clearInterval(interval);
+  }, [isOrgDashboard]);
 
   const getMetricIcon = (m) => {
     if (m.isTotal || m.title.includes('Total')) return <FileText size={18} color="#2563EB" />;
     if (m.isPending || m.title.includes('Pending')) return <Clock size={18} color="#D97706" />;
     if (m.isApproved || m.title.includes('Approved')) return <CheckCircle2 size={18} color="#059669" />;
-    if (m.isInProgress || m.title.includes('Progress')) return <RotateCw size={18} color="#7C3AED" />;
+    if (m.isInProgress || m.isImplemented || m.title.includes('Progress') || m.title.includes('Implemented')) return <RotateCw size={18} color="#7C3AED" />;
     return <XCircle size={18} color="#DC2626" />;
   };
 
@@ -49,10 +51,12 @@ function DashboardPage({ onNavigate, user }) {
       {/* Page Header */}
       <div>
         <h1 style={{ fontSize: '1.45rem', fontWeight: 800, color: 'var(--text-primary)', lineHeight: 1.2 }}>
-          Change Overview
+          {isOrgDashboard ? 'Organization Dashboard' : 'Change Overview'}
         </h1>
         <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginTop: '0.2rem' }}>
-          Snapshot across all active and historical change requests · updated just now
+          {isOrgDashboard
+            ? 'Overall company-wide change request metrics and analytics · updated just now'
+            : 'Snapshot across your submitted change requests · updated just now'}
         </p>
       </div>
 
@@ -67,7 +71,8 @@ function DashboardPage({ onNavigate, user }) {
             'Total Change Requests': 'All',
             'Pending Approval': 'Pending',
             'Approved': 'Approved',
-            'In Progress': 'In progress',
+            'In Progress': 'Implemented',
+            'Implemented': 'Implemented',
             'Rejected': 'Rejected',
             'Drafts': 'Draft'
           };
@@ -75,7 +80,7 @@ function DashboardPage({ onNavigate, user }) {
           return (
             <div
               key={idx}
-              onClick={() => onNavigate && onNavigate('My Requests', { filter: targetFilter })}
+              onClick={() => onNavigate && onNavigate(isOrgDashboard ? 'Organization worklist' : 'My Requests', { filter: targetFilter })}
               style={{
                 backgroundColor: 'var(--card-bg)',
                 border: '1px solid var(--border-color)',
@@ -267,11 +272,7 @@ function DashboardPage({ onNavigate, user }) {
         </div>
       );
     })()}
-
       </div>
-
-      {/* Bottom Table: Recent Change Requests */}
-      <RecentChangeRequests onNavigate={onNavigate} user={user} />
 
     </div>
   );

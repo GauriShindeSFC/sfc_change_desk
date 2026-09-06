@@ -9,7 +9,6 @@ import { Op } from 'sequelize';
 import { sequelize, Role, User, ChangeManagerCategory } from './models/index.js';
 import { roles } from './data/seed.js';
 import { verifyMailTransport } from './services/mailService.js';
-import { initScheduler } from './services/schedulerService.js';
 
 const app = express();
 const PORT = process.env.PORT || 5001;
@@ -49,21 +48,27 @@ const syncRolesInDb = async () => {
       await Role.upsert(r).catch(() => {});
     }
 
+    // Ensure all seeded users are Active by default (prevent accidental lockout/inactivity)
+    await User.update({ status: 'Active' }, { where: { status: ['Inactive', 'Disabled', 'disabled', 'inactive'] } }).catch(() => {});
+    await User.update({ status: 'Active', roleId: 'role-3' }, { where: { id: 'usr-5' } }).catch(() => {});
+
     // Remap any orphaned users missing a roleId to role-4 (Requester - least privileged)
     await User.update({ roleId: 'role-4' }, { where: { roleId: null } }).catch(() => {});
 
-    // Ensure default category assignments exist for Change Managers if empty
-    const cmCatCount = await ChangeManagerCategory.count().catch(() => 0);
-    if (cmCatCount === 0) {
-      const defaultAssignments = [
-        { id: 'cmc-usr-1-cat-srv', userId: 'usr-1', categoryId: 'cat-srv' },
-        { id: 'cmc-usr-1-cat-net', userId: 'usr-1', categoryId: 'cat-net' },
-        { id: 'cmc-usr-1-cat-acc', userId: 'usr-1', categoryId: 'cat-acc' },
-        { id: 'cmc-usr-1-cat-asset', userId: 'usr-1', categoryId: 'cat-asset' }
-      ];
-      for (const item of defaultAssignments) {
-        await ChangeManagerCategory.upsert(item).catch(() => {});
-      }
+    // Ensure default category assignments exist for Change Managers
+    const defaultAssignments = [
+      { id: 'cmc-usr-1-cat-srv', userId: 'usr-1', categoryId: 'cat-srv' },
+      { id: 'cmc-usr-1-cat-net', userId: 'usr-1', categoryId: 'cat-net' },
+      { id: 'cmc-usr-1-cat-acc', userId: 'usr-1', categoryId: 'cat-acc' },
+      { id: 'cmc-usr-1-cat-asset', userId: 'usr-1', categoryId: 'cat-asset' },
+      { id: 'cmc-usr-5-cat-srv', userId: 'usr-5', categoryId: 'cat-srv' },
+      { id: 'cmc-usr-5-cat-net', userId: 'usr-5', categoryId: 'cat-net' },
+      { id: 'cmc-usr-5-cat-acc', userId: 'usr-5', categoryId: 'cat-acc' },
+      { id: 'cmc-usr-5-cat-sec', userId: 'usr-5', categoryId: 'cat-sec' },
+      { id: 'cmc-usr-5-cat-asset', userId: 'usr-5', categoryId: 'cat-asset' }
+    ];
+    for (const item of defaultAssignments) {
+      await ChangeManagerCategory.upsert(item).catch(() => {});
     }
     console.log('[ChangeDesk Backend] Synced 4 system roles and category assignments in database');
   } catch (syncErr) {
@@ -84,7 +89,6 @@ const start = async () => {
   }
 
   await verifyMailTransport();
-  initScheduler();
 
   app.listen(PORT, () => {
     console.log(`[ChangeDesk Backend] Server running at http://localhost:${PORT} (env: ${NODE_ENV})`);

@@ -72,13 +72,19 @@ function Header({
     return () => clearInterval(interval);
   }, []);
 
-  // Mark all notifications as read and clear inbox history
+  // Mark all notifications as read
   const handleMarkAllRead = async () => {
     try {
       const res = await apiFetch('/notifications/mark-all-read', { method: 'PATCH' });
       if (res.ok) {
-        setNotifications([]);
-        setUnreadCount(0);
+        const body = await res.json();
+        if (body.data && Array.isArray(body.data)) {
+          setNotifications(body.data);
+          setUnreadCount(body.unreadCount || 0);
+        } else {
+          setNotifications(prev => prev.map(n => ({ ...n, isRead: true })));
+          setUnreadCount(0);
+        }
       }
     } catch (err) {
       console.warn('Failed to mark all as read:', err);
@@ -88,9 +94,20 @@ function Header({
   const handleNotifClick = async (notif) => {
     try {
       if (!notif.isRead) {
-        await apiFetch(`/notifications/${notif.id}/read`, { method: 'PATCH' });
-        setNotifications(prev => prev.map(n => n.id === notif.id ? { ...n, isRead: true } : n));
-        setUnreadCount(prev => Math.max(0, prev - 1));
+        const res = await apiFetch(`/notifications/${notif.id}/read`, { method: 'PATCH' });
+        if (res.ok) {
+          const body = await res.json();
+          if (body.data && Array.isArray(body.data)) {
+            setNotifications(body.data);
+            setUnreadCount(body.unreadCount || 0);
+          } else {
+            setNotifications(prev => prev.map(n => n.id === notif.id ? { ...n, isRead: true } : n));
+            setUnreadCount(prev => Math.max(0, prev - 1));
+          }
+        } else {
+          setNotifications(prev => prev.map(n => n.id === notif.id ? { ...n, isRead: true } : n));
+          setUnreadCount(prev => Math.max(0, prev - 1));
+        }
       }
     } catch (err) {
       console.warn('Failed to mark notification as read:', err);
@@ -232,9 +249,6 @@ function Header({
           <button
             type="button"
             onClick={() => {
-              if (showNotifMenu) {
-                handleMarkAllRead();
-              }
               setShowNotifMenu((prev) => !prev);
               setShowProfileMenu(false);
             }}
