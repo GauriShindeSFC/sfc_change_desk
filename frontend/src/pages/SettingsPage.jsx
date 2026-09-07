@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Plus, X, Download } from 'lucide-react';
+import FilterBar from '../components/ui/FilterBar';
 import { apiFetch } from '../lib/apiFetch';
 
 function SettingsPage({ user }) {
@@ -334,7 +335,7 @@ function SettingsPage({ user }) {
   if (!isSuperAdmin) {
     return (
       <div style={{ padding: '2rem', textAlign: 'center', backgroundColor: 'var(--card-bg)', border: '1px solid var(--border-color)', borderRadius: '12px' }}>
-        <h2 style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--text-primary)', marginBottom: '0.5rem' }}>Access Restricted</h2>
+        <h2 style={{ fontSize: '1.25rem', fontWeight: 500, color: 'var(--text-primary)', marginBottom: '0.5rem' }}>Access Restricted</h2>
         <p style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>Settings and user management are accessible to Super Admin users only.</p>
       </div>
     );
@@ -346,7 +347,7 @@ function SettingsPage({ user }) {
       {/* Header Row */}
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: '1rem' }}>
         <div>
-          <h1 style={{ fontSize: '1.45rem', fontWeight: 800, color: 'var(--text-primary)', lineHeight: 1.2 }}>
+          <h1 style={{ fontSize: '1.45rem', fontWeight: 700, color: 'var(--text-primary)', lineHeight: 1.2 }}>
             Settings
           </h1>
           <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginTop: '0.2rem' }}>
@@ -360,17 +361,17 @@ function SettingsPage({ user }) {
             onClick={() => setIsInviteModalOpen(true)}
             style={{
               padding: '0.55rem 1.1rem',
-              backgroundColor: '#0D9488',
+              backgroundColor: 'var(--brand-primary)',
               color: '#FFFFFF',
               border: 'none',
               borderRadius: '8px',
               fontSize: '0.85rem',
-              fontWeight: 700,
+              fontWeight: 500,
               cursor: 'pointer',
               display: 'inline-flex',
               alignItems: 'center',
               gap: '0.4rem',
-              boxShadow: '0 1px 3px rgba(13, 148, 136, 0.2)'
+              boxShadow: '0 1px 3px rgba(0, 0, 0, 0.2)'
             }}
           >
             <Plus size={16} />
@@ -437,12 +438,12 @@ function SettingsPage({ user }) {
               onClick={() => handleTabChange(tab.id)}
               style={{
                 padding: '0.45rem 1.1rem',
-                borderRadius: '99px',
+                borderRadius: 'var(--radius-lg)',
                 border: 'none',
                 backgroundColor: isActive ? '#10172A' : 'transparent',
                 color: isActive ? '#FFFFFF' : 'var(--text-secondary)',
                 fontSize: '0.85rem',
-                fontWeight: isActive ? 700 : 500,
+                fontWeight: 500,
                 cursor: 'pointer'
               }}
             >
@@ -457,7 +458,7 @@ function SettingsPage({ user }) {
         <div style={{ backgroundColor: 'var(--card-bg)', border: '1px solid var(--border-color)', borderRadius: '12px', overflow: 'hidden', boxShadow: '0 1px 3px rgba(16, 21, 30, 0.04)' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
             <thead>
-              <tr style={{ backgroundColor: 'var(--input-bg)', color: 'var(--text-secondary)', fontSize: '0.6875rem', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', borderBottom: '1px solid var(--border-color)' }}>
+              <tr style={{ backgroundColor: 'var(--input-bg)', color: 'var(--text-secondary)', fontSize: '0.6875rem', fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', borderBottom: '1px solid var(--border-color)' }}>
                 <th style={{ padding: '0.75rem 0.85rem' }}>USER</th>
                 <th style={{ padding: '0.75rem 0.85rem' }}>EMAIL ID</th>
                 <th style={{ padding: '0.75rem 0.85rem' }}>ROLE</th>
@@ -468,15 +469,15 @@ function SettingsPage({ user }) {
             <tbody>
               {users.map((u, idx) => (
                 <tr key={u.id} style={{ borderBottom: idx === users.length - 1 ? 'none' : '1px solid var(--border-color)' }}>
-                  <td style={{ padding: '0.75rem 0.85rem', fontSize: '0.875rem', fontWeight: 700, color: 'var(--text-primary)' }}>{u.name}</td>
+                  <td style={{ padding: '0.75rem 0.85rem', fontSize: '0.875rem', fontWeight: 500, color: 'var(--text-primary)' }}>{u.name}</td>
                   <td style={{ padding: '0.75rem 0.85rem', fontSize: '0.825rem', color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)' }}>{u.email}</td>
                   <td style={{ padding: '0.75rem 0.85rem', fontSize: '0.825rem', color: 'var(--text-primary)', fontWeight: 600 }}>{u.role}</td>
                   <td style={{ padding: '0.75rem 0.85rem' }}>
                     <span style={{
                       padding: '0.2rem 0.55rem',
-                      borderRadius: '99px',
+                      borderRadius: 'var(--radius-lg)',
                       fontSize: '0.75rem',
-                      fontWeight: 700,
+                      fontWeight: 500,
                       backgroundColor: u.status === 'Enabled' ? '#D1FAE5' : 'var(--input-bg)',
                       color: u.status === 'Enabled' ? '#059669' : 'var(--text-secondary)'
                     }}>
@@ -491,7 +492,7 @@ function SettingsPage({ user }) {
                       style={{
                         background: 'none',
                         border: 'none',
-                        color: isRequester ? 'var(--text-secondary)' : '#0D9488',
+                        color: isRequester ? 'var(--text-secondary)' : 'var(--brand-primary)',
                         fontSize: '0.8rem',
                         fontWeight: 600,
                         cursor: isRequester ? 'not-allowed' : 'pointer',
@@ -513,35 +514,18 @@ function SettingsPage({ user }) {
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
           
           {/* Audit Sub-Filter Pills Bar */}
-          <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-            {auditFilters.map(af => {
-              const isSelected = auditFilter === af;
-              return (
-                <button
-                  key={af}
-                  onClick={() => setAuditFilter(af)}
-                  style={{
-                    padding: '0.4rem 0.95rem',
-                    borderRadius: '99px',
-                    border: isSelected ? 'none' : '1px solid var(--border-color)',
-                    backgroundColor: isSelected ? '#10172A' : 'var(--card-bg)',
-                    color: isSelected ? '#FFFFFF' : 'var(--text-primary)',
-                    fontSize: '0.825rem',
-                    fontWeight: isSelected ? 700 : 500,
-                    cursor: 'pointer'
-                  }}
-                >
-                  {af}
-                </button>
-              );
-            })}
-          </div>
+          <FilterBar
+            variant="inline"
+            tabs={auditFilters.map((af) => ({ id: af, label: af }))}
+            activeTab={auditFilter}
+            onTabChange={setAuditFilter}
+          />
 
           {/* Audit Logs Table */}
           <div style={{ backgroundColor: 'var(--card-bg)', border: '1px solid var(--border-color)', borderRadius: '12px', overflow: 'hidden', boxShadow: '0 1px 3px rgba(16, 21, 30, 0.04)' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
               <thead>
-                <tr style={{ backgroundColor: 'var(--input-bg)', color: 'var(--text-secondary)', fontSize: '0.6875rem', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', borderBottom: '1px solid var(--border-color)' }}>
+                <tr style={{ backgroundColor: 'var(--input-bg)', color: 'var(--text-secondary)', fontSize: '0.6875rem', fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', borderBottom: '1px solid var(--border-color)' }}>
                   <th style={{ padding: '0.75rem 1rem' }}>TIMESTAMP</th>
                   <th style={{ padding: '0.75rem 1rem' }}>ACTOR</th>
                   <th style={{ padding: '0.75rem 1rem' }}>ACTION</th>
@@ -555,7 +539,7 @@ function SettingsPage({ user }) {
                     <td style={{ padding: '0.85rem 1rem', fontSize: '0.825rem', color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)' }}>
                       {log.timestamp}
                     </td>
-                    <td style={{ padding: '0.85rem 1rem', fontSize: '0.875rem', fontWeight: 700, color: 'var(--text-primary)' }}>
+                    <td style={{ padding: '0.85rem 1rem', fontSize: '0.875rem', fontWeight: 500, color: 'var(--text-primary)' }}>
                       {log.actor}
                     </td>
                     <td style={{ padding: '0.85rem 1rem', fontSize: '0.835rem', color: 'var(--text-primary)', fontWeight: 600 }}>
@@ -607,7 +591,7 @@ function SettingsPage({ user }) {
             {/* Modal Header */}
             <div style={{ padding: '1.25rem 1.75rem 0.75rem 1.75rem', display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', borderBottom: '1px solid var(--border-color)' }}>
               <div>
-                <h2 style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--text-primary)', margin: 0, lineHeight: 1.3 }}>
+                <h2 style={{ fontSize: '1.25rem', fontWeight: 500, color: 'var(--text-primary)', margin: 0, lineHeight: 1.3 }}>
                   Invite User
                 </h2>
                 <p style={{ fontSize: '0.825rem', color: 'var(--text-secondary)', margin: 0, marginTop: '0.25rem' }}>
@@ -625,7 +609,7 @@ function SettingsPage({ user }) {
               {/* Full name & Email ID 2-Col Grid */}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                 <div>
-                  <label style={{ display: 'block', fontSize: '0.825rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '0.4rem' }}>
+                  <label style={{ display: 'block', fontSize: '0.825rem', fontWeight: 500, color: 'var(--text-primary)', marginBottom: '0.4rem' }}>
                     Full name
                   </label>
                   <input
@@ -648,7 +632,7 @@ function SettingsPage({ user }) {
                 </div>
 
                 <div>
-                  <label style={{ display: 'block', fontSize: '0.825rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '0.4rem' }}>
+                  <label style={{ display: 'block', fontSize: '0.825rem', fontWeight: 500, color: 'var(--text-primary)', marginBottom: '0.4rem' }}>
                     Email ID
                   </label>
                   <input
@@ -673,7 +657,7 @@ function SettingsPage({ user }) {
 
               {/* Employee ID Input */}
               <div style={{ marginBottom: '1.25rem' }}>
-                <label style={{ display: 'block', fontSize: '0.825rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '0.4rem' }}>
+                <label style={{ display: 'block', fontSize: '0.825rem', fontWeight: 500, color: 'var(--text-primary)', marginBottom: '0.4rem' }}>
                   Employee ID
                 </label>
                 <input
@@ -697,7 +681,7 @@ function SettingsPage({ user }) {
               {/* Role Select */}
               <div style={{ marginBottom: '1.25rem' }}>
                   <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.35rem', marginBottom: '0.4rem' }}>
-                    <label style={{ fontSize: '0.825rem', fontWeight: 700, color: 'var(--text-primary)' }}>
+                    <label style={{ fontSize: '0.825rem', fontWeight: 500, color: 'var(--text-primary)' }}>
                       Role
                     </label>
                     <span style={{ fontSize: '0.725rem', color: 'var(--text-secondary)' }}>defined under Roles</span>
@@ -719,13 +703,14 @@ function SettingsPage({ user }) {
                     <option value="Super Admin">Super Admin</option>
                     <option value="Admin">Admin</option>
                     <option value="Change Manager">Change Manager</option>
+                    <option value="Requester">Requester</option>
                   </select>
                 </div>
 
               {/* Dynamic Category Assignment Dropdown for Change Manager */}
               {newUser.role === 'Change Manager' && (
                 <div style={{ marginBottom: '1.25rem' }}>
-                  <label style={{ display: 'block', fontSize: '0.825rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '0.4rem' }}>
+                  <label style={{ display: 'block', fontSize: '0.825rem', fontWeight: 500, color: 'var(--text-primary)', marginBottom: '0.4rem' }}>
                     Appointed Categories (Change Manager) *
                   </label>
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem', backgroundColor: 'var(--input-bg)', padding: '0.75rem', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
@@ -754,7 +739,7 @@ function SettingsPage({ user }) {
 
               {/* Status Selector */}
               <div>
-                <label style={{ display: 'block', fontSize: '0.825rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '0.4rem' }}>
+                <label style={{ display: 'block', fontSize: '0.825rem', fontWeight: 500, color: 'var(--text-primary)', marginBottom: '0.4rem' }}>
                   Status
                 </label>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
@@ -768,11 +753,11 @@ function SettingsPage({ user }) {
                         style={{
                           padding: '0.65rem',
                           borderRadius: '8px',
-                          border: isSelected ? '1px solid #0D9488' : '1px solid var(--border-color)',
+                          border: isSelected ? '1px solid var(--brand-primary)' : '1px solid var(--border-color)',
                           backgroundColor: isSelected ? '#E6F4F1' : 'var(--card-bg)',
-                          color: isSelected ? '#0D9488' : 'var(--text-primary)',
+                          color: isSelected ? 'var(--brand-primary)' : 'var(--text-primary)',
                           fontSize: '0.85rem',
-                          fontWeight: isSelected ? 700 : 500,
+                          fontWeight: 500,
                           cursor: 'pointer'
                         }}
                       >
@@ -806,14 +791,14 @@ function SettingsPage({ user }) {
                   type="submit"
                   style={{
                     padding: '0.65rem 1.35rem',
-                    backgroundColor: '#0D9488',
+                    backgroundColor: 'var(--brand-primary)',
                     color: '#FFFFFF',
                     border: 'none',
                     borderRadius: '8px',
                     fontSize: '0.85rem',
-                    fontWeight: 700,
+                    fontWeight: 500,
                     cursor: 'pointer',
-                    boxShadow: '0 1px 3px rgba(13, 148, 136, 0.2)'
+                    boxShadow: '0 1px 3px rgba(0, 0, 0, 0.2)'
                   }}
                 >
                   Save user
@@ -856,7 +841,7 @@ function SettingsPage({ user }) {
             {/* Header */}
             <div style={{ padding: '1.25rem 1.75rem 0.75rem 1.75rem', display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', borderBottom: '1px solid var(--border-color)' }}>
               <div>
-                <h2 style={{ fontSize: '1.35rem', fontWeight: 800, color: 'var(--text-primary)', margin: 0 }}>
+                <h2 style={{ fontSize: '1.35rem', fontWeight: 500, color: 'var(--text-primary)', margin: 0 }}>
                   Edit User
                 </h2>
                 <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginTop: '0.25rem' }}>
@@ -876,7 +861,7 @@ function SettingsPage({ user }) {
               {/* Row 1: Full name & Employee ID */}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                 <div>
-                  <label style={{ display: 'block', fontSize: '0.825rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '0.4rem' }}>
+                  <label style={{ display: 'block', fontSize: '0.825rem', fontWeight: 500, color: 'var(--text-primary)', marginBottom: '0.4rem' }}>
                     Full name
                   </label>
                   <input
@@ -896,7 +881,7 @@ function SettingsPage({ user }) {
                   />
                 </div>
                 <div>
-                  <label style={{ display: 'block', fontSize: '0.825rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '0.4rem' }}>
+                  <label style={{ display: 'block', fontSize: '0.825rem', fontWeight: 500, color: 'var(--text-primary)', marginBottom: '0.4rem' }}>
                     Employee ID
                   </label>
                   <input
@@ -920,7 +905,7 @@ function SettingsPage({ user }) {
               {/* Role Select */}
               <div style={{ marginBottom: '1.25rem' }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.4rem' }}>
-                  <label style={{ fontSize: '0.825rem', fontWeight: 700, color: 'var(--text-primary)' }}>Role</label>
+                  <label style={{ fontSize: '0.825rem', fontWeight: 500, color: 'var(--text-primary)' }}>Role</label>
                   <span style={{ fontSize: '0.725rem', color: 'var(--text-secondary)' }}>defined under Roles</span>
                 </div>
                   <select
@@ -947,7 +932,7 @@ function SettingsPage({ user }) {
               {/* Dynamic Category Assignment Dropdown for Change Manager */}
               {editingUser.role === 'Change Manager' && (
                 <div style={{ marginBottom: '1.25rem' }}>
-                  <label style={{ display: 'block', fontSize: '0.825rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '0.4rem' }}>
+                  <label style={{ display: 'block', fontSize: '0.825rem', fontWeight: 500, color: 'var(--text-primary)', marginBottom: '0.4rem' }}>
                     Appointed Categories (Change Manager) *
                   </label>
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem', backgroundColor: 'var(--input-bg)', padding: '0.75rem', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
@@ -976,7 +961,7 @@ function SettingsPage({ user }) {
 
               {/* Status Section */}
               <div>
-                <label style={{ display: 'block', fontSize: '0.825rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '0.5rem' }}>
+                <label style={{ display: 'block', fontSize: '0.825rem', fontWeight: 500, color: 'var(--text-primary)', marginBottom: '0.5rem' }}>
                   Status
                 </label>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
@@ -989,7 +974,7 @@ function SettingsPage({ user }) {
                       border: editingUser.status === 'Enabled' ? '1.5px solid #059669' : '1px solid var(--border-color)',
                       backgroundColor: editingUser.status === 'Enabled' ? '#E6F4EA' : 'var(--input-bg)',
                       color: editingUser.status === 'Enabled' ? '#059669' : 'var(--text-secondary)',
-                      fontWeight: 700,
+                      fontWeight: 500,
                       fontSize: '0.85rem',
                       cursor: 'pointer'
                     }}
@@ -1005,7 +990,7 @@ function SettingsPage({ user }) {
                       border: editingUser.status === 'Disabled' ? '1.5px solid #DC2626' : '1px solid var(--border-color)',
                       backgroundColor: editingUser.status === 'Disabled' ? '#FEE2E2' : 'var(--input-bg)',
                       color: editingUser.status === 'Disabled' ? '#DC2626' : 'var(--text-secondary)',
-                      fontWeight: 700,
+                      fontWeight: 500,
                       fontSize: '0.85rem',
                       cursor: 'pointer'
                     }}
@@ -1037,12 +1022,12 @@ function SettingsPage({ user }) {
                   type="submit"
                   style={{
                     padding: '0.6rem 1.25rem',
-                    backgroundColor: '#0D9488',
+                    backgroundColor: 'var(--brand-primary)',
                     color: '#FFFFFF',
                     border: 'none',
                     borderRadius: '8px',
                     fontSize: '0.85rem',
-                    fontWeight: 700,
+                    fontWeight: 500,
                     cursor: 'pointer'
                   }}
                 >

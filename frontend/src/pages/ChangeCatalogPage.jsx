@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Plus, X, ArrowRight } from 'lucide-react';
+import FilterBar from '../components/ui/FilterBar';
 import { apiFetch } from '../lib/apiFetch';
 
 function ChangeCatalogPage({ onNavigate, searchQuery = '', user, initialData }) {
@@ -206,7 +207,7 @@ function ChangeCatalogPage({ onNavigate, searchQuery = '', user, initialData }) 
       {/* Header Row */}
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: '1rem' }}>
         <div>
-          <h1 style={{ fontSize: '1.45rem', fontWeight: 800, color: 'var(--text-primary)', lineHeight: 1.2 }}>
+          <h1 style={{ fontSize: '1.45rem', fontWeight: 700, color: 'var(--text-primary)', lineHeight: 1.2 }}>
             Change Catalog
           </h1>
           <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginTop: '0.2rem' }}>
@@ -243,7 +244,7 @@ function ChangeCatalogPage({ onNavigate, searchQuery = '', user, initialData }) 
               borderRadius: '6px',
               padding: '0.35rem 0.75rem',
               fontSize: '0.775rem',
-              fontWeight: 700,
+              fontWeight: 500,
               cursor: 'pointer',
               whiteSpace: 'nowrap'
             }}
@@ -254,29 +255,12 @@ function ChangeCatalogPage({ onNavigate, searchQuery = '', user, initialData }) 
       )}
 
       {/* Filter Category Pills */}
-      <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-        {categories.map(cat => {
-          const isActive = activeCategory === cat;
-          return (
-            <button
-              key={cat}
-              onClick={() => setActiveCategory(cat)}
-              style={{
-                padding: '0.4rem 0.85rem',
-                borderRadius: '99px',
-                border: '1px solid var(--border-color)',
-                backgroundColor: isActive ? '#0D9488' : 'var(--card-bg)',
-                color: isActive ? '#FFFFFF' : 'var(--text-primary)',
-                fontSize: '0.8rem',
-                fontWeight: isActive ? 700 : 500,
-                cursor: 'pointer'
-              }}
-            >
-              {cat}
-            </button>
-          );
-        })}
-      </div>
+      <FilterBar
+        variant="inline"
+        tabs={categories.map((cat) => ({ id: cat, label: cat }))}
+        activeTab={activeCategory}
+        onTabChange={setActiveCategory}
+      />
 
       {/* Catalog Cards 3-Col Grid */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: '1.25rem' }}>
@@ -310,7 +294,7 @@ function ChangeCatalogPage({ onNavigate, searchQuery = '', user, initialData }) 
                 <Plus size={22} color={item.iconColor || '#2563EB'} strokeWidth={2.2} />
               </div>
 
-              <h3 style={{ fontSize: '1.05rem', fontWeight: 800, color: 'var(--text-primary)', marginBottom: '0.45rem', lineHeight: 1.3 }}>
+              <h3 style={{ fontSize: '1.05rem', fontWeight: 500, color: 'var(--text-primary)', marginBottom: '0.45rem', lineHeight: 1.3 }}>
                 {item.title}
               </h3>
               <p style={{ fontSize: '0.825rem', color: 'var(--text-secondary)', lineHeight: 1.45, marginBottom: '1.25rem' }}>
@@ -321,7 +305,7 @@ function ChangeCatalogPage({ onNavigate, searchQuery = '', user, initialData }) 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingTop: '0.75rem', borderTop: '1px solid var(--border-color)' }}>
                 <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', fontWeight: 500 }}>
-                  SLA <strong style={{ color: 'var(--text-primary)', fontWeight: 700, marginLeft: '0.2rem' }}>{item.sla}</strong>
+                  SLA <strong style={{ color: 'var(--text-primary)', fontWeight: 500, marginLeft: '0.2rem' }}>{item.sla}</strong>
                 </span>
 
                 <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}>
@@ -338,7 +322,7 @@ function ChangeCatalogPage({ onNavigate, searchQuery = '', user, initialData }) 
                       />
                     ))}
                   </div>
-                  <span style={{ fontSize: '0.775rem', fontWeight: 700, color: item.riskColor || '#D97706' }}>
+                  <span style={{ fontSize: '0.775rem', fontWeight: 500, color: item.riskColor || '#D97706' }}>
                     {item.risk || 'Medium'}
                   </span>
                 </div>
@@ -351,9 +335,9 @@ function ChangeCatalogPage({ onNavigate, searchQuery = '', user, initialData }) 
                 style={{
                   background: 'none',
                   border: 'none',
-                  color: '#0D9488',
+                  color: 'var(--brand-primary)',
                   fontSize: '0.85rem',
-                  fontWeight: 700,
+                  fontWeight: 500,
                   cursor: 'pointer',
                   display: 'inline-flex',
                   alignItems: 'center',

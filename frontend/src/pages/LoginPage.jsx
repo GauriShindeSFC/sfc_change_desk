@@ -1,13 +1,28 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Sun, Moon } from 'lucide-react';
 import { login } from '../lib/auth';
 
 export default function LoginPage({ onLogin, onLoginSuccess }) {
-  const [isDarkMode, setIsDarkMode] = useState(true);
+  const [isDarkMode, setIsDarkMode] = useState(() => {
+    try {
+      return localStorage.getItem('changedesk.theme') !== 'light';
+    } catch {
+      return true;
+    }
+  });
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+
+  useEffect(() => {
+    document.documentElement.classList.toggle('dark', isDarkMode);
+    try {
+      localStorage.setItem('changedesk.theme', isDarkMode ? 'dark' : 'light');
+    } catch {
+      /* ignore */
+    }
+  }, [isDarkMode]);
 
   const handleLogin = async (e) => {
     if (e) e.preventDefault();
@@ -31,14 +46,14 @@ export default function LoginPage({ onLogin, onLoginSuccess }) {
       flexDirection: 'column',
       alignItems: 'center',
       justifyContent: 'center',
-      backgroundColor: isDarkMode ? '#101520' : '#F8FAFC',
-      color: isDarkMode ? '#FFFFFF' : '#0F172A',
-      fontFamily: "'Inter', system-ui, -apple-system, sans-serif",
+      backgroundColor: 'var(--page-bg)',
+      color: 'var(--text-primary)',
+      fontFamily: 'var(--font-family)',
       padding: '1.5rem',
       position: 'relative'
     }}>
-      
-      {/* Top-Right Corner Theme Toggle Icon Button (Rounded Rectangle matching Screenshot 1) */}
+
+      {/* Top-Right Corner Theme Toggle Icon Button */}
       <button
         type="button"
         onClick={() => setIsDarkMode(prev => !prev)}
@@ -49,15 +64,15 @@ export default function LoginPage({ onLogin, onLoginSuccess }) {
           right: '1.5rem',
           width: '44px',
           height: '44px',
-          borderRadius: '12px',
-          backgroundColor: isDarkMode ? 'rgba(255, 255, 255, 0.05)' : '#FFFFFF',
-          border: isDarkMode ? '1px solid rgba(255, 255, 255, 0.12)' : '1px solid #E2E8F0',
-          color: isDarkMode ? '#FFFFFF' : '#0F172A',
+          borderRadius: 'var(--radius-md)',
+          backgroundColor: 'var(--card-bg)',
+          border: '1px solid var(--border-color)',
+          color: 'var(--text-primary)',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
           cursor: 'pointer',
-          boxShadow: isDarkMode ? '0 2px 8px rgba(0, 0, 0, 0.2)' : '0 2px 8px rgba(0, 0, 0, 0.05)',
+          boxShadow: 'var(--shadow-soft)',
           outline: 'none'
         }}
       >
@@ -72,7 +87,7 @@ export default function LoginPage({ onLogin, onLoginSuccess }) {
         alignItems: 'center',
         gap: '1.5rem'
       }}>
-        
+
         {/* Company logo */}
         <div style={{ marginBottom: '0.75rem', display: 'flex', justifyContent: 'center' }}>
           <img
@@ -94,10 +109,10 @@ export default function LoginPage({ onLogin, onLoginSuccess }) {
           style={{
             width: '100%',
             padding: '0.85rem 1rem',
-            backgroundColor: isDarkMode ? 'rgba(255, 255, 255, 0.04)' : '#FFFFFF',
-            border: isDarkMode ? '1px solid rgba(255, 255, 255, 0.14)' : '1px solid #CBD5E1',
-            borderRadius: '10px',
-            color: isDarkMode ? '#FFFFFF' : '#0F172A',
+            backgroundColor: 'var(--card-bg)',
+            border: '1px solid var(--border-color)',
+            borderRadius: 'var(--radius-md)',
+            color: 'var(--text-primary)',
             fontSize: '0.925rem',
             fontWeight: 600,
             cursor: 'not-allowed',
@@ -106,7 +121,7 @@ export default function LoginPage({ onLogin, onLoginSuccess }) {
             alignItems: 'center',
             justifyContent: 'center',
             gap: '0.75rem',
-            boxShadow: isDarkMode ? '0 2px 6px rgba(0, 0, 0, 0.2)' : '0 1px 3px rgba(0, 0, 0, 0.08)'
+            boxShadow: 'var(--shadow-soft)'
           }}
         >
           {/* 4-Color Microsoft Square Icon */}
@@ -127,11 +142,11 @@ export default function LoginPage({ onLogin, onLoginSuccess }) {
           gap: '1rem',
           margin: '0.15rem 0'
         }}>
-          <div style={{ flex: 1, height: '1px', backgroundColor: isDarkMode ? 'rgba(255, 255, 255, 0.12)' : '#CBD5E1' }} />
-          <span style={{ fontSize: '0.725rem', fontWeight: 600, letterSpacing: '0.08em', color: isDarkMode ? '#64748B' : '#64748B', textTransform: 'uppercase' }}>
+          <div style={{ flex: 1, height: '1px', backgroundColor: 'var(--border-color)' }} />
+          <span style={{ fontSize: '0.725rem', fontWeight: 600, letterSpacing: '0.08em', color: 'var(--text-secondary)', textTransform: 'uppercase' }}>
             OR WITH EMAIL
           </span>
-          <div style={{ flex: 1, height: '1px', backgroundColor: isDarkMode ? 'rgba(255, 255, 255, 0.12)' : '#CBD5E1' }} />
+          <div style={{ flex: 1, height: '1px', backgroundColor: 'var(--border-color)' }} />
         </div>
 
         {/* Email + Password Sign-in Form */}
@@ -142,10 +157,10 @@ export default function LoginPage({ onLogin, onLoginSuccess }) {
               style={{
                 width: '100%',
                 padding: '0.6rem 0.85rem',
-                borderRadius: '10px',
-                backgroundColor: isDarkMode ? 'rgba(220, 38, 38, 0.12)' : '#FEF2F2',
-                border: '1px solid ' + (isDarkMode ? 'rgba(248, 113, 113, 0.4)' : '#FCA5A5'),
-                color: isDarkMode ? '#FCA5A5' : '#B91C1C',
+                borderRadius: 'var(--radius-md)',
+                backgroundColor: 'color-mix(in srgb, var(--error-color) 12%, transparent)',
+                border: '1px solid color-mix(in srgb, var(--error-color) 45%, transparent)',
+                color: 'var(--error-color)',
                 fontSize: '0.8rem',
                 fontWeight: 600,
                 textAlign: 'left'
@@ -165,11 +180,12 @@ export default function LoginPage({ onLogin, onLoginSuccess }) {
             style={{
               width: '100%',
               padding: '0.85rem 1rem',
-              backgroundColor: isDarkMode ? 'rgba(255, 255, 255, 0.04)' : '#FFFFFF',
-              border: isDarkMode ? '1px solid rgba(255, 255, 255, 0.14)' : '1px solid #CBD5E1',
-              borderRadius: '10px',
+              backgroundColor: 'var(--input-bg)',
+              border: '1px solid var(--border-color)',
+              borderRadius: 'var(--radius-md)',
               fontSize: '0.9rem',
-              color: isDarkMode ? '#FFFFFF' : '#0F172A',
+              fontFamily: 'var(--font-family)',
+              color: 'var(--text-primary)',
               outline: 'none'
             }}
           />
@@ -184,11 +200,12 @@ export default function LoginPage({ onLogin, onLoginSuccess }) {
             style={{
               width: '100%',
               padding: '0.85rem 1rem',
-              backgroundColor: isDarkMode ? 'rgba(255, 255, 255, 0.04)' : '#FFFFFF',
-              border: isDarkMode ? '1px solid rgba(255, 255, 255, 0.14)' : '1px solid #CBD5E1',
-              borderRadius: '10px',
+              backgroundColor: 'var(--input-bg)',
+              border: '1px solid var(--border-color)',
+              borderRadius: 'var(--radius-md)',
               fontSize: '0.9rem',
-              color: isDarkMode ? '#FFFFFF' : '#0F172A',
+              fontFamily: 'var(--font-family)',
+              color: 'var(--text-primary)',
               outline: 'none'
             }}
           />
@@ -199,15 +216,16 @@ export default function LoginPage({ onLogin, onLoginSuccess }) {
             style={{
               width: '100%',
               padding: '0.85rem 1rem',
-              backgroundColor: isDarkMode ? '#174052' : '#0D9488',
+              backgroundColor: 'var(--brand-primary)',
               color: '#FFFFFF',
               border: 'none',
-              borderRadius: '10px',
+              borderRadius: 'var(--radius-md)',
               fontSize: '0.95rem',
+              fontFamily: 'var(--font-family)',
               fontWeight: 700,
               cursor: isLoading ? 'not-allowed' : 'pointer',
               opacity: isLoading ? 0.7 : 1,
-              boxShadow: '0 2px 6px rgba(0, 0, 0, 0.2)'
+              boxShadow: 'var(--shadow-card)'
             }}
           >
             {isLoading ? 'Signing in…' : 'Sign in'}
@@ -217,7 +235,7 @@ export default function LoginPage({ onLogin, onLoginSuccess }) {
         {/* Footer Disclaimer */}
         <p style={{
           fontSize: '0.775rem',
-          color: isDarkMode ? '#64748B' : '#64748B',
+          color: 'var(--text-secondary)',
           textAlign: 'center',
           lineHeight: 1.45,
           margin: 0,
@@ -227,7 +245,7 @@ export default function LoginPage({ onLogin, onLoginSuccess }) {
           By continuing you agree to the terms of internal use. For access issues, contact your IT administrator.
         </p>
 
-        <p style={{ fontSize: '0.72rem', color: isDarkMode ? '#475569' : '#94A3B8', textAlign: 'center', margin: 0 }}>
+        <p style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', textAlign: 'center', margin: 0 }}>
           Demo: <strong>gauri.shinde@company.com</strong> · <strong>changedesk123</strong>
         </p>
 

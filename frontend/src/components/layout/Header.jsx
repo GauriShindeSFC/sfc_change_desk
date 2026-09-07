@@ -193,7 +193,7 @@ function Header({
               <span style={{ color: 'var(--text-secondary)', fontSize: '0.75rem' }}>/</span>
             </>
           )}
-          <span style={{ color: 'var(--text-primary)', fontWeight: 700 }}>
+          <span style={{ color: 'var(--text-primary)', fontWeight: 500 }}>
             {activeRoute}
           </span>
         </div>
@@ -265,7 +265,7 @@ function Header({
                   backgroundColor: '#DC2626',
                   color: '#FFFFFF',
                   fontSize: '0.65rem',
-                  fontWeight: 800,
+                  fontWeight: 500,
                   width: '16px',
                   height: '16px',
                   borderRadius: '50%',
@@ -310,7 +310,7 @@ function Header({
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                   <strong style={{ fontSize: '0.85rem', color: 'var(--text-primary)' }}>Notifications</strong>
                   {unreadCount > 0 && (
-                    <span style={{ fontSize: '0.7rem', backgroundColor: '#0D9488', color: '#FFF', padding: '0.1rem 0.4rem', borderRadius: '99px', fontWeight: 700 }}>
+                    <span style={{ fontSize: '0.7rem', backgroundColor: 'var(--brand-primary)', color: '#FFF', padding: '0.1rem 0.4rem', borderRadius: 'var(--radius-lg)', fontWeight: 500 }}>
                       {unreadCount} new
                     </span>
                   )}
@@ -319,7 +319,7 @@ function Header({
                   <button
                     type="button"
                     onClick={handleMarkAllRead}
-                    style={{ background: 'none', border: 'none', color: '#0D9488', fontSize: '0.75rem', fontWeight: 700, cursor: 'pointer' }}
+                    style={{ background: 'none', border: 'none', color: 'var(--brand-primary)', fontSize: '0.75rem', fontWeight: 500, cursor: 'pointer' }}
                   >
                     Mark all read
                   </button>
@@ -335,16 +335,16 @@ function Header({
                       style={{
                         padding: '0.75rem 1rem',
                         borderBottom: '1px solid var(--border-color)',
-                        backgroundColor: !n.isRead ? 'rgba(13, 148, 136, 0.05)' : 'transparent',
+                        backgroundColor: !n.isRead ? 'rgba(0, 0, 0, 0.05)' : 'transparent',
                         opacity: n.isStale ? 0.6 : 1,
                         cursor: 'pointer',
                         transition: 'background-color 0.15s ease'
                       }}
                     >
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.2rem' }}>
-                        <span style={{ fontSize: '0.775rem', fontWeight: 800, color: 'var(--text-primary)' }}>{n.title}</span>
+                        <span style={{ fontSize: '0.775rem', fontWeight: 500, color: 'var(--text-primary)' }}>{n.title}</span>
                         {n.isStale && (
-                          <span style={{ fontSize: '0.65rem', backgroundColor: 'var(--input-bg)', color: 'var(--text-secondary)', padding: '0.1rem 0.35rem', borderRadius: '4px', fontWeight: 700 }}>
+                          <span style={{ fontSize: '0.65rem', backgroundColor: 'var(--input-bg)', color: 'var(--text-secondary)', padding: '0.1rem 0.35rem', borderRadius: '4px', fontWeight: 500 }}>
                             Already handled
                           </span>
                         )}
@@ -383,7 +383,7 @@ function Header({
               alignItems: 'center',
               justifyContent: 'center',
               fontSize: '0.75rem',
-              fontWeight: 700,
+              fontWeight: 500,
               cursor: 'pointer',
               flexShrink: 0
             }}

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Clock, Check, X, RotateCw, Calendar } from 'lucide-react';
+import { Clock, Check, X, RotateCw } from 'lucide-react';
 import ChangeRequestModal from '../components/ui/ChangeRequestModal';
+import FilterBar, { initCustomDateRange } from '../components/ui/FilterBar';
 import { apiFetch } from '../lib/apiFetch';
 
 function MyWorklistPage({ onNavigate, searchQuery = '', user }) {
@@ -13,7 +14,7 @@ function MyWorklistPage({ onNavigate, searchQuery = '', user }) {
 
   const [items, setItems] = useState([]);
   const [selectedCr, setSelectedCr] = useState(null);
-  const [dateFilter, setDateFilter] = useState('overall');
+  const [dateFilter, setDateFilter] = useState('last_7_days');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -150,7 +151,7 @@ function MyWorklistPage({ onNavigate, searchQuery = '', user }) {
       {/* Header Row */}
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: '1rem' }}>
         <div>
-          <h1 style={{ fontSize: '1.45rem', fontWeight: 800, color: 'var(--text-primary)', lineHeight: 1.2 }}>
+          <h1 style={{ fontSize: '1.45rem', fontWeight: 700, color: 'var(--text-primary)', lineHeight: 1.2 }}>
             {roleName.includes('admin') ? 'Organization worklist' : 'My Worklist'}
           </h1>
           <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginTop: '0.2rem' }}>
@@ -184,7 +185,7 @@ function MyWorklistPage({ onNavigate, searchQuery = '', user }) {
                 <IconComp size={20} />
               </div>
               <div>
-                <div style={{ fontSize: '1.35rem', fontWeight: 800, color: 'var(--text-primary)', lineHeight: 1.1 }}>{card.count}</div>
+                <div style={{ fontSize: '1.35rem', fontWeight: 700, color: 'var(--text-primary)', lineHeight: 1.1 }}>{card.count}</div>
                 <div style={{ fontSize: '0.775rem', color: 'var(--text-secondary)', marginTop: '0.2rem', fontWeight: 600 }}>{card.title}</div>
               </div>
             </div>
@@ -193,119 +194,29 @@ function MyWorklistPage({ onNavigate, searchQuery = '', user }) {
       </div>
 
       {/* Status & Date Filter Pills (Under Metrics) */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.75rem', flexWrap: 'wrap', marginTop: '0.25rem', gap: '0.75rem' }}>
-        <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
-          {filterTabs.map(tab => (
-            <button
-              key={tab.id}
-              type="button"
-              onClick={() => setActiveFilter(tab.id)}
-              style={{
-                padding: '0.45rem 0.95rem',
-                backgroundColor: activeFilter === tab.id ? '#0D9488' : 'transparent',
-                color: activeFilter === tab.id ? '#FFFFFF' : 'var(--text-secondary)',
-                border: activeFilter === tab.id ? 'none' : '1px solid var(--border-color)',
-                borderRadius: '99px',
-                fontSize: '0.825rem',
-                fontWeight: 700,
-                cursor: 'pointer',
-                transition: 'all 0.15s ease'
-              }}
-            >
-              {tab.label}
-            </button>
-          ))}
-        </div>
-
-        {/* Time Range Filter Dropdown */}
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '0.4rem' }}>
-          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', backgroundColor: 'var(--card-bg)', border: '1px solid var(--border-color)', borderRadius: '8px', padding: '0.25rem 0.65rem' }}>
-            <Calendar size={14} style={{ color: 'var(--text-secondary)' }} />
-            <select
-              value={dateFilter}
-              onChange={(e) => {
-                const val = e.target.value;
-                setDateFilter(val);
-                if (val === 'custom') {
-                  const formatDate = (d) =>
-                    d.getFullYear() +
-                    '-' +
-                    String(d.getMonth() + 1).padStart(2, '0') +
-                    '-' +
-                    String(d.getDate()).padStart(2, '0');
-
-                  if (!startDate) {
-                    const d = new Date();
-                    d.setDate(d.getDate() - 7);
-                    setStartDate(formatDate(d));
-                  }
-                  if (!endDate) {
-                    setEndDate(formatDate(new Date()));
-                  }
-                }
-                setPage(1);
-              }}
-              style={{
-                backgroundColor: 'var(--card-bg)',
-                color: 'var(--text-primary)',
-                border: 'none',
-                fontSize: '0.8rem',
-                fontWeight: 700,
-                cursor: 'pointer',
-                outline: 'none',
-                padding: '0.2rem'
-              }}
-            >
-              <option value="overall" style={{ backgroundColor: 'var(--card-bg)', color: 'var(--text-primary)' }}>Overall</option>
-              <option value="last_7_days" style={{ backgroundColor: 'var(--card-bg)', color: 'var(--text-primary)' }}>7 Days</option>
-              <option value="this_month" style={{ backgroundColor: 'var(--card-bg)', color: 'var(--text-primary)' }}>This Month</option>
-              <option value="last_month" style={{ backgroundColor: 'var(--card-bg)', color: 'var(--text-primary)' }}>Last Month</option>
-              <option value="custom" style={{ backgroundColor: 'var(--card-bg)', color: 'var(--text-primary)' }}>Custom</option>
-            </select>
-          </div>
-
-          {dateFilter === 'custom' && (
-            <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}>
-              <input
-                type="date"
-                value={startDate}
-                onChange={(e) => { setStartDate(e.target.value); setPage(1); }}
-                style={{
-                  backgroundColor: 'var(--card-bg)',
-                  border: '1px solid var(--border-color)',
-                  borderRadius: '8px',
-                  padding: '0.25rem 0.5rem',
-                  fontSize: '0.775rem',
-                  color: 'var(--text-primary)',
-                  outline: 'none'
-                }}
-              />
-              <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>to</span>
-              <input
-                type="date"
-                value={endDate}
-                onChange={(e) => { setEndDate(e.target.value); setPage(1); }}
-                style={{
-                  backgroundColor: 'var(--card-bg)',
-                  border: '1px solid var(--border-color)',
-                  borderRadius: '8px',
-                  padding: '0.25rem 0.5rem',
-                  fontSize: '0.775rem',
-                  color: 'var(--text-primary)',
-                  outline: 'none'
-                }}
-              />
-            </div>
-          )}
-        </div>
-      </div>
+      <FilterBar
+        tabs={filterTabs}
+        activeTab={activeFilter}
+        onTabChange={setActiveFilter}
+        dateValue={dateFilter}
+        onDateChange={(val) => {
+          setDateFilter(val);
+          if (val === 'custom') {
+            initCustomDateRange({ startDate, endDate, setStartDate, setEndDate });
+          }
+        }}
+        startDate={startDate}
+        endDate={endDate}
+        onStartDateChange={setStartDate}
+        onEndDateChange={setEndDate}
+      />
 
       {/* Worklist Table */}
       <div style={{ backgroundColor: 'var(--card-bg)', border: '1px solid var(--border-color)', borderRadius: '12px', overflow: 'hidden', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
         <div style={{ overflowX: 'auto' }}>
           <table style={{ width: '100%', minWidth: '1100px', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.85rem' }}>
             <thead>
-              <tr style={{ backgroundColor: 'var(--input-bg)', borderBottom: '1px solid var(--border-color)', color: 'var(--text-secondary)', fontSize: '0.75rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+              <tr style={{ backgroundColor: 'var(--input-bg)', borderBottom: '1px solid var(--border-color)', color: 'var(--text-secondary)', fontSize: '0.75rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                 <th style={{ padding: '0.9rem 1.1rem', minWidth: '100px', whiteSpace: 'nowrap' }}>CR ID</th>
                 <th style={{ padding: '0.9rem 1.1rem', minWidth: '280px' }}>Title</th>
                 <th style={{ padding: '0.9rem 1.1rem', minWidth: '180px' }}>Category</th>
@@ -331,10 +242,10 @@ function MyWorklistPage({ onNavigate, searchQuery = '', user }) {
 
                   return (
                     <tr key={item.id} style={{ borderBottom: '1px solid var(--border-color)', transition: 'background-color 0.15s ease' }}>
-                      <td style={{ padding: '1rem 1.1rem', fontWeight: 800, color: 'var(--text-primary)', fontFamily: 'var(--font-mono)', whiteSpace: 'nowrap' }}>
+                      <td style={{ padding: '1rem 1.1rem', fontWeight: 500, color: 'var(--text-primary)', fontFamily: 'var(--font-mono)', whiteSpace: 'nowrap' }}>
                         {item.id}
                       </td>
-                      <td style={{ padding: '1rem 1.1rem', fontWeight: 700, color: 'var(--text-primary)', minWidth: '280px' }}>
+                      <td style={{ padding: '1rem 1.1rem', fontWeight: 500, color: 'var(--text-primary)', minWidth: '280px' }}>
                         <span style={{ lineHeight: 1.4, color: 'var(--text-primary)', display: 'block' }}>{item.title}</span>
                       </td>
                       <td style={{ padding: '1rem 1.1rem', color: 'var(--text-secondary)', minWidth: '180px' }}>
@@ -342,7 +253,7 @@ function MyWorklistPage({ onNavigate, searchQuery = '', user }) {
                         {item.subCategory && <div style={{ fontSize: '0.775rem', color: 'var(--text-secondary)' }}>{item.subCategory}</div>}
                       </td>
                       <td style={{ padding: '1rem 1.1rem', color: 'var(--text-primary)', whiteSpace: 'nowrap' }}>
-                        <div style={{ fontWeight: 700, fontSize: '0.85rem', color: 'var(--text-primary)' }}>
+                        <div style={{ fontWeight: 500, fontSize: '0.85rem', color: 'var(--text-primary)' }}>
                           {displayName}
                         </div>
                         {emailVal && (
@@ -374,14 +285,14 @@ function MyWorklistPage({ onNavigate, searchQuery = '', user }) {
                               <button
                                 type="button"
                                 onClick={() => setSelectedCr(item)}
-                                style={{ padding: '0.4rem 0.8rem', backgroundColor: '#FEF2F2', color: '#DC2626', border: '1px solid #FCA5A5', borderRadius: '6px', fontSize: '0.8rem', fontWeight: 700, cursor: 'pointer' }}
+                                style={{ padding: '0.4rem 0.8rem', backgroundColor: '#FEF2F2', color: '#DC2626', border: '1px solid #FCA5A5', borderRadius: '6px', fontSize: '0.8rem', fontWeight: 500, cursor: 'pointer' }}
                               >
                                 Reject
                               </button>
                               <button
                                 type="button"
                                 onClick={() => handleAction(item.id, 'approve')}
-                                style={{ padding: '0.4rem 0.95rem', backgroundColor: '#0D9488', color: '#FFFFFF', border: 'none', borderRadius: '6px', fontSize: '0.8rem', fontWeight: 700, cursor: 'pointer', boxShadow: '0 1px 2px rgba(13, 148, 136, 0.2)' }}
+                                style={{ padding: '0.4rem 0.95rem', backgroundColor: 'var(--brand-primary)', color: '#FFFFFF', border: 'none', borderRadius: '6px', fontSize: '0.8rem', fontWeight: 500, cursor: 'pointer', boxShadow: '0 1px 2px rgba(0, 0, 0, 0.2)' }}
                               >
                                 Approve
                               </button>
@@ -390,16 +301,16 @@ function MyWorklistPage({ onNavigate, searchQuery = '', user }) {
                             <button
                               type="button"
                               onClick={() => handleAction(item.id, 'implement')}
-                              style={{ padding: '0.4rem 0.95rem', backgroundColor: '#0D9488', color: '#FFFFFF', border: 'none', borderRadius: '6px', fontSize: '0.8rem', fontWeight: 700, cursor: 'pointer', boxShadow: '0 1px 2px rgba(13, 148, 136, 0.2)' }}
+                              style={{ padding: '0.4rem 0.95rem', backgroundColor: 'var(--brand-primary)', color: '#FFFFFF', border: 'none', borderRadius: '6px', fontSize: '0.8rem', fontWeight: 500, cursor: 'pointer', boxShadow: '0 1px 2px rgba(0, 0, 0, 0.2)' }}
                             >
                               Implement
                             </button>
                           ) : (
                             <span style={{
                               padding: '0.3rem 0.65rem',
-                              borderRadius: '99px',
+                              borderRadius: 'var(--radius-lg)',
                               fontSize: '0.75rem',
-                              fontWeight: 700,
+                              fontWeight: 500,
                               backgroundColor: status === 'implemented' ? '#E0F2FE' : isItemApproved ? '#D1FAE5' : isItemRejected ? '#FEE2E2' : '#FEF3C7',
                               color: status === 'implemented' ? '#0284C7' : isItemApproved ? '#059669' : isItemRejected ? '#DC2626' : '#D97706'
                             }}>
@@ -415,7 +326,7 @@ function MyWorklistPage({ onNavigate, searchQuery = '', user }) {
                 <tr>
                   <td colSpan={8} style={{ padding: '2.5rem', textAlign: 'center', color: 'var(--text-secondary)' }}>
                     <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', fontWeight: 600, fontSize: '0.875rem' }}>
-                      <span style={{ display: 'inline-block', width: '16px', height: '16px', border: '2px solid var(--border-color)', borderTopColor: '#0D9488', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
+                      <span style={{ display: 'inline-block', width: '16px', height: '16px', border: '2px solid var(--border-color)', borderTopColor: 'var(--brand-primary)', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
                       <span>Loading worklist change requests...</span>
                     </div>
                   </td>

@@ -342,11 +342,11 @@ function ChangeRequestFormPage({ onNavigate, initialData, user }) {
           justifyContent: 'center',
           margin: '0 auto 1.25rem auto',
           fontSize: '1.75rem',
-          fontWeight: 800
+          fontWeight: 500
         }}>
           <Check size={28} />
         </div>
-        <h2 style={{ fontSize: '1.4rem', fontWeight: 800, color: 'var(--text-primary)', marginBottom: '0.5rem' }}>
+        <h2 style={{ fontSize: '1.4rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '0.5rem' }}>
           {isDraftSubmission ? 'Change Request Saved as Draft!' : 'Change Request Submitted Successfully!'}
         </h2>
         <p style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', maxWidth: '460px', margin: '0 auto 1.75rem auto' }}>
@@ -361,12 +361,12 @@ function ChangeRequestFormPage({ onNavigate, initialData, user }) {
             onClick={() => onNavigate('My Requests', { filter: isDraftSubmission ? 'Draft' : 'Pending' })}
             style={{
               padding: '0.65rem 1.35rem',
-              backgroundColor: '#0D9488',
+              backgroundColor: 'var(--brand-primary)',
               color: '#FFFFFF',
               border: 'none',
               borderRadius: '8px',
               fontSize: '0.85rem',
-              fontWeight: 700,
+              fontWeight: 500,
               cursor: 'pointer'
             }}
           >
@@ -389,7 +389,7 @@ function ChangeRequestFormPage({ onNavigate, initialData, user }) {
       {/* Top Header */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
         <div>
-          <h1 style={{ fontSize: '1.45rem', fontWeight: 800, color: 'var(--text-primary)', lineHeight: 1.2 }}>
+          <h1 style={{ fontSize: '1.45rem', fontWeight: 700, color: 'var(--text-primary)', lineHeight: 1.2 }}>
             Create Change Request
           </h1>
           <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginTop: '0.15rem' }}>
@@ -427,7 +427,7 @@ function ChangeRequestFormPage({ onNavigate, initialData, user }) {
         {/* Section 1: Employee Details */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <h3 style={{ fontSize: '1rem', fontWeight: 800, color: 'var(--text-primary)', margin: 0 }}>
+            <h3 style={{ fontSize: '1rem', fontWeight: 500, color: 'var(--text-primary)', margin: 0 }}>
               Employee Details
             </h3>
             <span style={{ fontSize: '0.775rem', fontWeight: 600, color: 'var(--text-secondary)' }}>
@@ -437,7 +437,7 @@ function ChangeRequestFormPage({ onNavigate, initialData, user }) {
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1.25rem' }}>
             <div>
-              <label style={{ display: 'block', fontSize: '0.825rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '0.4rem' }}>
+              <label style={{ display: 'block', fontSize: '0.825rem', fontWeight: 500, color: 'var(--text-primary)', marginBottom: '0.4rem' }}>
                 Employee name
               </label>
               <input
@@ -448,7 +448,7 @@ function ChangeRequestFormPage({ onNavigate, initialData, user }) {
               />
             </div>
             <div>
-              <label style={{ display: 'block', fontSize: '0.825rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '0.4rem' }}>
+              <label style={{ display: 'block', fontSize: '0.825rem', fontWeight: 500, color: 'var(--text-primary)', marginBottom: '0.4rem' }}>
                 Employee email
               </label>
               <input
@@ -460,7 +460,7 @@ function ChangeRequestFormPage({ onNavigate, initialData, user }) {
               />
             </div>
             <div>
-              <label style={{ display: 'block', fontSize: '0.825rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '0.4rem' }}>
+              <label style={{ display: 'block', fontSize: '0.825rem', fontWeight: 500, color: 'var(--text-primary)', marginBottom: '0.4rem' }}>
                 Employee ID
               </label>
               <input
@@ -472,7 +472,7 @@ function ChangeRequestFormPage({ onNavigate, initialData, user }) {
               />
             </div>
             <div>
-              <label style={{ display: 'block', fontSize: '0.825rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '0.4rem' }}>
+              <label style={{ display: 'block', fontSize: '0.825rem', fontWeight: 500, color: 'var(--text-primary)', marginBottom: '0.4rem' }}>
                 Location *
               </label>
               <select
@@ -488,7 +488,7 @@ function ChangeRequestFormPage({ onNavigate, initialData, user }) {
               </select>
             </div>
             <div>
-              <label style={{ display: 'block', fontSize: '0.825rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '0.4rem' }}>
+              <label style={{ display: 'block', fontSize: '0.825rem', fontWeight: 500, color: 'var(--text-primary)', marginBottom: '0.4rem' }}>
                 Manager Email *
               </label>
               <input
@@ -509,7 +509,7 @@ function ChangeRequestFormPage({ onNavigate, initialData, user }) {
         {/* Section 2: Change Details */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <h3 style={{ fontSize: '1rem', fontWeight: 800, color: 'var(--text-primary)', margin: 0 }}>
+            <h3 style={{ fontSize: '1rem', fontWeight: 500, color: 'var(--text-primary)', margin: 0 }}>
               Change Details
             </h3>
             <span style={{ fontSize: '0.775rem', fontWeight: 600, color: 'var(--text-secondary)' }}>
@@ -520,7 +520,7 @@ function ChangeRequestFormPage({ onNavigate, initialData, user }) {
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1.25rem' }}>
             {/* Change Title */}
             <div>
-              <label style={{ display: 'block', fontSize: '0.825rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '0.4rem' }}>
+              <label style={{ display: 'block', fontSize: '0.825rem', fontWeight: 500, color: 'var(--text-primary)', marginBottom: '0.4rem' }}>
                 Change title *
               </label>
               <input
@@ -544,7 +544,7 @@ function ChangeRequestFormPage({ onNavigate, initialData, user }) {
 
             {/* Category Dropdown */}
             <div>
-              <label style={{ display: 'block', fontSize: '0.825rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '0.4rem' }}>
+              <label style={{ display: 'block', fontSize: '0.825rem', fontWeight: 500, color: 'var(--text-primary)', marginBottom: '0.4rem' }}>
                 Category *
               </label>
               <select
@@ -571,7 +571,7 @@ function ChangeRequestFormPage({ onNavigate, initialData, user }) {
 
             {/* Sub-Category Dropdown */}
             <div>
-              <label style={{ display: 'block', fontSize: '0.825rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '0.4rem' }}>
+              <label style={{ display: 'block', fontSize: '0.825rem', fontWeight: 500, color: 'var(--text-primary)', marginBottom: '0.4rem' }}>
                 Sub-category *
               </label>
               <select
@@ -598,7 +598,7 @@ function ChangeRequestFormPage({ onNavigate, initialData, user }) {
 
             {/* Preferred Change Date */}
             <div>
-              <label style={{ display: 'block', fontSize: '0.825rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '0.4rem' }}>
+              <label style={{ display: 'block', fontSize: '0.825rem', fontWeight: 500, color: 'var(--text-primary)', marginBottom: '0.4rem' }}>
                 Preferred Change Date (Start Date)
               </label>
               <input
@@ -621,7 +621,7 @@ function ChangeRequestFormPage({ onNavigate, initialData, user }) {
             {/* Dynamic Fields Renderer */}
             {visibleFields.length > 0 && (
               <div style={{ gridColumn: '1 / -1', display: 'flex', flexDirection: 'column', gap: '1rem', padding: '1rem', backgroundColor: 'var(--input-bg)', borderRadius: '10px', border: '1px solid var(--border-color)' }}>
-                <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#0D9488', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--brand-primary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                   Sub-category Dynamic Attributes
                 </span>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1rem' }}>
@@ -633,7 +633,7 @@ function ChangeRequestFormPage({ onNavigate, initialData, user }) {
                       return (
                         <div key={field.id || field.fieldKey} style={{ gridColumn: 'span 2', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                           <div>
-                            <label style={{ display: 'block', fontSize: '0.825rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '0.35rem' }}>
+                            <label style={{ display: 'block', fontSize: '0.825rem', fontWeight: 500, color: 'var(--text-primary)', marginBottom: '0.35rem' }}>
                               Action Required *
                             </label>
                             <input
@@ -653,7 +653,7 @@ function ChangeRequestFormPage({ onNavigate, initialData, user }) {
                             />
                           </div>
                           <div>
-                            <label style={{ display: 'block', fontSize: '0.825rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '0.35rem' }}>
+                            <label style={{ display: 'block', fontSize: '0.825rem', fontWeight: 500, color: 'var(--text-primary)', marginBottom: '0.35rem' }}>
                               Specify Other Action *
                             </label>
                             <input
@@ -683,7 +683,7 @@ function ChangeRequestFormPage({ onNavigate, initialData, user }) {
                       return (
                         <div key={field.id || field.fieldKey} style={{ gridColumn: 'span 2', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                           <div>
-                            <label style={{ display: 'block', fontSize: '0.825rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '0.35rem' }}>
+                            <label style={{ display: 'block', fontSize: '0.825rem', fontWeight: 500, color: 'var(--text-primary)', marginBottom: '0.35rem' }}>
                               {field.fieldLabel} {field.isRequired ? '*' : ''}
                             </label>
                             <select
@@ -720,7 +720,7 @@ function ChangeRequestFormPage({ onNavigate, initialData, user }) {
                           </div>
 
                           <div>
-                            <label style={{ display: 'block', fontSize: '0.825rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '0.35rem' }}>
+                            <label style={{ display: 'block', fontSize: '0.825rem', fontWeight: 500, color: 'var(--text-primary)', marginBottom: '0.35rem' }}>
                               Specify Other Action *
                             </label>
                             <input
@@ -745,7 +745,7 @@ function ChangeRequestFormPage({ onNavigate, initialData, user }) {
                       );
                     }                    return (
                       <div key={field.id || field.fieldKey}>
-                        <label style={{ display: 'block', fontSize: '0.825rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '0.35rem' }}>
+                        <label style={{ display: 'block', fontSize: '0.825rem', fontWeight: 500, color: 'var(--text-primary)', marginBottom: '0.35rem' }}>
                           {field.fieldLabel} {field.isRequired ? '*' : ''}
                         </label>
                         {(() => {
@@ -847,7 +847,7 @@ function ChangeRequestFormPage({ onNavigate, initialData, user }) {
 
             {/* Business justification */}
             <div style={{ gridColumn: '1 / -1' }}>
-              <label style={{ display: 'block', fontSize: '0.825rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '0.4rem' }}>
+              <label style={{ display: 'block', fontSize: '0.825rem', fontWeight: 500, color: 'var(--text-primary)', marginBottom: '0.4rem' }}>
                 Business justification *
               </label>
               <textarea
@@ -914,17 +914,17 @@ function ChangeRequestFormPage({ onNavigate, initialData, user }) {
           disabled={isSubmitting}
           style={{
             padding: '0.6rem 1.35rem',
-            backgroundColor: '#0D9488',
+            backgroundColor: 'var(--brand-primary)',
             color: '#FFFFFF',
             border: 'none',
             borderRadius: '8px',
             fontSize: '0.85rem',
-            fontWeight: 700,
+            fontWeight: 500,
             cursor: 'pointer',
             display: 'inline-flex',
             alignItems: 'center',
             gap: '0.45rem',
-            boxShadow: '0 1px 3px rgba(13, 148, 136, 0.2)'
+            boxShadow: '0 1px 3px rgba(0, 0, 0, 0.2)'
           }}
         >
           <Send size={16} />

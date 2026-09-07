@@ -1,7 +1,7 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@500;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap');
 
 :root {
-  --font-family: 'Inter', sans-serif;
+  --font-family: 'Montserrat', sans-serif;
   --font-mono: 'JetBrains Mono', monospace;
 
   --radius: 0.625rem;
@@ -17,9 +17,33 @@
   --text-primary: #10151E;
   --text-secondary: #5B6472;
   --border-color: #E4E7EC;
-  --brand-primary: #173C4E;
-  --brand-primary-hover: #1F4F66;
+  --brand-primary: #000000;
+  --brand-primary-hover: #262626;
   --error-color: #DC2626;
+
+  /* Semantic status colors */
+  --success-color: #16A34A;
+  --success-foreground: #FFFFFF;
+  --warning-color: #D97706;
+  --warning-foreground: #FFFFFF;
+  --info-color: #2563EB;
+  --info-foreground: #FFFFFF;
+
+  /* Accent colors */
+  --purple-color: #7C3AED;
+  --orange-color: #EA580C;
+  --teal-color: #0D9488;
+
+  /* Sidebar surface */
+  --sidebar-bg: #F7F8FA;
+  --sidebar-text: #2B313B;
+  --sidebar-border: #E4E7EC;
+
+  --ring-color: #10151E;
+
+  --shadow-soft: 0 1px 2px 0 rgba(16, 21, 30, 0.04);
+  --shadow-card: 0 1px 2px 0 rgba(16, 21, 30, 0.04), 0 2px 8px -4px rgba(16, 21, 30, 0.06);
+  --shadow-pop: 0 10px 30px -12px rgba(16, 21, 30, 0.18);
 }
 
 .dark {
@@ -30,9 +54,33 @@
   --text-primary: #FFFFFF;
   --text-secondary: #94A0B0;
   --border-color: #2A3141;
-  --brand-primary: #173C4E;
-  --brand-primary-hover: #1F4F66;
+  --brand-primary: #000000;
+  --brand-primary-hover: #262626;
   --error-color: #EF4444;
+
+  /* Semantic status colors */
+  --success-color: #22C55E;
+  --success-foreground: #10151E;
+  --warning-color: #F59E0B;
+  --warning-foreground: #10151E;
+  --info-color: #60A5FA;
+  --info-foreground: #10151E;
+
+  /* Accent colors */
+  --purple-color: #C084FC;
+  --orange-color: #FB923C;
+  --teal-color: #5EEAD4;
+
+  /* Sidebar surface */
+  --sidebar-bg: #0B1018;
+  --sidebar-text: #D7DDE7;
+  --sidebar-border: #222836;
+
+  --ring-color: #FFFFFF;
+
+  --shadow-soft: 0 1px 2px 0 rgba(0, 0, 0, 0.4);
+  --shadow-card: 0 1px 2px 0 rgba(0, 0, 0, 0.4), 0 4px 16px -6px rgba(0, 0, 0, 0.55);
+  --shadow-pop: 0 10px 30px -12px rgba(0, 0, 0, 0.7);
 }
 
 * {
@@ -48,14 +96,23 @@ body {
 }
 
 body {
-  font-family: 'Inter', sans-serif;
+  font-family: var(--font-family);
   background-color: var(--page-bg);
   color: var(--text-primary);
   font-size: 14px;
+  font-weight: 500; /* Montserrat 400 reads thin; 500 is the base body weight */
+  letter-spacing: -0.005em;
   line-height: 1.5;
   min-height: 100vh;
+  font-feature-settings: "cv02", "cv03", "cv04", "cv11";
   -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
   transition: background-color 0.16s ease, color 0.16s ease;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-family);
+  letter-spacing: -0.02em;
 }
 
 #root,
@@ -75,6 +132,16 @@ svg {
   -webkit-overflow-scrolling: touch;
 }
 
+/* Subtle lift-on-hover for interactive dashboard cards */
+.cd-card-hover {
+  transition: transform 0.16s ease, box-shadow 0.16s ease, border-color 0.16s ease;
+}
+.cd-card-hover:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-pop);
+  border-color: var(--text-secondary);
+}
+
 /* Custom Scrollbar */
 ::-webkit-scrollbar {
   width: 9px;
@@ -87,8 +154,22 @@ svg {
   background: var(--border-color);
   border-radius: 99px;
 }
+::-webkit-scrollbar-thumb:hover {
+  background: var(--text-secondary);
+}
 
 /* Base Form Reset */
 input, button {
   font-family: inherit;
+}
+
+/* Native date/time pickers ship a black glyph that disappears on dark — invert it */
+.dark input[type="date"]::-webkit-calendar-picker-indicator,
+.dark input[type="time"]::-webkit-calendar-picker-indicator,
+.dark input[type="datetime-local"]::-webkit-calendar-picker-indicator,
+.dark input[type="month"]::-webkit-calendar-picker-indicator,
+.dark input[type="week"]::-webkit-calendar-picker-indicator {
+  filter: invert(1);
+  opacity: 0.85;
+  cursor: pointer;
 }

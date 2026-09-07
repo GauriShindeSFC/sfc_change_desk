@@ -167,7 +167,7 @@ function CatalogueManagementPage({ user }) {
   if (!canManageCatalog) {
     return (
       <div style={{ padding: '3rem 1.5rem', textAlign: 'center', backgroundColor: 'var(--card-bg)', borderRadius: '12px', border: '1px solid var(--border-color)' }}>
-        <h2 style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--text-primary)', marginBottom: '0.5rem' }}>Access Denied</h2>
+        <h2 style={{ fontSize: '1.25rem', fontWeight: 500, color: 'var(--text-primary)', marginBottom: '0.5rem' }}>Access Denied</h2>
         <p style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>Only Super Admin users can access Catalogue &amp; Workflow Management.</p>
       </div>
     );
@@ -179,7 +179,7 @@ function CatalogueManagementPage({ user }) {
       {/* Header Row */}
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: '1rem' }}>
         <div>
-          <h1 style={{ fontSize: '1.45rem', fontWeight: 800, color: 'var(--text-primary)', lineHeight: 1.2 }}>
+          <h1 style={{ fontSize: '1.45rem', fontWeight: 700, color: 'var(--text-primary)', lineHeight: 1.2 }}>
             Catalogue & Workflow Management
           </h1>
           <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginTop: '0.2rem' }}>
@@ -192,17 +192,17 @@ function CatalogueManagementPage({ user }) {
             onClick={() => setIsWfModalOpen(true)}
             style={{
               padding: '0.55rem 1.1rem',
-              backgroundColor: '#0D9488',
+              backgroundColor: 'var(--brand-primary)',
               color: '#FFFFFF',
               border: 'none',
               borderRadius: '8px',
               fontSize: '0.85rem',
-              fontWeight: 700,
+              fontWeight: 500,
               cursor: 'pointer',
               display: 'inline-flex',
               alignItems: 'center',
               gap: '0.4rem',
-              boxShadow: '0 1px 3px rgba(13, 148, 136, 0.2)'
+              boxShadow: '0 1px 3px rgba(0, 0, 0, 0.2)'
             }}
           >
             <Plus size={16} />
@@ -226,10 +226,10 @@ function CatalogueManagementPage({ user }) {
                 padding: '0.5rem 1.1rem',
                 borderRadius: '8px',
                 border: 'none',
-                backgroundColor: isActive ? '#0D9488' : 'transparent',
+                backgroundColor: isActive ? 'var(--brand-primary)' : 'transparent',
                 color: isActive ? '#FFFFFF' : 'var(--text-secondary)',
                 fontSize: '0.85rem',
-                fontWeight: isActive ? 700 : 500,
+                fontWeight: 500,
                 cursor: 'pointer'
               }}
             >
@@ -263,7 +263,7 @@ function CatalogueManagementPage({ user }) {
                 justifyContent: 'space-between'
               }}>
                 <div>
-                  <h3 style={{ fontSize: '1.05rem', fontWeight: 800, color: 'var(--text-primary)', margin: 0 }}>
+                  <h3 style={{ fontSize: '1.05rem', fontWeight: 500, color: 'var(--text-primary)', margin: 0 }}>
                     {cat.name}
                   </h3>
                   <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginTop: '0.15rem', display: 'block' }}>
@@ -272,11 +272,11 @@ function CatalogueManagementPage({ user }) {
                 </div>
                 <span style={{
                   padding: '0.2rem 0.6rem',
-                  borderRadius: '99px',
-                  backgroundColor: '#0D9488',
+                  borderRadius: 'var(--radius-lg)',
+                  backgroundColor: 'var(--brand-primary)',
                   color: '#FFFFFF',
                   fontSize: '0.75rem',
-                  fontWeight: 700
+                  fontWeight: 500
                 }}>
                   {cat.subcategories ? cat.subcategories.length : 0} Sub-categories
                 </span>
@@ -286,7 +286,7 @@ function CatalogueManagementPage({ user }) {
               {cat.subcategories && cat.subcategories.length > 0 ? (
                 <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
                   <thead>
-                    <tr style={{ color: 'var(--text-secondary)', fontSize: '0.6875rem', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', borderBottom: '1px solid var(--border-color)' }}>
+                    <tr style={{ color: 'var(--text-secondary)', fontSize: '0.6875rem', fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', borderBottom: '1px solid var(--border-color)' }}>
                       <th style={{ padding: '0.75rem 1.25rem' }}>SUB-CATEGORY NAME</th>
                       <th style={{ padding: '0.75rem 1rem' }}>SLA</th>
                       <th style={{ padding: '0.75rem 1rem' }}>RISK</th>
@@ -305,7 +305,7 @@ function CatalogueManagementPage({ user }) {
                       });
                       return sortedSubcats.map((sub, idx) => (
                         <tr key={sub.id} style={{ borderBottom: idx === sortedSubcats.length - 1 ? 'none' : '1px solid var(--border-color)' }}>
-                        <td style={{ padding: '0.75rem 1.25rem', fontSize: '0.875rem', fontWeight: 700, color: 'var(--text-primary)' }}>
+                        <td style={{ padding: '0.75rem 1.25rem', fontSize: '0.875rem', fontWeight: 500, color: 'var(--text-primary)' }}>
                           {sub.name}
                         </td>
                         <td style={{ padding: '0.75rem 1rem', fontSize: '0.825rem', color: 'var(--text-secondary)' }}>
@@ -318,7 +318,7 @@ function CatalogueManagementPage({ user }) {
                                 <div key={bar} style={{ width: '3.5px', height: '12px', borderRadius: '1.5px', backgroundColor: bar <= (riskBarsMap[sub.risk] || 2) ? (riskColorMap[sub.risk] || '#D97706') : 'var(--border-color)' }} />
                               ))}
                             </div>
-                            <span style={{ fontSize: '0.775rem', fontWeight: 700, color: riskColorMap[sub.risk] || '#D97706' }}>
+                            <span style={{ fontSize: '0.775rem', fontWeight: 500, color: riskColorMap[sub.risk] || '#D97706' }}>
                               {sub.risk}
                             </span>
                           </div>
@@ -327,7 +327,7 @@ function CatalogueManagementPage({ user }) {
                           {sub.workflow?.name || 'Standard Change Workflow'}
                         </td>
                         <td style={{ padding: '0.75rem 1.25rem', textAlign: 'right' }}>
-                          <button style={{ background: 'none', border: 'none', color: '#0D9488', fontSize: '0.8rem', fontWeight: 600, cursor: 'pointer' }}>
+                          <button style={{ background: 'none', border: 'none', color: 'var(--brand-primary)', fontSize: '0.8rem', fontWeight: 600, cursor: 'pointer' }}>
                             Configure Fields
                           </button>
                         </td>
@@ -350,7 +350,7 @@ function CatalogueManagementPage({ user }) {
       {activeTab === 'workflows' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <h2 style={{ fontSize: '1.1rem', fontWeight: 800, color: 'var(--text-primary)', margin: 0 }}>
+            <h2 style={{ fontSize: '1.1rem', fontWeight: 600, color: 'var(--text-primary)', margin: 0 }}>
               Approval Workflows
             </h2>
             <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
@@ -374,10 +374,10 @@ function CatalogueManagementPage({ user }) {
                 }}
               >
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <h3 style={{ fontSize: '1.05rem', fontWeight: 800, color: 'var(--text-primary)', margin: 0 }}>
+                  <h3 style={{ fontSize: '1.05rem', fontWeight: 500, color: 'var(--text-primary)', margin: 0 }}>
                     {wf.name}
                   </h3>
-                  <button style={{ background: 'none', border: 'none', color: '#0D9488', fontSize: '0.85rem', fontWeight: 700, cursor: 'pointer' }}>
+                  <button style={{ background: 'none', border: 'none', color: 'var(--brand-primary)', fontSize: '0.85rem', fontWeight: 500, cursor: 'pointer' }}>
                     Modify workflow
                   </button>
                 </div>
@@ -417,7 +417,7 @@ function CatalogueManagementPage({ user }) {
           }}>
             <div style={{ padding: '1.5rem 1.75rem 1rem 1.75rem', display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', borderBottom: '1px solid var(--border-color)' }}>
               <div>
-                <h2 style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--text-primary)', margin: 0 }}>
+                <h2 style={{ fontSize: '1.25rem', fontWeight: 500, color: 'var(--text-primary)', margin: 0 }}>
                   New Sub-category Template
                 </h2>
                 <p style={{ fontSize: '0.825rem', color: 'var(--text-secondary)', margin: 0, marginTop: '0.2rem' }}>
@@ -431,7 +431,7 @@ function CatalogueManagementPage({ user }) {
 
             <form onSubmit={handleSaveSubcatTemplate} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', padding: '1.5rem 1.75rem' }}>
               <div>
-                <label style={{ display: 'block', fontSize: '0.825rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '0.4rem' }}>
+                <label style={{ display: 'block', fontSize: '0.825rem', fontWeight: 500, color: 'var(--text-primary)', marginBottom: '0.4rem' }}>
                   Sub-category Name *
                 </label>
                 <input
@@ -446,7 +446,7 @@ function CatalogueManagementPage({ user }) {
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                 <div>
-                  <label style={{ display: 'block', fontSize: '0.825rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '0.4rem' }}>
+                  <label style={{ display: 'block', fontSize: '0.825rem', fontWeight: 500, color: 'var(--text-primary)', marginBottom: '0.4rem' }}>
                     Parent Category
                   </label>
                   <select
@@ -461,7 +461,7 @@ function CatalogueManagementPage({ user }) {
                 </div>
 
                 <div>
-                  <label style={{ display: 'block', fontSize: '0.825rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '0.4rem' }}>
+                  <label style={{ display: 'block', fontSize: '0.825rem', fontWeight: 500, color: 'var(--text-primary)', marginBottom: '0.4rem' }}>
                     SLA Target
                   </label>
                   <input
@@ -475,7 +475,7 @@ function CatalogueManagementPage({ user }) {
               </div>
 
               <div>
-                <label style={{ display: 'block', fontSize: '0.825rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '0.4rem' }}>
+                <label style={{ display: 'block', fontSize: '0.825rem', fontWeight: 500, color: 'var(--text-primary)', marginBottom: '0.4rem' }}>
                   Risk Level
                 </label>
                 <select
@@ -490,7 +490,7 @@ function CatalogueManagementPage({ user }) {
               </div>
 
               <div>
-                <label style={{ display: 'block', fontSize: '0.825rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '0.4rem' }}>
+                <label style={{ display: 'block', fontSize: '0.825rem', fontWeight: 500, color: 'var(--text-primary)', marginBottom: '0.4rem' }}>
                   Assigned Approval Workflow
                 </label>
                 <select
@@ -508,7 +508,7 @@ function CatalogueManagementPage({ user }) {
                 <button type="button" onClick={() => setIsModalOpen(false)} style={{ padding: '0.65rem 1.25rem', backgroundColor: 'var(--card-bg)', border: '1px solid var(--border-color)', borderRadius: '8px', fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-primary)', cursor: 'pointer' }}>
                   Cancel
                 </button>
-                <button type="submit" style={{ padding: '0.65rem 1.35rem', backgroundColor: '#0D9488', color: '#FFFFFF', border: 'none', borderRadius: '8px', fontSize: '0.85rem', fontWeight: 700, cursor: 'pointer' }}>
+                <button type="submit" style={{ padding: '0.65rem 1.35rem', backgroundColor: 'var(--brand-primary)', color: '#FFFFFF', border: 'none', borderRadius: '8px', fontSize: '0.85rem', fontWeight: 500, cursor: 'pointer' }}>
                   Save Sub-category
                 </button>
               </div>
@@ -543,13 +543,13 @@ function CatalogueManagementPage({ user }) {
             flexDirection: 'column'
           }}>
             <div style={{ padding: '1.5rem 1.75rem 1rem 1.75rem', borderBottom: '1px solid var(--border-color)' }}>
-              <h2 style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--text-primary)', margin: 0 }}>
+              <h2 style={{ fontSize: '1.25rem', fontWeight: 500, color: 'var(--text-primary)', margin: 0 }}>
                 Create Approval Workflow
               </h2>
             </div>
             <form onSubmit={handleSaveWorkflow} style={{ padding: '1.5rem 1.75rem', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
               <div>
-                <label style={{ display: 'block', fontSize: '0.825rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '0.4rem' }}>
+                <label style={{ display: 'block', fontSize: '0.825rem', fontWeight: 500, color: 'var(--text-primary)', marginBottom: '0.4rem' }}>
                   Workflow name *
                 </label>
                 <input
@@ -563,7 +563,7 @@ function CatalogueManagementPage({ user }) {
               </div>
 
               <div>
-                <label style={{ display: 'block', fontSize: '0.825rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '0.4rem' }}>
+                <label style={{ display: 'block', fontSize: '0.825rem', fontWeight: 500, color: 'var(--text-primary)', marginBottom: '0.4rem' }}>
                   Workflow steps sequence *
                 </label>
                 <input
@@ -580,7 +580,7 @@ function CatalogueManagementPage({ user }) {
                 <button type="button" onClick={() => setIsWfModalOpen(false)} style={{ padding: '0.65rem 1.25rem', backgroundColor: 'var(--card-bg)', border: '1px solid var(--border-color)', borderRadius: '8px', fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-primary)', cursor: 'pointer' }}>
                   Cancel
                 </button>
-                <button type="submit" style={{ padding: '0.65rem 1.35rem', backgroundColor: '#0D9488', color: '#FFFFFF', border: 'none', borderRadius: '8px', fontSize: '0.85rem', fontWeight: 700, cursor: 'pointer' }}>
+                <button type="submit" style={{ padding: '0.65rem 1.35rem', backgroundColor: 'var(--brand-primary)', color: '#FFFFFF', border: 'none', borderRadius: '8px', fontSize: '0.85rem', fontWeight: 500, cursor: 'pointer' }}>
                   Save workflow
                 </button>
               </div>

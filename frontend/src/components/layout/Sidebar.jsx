@@ -7,6 +7,7 @@ import {
   CheckCircle2,
   TrendingUp,
   Sun,
+  Layers,
   X,
   ChevronLeft,
   ChevronRight
@@ -96,14 +97,14 @@ function Sidebar({
           border: 'none',
           backgroundColor: isActive ? '#1E293B' : 'transparent',
           color: isActive ? '#FFFFFF' : '#94A3B8',
-          fontWeight: isActive ? 700 : 500,
+          fontWeight: 500,
           fontSize: '0.85rem',
           cursor: 'pointer',
           transition: 'background-color 0.15s ease, color 0.15s ease',
           position: 'relative'
         }}
       >
-        <Icon size={18} style={{ color: isActive ? '#0D9488' : '#64748B', flexShrink: 0 }} />
+        <Icon size={18} style={{ color: isActive ? '#FFFFFF' : '#64748B', flexShrink: 0 }} />
         {!mini && (
           <span style={{ flex: 1, textAlign: 'left', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
             {item.label}
@@ -113,10 +114,10 @@ function Sidebar({
           <span
             style={{
               padding: '0.1rem 0.45rem',
-              borderRadius: '99px',
+              borderRadius: 'var(--radius-lg)',
               fontSize: '0.7rem',
-              fontWeight: 700,
-              backgroundColor: '#0D9488',
+              fontWeight: 500,
+              backgroundColor: 'var(--brand-primary)',
               color: '#FFFFFF'
             }}
           >
@@ -145,7 +146,7 @@ function Sidebar({
     <aside
       style={{
         width: `${width}px`,
-        backgroundColor: '#0F172A',
+        backgroundColor: '#0B1018',
         color: '#A0AEC0',
         display: 'flex',
         flexDirection: 'column',
@@ -191,7 +192,7 @@ function Sidebar({
               <span
                 style={{
                   fontSize: '1.05rem',
-                  fontWeight: 800,
+                  fontWeight: 700,
                   color: '#FFFFFF',
                   lineHeight: 1.15,
                   letterSpacing: '-0.01em',
@@ -205,7 +206,7 @@ function Sidebar({
               <span
                 style={{
                   fontSize: '0.6rem',
-                  fontWeight: 700,
+                  fontWeight: 500,
                   color: '#64748B',
                   letterSpacing: '0.08em',
                   marginTop: '0.15rem',
@@ -272,6 +273,7 @@ function Sidebar({
         ];
 
         if (isSuperAdmin) {
+          visibleMgmtItems.push({ id: 'Catalogue Management', label: 'Catalogue Management', icon: Layers });
           visibleMgmtItems.push({ id: 'Settings', label: 'Settings', icon: Sun });
         }
 
@@ -280,7 +282,7 @@ function Sidebar({
             <div
               style={{
                 fontSize: '0.6875rem',
-                fontWeight: 700,
+                fontWeight: 500,
                 color: '#475569',
                 letterSpacing: '0.08em',
                 textTransform: 'uppercase',
@@ -337,7 +339,7 @@ function Sidebar({
               alignItems: 'center',
               justifyContent: 'center',
               fontSize: '0.75rem',
-              fontWeight: 700,
+              fontWeight: 500,
               flexShrink: 0
             }}
           >
@@ -348,7 +350,7 @@ function Sidebar({
               <span
                 style={{
                   fontSize: '0.8rem',
-                  fontWeight: 700,
+                  fontWeight: 500,
                   color: '#F1F5F9',
                   whiteSpace: 'nowrap',
                   overflow: 'hidden',
@@ -401,7 +403,7 @@ function Sidebar({
                 backgroundColor: 'transparent',
                 color: '#EF4444',
                 fontSize: '0.825rem',
-                fontWeight: 700,
+                fontWeight: 500,
                 cursor: 'pointer'
               }}
             >
@@ -433,7 +435,7 @@ const iconBtnStyle = {
   height: '30px',
   borderRadius: '7px',
   border: '1px solid #1E293B',
-  backgroundColor: '#0F172A',
+  backgroundColor: '#0B1018',
   color: '#94A3B8',
   display: 'flex',
   alignItems: 'center',

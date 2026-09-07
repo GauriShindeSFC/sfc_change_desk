@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Calendar } from 'lucide-react';
+import { Plus } from 'lucide-react';
 import ChangeRequestModal from '../components/ui/ChangeRequestModal';
+import FilterBar, { initCustomDateRange } from '../components/ui/FilterBar';
 import { apiFetch } from '../lib/apiFetch';
 
 function MyRequestsPage({ onNavigate, searchQuery = '', initialData, user }) {
   const [requests, setRequests] = useState([]);
-  const [dateFilter, setDateFilter] = useState('overall');
+  const [dateFilter, setDateFilter] = useState('last_7_days');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -96,7 +97,7 @@ function MyRequestsPage({ onNavigate, searchQuery = '', initialData, user }) {
       {/* Header Row */}
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: '1rem' }}>
         <div>
-          <h1 style={{ fontSize: '1.45rem', fontWeight: 800, color: 'var(--text-primary)', lineHeight: 1.2 }}>
+          <h1 style={{ fontSize: '1.45rem', fontWeight: 700, color: 'var(--text-primary)', lineHeight: 1.2 }}>
             My Requests
           </h1>
           <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginTop: '0.2rem' }}>
@@ -109,17 +110,17 @@ function MyRequestsPage({ onNavigate, searchQuery = '', initialData, user }) {
           onClick={() => onNavigate && onNavigate('Change Catalog')}
           style={{
             padding: '0.55rem 1.1rem',
-            backgroundColor: '#0D9488',
+            backgroundColor: 'var(--brand-primary)',
             color: '#FFFFFF',
             border: 'none',
             borderRadius: '8px',
             fontSize: '0.85rem',
-            fontWeight: 700,
+            fontWeight: 500,
             cursor: 'pointer',
             display: 'inline-flex',
             alignItems: 'center',
             gap: '0.4rem',
-            boxShadow: '0 1px 3px rgba(13, 148, 136, 0.2)'
+            boxShadow: '0 1px 3px rgba(0, 0, 0, 0.2)'
           }}
         >
           <Plus size={16} />
@@ -128,111 +129,22 @@ function MyRequestsPage({ onNavigate, searchQuery = '', initialData, user }) {
       </div>
 
       {/* Main Sub-Tabs / Status & Date Filter */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.5rem', flexWrap: 'wrap', gap: '0.75rem' }}>
-        <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
-          {filterTabs.map(tab => (
-            <button
-              key={tab.id}
-              type="button"
-              onClick={() => setActiveFilter(tab.id)}
-              style={{
-                padding: '0.45rem 0.95rem',
-                backgroundColor: activeFilter === tab.id ? '#0D9488' : 'transparent',
-                color: activeFilter === tab.id ? '#FFFFFF' : 'var(--text-secondary)',
-                border: activeFilter === tab.id ? 'none' : '1px solid var(--border-color)',
-                borderRadius: '99px',
-                fontSize: '0.825rem',
-                fontWeight: 700,
-                cursor: 'pointer'
-              }}
-            >
-              {tab.label}
-            </button>
-          ))}
-        </div>
-
-        {/* Time Range Filter Dropdown */}
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '0.4rem' }}>
-          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', backgroundColor: 'var(--card-bg)', border: '1px solid var(--border-color)', borderRadius: '8px', padding: '0.25rem 0.65rem' }}>
-            <Calendar size={14} style={{ color: 'var(--text-secondary)' }} />
-            <select
-              value={dateFilter}
-              onChange={(e) => {
-                const val = e.target.value;
-                setDateFilter(val);
-                if (val === 'custom') {
-                  const formatDate = (d) =>
-                    d.getFullYear() +
-                    '-' +
-                    String(d.getMonth() + 1).padStart(2, '0') +
-                    '-' +
-                    String(d.getDate()).padStart(2, '0');
-
-                  if (!startDate) {
-                    const d = new Date();
-                    d.setDate(d.getDate() - 7);
-                    setStartDate(formatDate(d));
-                  }
-                  if (!endDate) {
-                    setEndDate(formatDate(new Date()));
-                  }
-                }
-                setPage(1);
-              }}
-              style={{
-                backgroundColor: 'var(--card-bg)',
-                color: 'var(--text-primary)',
-                border: 'none',
-                fontSize: '0.8rem',
-                fontWeight: 700,
-                cursor: 'pointer',
-                outline: 'none',
-                padding: '0.2rem'
-              }}
-            >
-              <option value="overall" style={{ backgroundColor: 'var(--card-bg)', color: 'var(--text-primary)' }}>Overall</option>
-              <option value="last_7_days" style={{ backgroundColor: 'var(--card-bg)', color: 'var(--text-primary)' }}>7 Days</option>
-              <option value="this_month" style={{ backgroundColor: 'var(--card-bg)', color: 'var(--text-primary)' }}>This Month</option>
-              <option value="last_month" style={{ backgroundColor: 'var(--card-bg)', color: 'var(--text-primary)' }}>Last Month</option>
-              <option value="custom" style={{ backgroundColor: 'var(--card-bg)', color: 'var(--text-primary)' }}>Custom</option>
-            </select>
-          </div>
-
-          {dateFilter === 'custom' && (
-            <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}>
-              <input
-                type="date"
-                value={startDate}
-                onChange={(e) => setStartDate(e.target.value)}
-                style={{
-                  backgroundColor: 'var(--card-bg)',
-                  border: '1px solid var(--border-color)',
-                  borderRadius: '8px',
-                  padding: '0.25rem 0.5rem',
-                  fontSize: '0.775rem',
-                  color: 'var(--text-primary)',
-                  outline: 'none'
-                }}
-              />
-              <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>to</span>
-              <input
-                type="date"
-                value={endDate}
-                onChange={(e) => setEndDate(e.target.value)}
-                style={{
-                  backgroundColor: 'var(--card-bg)',
-                  border: '1px solid var(--border-color)',
-                  borderRadius: '8px',
-                  padding: '0.25rem 0.5rem',
-                  fontSize: '0.775rem',
-                  color: 'var(--text-primary)',
-                  outline: 'none'
-                }}
-              />
-            </div>
-          )}
-        </div>
-      </div>
+      <FilterBar
+        tabs={filterTabs}
+        activeTab={activeFilter}
+        onTabChange={setActiveFilter}
+        dateValue={dateFilter}
+        onDateChange={(val) => {
+          setDateFilter(val);
+          if (val === 'custom') {
+            initCustomDateRange({ startDate, endDate, setStartDate, setEndDate });
+          }
+        }}
+        startDate={startDate}
+        endDate={endDate}
+        onStartDateChange={setStartDate}
+        onEndDateChange={setEndDate}
+      />
 
       {/* Requests Table */}
       <div style={{
@@ -246,22 +158,22 @@ function MyRequestsPage({ onNavigate, searchQuery = '', initialData, user }) {
           <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.85rem' }}>
             <thead>
               <tr style={{ backgroundColor: 'var(--input-bg)', borderBottom: '1px solid var(--border-color)' }}>
-                <th style={{ padding: '0.75rem 1rem', fontWeight: 800, color: 'var(--text-secondary)', textTransform: 'uppercase', fontSize: '0.725rem', letterSpacing: '0.05em', whiteSpace: 'nowrap' }}>CR ID</th>
-                <th style={{ padding: '0.75rem 1rem', fontWeight: 800, color: 'var(--text-secondary)', textTransform: 'uppercase', fontSize: '0.725rem', letterSpacing: '0.05em' }}>Title</th>
-                <th style={{ padding: '0.75rem 1rem', fontWeight: 800, color: 'var(--text-secondary)', textTransform: 'uppercase', fontSize: '0.725rem', letterSpacing: '0.05em' }}>Category</th>
-                <th style={{ padding: '0.75rem 1rem', fontWeight: 800, color: 'var(--text-secondary)', textTransform: 'uppercase', fontSize: '0.725rem', letterSpacing: '0.05em', whiteSpace: 'nowrap' }}>Risk</th>
-                <th style={{ padding: '0.75rem 1rem', fontWeight: 800, color: 'var(--text-secondary)', textTransform: 'uppercase', fontSize: '0.725rem', letterSpacing: '0.05em', whiteSpace: 'nowrap' }}>Raised Date</th>
-                <th style={{ padding: '0.75rem 1rem', fontWeight: 800, color: 'var(--text-secondary)', textTransform: 'uppercase', fontSize: '0.725rem', letterSpacing: '0.05em', whiteSpace: 'nowrap' }}>Closed Date</th>
-                <th style={{ padding: '0.75rem 1rem', fontWeight: 800, color: 'var(--text-secondary)', textTransform: 'uppercase', fontSize: '0.725rem', letterSpacing: '0.05em', whiteSpace: 'nowrap' }}>Status</th>
-                <th style={{ padding: '0.75rem 1rem', fontWeight: 800, color: 'var(--text-secondary)', textTransform: 'uppercase', fontSize: '0.725rem', letterSpacing: '0.05em', textAlign: 'right', whiteSpace: 'nowrap' }}>Actions</th>
+                <th style={{ padding: '0.75rem 1rem', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', fontSize: '0.725rem', letterSpacing: '0.05em', whiteSpace: 'nowrap' }}>CR ID</th>
+                <th style={{ padding: '0.75rem 1rem', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', fontSize: '0.725rem', letterSpacing: '0.05em' }}>Title</th>
+                <th style={{ padding: '0.75rem 1rem', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', fontSize: '0.725rem', letterSpacing: '0.05em' }}>Category</th>
+                <th style={{ padding: '0.75rem 1rem', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', fontSize: '0.725rem', letterSpacing: '0.05em', whiteSpace: 'nowrap' }}>Risk</th>
+                <th style={{ padding: '0.75rem 1rem', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', fontSize: '0.725rem', letterSpacing: '0.05em', whiteSpace: 'nowrap' }}>Raised Date</th>
+                <th style={{ padding: '0.75rem 1rem', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', fontSize: '0.725rem', letterSpacing: '0.05em', whiteSpace: 'nowrap' }}>Closed Date</th>
+                <th style={{ padding: '0.75rem 1rem', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', fontSize: '0.725rem', letterSpacing: '0.05em', whiteSpace: 'nowrap' }}>Status</th>
+                <th style={{ padding: '0.75rem 1rem', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', fontSize: '0.725rem', letterSpacing: '0.05em', textAlign: 'right', whiteSpace: 'nowrap' }}>Actions</th>
               </tr>
             </thead>
             <tbody>
               {requests.length > 0 ? (
                 requests.map(cr => (
                   <tr key={cr.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
-                    <td style={{ padding: '0.85rem 1rem', fontWeight: 700, color: 'var(--text-primary)', fontFamily: 'var(--font-mono)', whiteSpace: 'nowrap' }}>{cr.id}</td>
-                    <td style={{ padding: '0.85rem 1rem', fontWeight: 700, color: 'var(--text-primary)', maxWidth: '280px', wordBreak: 'break-word' }}>{cr.title}</td>
+                    <td style={{ padding: '0.85rem 1rem', fontWeight: 500, color: 'var(--text-primary)', fontFamily: 'var(--font-mono)', whiteSpace: 'nowrap' }}>{cr.id}</td>
+                    <td style={{ padding: '0.85rem 1rem', fontWeight: 500, color: 'var(--text-primary)', maxWidth: '280px', wordBreak: 'break-word' }}>{cr.title}</td>
                     <td style={{ padding: '0.85rem 1rem', color: 'var(--text-secondary)', wordBreak: 'break-word' }}>{cr.category}</td>
                     <td style={{ padding: '0.85rem 1rem', whiteSpace: 'nowrap' }}>
                       <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', whiteSpace: 'nowrap' }}>
@@ -270,7 +182,7 @@ function MyRequestsPage({ onNavigate, searchQuery = '', initialData, user }) {
                             <div key={bar} style={{ width: '3px', height: '12px', borderRadius: '1px', backgroundColor: bar <= (cr.riskBars || 2) ? (cr.riskColor || '#D97706') : 'var(--border-color)' }} />
                           ))}
                         </div>
-                        <span style={{ fontWeight: 700, color: cr.riskColor || '#D97706', fontSize: '0.8rem', whiteSpace: 'nowrap' }}>{cr.risk || 'Medium'}</span>
+                        <span style={{ fontWeight: 500, color: cr.riskColor || '#D97706', fontSize: '0.8rem', whiteSpace: 'nowrap' }}>{cr.risk || 'Medium'}</span>
                       </div>
                     </td>
                     <td style={{ padding: '0.85rem 1rem', color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)', fontSize: '0.8rem', whiteSpace: 'nowrap' }}>{cr.raisedDate}</td>
@@ -281,11 +193,11 @@ function MyRequestsPage({ onNavigate, searchQuery = '', initialData, user }) {
                         alignItems: 'center',
                         gap: '0.35rem',
                         padding: '0.2rem 0.65rem',
-                        borderRadius: '99px',
+                        borderRadius: 'var(--radius-lg)',
                         backgroundColor: cr.statusBg || ((cr.status || '').toLowerCase() === 'draft' ? 'var(--input-bg)' : '#FEF3C7'),
                         color: cr.statusColor || ((cr.status || '').toLowerCase() === 'draft' ? 'var(--text-secondary)' : '#D97706'),
                         fontSize: '0.775rem',
-                        fontWeight: 700,
+                        fontWeight: 500,
                         whiteSpace: 'nowrap'
                       }}>
                         <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: cr.statusDot || ((cr.status || '').toLowerCase() === 'draft' ? '#94A0B0' : '#D97706') }} />
@@ -301,10 +213,10 @@ function MyRequestsPage({ onNavigate, searchQuery = '', initialData, user }) {
                             style={{
                               padding: '0.3rem 0.65rem',
                               backgroundColor: '#E6F4F1',
-                              color: '#0D9488',
+                              color: 'var(--brand-primary)',
                               border: '1px solid #A7F3D0',
                               borderRadius: '6px',
-                              fontWeight: 700,
+                              fontWeight: 500,
                               cursor: 'pointer',
                               fontSize: '0.775rem'
                             }}
@@ -318,8 +230,8 @@ function MyRequestsPage({ onNavigate, searchQuery = '', initialData, user }) {
                           style={{
                             background: 'none',
                             border: 'none',
-                            color: '#0D9488',
-                            fontWeight: 700,
+                            color: 'var(--brand-primary)',
+                            fontWeight: 500,
                             cursor: 'pointer',
                             fontSize: '0.825rem'
                           }}
@@ -334,7 +246,7 @@ function MyRequestsPage({ onNavigate, searchQuery = '', initialData, user }) {
                 <tr>
                   <td colSpan={8} style={{ padding: '2.5rem', textAlign: 'center', color: 'var(--text-secondary)' }}>
                     <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', fontWeight: 600, fontSize: '0.875rem' }}>
-                      <span style={{ display: 'inline-block', width: '16px', height: '16px', border: '2px solid var(--border-color)', borderTopColor: '#0D9488', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
+                      <span style={{ display: 'inline-block', width: '16px', height: '16px', border: '2px solid var(--border-color)', borderTopColor: 'var(--brand-primary)', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
                       <span>Loading change requests...</span>
                     </div>
                   </td>

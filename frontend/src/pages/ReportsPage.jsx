@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Download, Calendar } from 'lucide-react';
+import { Download } from 'lucide-react';
+import FilterBar, { initCustomDateRange } from '../components/ui/FilterBar';
 import { apiFetch } from '../lib/apiFetch';
 
 function ReportsPage() {
@@ -16,7 +17,7 @@ function ReportsPage() {
 
   const [monthlyData, setMonthlyData] = useState([]);
   const [locationData, setLocationData] = useState([]);
-  const [locationDateFilter, setLocationDateFilter] = useState('overall');
+  const [locationDateFilter, setLocationDateFilter] = useState('last_7_days');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [isExportingCsv, setIsExportingCsv] = useState(false);
@@ -121,7 +122,7 @@ function ReportsPage() {
             }));
 
             const maxVal = Math.max(...mergedList.map(m => m.count), 1);
-            const palette = ['#2563EB', '#2563EB', '#2563EB', '#2563EB', '#0D9488', '#0D9488', '#0D9488', '#0D9488', '#7C3AED', '#7C3AED', '#D97706', '#D97706'];
+            const palette = ['#2563EB', '#2563EB', '#2563EB', '#2563EB', 'var(--brand-primary)', 'var(--brand-primary)', 'var(--brand-primary)', 'var(--brand-primary)', '#7C3AED', '#7C3AED', '#D97706', '#D97706'];
             const formattedMonthly = mergedList.map((m, idx) => ({
               month: m.month,
               count: m.count,
@@ -144,7 +145,7 @@ function ReportsPage() {
       {/* Header Row */}
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: '1rem' }}>
         <div>
-          <h1 style={{ fontSize: '1.45rem', fontWeight: 800, color: 'var(--text-primary)', lineHeight: 1.2 }}>
+          <h1 style={{ fontSize: '1.45rem', fontWeight: 700, color: 'var(--text-primary)', lineHeight: 1.2 }}>
             Reports & Analytics
           </h1>
           <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginTop: '0.2rem' }}>
@@ -208,7 +209,7 @@ function ReportsPage() {
             <div style={{ fontSize: '0.775rem', color: 'var(--text-secondary)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
               Change Success Rate
             </div>
-            <div style={{ fontSize: '1.75rem', fontWeight: 800, color: 'var(--text-primary)', marginTop: '0.35rem' }}>
+            <div style={{ fontSize: '1.75rem', fontWeight: 700, color: 'var(--text-primary)', marginTop: '0.35rem' }}>
               {metrics.successRate}
             </div>
             <div style={{ fontSize: '0.8rem', color: '#059669', fontWeight: 600, marginTop: '0.35rem' }}>
@@ -220,7 +221,7 @@ function ReportsPage() {
             <div style={{ fontSize: '0.775rem', color: 'var(--text-secondary)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
               Avg Approval Turnaround
             </div>
-            <div style={{ fontSize: '1.75rem', fontWeight: 800, color: 'var(--text-primary)', marginTop: '0.35rem' }}>
+            <div style={{ fontSize: '1.75rem', fontWeight: 700, color: 'var(--text-primary)', marginTop: '0.35rem' }}>
               {metrics.avgApprovalTime}
             </div>
             <div style={{ fontSize: '0.8rem', color: '#059669', fontWeight: 600, marginTop: '0.35rem' }}>
@@ -232,7 +233,7 @@ function ReportsPage() {
             <div style={{ fontSize: '0.775rem', color: 'var(--text-secondary)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
               Emergency Changes
             </div>
-            <div style={{ fontSize: '1.75rem', fontWeight: 800, color: 'var(--text-primary)', marginTop: '0.35rem' }}>
+            <div style={{ fontSize: '1.75rem', fontWeight: 700, color: 'var(--text-primary)', marginTop: '0.35rem' }}>
               {metrics.emergencyCount}
             </div>
             <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', fontWeight: 500, marginTop: '0.35rem' }}>
@@ -244,7 +245,7 @@ function ReportsPage() {
             <div style={{ fontSize: '0.775rem', color: 'var(--text-secondary)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
               Post-Change Incidents
             </div>
-            <div style={{ fontSize: '1.75rem', fontWeight: 800, color: 'var(--text-primary)', marginTop: '0.35rem' }}>
+            <div style={{ fontSize: '1.75rem', fontWeight: 700, color: 'var(--text-primary)', marginTop: '0.35rem' }}>
               {metrics.incidentCount ?? 0}
             </div>
             <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', fontWeight: 500, marginTop: '0.35rem' }}>
@@ -260,7 +261,7 @@ function ReportsPage() {
           <div style={{ backgroundColor: 'var(--card-bg)', border: '1px solid var(--border-color)', borderRadius: '12px', padding: '1.25rem', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
             <div>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <h3 style={{ fontSize: '1rem', fontWeight: 800, color: 'var(--text-primary)', margin: 0 }}>
+                <h3 style={{ fontSize: '1rem', fontWeight: 500, color: 'var(--text-primary)', margin: 0 }}>
                   Monthly Change Request Volume
                 </h3>
                 <span style={{ fontSize: '0.775rem', color: 'var(--text-secondary)' }}>Year to date</span>
@@ -274,7 +275,7 @@ function ReportsPage() {
             <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: '0.75rem', height: '180px', padding: '0 0.5rem' }}>
               {monthlyData.map((d, idx) => (
                 <div key={idx} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flex: 1, height: '100%', justifyContent: 'flex-end' }}>
-                  <span style={{ fontSize: '0.725rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '0.35rem' }}>
+                  <span style={{ fontSize: '0.725rem', fontWeight: 500, color: 'var(--text-primary)', marginBottom: '0.35rem' }}>
                     {d.count}
                   </span>
                   <div
@@ -299,7 +300,7 @@ function ReportsPage() {
           <div style={{ backgroundColor: 'var(--card-bg)', border: '1px solid var(--border-color)', borderRadius: '12px', padding: '1.25rem' }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.75rem', marginBottom: '1.25rem' }}>
               <div>
-                <h3 style={{ fontSize: '1rem', fontWeight: 800, color: 'var(--text-primary)', margin: 0 }}>
+                <h3 style={{ fontSize: '1rem', fontWeight: 500, color: 'var(--text-primary)', margin: 0 }}>
                   Volume by Location
                 </h3>
                 <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', margin: '0.2rem 0 0 0' }}>
@@ -307,66 +308,21 @@ function ReportsPage() {
                 </p>
               </div>
 
-              {/* Time Range Filter Dropdown */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap' }}>
-                <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', backgroundColor: 'var(--input-bg)', border: '1px solid var(--border-color)', borderRadius: '8px', padding: '0.3rem 0.65rem' }}>
-                  <Calendar size={14} style={{ color: 'var(--text-secondary)' }} />
-                  <select
-                    value={locationDateFilter}
-                    onChange={(e) => setLocationDateFilter(e.target.value)}
-                    style={{
-                      backgroundColor: 'transparent',
-                      color: 'var(--text-primary)',
-                      border: 'none',
-                      fontSize: '0.8rem',
-                      fontWeight: 700,
-                      cursor: 'pointer',
-                      outline: 'none',
-                      padding: '0.1rem'
-                    }}
-                  >
-                    <option value="overall" style={{ backgroundColor: 'var(--card-bg)', color: 'var(--text-primary)' }}>Overall Time</option>
-                    <option value="last_7_days" style={{ backgroundColor: 'var(--card-bg)', color: 'var(--text-primary)' }}>Last 7 Days</option>
-                    <option value="this_month" style={{ backgroundColor: 'var(--card-bg)', color: 'var(--text-primary)' }}>This Month</option>
-                    <option value="last_month" style={{ backgroundColor: 'var(--card-bg)', color: 'var(--text-primary)' }}>Last Month</option>
-                    <option value="custom" style={{ backgroundColor: 'var(--card-bg)', color: 'var(--text-primary)' }}>Custom</option>
-                  </select>
-                </div>
-
-                {locationDateFilter === 'custom' && (
-                  <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}>
-                    <input
-                      type="date"
-                      value={startDate}
-                      onChange={(e) => setStartDate(e.target.value)}
-                      style={{
-                        backgroundColor: 'var(--input-bg)',
-                        border: '1px solid var(--border-color)',
-                        borderRadius: '8px',
-                        padding: '0.25rem 0.5rem',
-                        fontSize: '0.775rem',
-                        color: 'var(--text-primary)',
-                        outline: 'none'
-                      }}
-                    />
-                    <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>to</span>
-                    <input
-                      type="date"
-                      value={endDate}
-                      onChange={(e) => setEndDate(e.target.value)}
-                      style={{
-                        backgroundColor: 'var(--input-bg)',
-                        border: '1px solid var(--border-color)',
-                        borderRadius: '8px',
-                        padding: '0.25rem 0.5rem',
-                        fontSize: '0.775rem',
-                        color: 'var(--text-primary)',
-                        outline: 'none'
-                      }}
-                    />
-                  </div>
-                )}
-              </div>
+              {/* Time Range Filter */}
+              <FilterBar
+                variant="inline"
+                dateValue={locationDateFilter}
+                onDateChange={(val) => {
+                  setLocationDateFilter(val);
+                  if (val === 'custom') {
+                    initCustomDateRange({ startDate, endDate, setStartDate, setEndDate });
+                  }
+                }}
+                startDate={startDate}
+                endDate={endDate}
+                onStartDateChange={setStartDate}
+                onEndDateChange={setEndDate}
+              />
             </div>
 
             {locationData.length > 0 ? (
@@ -382,7 +338,7 @@ function ReportsPage() {
                         style={{
                           width: `${loc.percentage}%`,
                           height: '100%',
-                          backgroundColor: loc.color || '#0D9488',
+                          backgroundColor: loc.color || 'var(--brand-primary)',
                           borderRadius: '99px'
                         }}
                       />

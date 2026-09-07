@@ -91,7 +91,7 @@ export default function ChangeRequestModal({ cr, onClose, onApprove, onReject, o
 
   const progressPercent = Math.min(100, Math.max(0, (currentStepIdx / (steps.length - 1)) * 100));
 
-  const activeColor = isRejected ? '#DC2626' : isImplemented ? '#0284C7' : isDraft ? '#7C3AED' : '#0D9488';
+  const activeColor = isRejected ? '#DC2626' : isImplemented ? '#0284C7' : isDraft ? '#7C3AED' : 'var(--brand-primary)';
 
   const canAct = cr.canAct !== false && !isApproved && !isRejected && !isDraft && !isImplemented;
 
@@ -125,7 +125,7 @@ export default function ChangeRequestModal({ cr, onClose, onApprove, onReject, o
         {/* Header */}
         <div style={{ padding: '1.5rem 1.75rem 1rem 1.75rem', display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', borderBottom: '1px solid var(--border-color)' }}>
           <div>
-            <h2 style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--text-primary)', margin: 0, lineHeight: 1.3 }}>
+            <h2 style={{ fontSize: '1.25rem', fontWeight: 500, color: 'var(--text-primary)', margin: 0, lineHeight: 1.3 }}>
               {cr.id}: {cr.title}
             </h2>
             <span style={{ fontSize: '0.825rem', color: 'var(--text-secondary)', display: 'block', marginTop: '0.25rem' }}>
@@ -140,17 +140,17 @@ export default function ChangeRequestModal({ cr, onClose, onApprove, onReject, o
         {/* Status & Risk */}
         <div style={{ padding: '1.25rem 1.75rem 0.5rem 1.75rem', display: 'flex', alignItems: 'center', gap: '3rem' }}>
           <div>
-            <div style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '0.4rem' }}>Status</div>
+            <div style={{ fontSize: '0.8rem', fontWeight: 500, color: 'var(--text-primary)', marginBottom: '0.4rem' }}>Status</div>
             <div style={{
               display: 'inline-flex',
               alignItems: 'center',
               gap: '0.35rem',
               padding: '0.25rem 0.75rem',
-              borderRadius: '99px',
+              borderRadius: 'var(--radius-lg)',
               backgroundColor: statusBg,
               color: statusColor,
               fontSize: '0.8rem',
-              fontWeight: 700
+              fontWeight: 500
             }}>
               <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: statusDot }} />
               <span>{statusLabel}</span>
@@ -158,14 +158,14 @@ export default function ChangeRequestModal({ cr, onClose, onApprove, onReject, o
           </div>
 
           <div>
-            <div style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '0.4rem' }}>Risk</div>
+            <div style={{ fontSize: '0.8rem', fontWeight: 500, color: 'var(--text-primary)', marginBottom: '0.4rem' }}>Risk</div>
             <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}>
               <div style={{ display: 'flex', gap: '2px', alignItems: 'center' }}>
                 {[1, 2, 3].map(bar => (
                   <div key={bar} style={{ width: '4px', height: '14px', borderRadius: '1.5px', backgroundColor: bar <= (cr.riskBars || 2) ? (cr.riskColor || '#D97706') : 'var(--border-color)' }} />
                 ))}
               </div>
-              <span style={{ fontSize: '0.825rem', fontWeight: 700, color: cr.riskColor || '#D97706' }}>
+              <span style={{ fontSize: '0.825rem', fontWeight: 500, color: cr.riskColor || '#D97706' }}>
                 {cr.risk || 'Medium'}
               </span>
             </div>
@@ -187,11 +187,11 @@ export default function ChangeRequestModal({ cr, onClose, onApprove, onReject, o
             }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
                 <span style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#DC2626' }} />
-                <span style={{ fontSize: '0.775rem', fontWeight: 800, color: '#DC2626', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                <span style={{ fontSize: '0.775rem', fontWeight: 600, color: '#DC2626', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                   Rejection Reason / Approver Comments
                 </span>
               </div>
-              <p style={{ fontSize: '0.9rem', fontWeight: 700, color: '#991B1B', margin: 0, lineHeight: 1.5, wordBreak: 'break-word', overflowWrap: 'anywhere' }}>
+              <p style={{ fontSize: '0.9rem', fontWeight: 500, color: '#991B1B', margin: 0, lineHeight: 1.5, wordBreak: 'break-word', overflowWrap: 'anywhere' }}>
                 {cr.rejectionReason || cr.rejection_reason || cr.customFieldValues?.rejectionReason || 'This change request was rejected during CAB review.'}
               </p>
             </div>
@@ -200,7 +200,7 @@ export default function ChangeRequestModal({ cr, onClose, onApprove, onReject, o
 
         {/* Dynamic Lifecycle Visualizer */}
         <div style={{ padding: '1.25rem 1.75rem 1.5rem 1.75rem' }}>
-          <div style={{ fontSize: '0.85rem', fontWeight: 800, color: 'var(--text-primary)', marginBottom: '1.25rem' }}>Lifecycle</div>
+          <div style={{ fontSize: '0.85rem', fontWeight: 500, color: 'var(--text-primary)', marginBottom: '1.25rem' }}>Lifecycle</div>
           <div style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <div style={{ position: 'absolute', top: '10px', left: '20px', right: '20px', height: '2px', backgroundColor: 'var(--border-color)', zIndex: 1 }} />
             <div style={{ position: 'absolute', top: '10px', left: '20px', width: `${progressPercent}%`, height: '2px', backgroundColor: activeColor, zIndex: 2, transition: 'width 0.3s ease' }} />
@@ -228,7 +228,7 @@ export default function ChangeRequestModal({ cr, onClose, onApprove, onReject, o
                   }}>
                     {isReached && !isStepRejected && <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: '#FFFFFF' }} />}
                   </div>
-                  <span style={{ fontSize: '0.725rem', fontWeight: isCurrent ? 800 : 500, color: textColor }}>
+                  <span style={{ fontSize: '0.725rem', fontWeight: isCurrent ? 600 : 500, color: textColor }}>
                     {step}
                   </span>
                 </div>
@@ -240,35 +240,35 @@ export default function ChangeRequestModal({ cr, onClose, onApprove, onReject, o
         {/* Section 1: Employee Details */}
         <div style={{ padding: '1.25rem 1.75rem', borderBottom: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <h3 style={{ fontSize: '0.9rem', fontWeight: 800, color: 'var(--text-primary)', margin: 0 }}>Section 1: Employee Details</h3>
+            <h3 style={{ fontSize: '0.9rem', fontWeight: 500, color: 'var(--text-primary)', margin: 0 }}>Section 1: Employee Details</h3>
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '1rem' }}>
             <div>
-              <div style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '0.25rem' }}>Requester / Employee</div>
+              <div style={{ fontSize: '0.8rem', fontWeight: 500, color: 'var(--text-primary)', marginBottom: '0.25rem' }}>Requester / Employee</div>
               <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>{cr.employeeName || cr.requester || 'Requester'}</div>
             </div>
             <div>
-              <div style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '0.25rem' }}>
+              <div style={{ fontSize: '0.8rem', fontWeight: 500, color: 'var(--text-primary)', marginBottom: '0.25rem' }}>
                 {isRejected ? 'Rejected By' : isApproved || isImplemented ? 'Approved By' : 'Approver'}
               </div>
-              <div style={{ fontSize: '0.85rem', fontWeight: 700, color: isRejected ? '#DC2626' : isApproved || isImplemented ? '#059669' : 'var(--text-secondary)' }}>
+              <div style={{ fontSize: '0.85rem', fontWeight: 500, color: isRejected ? '#DC2626' : isApproved || isImplemented ? '#059669' : 'var(--text-secondary)' }}>
                 {cr.decidedBy || cr.approver || (isApproved || isImplemented || isRejected ? 'Gauri Shinde' : '—')}
               </div>
             </div>
             <div>
-              <div style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '0.25rem' }}>Employee ID</div>
+              <div style={{ fontSize: '0.8rem', fontWeight: 500, color: 'var(--text-primary)', marginBottom: '0.25rem' }}>Employee ID</div>
               <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)' }}>{cr.employeeId || cr.empId || 'N/A'}</div>
             </div>
             <div>
-              <div style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '0.25rem' }}>Employee Email</div>
+              <div style={{ fontSize: '0.8rem', fontWeight: 500, color: 'var(--text-primary)', marginBottom: '0.25rem' }}>Employee Email</div>
               <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>{cr.employeeEmail || cr.requesterEmail || 'N/A'}</div>
             </div>
             <div>
-              <div style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '0.25rem' }}>Location</div>
+              <div style={{ fontSize: '0.8rem', fontWeight: 500, color: 'var(--text-primary)', marginBottom: '0.25rem' }}>Location</div>
               <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>{cr.location || 'N/A'}</div>
             </div>
             <div>
-              <div style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '0.25rem' }}>Manager Email</div>
+              <div style={{ fontSize: '0.8rem', fontWeight: 500, color: 'var(--text-primary)', marginBottom: '0.25rem' }}>Manager Email</div>
               <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>{cr.managerEmail || 'N/A'}</div>
             </div>
           </div>
@@ -276,7 +276,7 @@ export default function ChangeRequestModal({ cr, onClose, onApprove, onReject, o
 
         {/* Section 2: Change Details */}
         <div style={{ padding: '1.25rem 1.75rem 0.5rem 1.75rem' }}>
-          <h3 style={{ fontSize: '0.9rem', fontWeight: 800, color: 'var(--text-primary)', margin: '0 0 1rem 0' }}>Section 2: Change Details</h3>
+          <h3 style={{ fontSize: '0.9rem', fontWeight: 500, color: 'var(--text-primary)', margin: '0 0 1rem 0' }}>Section 2: Change Details</h3>
         </div>
 
         {/* Dynamic Sub-category Attributes Block */}
@@ -291,7 +291,7 @@ export default function ChangeRequestModal({ cr, onClose, onApprove, onReject, o
               flexDirection: 'column',
               gap: '0.75rem'
             }}>
-              <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#0D9488', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+              <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--brand-primary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                 Filled Form Attributes
               </span>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '0.85rem' }}>
@@ -301,10 +301,10 @@ export default function ChangeRequestModal({ cr, onClose, onApprove, onReject, o
                     .replace(/^./, (str) => str.toUpperCase());
                   return (
                     <div key={key}>
-                      <div style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-secondary)' }}>
+                      <div style={{ fontSize: '0.75rem', fontWeight: 500, color: 'var(--text-secondary)' }}>
                         {formattedKey}
                       </div>
-                      <div style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-primary)', marginTop: '0.15rem' }}>
+                      <div style={{ fontSize: '0.85rem', fontWeight: 500, color: 'var(--text-primary)', marginTop: '0.15rem' }}>
                         {String(val)}
                       </div>
                     </div>
@@ -318,15 +318,15 @@ export default function ChangeRequestModal({ cr, onClose, onApprove, onReject, o
         {/* Dates Grid */}
         <div style={{ padding: '0 1.75rem 1.25rem 1.75rem', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '1.25rem' }}>
           <div>
-            <div style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '0.25rem' }}>Raised date</div>
+            <div style={{ fontSize: '0.8rem', fontWeight: 500, color: 'var(--text-primary)', marginBottom: '0.25rem' }}>Raised date</div>
             <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)' }}>{cr.raisedDate || 'Recently'}</div>
           </div>
           <div>
-            <div style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '0.25rem' }}>Closed date</div>
-            <div style={{ fontSize: '0.85rem', color: isImplemented ? '#0284C7' : 'var(--text-secondary)', fontWeight: isImplemented ? 700 : 400 }}>{cr.closedDate || (isImplemented ? 'Today' : 'Open')}</div>
+            <div style={{ fontSize: '0.8rem', fontWeight: 500, color: 'var(--text-primary)', marginBottom: '0.25rem' }}>Closed date</div>
+            <div style={{ fontSize: '0.85rem', color: isImplemented ? '#0284C7' : 'var(--text-secondary)', fontWeight: isImplemented ? 500 : 400 }}>{cr.closedDate || (isImplemented ? 'Today' : 'Open')}</div>
           </div>
           <div>
-            <div style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '0.25rem' }}>Start date</div>
+            <div style={{ fontSize: '0.8rem', fontWeight: 500, color: 'var(--text-primary)', marginBottom: '0.25rem' }}>Start date</div>
             <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)' }}>{cr.startDate || 'Not specified'}</div>
           </div>
         </div>
@@ -334,13 +334,13 @@ export default function ChangeRequestModal({ cr, onClose, onApprove, onReject, o
         {/* Business Justification & Workflow */}
         <div style={{ padding: '0 1.75rem 1.25rem 1.75rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
           <div>
-            <div style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '0.35rem' }}>Business justification</div>
+            <div style={{ fontSize: '0.8rem', fontWeight: 500, color: 'var(--text-primary)', marginBottom: '0.35rem' }}>Business justification</div>
             <div style={{ fontSize: '0.825rem', color: 'var(--text-secondary)', lineHeight: 1.45, wordBreak: 'break-word', overflowWrap: 'anywhere' }}>
               {cr.justification || 'No business justification provided.'}
             </div>
           </div>
           <div>
-            <div style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '0.35rem' }}>Assigned workflow</div>
+            <div style={{ fontSize: '0.8rem', fontWeight: 500, color: 'var(--text-primary)', marginBottom: '0.35rem' }}>Assigned workflow</div>
             <div style={{ fontSize: '0.825rem', color: 'var(--text-secondary)' }}>
               {cr.workflow || 'Standard Change Workflow'}
             </div>
@@ -351,11 +351,11 @@ export default function ChangeRequestModal({ cr, onClose, onApprove, onReject, o
         {!isRequester && (
           <div style={{ padding: '1.25rem 1.75rem', borderTop: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <h3 style={{ fontSize: '0.9rem', fontWeight: 800, color: 'var(--text-primary)', margin: 0, display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
-                <MessageSquare size={16} color="#0D9488" />
+              <h3 style={{ fontSize: '0.9rem', fontWeight: 500, color: 'var(--text-primary)', margin: 0, display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+                <MessageSquare size={16} color="var(--brand-primary)" />
                 <span>Comments & Admin Notes</span>
               </h3>
-              <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-secondary)' }}>
+              <span style={{ fontSize: '0.75rem', fontWeight: 500, color: 'var(--text-secondary)' }}>
                 {commentsList.length} {commentsList.length === 1 ? 'comment' : 'comments'}
               </span>
             </div>
@@ -367,8 +367,8 @@ export default function ChangeRequestModal({ cr, onClose, onApprove, onReject, o
                   <div key={cmt.id || idx} style={{ padding: '0.85rem 1rem', backgroundColor: 'var(--input-bg)', borderRadius: '10px', border: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column', gap: '0.35rem', overflow: 'hidden' }}>
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem', flexWrap: 'wrap' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
-                        <span style={{ fontSize: '0.825rem', fontWeight: 800, color: 'var(--text-primary)' }}>{cmt.authorName || 'Admin'}</span>
-                        <span style={{ fontSize: '0.7rem', fontWeight: 700, padding: '0.15rem 0.45rem', borderRadius: '4px', backgroundColor: '#EDE9FE', color: '#6D28D9' }}>{cmt.authorRole || 'Admin'}</span>
+                        <span style={{ fontSize: '0.825rem', fontWeight: 500, color: 'var(--text-primary)' }}>{cmt.authorName || 'Admin'}</span>
+                        <span style={{ fontSize: '0.7rem', fontWeight: 500, padding: '0.15rem 0.45rem', borderRadius: '4px', backgroundColor: '#EDE9FE', color: '#6D28D9' }}>{cmt.authorRole || 'Admin'}</span>
                       </div>
                       <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)' }}>
                         {cmt.createdAt ? new Date(cmt.createdAt).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' }) : ''}
@@ -415,7 +415,7 @@ export default function ChangeRequestModal({ cr, onClose, onApprove, onReject, o
                     resize: 'vertical'
                   }}
                 />
-                {commentError && <span style={{ fontSize: '0.775rem', fontWeight: 700, color: '#DC2626' }}>{commentError}</span>}
+                {commentError && <span style={{ fontSize: '0.775rem', fontWeight: 500, color: '#DC2626' }}>{commentError}</span>}
                 <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
                   <button
                     type="button"
@@ -423,12 +423,12 @@ export default function ChangeRequestModal({ cr, onClose, onApprove, onReject, o
                     disabled={isPostingComment || !commentInput.trim()}
                     style={{
                       padding: '0.45rem 1rem',
-                      backgroundColor: isPostingComment || !commentInput.trim() ? 'var(--border-color)' : '#0D9488',
+                      backgroundColor: isPostingComment || !commentInput.trim() ? 'var(--border-color)' : 'var(--brand-primary)',
                       color: '#FFFFFF',
                       border: 'none',
                       borderRadius: '6px',
                       fontSize: '0.8rem',
-                      fontWeight: 700,
+                      fontWeight: 500,
                       cursor: isPostingComment || !commentInput.trim() ? 'not-allowed' : 'pointer'
                     }}
                   >
@@ -454,7 +454,7 @@ export default function ChangeRequestModal({ cr, onClose, onApprove, onReject, o
             flexDirection: 'column',
             gap: '0.75rem'
           }}>
-            <div style={{ fontSize: '0.85rem', fontWeight: 800, color: '#DC2626' }}>
+            <div style={{ fontSize: '0.85rem', fontWeight: 500, color: '#DC2626' }}>
               Provide Rejection Reason *
             </div>
             <textarea
@@ -477,7 +477,7 @@ export default function ChangeRequestModal({ cr, onClose, onApprove, onReject, o
               }}
             />
             {rejectReasonError && (
-              <span style={{ fontSize: '0.775rem', fontWeight: 700, color: '#DC2626' }}>
+              <span style={{ fontSize: '0.775rem', fontWeight: 500, color: '#DC2626' }}>
                 {rejectReasonError}
               </span>
             )}
@@ -500,7 +500,7 @@ export default function ChangeRequestModal({ cr, onClose, onApprove, onReject, o
                   setShowRejectPrompt(false);
                   onClose();
                 }}
-                style={{ padding: '0.45rem 1rem', backgroundColor: '#DC2626', color: '#FFFFFF', border: 'none', borderRadius: '6px', fontSize: '0.8rem', fontWeight: 700, cursor: 'pointer' }}
+                style={{ padding: '0.45rem 1rem', backgroundColor: '#DC2626', color: '#FFFFFF', border: 'none', borderRadius: '6px', fontSize: '0.8rem', fontWeight: 500, cursor: 'pointer' }}
               >
                 Confirm Rejection
               </button>
@@ -521,14 +521,14 @@ export default function ChangeRequestModal({ cr, onClose, onApprove, onReject, o
                 }}
                 style={{
                   padding: '0.55rem 1.25rem',
-                  backgroundColor: '#0D9488',
+                  backgroundColor: 'var(--brand-primary)',
                   color: '#FFFFFF',
                   border: 'none',
                   borderRadius: '8px',
                   fontSize: '0.825rem',
-                  fontWeight: 700,
+                  fontWeight: 500,
                   cursor: 'pointer',
-                  boxShadow: '0 1px 3px rgba(13, 148, 136, 0.2)'
+                  boxShadow: '0 1px 3px rgba(0, 0, 0, 0.2)'
                 }}
               >
                 Submit for Approval
@@ -536,10 +536,10 @@ export default function ChangeRequestModal({ cr, onClose, onApprove, onReject, o
             ) : canAct ? (
               <>
                 {onReject && (
-                  <button onClick={() => setShowRejectPrompt(true)} style={{ padding: '0.55rem 1.1rem', backgroundColor: '#FEF2F2', color: '#DC2626', border: '1px solid #FCA5A5', borderRadius: '8px', fontSize: '0.825rem', fontWeight: 700, cursor: 'pointer' }}>Reject</button>
+                  <button onClick={() => setShowRejectPrompt(true)} style={{ padding: '0.55rem 1.1rem', backgroundColor: '#FEF2F2', color: '#DC2626', border: '1px solid #FCA5A5', borderRadius: '8px', fontSize: '0.825rem', fontWeight: 500, cursor: 'pointer' }}>Reject</button>
                 )}
                 {onApprove && (
-                  <button onClick={() => { onApprove(cr.id); onClose(); }} style={{ padding: '0.55rem 1.25rem', backgroundColor: '#0D9488', color: '#FFFFFF', border: 'none', borderRadius: '8px', fontSize: '0.825rem', fontWeight: 700, cursor: 'pointer', boxShadow: '0 1px 3px rgba(13, 148, 136, 0.2)' }}>Approve</button>
+                  <button onClick={() => { onApprove(cr.id); onClose(); }} style={{ padding: '0.55rem 1.25rem', backgroundColor: 'var(--brand-primary)', color: '#FFFFFF', border: 'none', borderRadius: '8px', fontSize: '0.825rem', fontWeight: 500, cursor: 'pointer', boxShadow: '0 1px 3px rgba(0, 0, 0, 0.2)' }}>Approve</button>
                 )}
               </>
             ) : isApproved && isAdminOrSuperAdmin && !isSelfRequest ? (
@@ -550,14 +550,14 @@ export default function ChangeRequestModal({ cr, onClose, onApprove, onReject, o
                 }}
                 style={{
                   padding: '0.55rem 1.25rem',
-                  backgroundColor: '#0D9488',
+                  backgroundColor: 'var(--brand-primary)',
                   color: '#FFFFFF',
                   border: 'none',
                   borderRadius: '8px',
                   fontSize: '0.825rem',
-                  fontWeight: 700,
+                  fontWeight: 500,
                   cursor: 'pointer',
-                  boxShadow: '0 1px 3px rgba(13, 148, 136, 0.2)'
+                  boxShadow: '0 1px 3px rgba(0, 0, 0, 0.2)'
                 }}
               >
                 Mark as Implemented
@@ -565,9 +565,9 @@ export default function ChangeRequestModal({ cr, onClose, onApprove, onReject, o
             ) : (
               <span style={{
                 padding: '0.4rem 0.9rem',
-                borderRadius: '99px',
+                borderRadius: 'var(--radius-lg)',
                 fontSize: '0.8rem',
-                fontWeight: 700,
+                fontWeight: 500,
                 backgroundColor: isImplemented ? '#E0F2FE' : isRejected ? '#FEE2E2' : '#D1FAE5',
                 color: isImplemented ? '#0284C7' : isRejected ? '#DC2626' : '#059669'
               }}>

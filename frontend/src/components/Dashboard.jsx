@@ -32,6 +32,13 @@ export default function Dashboard({ user, onLogout }) {
   const [myRequestsCount, setMyRequestsCount] = useState(0);
   const [worklistCount, setWorklistCount] = useState(0);
 
+  const roleName = (user?.role || '').toLowerCase();
+  const roleId = user?.roleId || '';
+  const isSuperAdmin = roleId === 'role-1' || roleName.includes('super');
+  const isAdmin = isSuperAdmin || roleId === 'role-2' || roleName.includes('admin');
+  const isChangeManager = roleId === 'role-3' || roleName.includes('manager');
+  const canSeeWorklist = isAdmin || isChangeManager;
+
   useEffect(() => {
     try {
       localStorage.setItem(COLLAPSE_KEY, collapsed ? '1' : '0');
@@ -49,17 +56,16 @@ export default function Dashboard({ user, onLogout }) {
   useEffect(() => {
     const fetchBadgeCounts = async () => {
       try {
-        const [reqRes, workRes] = await Promise.all([
-          apiFetch('/my-requests'),
-          apiFetch('/worklist')
-        ]);
+        const requests = [apiFetch('/my-requests')];
+        if (canSeeWorklist) requests.push(apiFetch('/worklist'));
+        const [reqRes, workRes] = await Promise.all(requests);
         if (reqRes.ok) {
           const reqBody = await reqRes.json();
           if (reqBody.data && Array.isArray(reqBody.data)) {
             setMyRequestsCount(reqBody.data.length);
           }
         }
-        if (workRes.ok) {
+        if (workRes?.ok) {
           const workBody = await workRes.json();
           if (workBody.data && Array.isArray(workBody.data)) {
             setWorklistCount(workBody.data.length);
@@ -73,7 +79,7 @@ export default function Dashboard({ user, onLogout }) {
     fetchBadgeCounts();
     const interval = setInterval(fetchBadgeCounts, 10000);
     return () => clearInterval(interval);
-  }, [user?.id, activeItem]);
+  }, [user?.id, activeItem, canSeeWorklist]);
 
   const [visitedSections, setVisitedSections] = useState(() => {
     try {
@@ -114,12 +120,6 @@ export default function Dashboard({ user, onLogout }) {
   const handleOpenMobile = useCallback(() => {
     setMobileOpen(true);
   }, []);
-
-  const roleName = (user?.role || '').toLowerCase();
-  const roleId = user?.roleId || '';
-  const isSuperAdmin = roleId === 'role-1' || roleName.includes('super');
-  const isAdmin = isSuperAdmin || roleId === 'role-2' || roleName.includes('admin');
-  const isChangeManager = roleId === 'role-3' || roleName.includes('manager');
 
   let currentItem = activeItem;
   if (!isAdmin && !isChangeManager && (currentItem === 'My Worklist' || currentItem === 'Org Worklist' || currentItem === 'Organization worklist')) {
@@ -204,7 +204,7 @@ export default function Dashboard({ user, onLogout }) {
                   marginBottom: '1rem'
                 }}
               >
-                <h2 style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--text-primary)' }}>
+                <h2 style={{ fontSize: '1.25rem', fontWeight: 600, color: 'var(--text-primary)' }}>
                   {activeItem}
                 </h2>
                 <button
