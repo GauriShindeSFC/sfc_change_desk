@@ -107,7 +107,11 @@ function MyWorklistPage({ onNavigate, searchQuery = '', user }) {
           ...(dateFilter === 'custom' && endDate && { endDate }),
           ...(searchQuery && { search: searchQuery })
         });
-        const res = await apiFetch(`/worklist?${params}`);
+        const res = await apiFetch(`/worklist?${params}`, {
+          headers: {
+            ...(user?.id ? { 'x-user-id': user.id } : {})
+          }
+        });
         if (res.ok) {
           const body = await res.json();
           if (body.data && Array.isArray(body.data)) setItems(body.data);

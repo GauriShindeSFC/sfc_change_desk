@@ -611,10 +611,7 @@ export const updateDraftChangeRequestService = async (id, actorId, payload = {})
   if (payload.startDate) cr.startDate = payload.startDate;
   if (payload.endDate) cr.endDate = payload.endDate;
   if (payload.risk) cr.risk = payload.risk;
-  if (payload.hostname !== undefined) cr.hostname = payload.hostname;
   if (payload.location) cr.location = payload.location;
-  if (payload.environment) cr.environment = payload.environment;
-  if (payload.contactNumber !== undefined) cr.contactNumber = payload.contactNumber;
   if (payload.managerEmail !== undefined) cr.managerEmail = payload.managerEmail;
   if (payload.customFieldValues) cr.customFieldValues = payload.customFieldValues;
   if (workflowId) cr.workflowId = workflowId;
@@ -765,11 +762,8 @@ export const createChangeRequestService = async (payload = {}) => {
     category: categoryName,
     subCategory: subCategoryName,
     employeeId: payload.employeeId || requesterUser?.employeeId || '',
-    contactNumber: payload.contactNumber || '',
     managerEmail: payload.managerEmail || '',
-    hostname: payload.hostname || '',
     location: payload.location || 'Ahmedabad HQ',
-    environment: payload.environment || 'Production',
     justification: payload.justification || '',
     startDate: payload.startDate || null,
     endDate: payload.endDate || null,

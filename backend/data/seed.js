@@ -62,11 +62,8 @@ export const changeRequests = [
     title: '[Create a New Server] - Server Lifecycle',
     category: 'Server & Infra',
     subCategory: 'Server Lifecycle',
-    hostname: 'srv-db-prod-01',
     location: 'Ahmedabad HQ',
-    environment: 'Production',
     justification: 'Provision new database server for core trading microservices.',
-    contactNumber: '+91 98765 43210',
     managerEmail: 'rahul.verma@company.com',
     startDate: hoursAgo(48),
     endDate: hoursAgo(24),
@@ -96,11 +93,8 @@ export const changeRequests = [
     title: '[Open a Firewall Port] - Firewall / Port',
     category: 'Network & Connectivity',
     subCategory: 'Firewall / Port',
-    hostname: 'fw-edge-01',
     location: 'Mumbai DC',
-    environment: 'Production',
     justification: 'Open port 8443 for partner API gateway communication.',
-    contactNumber: '+91 98765 43211',
     managerEmail: 'rahul.verma@company.com',
     startDate: hoursAgo(12),
     endDate: hoursAgo(2),
@@ -130,11 +124,8 @@ export const changeRequests = [
     title: '[Request Application Access] - Application Access',
     category: 'Access & Security',
     subCategory: 'Application Access',
-    hostname: 'app-sso-01',
     location: 'Ahmedabad HQ',
-    environment: 'Production',
     justification: 'Grant senior engineer access to staging deployment dashboard.',
-    contactNumber: '+91 98765 43212',
     managerEmail: 'rahul.verma@company.com',
     startDate: hoursAgo(6),
     endDate: hoursAgo(1),
@@ -143,7 +134,7 @@ export const changeRequests = [
     isDraft: false,
     submittedAt: hoursAgo(8),
     closedAt: hoursAgo(1),
-    requesterId: 'usr-2',
+    requesterId: 'usr-0',
     approverId: 'usr-1',
     workflowId: 'wf-3',
     customFieldValues: {
@@ -151,7 +142,7 @@ export const changeRequests = [
       application: 'Deployment Portal',
       requestedRole: 'Lead Engineer',
       purposeReason: 'Project Onboarding',
-      employeeEmail: 'priya.nair@company.com'
+      employeeEmail: 'ashish.sfc@company.com'
     }
   },
   {
@@ -159,11 +150,8 @@ export const changeRequests = [
     title: '[Upgrade / Patch Server OS] - OS / Patching',
     category: 'Server & Infra',
     subCategory: 'OS / Patching',
-    hostname: 'srv-app-prod-03',
     location: 'Ahmedabad HQ',
-    environment: 'Production',
     justification: 'Apply Q3 OS kernel security patches.',
-    contactNumber: '+91 98765 43213',
     managerEmail: 'rahul.verma@company.com',
     startDate: hoursAgo(3),
     endDate: hoursAgo(1),
@@ -173,7 +161,7 @@ export const changeRequests = [
     rejectionReason: 'Maintenance window conflicts with month-end financial processing.',
     submittedAt: hoursAgo(5),
     closedAt: hoursAgo(1),
-    requesterId: 'usr-2',
+    requesterId: 'usr-0',
     approverId: 'usr-1',
     workflowId: 'wf-2',
     customFieldValues: {
@@ -184,7 +172,7 @@ export const changeRequests = [
       targetVersionPatch: 'RHEL 8.8 (KB-2026-99)',
       rebootRequired: 'Yes',
       purposeReason: 'Quarterly OS Patching',
-      employeeEmail: 'priya.nair@company.com'
+      employeeEmail: 'ashish.sfc@company.com'
     }
   },
   {
@@ -192,11 +180,8 @@ export const changeRequests = [
     title: '[Request VPN Access] - VPN',
     category: 'Network & Connectivity',
     subCategory: 'VPN',
-    hostname: 'vpn-gw-01',
     location: 'Remote',
-    environment: 'Production',
     justification: 'Provision remote SSL VPN access for on-call engineer.',
-    contactNumber: '+91 98765 43214',
     managerEmail: 'rahul.verma@company.com',
     startDate: hoursAgo(2),
     endDate: hoursAgo(1),

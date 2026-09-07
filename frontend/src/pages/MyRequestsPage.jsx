@@ -5,7 +5,7 @@ import { apiFetch } from '../lib/apiFetch';
 
 function MyRequestsPage({ onNavigate, searchQuery = '', initialData, user }) {
   const [requests, setRequests] = useState([]);
-  const [dateFilter, setDateFilter] = useState('last_7_days');
+  const [dateFilter, setDateFilter] = useState('overall');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -47,7 +47,11 @@ function MyRequestsPage({ onNavigate, searchQuery = '', initialData, user }) {
           ...(dateFilter === 'custom' && endDate && { endDate }),
           ...(searchQuery && { search: searchQuery })
         });
-        const res = await apiFetch(`/my-requests?${params}`);
+        const res = await apiFetch(`/my-requests?${params}`, {
+          headers: {
+            ...(user?.id ? { 'x-user-id': user.id } : {})
+          }
+        });
         if (res.ok) {
           const body = await res.json();
           if (body.data && Array.isArray(body.data)) setRequests(body.data);

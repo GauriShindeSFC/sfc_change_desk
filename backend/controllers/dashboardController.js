@@ -60,7 +60,7 @@ export const getStatusBreakdown = asyncHandler(async (req, res) => {
 // ---------- Change requests -------------------------------
 
 export const getMyRequests = asyncHandler(async (req, res) => {
-  const userId = req.user?.id || req.headers['x-user-id'] || 'usr-1';
+  const userId = req.headers['x-user-id'] || req.user?.id || 'usr-1';
   const page = req.query.page || 1;
   const limit = req.query.limit || 10;
   const status = req.query.status || null;
@@ -115,7 +115,7 @@ export const submitDraftChangeRequest = asyncHandler(async (req, res) => {
 // ---------- CAB worklist --------------------------------
 
 export const getWorklist = asyncHandler(async (req, res) => {
-  const userId = req.user?.id || req.headers['x-user-id'] || 'usr-1';
+  const userId = req.headers['x-user-id'] || req.user?.id || 'usr-1';
   const page = req.query.page || 1;
   const limit = req.query.limit || 10;
   const status = req.query.status || null;
