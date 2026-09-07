@@ -231,7 +231,7 @@ function ChangeCatalogPage({ onNavigate, searchQuery = '', user, initialData }) 
           gap: '0.75rem'
         }}>
           <span>
-            ⚠️ Could not load the latest live catalog from the database. Showing fallback items — values may be outdated.
+            Could not load the latest live catalog from the database. Showing fallback items — values may be outdated.
           </span>
           <button
             type="button"

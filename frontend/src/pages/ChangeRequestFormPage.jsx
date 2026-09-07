@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Send, ArrowLeft } from 'lucide-react';
+import { Send, ArrowLeft, Check } from 'lucide-react';
 import { apiFetch } from '../lib/apiFetch';
 import { getSession } from '../lib/auth';
 
@@ -344,7 +344,7 @@ function ChangeRequestFormPage({ onNavigate, initialData, user }) {
           fontSize: '1.75rem',
           fontWeight: 800
         }}>
-          ✓
+          <Check size={28} />
         </div>
         <h2 style={{ fontSize: '1.4rem', fontWeight: 800, color: 'var(--text-primary)', marginBottom: '0.5rem' }}>
           {isDraftSubmission ? 'Change Request Saved as Draft!' : 'Change Request Submitted Successfully!'}

@@ -9,6 +9,10 @@ export default function ChangeRequestModal({ cr, onClose, onApprove, onReject, o
   const userRoleName = (currentUser?.role || '').toLowerCase();
   const userRoleId = currentUser?.roleId || '';
   const isAdminOrSuperAdmin = ['role-1', 'role-2'].includes(userRoleId) || userRoleName.includes('admin') || userRoleName.includes('super');
+  const isChangeManager = userRoleId === 'role-3' || userRoleName.includes('manager');
+  const isRequester = !isAdminOrSuperAdmin && !isChangeManager;
+  const isSelfRequest = (cr.requesterId && currentUser?.id && String(cr.requesterId) === String(currentUser.id)) ||
+    (cr.employeeEmail && currentUser?.email && cr.employeeEmail.toLowerCase() === currentUser.email.toLowerCase());
 
   const [showRejectPrompt, setShowRejectPrompt] = useState(false);
   const [rejectReasonInput, setRejectReasonInput] = useState('');
@@ -187,7 +191,7 @@ export default function ChangeRequestModal({ cr, onClose, onApprove, onReject, o
                   Rejection Reason / Approver Comments
                 </span>
               </div>
-              <p style={{ fontSize: '0.9rem', fontWeight: 700, color: '#991B1B', margin: 0, lineHeight: 1.5 }}>
+              <p style={{ fontSize: '0.9rem', fontWeight: 700, color: '#991B1B', margin: 0, lineHeight: 1.5, wordBreak: 'break-word', overflowWrap: 'anywhere' }}>
                 {cr.rejectionReason || cr.rejection_reason || cr.customFieldValues?.rejectionReason || 'This change request was rejected during CAB review.'}
               </p>
             </div>
@@ -331,7 +335,7 @@ export default function ChangeRequestModal({ cr, onClose, onApprove, onReject, o
         <div style={{ padding: '0 1.75rem 1.25rem 1.75rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
           <div>
             <div style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '0.35rem' }}>Business justification</div>
-            <div style={{ fontSize: '0.825rem', color: 'var(--text-secondary)', lineHeight: 1.45 }}>
+            <div style={{ fontSize: '0.825rem', color: 'var(--text-secondary)', lineHeight: 1.45, wordBreak: 'break-word', overflowWrap: 'anywhere' }}>
               {cr.justification || 'No business justification provided.'}
             </div>
           </div>
@@ -343,91 +347,102 @@ export default function ChangeRequestModal({ cr, onClose, onApprove, onReject, o
           </div>
         </div>
 
-        {/* Comments / Admin Notes Section */}
-        <div style={{ padding: '1.25rem 1.75rem', borderTop: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <h3 style={{ fontSize: '0.9rem', fontWeight: 800, color: 'var(--text-primary)', margin: 0, display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
-              <MessageSquare size={16} color="#0D9488" />
-              <span>Comments & Admin Notes</span>
-            </h3>
-            <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-secondary)' }}>
-              {commentsList.length} {commentsList.length === 1 ? 'comment' : 'comments'}
-            </span>
-          </div>
+        {/* Comments / Admin Notes Section (Hidden for Requester) */}
+        {!isRequester && (
+          <div style={{ padding: '1.25rem 1.75rem', borderTop: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <h3 style={{ fontSize: '0.9rem', fontWeight: 800, color: 'var(--text-primary)', margin: 0, display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+                <MessageSquare size={16} color="#0D9488" />
+                <span>Comments & Admin Notes</span>
+              </h3>
+              <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-secondary)' }}>
+                {commentsList.length} {commentsList.length === 1 ? 'comment' : 'comments'}
+              </span>
+            </div>
 
-          {/* Existing comments list */}
-          {commentsList.length > 0 ? (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-              {commentsList.map((cmt, idx) => (
-                <div key={cmt.id || idx} style={{ padding: '0.85rem 1rem', backgroundColor: 'var(--input-bg)', borderRadius: '10px', border: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
-                      <span style={{ fontSize: '0.825rem', fontWeight: 800, color: 'var(--text-primary)' }}>{cmt.authorName || 'Admin'}</span>
-                      <span style={{ fontSize: '0.7rem', fontWeight: 700, padding: '0.15rem 0.45rem', borderRadius: '4px', backgroundColor: '#EDE9FE', color: '#6D28D9' }}>{cmt.authorRole || 'Admin'}</span>
+            {/* Existing comments list */}
+            {commentsList.length > 0 ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                {commentsList.map((cmt, idx) => (
+                  <div key={cmt.id || idx} style={{ padding: '0.85rem 1rem', backgroundColor: 'var(--input-bg)', borderRadius: '10px', border: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column', gap: '0.35rem', overflow: 'hidden' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem', flexWrap: 'wrap' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+                        <span style={{ fontSize: '0.825rem', fontWeight: 800, color: 'var(--text-primary)' }}>{cmt.authorName || 'Admin'}</span>
+                        <span style={{ fontSize: '0.7rem', fontWeight: 700, padding: '0.15rem 0.45rem', borderRadius: '4px', backgroundColor: '#EDE9FE', color: '#6D28D9' }}>{cmt.authorRole || 'Admin'}</span>
+                      </div>
+                      <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)' }}>
+                        {cmt.createdAt ? new Date(cmt.createdAt).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' }) : ''}
+                      </span>
                     </div>
-                    <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)' }}>
-                      {cmt.createdAt ? new Date(cmt.createdAt).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' }) : ''}
-                    </span>
+                    <p style={{
+                      fontSize: '0.85rem',
+                      color: 'var(--text-primary)',
+                      margin: 0,
+                      lineHeight: 1.45,
+                      whiteSpace: 'pre-wrap',
+                      wordBreak: 'break-word',
+                      overflowWrap: 'anywhere',
+                      maxWidth: '100%'
+                    }}>
+                      {cmt.text}
+                    </p>
                   </div>
-                  <p style={{ fontSize: '0.85rem', color: 'var(--text-primary)', margin: 0, lineHeight: 1.45, whiteSpace: 'pre-wrap' }}>
-                    {cmt.text}
-                  </p>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', fontStyle: 'italic' }}>
-              No comments posted yet.
-            </div>
-          )}
-
-          {/* Composer */}
-          {isAdminOrSuperAdmin ? (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginTop: '0.25rem' }}>
-              <textarea
-                rows={2}
-                placeholder="Add an admin note or implementation comment..."
-                value={commentInput}
-                onChange={(e) => setCommentInput(e.target.value)}
-                style={{
-                  width: '100%',
-                  padding: '0.65rem 0.85rem',
-                  backgroundColor: 'var(--input-bg)',
-                  border: '1px solid var(--border-color)',
-                  borderRadius: '8px',
-                  fontSize: '0.85rem',
-                  color: 'var(--text-primary)',
-                  outline: 'none',
-                  resize: 'vertical'
-                }}
-              />
-              {commentError && <span style={{ fontSize: '0.775rem', fontWeight: 700, color: '#DC2626' }}>{commentError}</span>}
-              <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-                <button
-                  type="button"
-                  onClick={handlePostComment}
-                  disabled={isPostingComment || !commentInput.trim()}
-                  style={{
-                    padding: '0.45rem 1rem',
-                    backgroundColor: isPostingComment || !commentInput.trim() ? 'var(--border-color)' : '#0D9488',
-                    color: '#FFFFFF',
-                    border: 'none',
-                    borderRadius: '6px',
-                    fontSize: '0.8rem',
-                    fontWeight: 700,
-                    cursor: isPostingComment || !commentInput.trim() ? 'not-allowed' : 'pointer'
-                  }}
-                >
-                  {isPostingComment ? 'Posting...' : 'Post Comment'}
-                </button>
+                ))}
               </div>
-            </div>
-          ) : (
-            <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', fontStyle: 'italic', padding: '0.5rem', backgroundColor: 'var(--input-bg)', borderRadius: '6px' }}>
-              🔒 Only Admins and Super Admins can add comments to this change request.
-            </div>
-          )}
-        </div>
+            ) : (
+              <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', fontStyle: 'italic' }}>
+                No comments posted yet.
+              </div>
+            )}
+
+            {/* Composer */}
+            {isAdminOrSuperAdmin ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginTop: '0.25rem' }}>
+                <textarea
+                  rows={2}
+                  placeholder="Add an admin note or implementation comment..."
+                  value={commentInput}
+                  onChange={(e) => setCommentInput(e.target.value)}
+                  style={{
+                    width: '100%',
+                    padding: '0.65rem 0.85rem',
+                    backgroundColor: 'var(--input-bg)',
+                    border: '1px solid var(--border-color)',
+                    borderRadius: '8px',
+                    fontSize: '0.85rem',
+                    color: 'var(--text-primary)',
+                    outline: 'none',
+                    resize: 'vertical'
+                  }}
+                />
+                {commentError && <span style={{ fontSize: '0.775rem', fontWeight: 700, color: '#DC2626' }}>{commentError}</span>}
+                <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                  <button
+                    type="button"
+                    onClick={handlePostComment}
+                    disabled={isPostingComment || !commentInput.trim()}
+                    style={{
+                      padding: '0.45rem 1rem',
+                      backgroundColor: isPostingComment || !commentInput.trim() ? 'var(--border-color)' : '#0D9488',
+                      color: '#FFFFFF',
+                      border: 'none',
+                      borderRadius: '6px',
+                      fontSize: '0.8rem',
+                      fontWeight: 700,
+                      cursor: isPostingComment || !commentInput.trim() ? 'not-allowed' : 'pointer'
+                    }}
+                  >
+                    {isPostingComment ? 'Posting...' : 'Post Comment'}
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', fontStyle: 'italic', padding: '0.5rem', backgroundColor: 'var(--input-bg)', borderRadius: '6px' }}>
+                Only Admins and Super Admins can add comments to this change request.
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Rejection Prompt Form Overlay */}
         {showRejectPrompt && (
@@ -527,7 +542,7 @@ export default function ChangeRequestModal({ cr, onClose, onApprove, onReject, o
                   <button onClick={() => { onApprove(cr.id); onClose(); }} style={{ padding: '0.55rem 1.25rem', backgroundColor: '#0D9488', color: '#FFFFFF', border: 'none', borderRadius: '8px', fontSize: '0.825rem', fontWeight: 700, cursor: 'pointer', boxShadow: '0 1px 3px rgba(13, 148, 136, 0.2)' }}>Approve</button>
                 )}
               </>
-            ) : isApproved && isAdminOrSuperAdmin ? (
+            ) : isApproved && isAdminOrSuperAdmin && !isSelfRequest ? (
               <button
                 onClick={() => {
                   if (onImplement) onImplement(cr.id);
@@ -535,14 +550,14 @@ export default function ChangeRequestModal({ cr, onClose, onApprove, onReject, o
                 }}
                 style={{
                   padding: '0.55rem 1.25rem',
-                  backgroundColor: '#0284C7',
+                  backgroundColor: '#0D9488',
                   color: '#FFFFFF',
                   border: 'none',
                   borderRadius: '8px',
                   fontSize: '0.825rem',
                   fontWeight: 700,
                   cursor: 'pointer',
-                  boxShadow: '0 1px 3px rgba(2, 132, 199, 0.2)'
+                  boxShadow: '0 1px 3px rgba(13, 148, 136, 0.2)'
                 }}
               >
                 Mark as Implemented
@@ -556,7 +571,7 @@ export default function ChangeRequestModal({ cr, onClose, onApprove, onReject, o
                 backgroundColor: isImplemented ? '#E0F2FE' : isRejected ? '#FEE2E2' : '#D1FAE5',
                 color: isImplemented ? '#0284C7' : isRejected ? '#DC2626' : '#059669'
               }}>
-                {isImplemented ? '✓ Implemented' : decisionLower === 'approved' ? '✓ You approved' : decisionLower === 'rejected' ? '✕ You rejected' : isApproved ? '✓ Approved' : '✕ Rejected'}
+                {isImplemented ? 'Implemented' : decisionLower === 'approved' ? 'You approved' : decisionLower === 'rejected' ? 'You rejected' : isApproved ? 'Approved' : 'Rejected'}
               </span>
             )}
           </div>

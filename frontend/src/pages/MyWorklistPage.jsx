@@ -5,6 +5,9 @@ import { apiFetch } from '../lib/apiFetch';
 
 function MyWorklistPage({ onNavigate, searchQuery = '', user }) {
   const roleName = (user?.role || '').toLowerCase();
+  const roleId = user?.roleId || '';
+  const isSuperAdmin = roleId === 'role-1' || roleName.includes('super');
+  const isAdmin = isSuperAdmin || roleId === 'role-2' || roleName.includes('admin');
   const isApprover = (user?.roleId && ['role-1', 'role-2', 'role-3'].includes(user.roleId)) || roleName.includes('manager') || roleName.includes('admin');
   const isRequester = !isApprover;
 
@@ -379,16 +382,24 @@ function MyWorklistPage({ onNavigate, searchQuery = '', user }) {
                                 Approve
                               </button>
                             </>
+                          ) : isItemApproved && status !== 'implemented' && isAdmin && !isSelfRequest ? (
+                            <button
+                              type="button"
+                              onClick={() => handleAction(item.id, 'implement')}
+                              style={{ padding: '0.4rem 0.95rem', backgroundColor: '#0D9488', color: '#FFFFFF', border: 'none', borderRadius: '6px', fontSize: '0.8rem', fontWeight: 700, cursor: 'pointer', boxShadow: '0 1px 2px rgba(13, 148, 136, 0.2)' }}
+                            >
+                              Implement
+                            </button>
                           ) : (
                             <span style={{
                               padding: '0.3rem 0.65rem',
                               borderRadius: '99px',
                               fontSize: '0.75rem',
                               fontWeight: 700,
-                              backgroundColor: isItemApproved ? '#D1FAE5' : isItemRejected ? '#FEE2E2' : '#FEF3C7',
-                              color: isItemApproved ? '#059669' : isItemRejected ? '#DC2626' : '#D97706'
+                              backgroundColor: status === 'implemented' ? '#E0F2FE' : isItemApproved ? '#D1FAE5' : isItemRejected ? '#FEE2E2' : '#FEF3C7',
+                              color: status === 'implemented' ? '#0284C7' : isItemApproved ? '#059669' : isItemRejected ? '#DC2626' : '#D97706'
                             }}>
-                              {isItemApproved ? 'Approved' : isItemRejected ? 'Rejected' : 'Pending'}
+                              {status === 'implemented' ? 'Implemented' : isItemApproved ? 'Approved' : isItemRejected ? 'Rejected' : 'Pending'}
                             </span>
                           )}
                         </div>
@@ -408,7 +419,7 @@ function MyWorklistPage({ onNavigate, searchQuery = '', user }) {
               ) : (
                 <tr>
                   <td colSpan={8} style={{ padding: '2.5rem', textAlign: 'center', color: 'var(--text-secondary)' }}>
-                    🎉 No change requests found matching the selected filter.
+                    No change requests found matching the selected filter.
                   </td>
                 </tr>
               )}

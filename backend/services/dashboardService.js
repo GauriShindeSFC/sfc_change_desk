@@ -882,6 +882,7 @@ export const applyWorklistActionService = async ({ id, action, rejectionReason =
         cr.closedAt = new Date();
         await cr.save({ transaction: tx });
         await addAuditLog({ actorId, action: 'CR Implemented', ref: id, detail: `Marked Change Request ${id} as Implemented and Closed.` }, tx);
+        await createWorklistActionNotifications(cr, 'implement', actorId, tx);
       }
     });
 
@@ -1525,8 +1526,8 @@ export const createWorklistActionNotifications = async (changeRequest, action, a
     const actorName = actor?.name || 'an approver';
     const requesterName = changeRequest.employeeName || (await User.findByPk(changeRequest.requesterId, { transaction: tx }))?.name || 'an employee';
 
-    const verb = action === 'approve' ? 'Approved' : action === 'reject' ? 'Rejected' : 'Sent back';
-    const type = action === 'approve' ? 'CR_APPROVED' : action === 'reject' ? 'CR_REJECTED' : 'CR_SENT_BACK';
+    const verb = action === 'approve' ? 'Approved' : action === 'reject' ? 'Rejected' : action === 'implement' ? 'Implemented' : 'Sent back';
+    const type = action === 'approve' ? 'CR_APPROVED' : action === 'reject' ? 'CR_REJECTED' : action === 'implement' ? 'CR_IMPLEMENTED' : 'CR_SENT_BACK';
 
     // 1. Notification for Requester
     if (changeRequest.requesterId) {

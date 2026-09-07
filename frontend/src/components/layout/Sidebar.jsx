@@ -267,7 +267,7 @@ function Sidebar({
 
         const visibleMgmtItems = [
           { id: 'Organization Dashboard', label: 'Organization Dashboard', icon: LayoutGrid },
-          { id: 'Org Worklist', label: 'Org Worklist', icon: CheckCircle2, badge: worklistCount },
+          { id: 'Organization worklist', label: 'Organization worklist', icon: CheckCircle2, badge: worklistCount },
           { id: 'Reports', label: 'Reports', icon: TrendingUp }
         ];
 
