@@ -16,7 +16,7 @@ export const serializeChangeRequest = (row) => {
   } = cr;
 
   const rejApproval = Array.isArray(approvals) ? approvals.find(a => (a.decision === 'Rejected' || a.action === 'Rejected') && (a.rationale || a.comments)) : null;
-  const rationale = cr.rejectionReason || cr.rejection_reason || rejApproval?.rationale || rejApproval?.comments || cr.customFieldValues?.rejectionReason || (cr.status === 'Rejected' ? 'This change request was rejected during CAB review.' : null);
+  const rationale = cr.rejectionReason || cr.rejection_reason || rejApproval?.rationale || rejApproval?.comments || cr.customFieldValues?.rejectionReason || (cr.status === 'Rejected' ? 'This change request was rejected during Change Manager review.' : null);
 
   const decidedApproval = Array.isArray(approvals) ? approvals.find(a => (a.decision === 'Approved' || a.decision === 'Rejected' || a.action === 'Approved' || a.action === 'Rejected')) : null;
   const decidedBy = decidedApproval?.approver?.name || cr.decidedBy || null;
@@ -80,9 +80,13 @@ export const serializeChangeRequest = (row) => {
     hostname: cr.customFieldValues?.hostname || cr.customFieldValues?.assetId || null,
     environment: cr.customFieldValues?.environment || 'Production',
     approver: approver?.name ?? null,
-    workflow: workflow?.name ?? null,
     raisedDate: submittedAt ? formatDate(new Date(submittedAt)) : (createdAt ? formatDate(new Date(createdAt)) : ''),
-    closedDate: closedAt ? formatDate(new Date(closedAt)) : 'Open',
+    submittedAt: submittedAt || createdAt || null,
+    createdAt: createdAt || null,
+    updatedAt: updatedAt || null,
+    closedAt: closedAt || null,
+    subcategoryId: cr.subcategoryId || cr.sub_category_id || null,
+    customFieldValues: cr.customFieldValues || cr.custom_field_values || {},
     comments: cr.comments || cr.customFieldValues?.comments || [],
     rejectionReason: rationale,
     ...riskStyle(cr.risk),
@@ -90,12 +94,12 @@ export const serializeChangeRequest = (row) => {
   };
 };
 
-// A pending change request as it appears in the CAB worklist.
+// A pending change request as it appears in the Change Manager worklist.
 // Needs include: requester, approvals
 export const serializeWorklistEntry = (row) => {
   const cr = plain(row);
   const rejApproval = Array.isArray(cr.approvals) ? cr.approvals.find(a => (a.decision === 'Rejected' || a.action === 'Rejected') && (a.rationale || a.comments)) : null;
-  const rationale = cr.rejectionReason || cr.rejection_reason || rejApproval?.rationale || rejApproval?.comments || cr.customFieldValues?.rejectionReason || (cr.status === 'Rejected' ? 'This change request was rejected during CAB review.' : null);
+  const rationale = cr.rejectionReason || cr.rejection_reason || rejApproval?.rationale || rejApproval?.comments || cr.customFieldValues?.rejectionReason || (cr.status === 'Rejected' ? 'This change request was rejected during Change Manager review.' : null);
 
   const decidedApproval = Array.isArray(cr.approvals) ? cr.approvals.find(a => (a.decision === 'Approved' || a.decision === 'Rejected' || a.action === 'Approved' || a.action === 'Rejected')) : null;
   const decidedBy = decidedApproval?.approver?.name || cr.decidedBy || null;
@@ -151,7 +155,10 @@ export const serializeWorklistEntry = (row) => {
     employeeName: cr.employeeName || cr.requester?.name || cr.customFieldValues?.employeeName || cr.requesterName || '',
     employeeEmail: cr.customFieldValues?.employeeEmail || cr.requester?.email || cr.employeeEmail || '',
     raisedDate: cr.submittedAt ? formatDate(new Date(cr.submittedAt)) : '',
-    closedDate: cr.closedAt ? formatDate(new Date(cr.closedAt)) : 'Open',
+    submittedAt: cr.submittedAt || cr.createdAt || null,
+    createdAt: cr.createdAt || null,
+    updatedAt: cr.updatedAt || null,
+    closedAt: cr.closedAt || null,
     comments: cr.comments || cr.customFieldValues?.comments || [],
     startDate: cr.startDate ? formatDate(new Date(cr.startDate)) : '',
     endDate: cr.endDate ? formatDate(new Date(cr.endDate)) : '',
@@ -262,7 +269,7 @@ export const serializeAuditLog = (row, actorIdentity = null) => {
 // ---------- Dashboard metric cards ----------------------
 const METRIC_CARD_META = {
   total: { title: 'Total Change Requests', subtext: '▲ 12 This Month', subtextColor: '#10B981', iconBg: '#EBF5FF', iconColor: '#00A4EF' },
-  pending: { title: 'Pending Approval', subtext: 'CAB Review Pending', subtextColor: 'var(--text-secondary)', iconBg: '#FEF3C7', iconColor: '#D97706' },
+  pending: { title: 'Pending Approval', subtext: 'Change Manager Review Pending', subtextColor: 'var(--text-secondary)', iconBg: '#FEF3C7', iconColor: '#D97706' },
   approved: { title: 'Approved', subtext: '▲ 59% Of Total', subtextColor: '#10B981', iconBg: '#D1FAE5', iconColor: '#059669' },
   'in-progress': { title: 'Implemented', subtext: 'Scheduled This Week: 6', subtextColor: 'var(--text-secondary)', iconBg: '#F3E8FF', iconColor: '#7C3AED' },
   rejected: { title: 'Rejected', subtext: '▼ 3 This Month', subtextColor: '#DC2626', iconBg: '#FEE2E2', iconColor: '#DC2626' }

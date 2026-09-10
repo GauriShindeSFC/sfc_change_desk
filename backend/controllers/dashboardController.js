@@ -27,38 +27,52 @@ import {
   getSettingsRolesService,
   updateRolePermissionsService,
   getSettingsAuditLogsService,
-  getReportsMetricsService,
-  getUserNotificationsService,
-  markNotificationAsReadService,
-  markAllNotificationsAsReadService,
   getChangeManagerCategoriesService,
-  updateChangeManagerCategoriesService
+  updateChangeManagerCategoriesService,
+  getChangeImplementerCategoriesService,
+  updateChangeImplementerCategoriesService
 } from '../services/dashboardService.js';
 
 // ---------- Dashboard analytics ---------------------------
 
 export const getMetrics = asyncHandler(async (req, res) => {
   const isOrgScope = req.query.scope === 'organization' || req.query.scope === 'org';
-  const userId = isOrgScope ? null : (req.user?.userKey || req.user?.id || req.query.userId || null);
-  res.json({ success: true, data: await getMetricsService(userId) });
+  const userId = isOrgScope ? null : (req.user?.userKey || req.user?.id || req.headers['x-user-id'] || req.query.userId || null);
+  if (!isOrgScope && !userId) {
+    return res.status(401).json({ success: false, message: 'Authentication required for personal metrics.' });
+  }
+  const { dateFilter, startDate, endDate, status, search, searchQuery } = req.query;
+  res.json({ success: true, data: await getMetricsService(userId, { dateFilter, startDate, endDate, status, searchQuery: search || searchQuery }) });
 });
 
 export const getCategories = asyncHandler(async (req, res) => {
   const isOrgScope = req.query.scope === 'organization' || req.query.scope === 'org';
-  const userId = isOrgScope ? null : (req.user?.userKey || req.user?.id || req.query.userId || null);
-  res.json({ success: true, data: await getCategoryMetricsService(userId) });
+  const userId = isOrgScope ? null : (req.user?.userKey || req.user?.id || req.headers['x-user-id'] || req.query.userId || null);
+  if (!isOrgScope && !userId) {
+    return res.status(401).json({ success: false, message: 'Authentication required for personal categories.' });
+  }
+  const { dateFilter, startDate, endDate, status, search, searchQuery } = req.query;
+  res.json({ success: true, data: await getCategoryMetricsService(userId, { dateFilter, startDate, endDate, status, searchQuery: search || searchQuery }) });
 });
 
 export const getStatusBreakdown = asyncHandler(async (req, res) => {
   const isOrgScope = req.query.scope === 'organization' || req.query.scope === 'org';
-  const userId = isOrgScope ? null : (req.user?.userKey || req.user?.id || req.query.userId || null);
-  res.json({ success: true, data: await getStatusBreakdownService(userId) });
+  const userId = isOrgScope ? null : (req.user?.userKey || req.user?.id || req.headers['x-user-id'] || req.query.userId || null);
+  if (!isOrgScope && !userId) {
+    return res.status(401).json({ success: false, message: 'Authentication required for personal status breakdown.' });
+  }
+  const { dateFilter, startDate, endDate, status, search, searchQuery } = req.query;
+  res.json({ success: true, data: await getStatusBreakdownService(userId, { dateFilter, startDate, endDate, status, searchQuery: search || searchQuery }) });
 });
 
 // ---------- Change requests -------------------------------
 
 export const getMyRequests = asyncHandler(async (req, res) => {
-  const userId = req.user?.userKey || req.user?.id || req.headers['x-user-id'];
+  const organizationScope = ['organization', 'org'].includes(String(req.query.scope || '').toLowerCase());
+  const userId = organizationScope ? null : (req.user?.userKey || req.user?.id || req.headers['x-user-id'] || null);
+  if (!organizationScope && !userId) {
+    return res.status(401).json({ success: false, message: 'Authentication required to view personal requests.' });
+  }
   const page = req.query.page || 1;
   const limit = req.query.limit || 10;
   const status = req.query.status || null;
@@ -66,7 +80,6 @@ export const getMyRequests = asyncHandler(async (req, res) => {
   const startDate = req.query.startDate || null;
   const endDate = req.query.endDate || null;
   const searchQuery = req.query.search || req.query.searchQuery || null;
-  const organizationScope = ['organization', 'org'].includes(String(req.query.scope || '').toLowerCase());
 
   const result = await getFilteredChangeRequests({
     userId,
@@ -118,6 +131,7 @@ export const submitDraftChangeRequest = asyncHandler(async (req, res) => {
 
 export const getWorklist = asyncHandler(async (req, res) => {
   const userId = req.user?.userKey || req.user?.id || req.headers['x-user-id'];
+  const organizationScope = ['organization', 'org'].includes(String(req.query.scope || '').toLowerCase());
   const page = req.query.page || 1;
   const limit = req.query.limit || 10;
   const status = req.query.status || null;
@@ -135,6 +149,7 @@ export const getWorklist = asyncHandler(async (req, res) => {
     startDate,
     endDate,
     searchQuery,
+    organizationScope,
     page,
     limit
   });
@@ -317,216 +332,7 @@ export const exportAuditLogs = asyncHandler(async (req, res) => {
   res.json({ success: true, message: `Audit logs exported as ${format.toUpperCase()}` });
 });
 
-// ---------- Reports ----------------------------------
-
-export const getReportsMetrics = asyncHandler(async (req, res) => {
-  const { dateFilter, startDate, endDate } = req.query;
-  res.json({ success: true, ...(await getReportsMetricsService(dateFilter, startDate, endDate)) });
-});
-
-export const exportReport = asyncHandler(async (req, res) => {
-  const format = (req.body?.format || req.query?.format || 'csv').toLowerCase();
-  const requests = await getChangeRequestsService();
-
-  if (format === 'csv') {
-    const headers = ['CR ID', 'Title', 'Category', 'Risk', 'Status', 'Submitted At'];
-    const rows = requests.map(r => [
-      `"${r.id}"`,
-      `"${(r.title || '').replace(/"/g, '""')}"`,
-      `"${r.category}"`,
-      `"${r.risk}"`,
-      `"${r.status}"`,
-      `"${r.raisedDate}"`
-    ]);
-
-    const csvContent = [headers.join(','), ...rows.map(row => row.join(','))].join('\n');
-    res.setHeader('Content-Type', 'text/csv');
-    res.setHeader('Content-Disposition', 'attachment; filename="change_requests_report.csv"');
-    return res.send(csvContent);
-  }
-
-  if (format === 'pdf') {
-    try {
-      const { monthlyChartImage, monthlyData: payloadMonthly, locationData: payloadLocation } = req.body || {};
-
-      const PDFDoc = PDFDocument.default || PDFDocument;
-      const doc = new PDFDoc({ margin: 40, size: 'A4' });
-
-      const chunks = [];
-      doc.on('data', (chunk) => chunks.push(chunk));
-
-      const pdfPromise = new Promise((resolve, reject) => {
-        doc.on('end', () => resolve(Buffer.concat(chunks)));
-        doc.on('error', (err) => reject(err));
-      });
-
-      const decodeBase64Image = (dataUrl) => {
-        if (!dataUrl || typeof dataUrl !== 'string') return null;
-        try {
-          const base64Data = dataUrl.replace(/^data:image\/\w+;base64,/, '');
-          return Buffer.from(base64Data, 'base64');
-        } catch (err) {
-          return null;
-        }
-      };
-
-      // Document Header
-      doc.fontSize(20).fillColor('#0F172A').text('Change Requests Performance Report', { align: 'left' });
-      doc.fontSize(9).fillColor('#64748B').text(`Generated on ${new Date().toLocaleString()}`, { align: 'left' });
-      doc.moveDown(1.5);
-
-      // Summary Table Section
-      doc.fontSize(13).fillColor('#0F172A').text('Change Requests Summary', { align: 'left' });
-      doc.moveDown(0.5);
-
-      const tableTop = doc.y;
-      doc.fontSize(9).fillColor('#475569');
-      doc.text('CR ID', 40, tableTop, { width: 70 });
-      doc.text('Title', 110, tableTop, { width: 180 });
-      doc.text('Category', 290, tableTop, { width: 100 });
-      doc.text('Risk', 390, tableTop, { width: 60 });
-      doc.text('Status', 450, tableTop, { width: 80 });
-
-      doc.moveTo(40, tableTop + 14).lineTo(550, tableTop + 14).strokeColor('#CBD5E1').stroke();
-
-      let currentY = tableTop + 20;
-      const sampleRequests = requests.slice(0, 15);
-      sampleRequests.forEach((r) => {
-        if (currentY > 750) {
-          doc.addPage();
-          currentY = 40;
-        }
-        doc.fontSize(8.5).fillColor('#1E293B');
-        doc.text(r.id || '', 40, currentY, { width: 70 });
-        doc.text((r.title || '').substring(0, 30), 110, currentY, { width: 180 });
-        doc.text(r.category || '', 290, currentY, { width: 100 });
-        doc.text(r.risk || '', 390, currentY, { width: 60 });
-        doc.text(r.status || '', 450, currentY, { width: 80 });
-        currentY += 16;
-      });
-
-      // New Page for Embedded Charts
-      doc.addPage();
-
-      doc.fontSize(16).fillColor('#0F172A').text('Reports Analytics & Visual Charts', { align: 'left' });
-      doc.moveDown(1.5);
-
-      // Helper: Vector Monthly Bar Chart
-      const renderMonthlyVectorChart = (dataList) => {
-        const months = Array.isArray(dataList) && dataList.length > 0 ? dataList : [
-          { month: 'Jan', count: 12 }, { month: 'Feb', count: 18 }, { month: 'Mar', count: 15 },
-          { month: 'Apr', count: 22 }, { month: 'May', count: 28 }, { month: 'Jun', count: 35 },
-          { month: 'Jul', count: 20 }, { month: 'Aug', count: 42 }
-        ];
-        const maxVal = Math.max(...months.map((m) => Number(m.count) || 0), 1);
-        const startX = 50;
-        const startY = doc.y + 10;
-        const chartHeight = 110;
-        const barWidth = Math.min(32, Math.floor(450 / months.length) - 8);
-
-        months.forEach((m, idx) => {
-          const count = Number(m.count) || 0;
-          const barH = Math.max(4, Math.round((count / maxVal) * chartHeight));
-          const x = startX + idx * (barWidth + 10);
-          const y = startY + chartHeight - barH;
-
-          doc.rect(x, y, barWidth, barH).fill('#0D9488');
-          doc.fontSize(7.5).fillColor('#0F172A').text(String(count), x - 2, y - 10, { width: barWidth + 4, align: 'center' });
-          doc.fontSize(7.5).fillColor('#64748B').text(m.month || '', x - 4, startY + chartHeight + 4, { width: barWidth + 8, align: 'center' });
-        });
-        doc.y = startY + chartHeight + 30;
-      };
-
-      // Monthly Volume Chart Section
-      doc.fontSize(13).fillColor('#0F172A').text('Monthly Volume', { align: 'left' });
-      doc.moveDown(0.5);
-      const monthlyImgBuffer = decodeBase64Image(monthlyChartImage);
-      if (monthlyImgBuffer) {
-        try {
-          doc.image(monthlyImgBuffer, { fit: [470, 180], align: 'center' });
-        } catch (e) {
-          renderMonthlyVectorChart(payloadMonthly);
-        }
-      } else {
-        renderMonthlyVectorChart(payloadMonthly);
-      }
-
-      // Helper: Vector Location Distribution Progress Chart
-      const renderLocationVectorChart = (dataList) => {
-        const locations = Array.isArray(dataList) && dataList.length > 0 ? dataList : [
-          { location: 'Ahmedabad HQ', count: 12, pct: 40, department: 'IT Operations' },
-          { location: 'Mumbai Branch', count: 8, pct: 27, department: 'Infrastructure' },
-          { location: 'Delhi Office', count: 6, pct: 20, department: 'Security' },
-          { location: 'Bangalore Hub', count: 4, pct: 13, department: 'Collaboration' }
-        ];
-
-        doc.addPage();
-        doc.fontSize(14).fillColor('#0F172A').text('Location-Wise Requests Distribution', { align: 'left' });
-        doc.fontSize(9).fillColor('#64748B').text('Distribution of change requests by location and department', { align: 'left' });
-        doc.moveDown(1);
-
-        const maxVal = Math.max(...locations.map((l) => Number(l.count) || 0), 1);
-
-        locations.forEach((loc) => {
-          if (doc.y > 720) {
-            doc.addPage();
-          }
-          const count = Number(loc.count) || 0;
-          const pct = loc.pct !== undefined ? loc.pct : Math.round((count / maxVal) * 100);
-          const startY = doc.y;
-
-          const titleStr = `${loc.location || 'Location'} (${loc.department || 'All Depts'})`;
-          doc.fontSize(9).fillColor('#0F172A').text(titleStr, 40, startY, { width: 330 });
-          doc.fontSize(8.5).fillColor('#0F172A').text(`${count} requests (${pct}%)`, 380, startY, { width: 150, align: 'right' });
-          
-          const barY = Math.max(doc.y + 2, startY + 14);
-          doc.rect(40, barY, 490, 8).fill('#E2E8F0');
-          doc.rect(40, barY, Math.min(490, Math.round((pct / 100) * 490)), 8).fill('#0D9488');
-          doc.y = barY + 18;
-        });
-      };
-
-      renderLocationVectorChart(payloadLocation);
-
-      doc.end();
-
-      const pdfBuffer = await pdfPromise;
-      res.setHeader('Content-Type', 'application/pdf');
-      res.setHeader('Content-Disposition', 'attachment; filename="change_requests_report.pdf"');
-      res.setHeader('Content-Length', pdfBuffer.length);
-      return res.send(pdfBuffer);
-    } catch (pdfErr) {
-      console.error('[Export PDF Error]:', pdfErr);
-      if (!res.headersSent) {
-        return res.status(500).json({ success: false, message: 'Failed to generate PDF: ' + pdfErr.message });
-      }
-      return;
-    }
-  }
-
-  res.json({ success: true, message: `Report exported successfully as ${format.toUpperCase()}` });
-});
-
-// ---------- Notifications -----------------------------
-
-export const getUserNotifications = asyncHandler(async (req, res) => {
-  const userId = req.user?.userKey || req.user?.id || req.headers['x-user-id'];
-  const result = await getUserNotificationsService(userId);
-  res.json({ success: true, ...result });
-});
-
-export const markNotificationAsRead = asyncHandler(async (req, res) => {
-  const userId = req.user?.userKey || req.user?.id || req.headers['x-user-id'];
-  const { id } = req.params;
-  const result = await markNotificationAsReadService(id, userId);
-  res.json({ success: true, ...result });
-});
-
-export const markAllNotificationsAsRead = asyncHandler(async (req, res) => {
-  const userId = req.user?.userKey || req.user?.id || req.headers['x-user-id'];
-  const result = await markAllNotificationsAsReadService(userId);
-  res.json({ success: true, ...result });
-});
+// ---------- Change Manager Categories ------------------
 
 
 export const getChangeManagerCategories = asyncHandler(async (req, res) => {
@@ -541,3 +347,19 @@ export const updateChangeManagerCategories = asyncHandler(async (req, res) => {
   const data = await updateChangeManagerCategoriesService(userId, categoryIds || []);
   res.json({ success: true, message: 'Change manager categories updated successfully', data });
 });
+
+// ---------- Change Implementer Categories --------------
+
+export const getChangeImplementerCategories = asyncHandler(async (req, res) => {
+  const { userId } = req.params;
+  const data = await getChangeImplementerCategoriesService(userId);
+  res.json({ success: true, count: data.length, data });
+});
+
+export const updateChangeImplementerCategories = asyncHandler(async (req, res) => {
+  const { userId } = req.params;
+  const { categoryIds } = req.body;
+  const data = await updateChangeImplementerCategoriesService(userId, categoryIds || []);
+  res.json({ success: true, message: 'Change implementer categories updated successfully', data });
+});
+

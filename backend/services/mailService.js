@@ -235,7 +235,7 @@ export const verifyMailTransport = async () => {
 
 const plainRows = (rows) => rows.map(([k, v]) => `${k}: ${v}`).join('\n');
 
-/** New change request submitted → notify CAB approvers (+ manager as CC). */
+/** New change request submitted → notify Change Manager approvers (+ manager as CC). */
 export const sendChangeRequestCreatedEmail = async ({ cr, requesterName, approverEmails, managerEmail }) => {
   const url = `${appUrl()}/`;
   const to = asList(approverEmails);
@@ -253,12 +253,12 @@ export const sendChangeRequestCreatedEmail = async ({ cr, requesterName, approve
     ['Submitted', cr.raisedDate || '—']
   ];
 
-  const subject = `[ChangeDesk] ${cr.id} — ${cr.title} awaiting CAB review`;
+  const subject = `[ChangeDesk] ${cr.id} — ${cr.title} awaiting Change Manager review`;
 
   const html = renderEmail({
-    preheader: `${cr.id} raised by ${requesterName || 'a requester'} needs CAB review`,
+    preheader: `${cr.id} raised by ${requesterName || 'a requester'} needs Change Manager review`,
     heading: 'New change request awaiting your review',
-    intro: `<strong>${esc(requesterName || 'A requester')}</strong> submitted <strong>${esc(cr.id)}</strong> for CAB review.`,
+    intro: `<strong>${esc(requesterName || 'A requester')}</strong> submitted <strong>${esc(cr.id)}</strong> for Change Manager review.`,
     rows,
     bodyHtml: cr.justification
       ? `<p style="font:700 11px Arial,Helvetica,sans-serif;color:${C.muted};letter-spacing:.06em;margin:18px 0 4px">JUSTIFICATION</p>
@@ -269,7 +269,7 @@ export const sendChangeRequestCreatedEmail = async ({ cr, requesterName, approve
   });
 
   const text =
-    `${requesterName || 'A requester'} submitted ${cr.id} for CAB review.\n\n` +
+    `${requesterName || 'A requester'} submitted ${cr.id} for Change Manager review.\n\n` +
     plainRows(rows) +
     (cr.justification ? `\n\nJustification:\n${cr.justification}` : '') +
     `\n\nReview it: ${url}\n`;

@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Search, Bell, Sun, Moon, Menu, Check } from 'lucide-react';
-import { apiFetch } from '../../lib/apiFetch';
+import { Search, Menu } from 'lucide-react';
 
 function Header({
   activeRoute = 'Dashboard',
@@ -13,36 +12,21 @@ function Header({
   onSearchChange
 }) {
   const [showProfileMenu, setShowProfileMenu] = useState(false);
-  const [showNotifMenu, setShowNotifMenu] = useState(false);
-  const [isDarkMode, setIsDarkMode] = useState(() => {
-    try {
-      return localStorage.getItem('changedesk.theme') === 'dark' || document.documentElement.classList.contains('dark');
-    } catch {
-      return false;
-    }
-  });
+  const profileRef = useRef(null);
 
+  // Ensure light mode is strictly applied
   useEffect(() => {
-    document.documentElement.classList.toggle('dark', isDarkMode);
+    document.documentElement.classList.remove('dark');
     try {
-      localStorage.setItem('changedesk.theme', isDarkMode ? 'dark' : 'light');
+      localStorage.setItem('changedesk.theme', 'light');
     } catch {
       /* ignore */
     }
-  }, [isDarkMode]);
-  const [notifications, setNotifications] = useState([]);
-  const [unreadCount, setUnreadCount] = useState(0);
+  }, []);
 
-  const notifRef = useRef(null);
-  const profileRef = useRef(null);
-  const notificationRequestInFlight = useRef(false);
-
-  // Click outside to close dropdowns
+  // Click outside to close profile dropdown
   useEffect(() => {
     const handleClickOutside = (event) => {
-      if (notifRef.current && !notifRef.current.contains(event.target)) {
-        setShowNotifMenu(false);
-      }
       if (profileRef.current && !profileRef.current.contains(event.target)) {
         setShowProfileMenu(false);
       }
@@ -50,83 +34,6 @@ function Header({
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
-
-  // 10-Second Polling for Notifications
-  useEffect(() => {
-    const fetchNotifications = async () => {
-      if (document.hidden || notificationRequestInFlight.current) return;
-      notificationRequestInFlight.current = true;
-      try {
-        const res = await apiFetch('/notifications');
-        if (res.ok) {
-          const body = await res.json();
-          if (body.data && Array.isArray(body.data)) {
-            setNotifications(body.data);
-            setUnreadCount(body.unreadCount || 0);
-          }
-        }
-      } catch (err) {
-        // Polling catch - silent
-      } finally {
-        notificationRequestInFlight.current = false;
-      }
-    };
-
-    fetchNotifications();
-    const interval = setInterval(fetchNotifications, 30000);
-    return () => clearInterval(interval);
-  }, []);
-
-  // Mark all notifications as read
-  const handleMarkAllRead = async () => {
-    try {
-      const res = await apiFetch('/notifications/mark-all-read', { method: 'PATCH' });
-      if (res.ok) {
-        const body = await res.json();
-        if (body.data && Array.isArray(body.data)) {
-          setNotifications(body.data);
-          setUnreadCount(body.unreadCount || 0);
-        } else {
-          setNotifications(prev => prev.map(n => ({ ...n, isRead: true })));
-          setUnreadCount(0);
-        }
-      }
-    } catch (err) {
-      console.warn('Failed to mark all as read:', err);
-    }
-  };
-
-  const handleNotifClick = async (notif) => {
-    try {
-      if (!notif.isRead) {
-        const res = await apiFetch(`/notifications/${notif.id}/read`, { method: 'PATCH' });
-        if (res.ok) {
-          const body = await res.json();
-          if (body.data && Array.isArray(body.data)) {
-            setNotifications(body.data);
-            setUnreadCount(body.unreadCount || 0);
-          } else {
-            setNotifications(prev => prev.map(n => n.id === notif.id ? { ...n, isRead: true } : n));
-            setUnreadCount(prev => Math.max(0, prev - 1));
-          }
-        } else {
-          setNotifications(prev => prev.map(n => n.id === notif.id ? { ...n, isRead: true } : n));
-          setUnreadCount(prev => Math.max(0, prev - 1));
-        }
-      }
-    } catch (err) {
-      console.warn('Failed to mark notification as read:', err);
-    }
-
-    setShowNotifMenu(false);
-    if (onNavigate) {
-      if (notif.type === 'CR_SUBMITTED') {
-        onNavigate('Organization worklist');
-      } else {
-        onNavigate('My Requests');
-      }
-    }
-  };
 
   const initials = user?.initials || 'U';
 
@@ -199,7 +106,7 @@ function Header({
             </>
           )}
           <span style={{ color: 'var(--text-primary)', fontWeight: 500 }}>
-            {activeRoute}
+            {activeRoute === 'Dashboard' ? 'My Dashboard' : activeRoute}
           </span>
         </div>
       </div>
@@ -240,143 +147,11 @@ function Header({
           </div>
         )}
 
-        <button
-          type="button"
-          onClick={() => setIsDarkMode((v) => !v)}
-          title={isDarkMode ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
-          style={squareBtn}
-        >
-          {isDarkMode ? <Sun size={16} /> : <Moon size={16} />}
-        </button>
-
-        {/* Notifications Dropdown */}
-        <div ref={notifRef} style={{ position: 'relative' }}>
-          <button
-            type="button"
-            onClick={() => {
-              setShowNotifMenu((prev) => !prev);
-              setShowProfileMenu(false);
-            }}
-            style={squareBtn}
-            title="Notifications"
-          >
-            <Bell size={16} />
-            {unreadCount > 0 && (
-              <span
-                style={{
-                  position: 'absolute',
-                  top: '-3px',
-                  right: '-3px',
-                  backgroundColor: '#DC2626',
-                  color: '#FFFFFF',
-                  fontSize: '0.65rem',
-                  fontWeight: 500,
-                  width: '16px',
-                  height: '16px',
-                  borderRadius: '50%',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center'
-                }}
-              >
-                {unreadCount > 9 ? '9+' : unreadCount}
-              </span>
-            )}
-          </button>
-
-          {showNotifMenu && (
-            <div
-              style={{
-                position: 'absolute',
-                right: 0,
-                top: 'calc(100% + 8px)',
-                width: '320px',
-                maxHeight: '400px',
-                backgroundColor: 'var(--card-bg)',
-                border: '1px solid var(--border-color)',
-                borderRadius: '10px',
-                boxShadow: '0 8px 24px rgba(0,0,0,0.15)',
-                display: 'flex',
-                flexDirection: 'column',
-                zIndex: 60,
-                overflow: 'hidden'
-              }}
-            >
-              <div
-                style={{
-                  padding: '0.75rem 1rem',
-                  borderBottom: '1px solid var(--border-color)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  backgroundColor: 'var(--input-bg)'
-                }}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                  <strong style={{ fontSize: '0.85rem', color: 'var(--text-primary)' }}>Notifications</strong>
-                  {unreadCount > 0 && (
-                    <span style={{ fontSize: '0.7rem', backgroundColor: 'var(--brand-primary)', color: '#FFF', padding: '0.1rem 0.4rem', borderRadius: 'var(--radius-lg)', fontWeight: 500 }}>
-                      {unreadCount} new
-                    </span>
-                  )}
-                </div>
-                {unreadCount > 0 && (
-                  <button
-                    type="button"
-                    onClick={handleMarkAllRead}
-                    style={{ background: 'none', border: 'none', color: 'var(--brand-primary)', fontSize: '0.75rem', fontWeight: 500, cursor: 'pointer' }}
-                  >
-                    Mark all read
-                  </button>
-                )}
-              </div>
-
-              <div style={{ overflowY: 'auto', maxHeight: '320px' }}>
-                {notifications.length > 0 ? (
-                  notifications.map((n) => (
-                    <div
-                      key={n.id}
-                      onClick={() => handleNotifClick(n)}
-                      style={{
-                        padding: '0.75rem 1rem',
-                        borderBottom: '1px solid var(--border-color)',
-                        backgroundColor: !n.isRead ? 'rgba(0, 0, 0, 0.05)' : 'transparent',
-                        opacity: n.isStale ? 0.6 : 1,
-                        cursor: 'pointer',
-                        transition: 'background-color 0.15s ease'
-                      }}
-                    >
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.2rem' }}>
-                        <span style={{ fontSize: '0.775rem', fontWeight: 500, color: 'var(--text-primary)' }}>{n.title}</span>
-                        {n.isStale && (
-                          <span style={{ fontSize: '0.65rem', backgroundColor: 'var(--input-bg)', color: 'var(--text-secondary)', padding: '0.1rem 0.35rem', borderRadius: '4px', fontWeight: 500 }}>
-                            Already handled
-                          </span>
-                        )}
-                      </div>
-                      <p style={{ fontSize: '0.775rem', color: 'var(--text-secondary)', margin: 0, lineHeight: 1.3 }}>
-                        {n.message}
-                      </p>
-                    </div>
-                  ))
-                ) : (
-                  <div style={{ padding: '2rem 1rem', textAlign: 'center', color: 'var(--text-secondary)', fontSize: '0.8rem' }}>
-                    No notifications right now.
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-        </div>
-
         {/* Profile Menu */}
         <div ref={profileRef} style={{ position: 'relative' }}>
           <button
             type="button"
-            onClick={() => {
-              setShowProfileMenu((v) => !v);
-              setShowNotifMenu(false);
-            }}
+            onClick={() => setShowProfileMenu((v) => !v)}
             style={{
               width: '34px',
               height: '34px',
@@ -415,9 +190,16 @@ function Header({
                 <strong style={{ display: 'block', fontSize: '0.825rem', color: 'var(--text-primary)' }}>
                   {user?.name || 'Unknown user'}
                 </strong>
-                <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>
-                  {user?.role || user?.email || '—'}
-                </span>
+                {(() => {
+                  const roleStr = (user?.role || user?.applicationRole || '').trim().toLowerCase();
+                  const isRequester = roleStr === 'requester' || user?.roleId === 'role-4';
+                  if (isRequester || !user?.role) return null;
+                  return (
+                    <span style={{ display: 'block', fontSize: '0.7rem', color: 'var(--text-secondary)', marginTop: '0.15rem' }}>
+                      {user.role}
+                    </span>
+                  );
+                })()}
               </div>
               <button
                 type="button"

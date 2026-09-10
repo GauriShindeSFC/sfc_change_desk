@@ -6,10 +6,11 @@ import {
   submitDraftChangeRequest
 } from '../controllers/dashboardController.js';
 import { validateChangeRequest } from '../validations/changeRequestValidation.js';
+import { requireOrganizationScopeRole } from '../middlewares/authMiddleware.js';
 
 const router = express.Router();
 
-router.get('/my-requests', getMyRequests);
+router.get('/my-requests', requireOrganizationScopeRole, getMyRequests);
 router.post('/change-requests', validateChangeRequest, createChangeRequest);
 router.patch('/change-requests/:id', updateDraftChangeRequest);
 router.patch('/change-requests/:id/submit', submitDraftChangeRequest);

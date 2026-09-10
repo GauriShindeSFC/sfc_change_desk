@@ -8,7 +8,9 @@ import {
   getSettingsAuditLogs,
   exportAuditLogs,
   getChangeManagerCategories,
-  updateChangeManagerCategories
+  updateChangeManagerCategories,
+  getChangeImplementerCategories,
+  updateChangeImplementerCategories
 } from '../controllers/dashboardController.js';
 import { requireRole } from '../middlewares/authMiddleware.js';
 
@@ -24,5 +26,8 @@ router.post('/settings/audit-logs/export', requireRole(['Super Admin', 'role-1']
 
 router.get('/settings/change-manager-categories/:userId', requireRole(['Super Admin', 'role-1']), getChangeManagerCategories);
 router.put('/settings/change-manager-categories/:userId', requireRole(['Super Admin', 'role-1']), updateChangeManagerCategories);
+
+router.get('/settings/change-implementer-categories/:userId', requireRole(['Super Admin', 'role-1']), getChangeImplementerCategories);
+router.put('/settings/change-implementer-categories/:userId', requireRole(['Super Admin', 'role-1']), updateChangeImplementerCategories);
 
 export default router;

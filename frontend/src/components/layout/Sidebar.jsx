@@ -1,54 +1,24 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState } from 'react';
 import {
   LayoutGrid,
   Menu,
-  Plus,
   FileText,
   CheckCircle2,
-  TrendingUp,
-  Sun,
-  X,
-  PanelLeft
+  Settings,
+  X
 } from 'lucide-react';
-
-const TOP_NAV = [
-  { id: 'Dashboard', label: 'Dashboard', icon: LayoutGrid },
-  { id: 'Change Catalog', label: 'Change Catalog', icon: Menu },
-  { id: 'My Requests', label: 'My Requests', icon: FileText, badge: 6 }
-];
-
-const MANAGEMENT_NAV = [
-  { id: 'Organization Dashboard', label: 'Organization Dashboard', icon: LayoutGrid },
-  { id: 'Organization worklist', label: 'Organization worklist', icon: CheckCircle2, badge: 4 },
-  { id: 'Reports', label: 'Reports', icon: TrendingUp },
-  { id: 'Settings', label: 'Settings', icon: Sun }
-];
 
 function Sidebar({
   activeItem,
   onItemSelect,
   user,
   isMobile = false,
-  collapsed = false,
-  onToggleCollapse,
   mobileOpen = false,
   onCloseMobile,
-  onLogout,
   myRequestsCount = 6,
   worklistCount = 4
 }) {
-  const [showProfileMenu, setShowProfileMenu] = useState(false);
-  const profileRef = useRef(null);
-
-  useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (profileRef.current && !profileRef.current.contains(event.target)) {
-        setShowProfileMenu(false);
-      }
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
+  const [isHovered, setIsHovered] = useState(false);
 
   const roleName = (user?.role || '').toLowerCase();
   const roleId = user?.roleId || '';
@@ -56,20 +26,18 @@ function Sidebar({
   const isSuperAdmin = roleId === 'role-1' || roleName.includes('super');
   const isAdmin = isSuperAdmin || roleId === 'role-2' || roleName.includes('admin');
   const isChangeManager = roleId === 'role-3' || roleName.includes('manager');
+  const isChangeImplementer = roleId === 'role-5' || roleName.includes('implementer');
 
   const topNavItems = [
-    { id: 'Dashboard', label: 'Dashboard', icon: LayoutGrid },
-    { id: 'Change Catalog', label: 'Change Catalog', icon: Menu },
-    { id: 'My Requests', label: 'My Requests', icon: FileText, badge: myRequestsCount }
+    { id: 'Dashboard', label: 'My Dashboard', icon: LayoutGrid },
+    { id: 'Change Catalog', label: 'Change Request', icon: FileText }
   ];
 
-  if (isChangeManager || isAdmin) {
-    topNavItems.push({ id: 'My Worklist', label: 'My Worklist', icon: CheckCircle2, badge: worklistCount });
-  }
-
-  // On mobile the rail is always full width; it just slides in/out.
-  const mini = collapsed && !isMobile;
-  const width = isMobile ? 250 : mini ? 68 : 250;
+  // On desktop: compact rail by default, expands to full width on hover.
+  // On mobile: slides in/out full width.
+  const isExpanded = isMobile || isHovered;
+  const mini = !isExpanded;
+  const width = isMobile ? 250 : isHovered ? 250 : 68;
 
   const handleSelect = (id) => {
     onItemSelect?.(id);
@@ -126,22 +94,10 @@ function Sidebar({
     );
   };
 
-  const iconBtnStyle = {
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    width: '28px',
-    height: '28px',
-    borderRadius: '6px',
-    backgroundColor: '#1E293B',
-    border: '1px solid #334155',
-    color: '#94A3B8',
-    cursor: 'pointer',
-    flexShrink: 0
-  };
-
   const aside = (
     <aside
+      onMouseEnter={() => !isMobile && setIsHovered(true)}
+      onMouseLeave={() => !isMobile && setIsHovered(false)}
       style={{
         width: `${width}px`,
         backgroundColor: '#0B1018',
@@ -155,7 +111,8 @@ function Sidebar({
         left: 0,
         zIndex: isMobile ? 120 : 100,
         transform: isMobile ? `translateX(${mobileOpen ? '0' : '-110%'})` : 'none',
-        transition: 'transform 0.22s ease, width 0.16s ease',
+        transition: 'transform 0.22s ease, width 0.2s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.2s ease',
+        boxShadow: !isMobile && isHovered ? '4px 0 24px rgba(0, 0, 0, 0.45)' : 'none',
         overflowX: 'hidden',
         overflowY: 'auto',
         padding: mini ? '1.25rem 0' : '1.25rem 0.85rem',
@@ -164,7 +121,7 @@ function Sidebar({
         borderRight: '1px solid #1E293B'
       }}
     >
-      {/* Brand + controls */}
+      {/* Brand Header */}
       <div
         style={{
           display: 'flex',
@@ -175,7 +132,7 @@ function Sidebar({
           width: '100%'
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: mini ? 'center' : 'flex-start', width: mini ? '100%' : 'auto', flex: mini ? 'none' : 1, minWidth: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: mini ? 0 : '0.85rem', justifyContent: mini ? 'center' : 'flex-start', width: mini ? '100%' : 'auto', flex: mini ? 'none' : 1, minWidth: 0 }}>
           <img
             src="/images/white-favicon.png"
             alt="Logo"
@@ -217,7 +174,7 @@ function Sidebar({
           )}
         </div>
 
-        {isMobile ? (
+        {isMobile && (
           <button
             type="button"
             onClick={onCloseMobile}
@@ -226,48 +183,8 @@ function Sidebar({
           >
             <X size={16} />
           </button>
-        ) : (
-          !mini && (
-            <button
-              type="button"
-              onClick={onToggleCollapse}
-              aria-label="Collapse sidebar"
-              title="Collapse sidebar"
-              style={iconBtnStyle}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.backgroundColor = '#1E293B';
-                e.currentTarget.style.color = '#FFFFFF';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.backgroundColor = 'transparent';
-                e.currentTarget.style.color = '#94A3B8';
-              }}
-            >
-              <PanelLeft size={18} />
-            </button>
-          )
         )}
       </div>
-
-      {mini && (
-        <button
-          type="button"
-          onClick={onToggleCollapse}
-          aria-label="Expand sidebar"
-          title="Expand sidebar"
-          style={{ ...iconBtnStyle, alignSelf: 'center', margin: '0 auto 1rem auto' }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.backgroundColor = '#1E293B';
-            e.currentTarget.style.color = '#FFFFFF';
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.backgroundColor = 'transparent';
-            e.currentTarget.style.color = '#94A3B8';
-          }}
-        >
-          <PanelLeft size={18} />
-        </button>
-      )}
 
       {/* Main nav */}
       <nav style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
@@ -276,18 +193,22 @@ function Sidebar({
         ))}
       </nav>
 
-      {/* Management section (Only visible to Admin / Super Admin) */}
+      {/* Management section (Visible to Change Manager, Change Implementer & Admin) */}
       {(() => {
-        if (!isAdmin) return null;
+        if (!isAdmin && !isChangeManager && !isChangeImplementer) return null;
 
-        const visibleMgmtItems = [
-          { id: 'Organization Dashboard', label: 'Organization Dashboard', icon: LayoutGrid },
-          { id: 'Organization worklist', label: 'Organization worklist', icon: CheckCircle2, badge: worklistCount },
-          { id: 'Reports', label: 'Reports', icon: TrendingUp }
-        ];
+        const visibleMgmtItems = [];
+
+        if (isChangeManager || isChangeImplementer || isAdmin) {
+          visibleMgmtItems.push({ id: 'My Worklist', label: 'My Worklist', icon: CheckCircle2, badge: worklistCount });
+        }
+
+        if (isAdmin) {
+          visibleMgmtItems.push({ id: 'Organization Dashboard', label: 'Organization Dashboard', icon: LayoutGrid });
+        }
 
         if (isSuperAdmin) {
-          visibleMgmtItems.push({ id: 'Settings', label: 'Settings', icon: Sun });
+          visibleMgmtItems.push({ id: 'Settings', label: 'Settings', icon: Settings });
         }
 
         return (
@@ -314,117 +235,6 @@ function Sidebar({
           </>
         );
       })()}
-
-      {/* User footer */}
-      <div
-        ref={profileRef}
-        style={{
-          marginTop: 'auto',
-          paddingTop: '0.85rem',
-          borderTop: '1px solid #1E293B',
-          position: 'relative',
-          width: '100%'
-        }}
-      >
-        <div
-          onClick={() => setShowProfileMenu((prev) => !prev)}
-          title={mini ? `${user?.name || 'User'} (${user?.role || ''}) - Click for options` : undefined}
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '0.75rem',
-            justifyContent: mini ? 'center' : 'flex-start',
-            padding: mini ? '0.4rem 0' : '0.4rem 0.5rem',
-            cursor: 'pointer',
-            borderRadius: '8px',
-            backgroundColor: showProfileMenu ? '#1E293B' : 'transparent',
-            transition: 'background-color 0.15s ease'
-          }}
-        >
-          <div
-            style={{
-              width: '34px',
-              height: '34px',
-              borderRadius: '50%',
-              backgroundColor: '#27354A',
-              color: '#FFFFFF',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              fontSize: '0.75rem',
-              fontWeight: 500,
-              flexShrink: 0
-            }}
-          >
-            {user?.initials || 'U'}
-          </div>
-          {!mini && (
-            <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0, flex: 1 }}>
-              <span
-                style={{
-                  fontSize: '0.8rem',
-                  fontWeight: 500,
-                  color: '#F1F5F9',
-                  whiteSpace: 'nowrap',
-                  overflow: 'hidden',
-                  textOverflow: 'ellipsis'
-                }}
-              >
-                {user?.name || 'Unknown user'}
-              </span>
-              <span style={{ fontSize: '0.7rem', color: '#64748B' }}>
-                {user?.role || '—'}
-              </span>
-            </div>
-          )}
-        </div>
-
-        {showProfileMenu && (
-          <div
-            style={{
-              position: 'fixed',
-              bottom: mini ? '16px' : '65px',
-              left: mini ? '76px' : '16px',
-              width: mini ? '210px' : '218px',
-              backgroundColor: '#1E293B',
-              border: '1px solid #334155',
-              borderRadius: '10px',
-              boxShadow: '0 8px 24px rgba(0,0,0,0.5)',
-              padding: '0.5rem 0',
-              zIndex: 9999
-            }}
-          >
-            <div style={{ padding: '0.6rem 1rem', borderBottom: '1px solid #334155' }}>
-              <strong style={{ display: 'block', fontSize: '0.85rem', color: '#FFFFFF' }}>
-                {user?.name || 'Unknown user'}
-              </strong>
-              <span style={{ fontSize: '0.725rem', color: '#94A3B8' }}>
-                {user?.role || user?.email || '—'}
-              </span>
-            </div>
-            <button
-              type="button"
-              onClick={() => {
-                setShowProfileMenu(false);
-                onLogout?.();
-              }}
-              style={{
-                width: '100%',
-                textAlign: 'left',
-                padding: '0.6rem 1rem',
-                border: 'none',
-                backgroundColor: 'transparent',
-                color: '#EF4444',
-                fontSize: '0.825rem',
-                fontWeight: 500,
-                cursor: 'pointer'
-              }}
-            >
-              Sign out
-            </button>
-          </div>
-        )}
-      </div>
     </aside>
   );
 

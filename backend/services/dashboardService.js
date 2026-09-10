@@ -14,9 +14,9 @@ import {
   ChangeRequest,
   ChangeRequestApproval,
   AuditLog,
-  Notification,
   AppConfig,
-  ChangeManagerCategory
+  ChangeManagerCategory,
+  ChangeImplementerCategory
 } from '../models/index.js';
 import { Employee } from '../models/Employee.js';
 import { UserAppRole } from '../models/userAppRole.js';
@@ -70,92 +70,106 @@ export const addAuditLog = async ({ actorId = null, action, ref = '—', detail 
 
 // Helper to resolve Dashboard scoping: Dashboard metrics are strictly user-scoped for all employees
 const getDashboardScopeWhere = async (userId) => {
-  if (!userId) return {};
+  if (!userId) {
+    return { id: 'NONE' };
+  }
 
   const identityRes = await IdentityResolver.resolveByKey(String(userId));
   const identity = identityRes.status === 'SUCCESS' ? identityRes.identity : null;
-  if (identity?.roleId === 'role-3') {
-    const assignedCategoryIds = identity.cmCategories || [];
-    if (assignedCategoryIds.length === 0) return { id: 'NONE' };
-
-    const assignedCategories = await CatalogCategory.findAll({
-      where: {
-        [Op.or]: [
-          { id: { [Op.in]: assignedCategoryIds } },
-          { name: { [Op.in]: assignedCategoryIds } }
-        ]
-      },
-      attributes: ['id', 'name']
-    });
-    const categoryConditions = [];
-    for (const category of assignedCategories) {
-      categoryConditions.push({ category: category.id });
-      categoryConditions.push({ category: category.name });
-      categoryConditions.push({ category: { [Op.iLike]: `%${category.name}%` } });
-    }
-    for (const categoryId of assignedCategoryIds) {
-      categoryConditions.push({ category: categoryId });
-    }
-    return categoryConditions.length > 0 ? { [Op.or]: categoryConditions } : { id: 'NONE' };
-  }
 
   const aliases = new Set([userId]);
-
-  // If S8-{id} or EMP-{id}, also check the bare numeric id
-  const numericMatch = userId.match(/^(S8|EMP)-(\d+)$/);
-  if (numericMatch) {
-    aliases.add(numericMatch[2]);
-  }
 
   // If this person has a dual-source identity (both S8 and EMP,
   // per the migration's dual-identity design), resolve and include
   // BOTH keys — reuse the existing dual-identity lookup logic
-  // already built during the migration, do not write a new one.
-  const linkedKeys = await resolveDualSourceIdentities(userId); // <- reuse existing function
+  // already built during the migration.
+  const linkedKeys = await resolveDualSourceIdentities(userId);
   linkedKeys.forEach(k => aliases.add(k));
 
-  // Also resolve their real email (via the existing identity
-  // resolver) and check customFieldValues->>employeeEmail, since
-  // some historical tickets may only have the email, not a userKey
-  const email = await resolveEmailForUser(userId); // <- reuse existing function
-  
-  const aliasArray = Array.from(aliases);
+  if (identity) {
+    if (identity.userKey) aliases.add(identity.userKey);
+    if (identity.sourceId) aliases.add(String(identity.sourceId));
+    if (identity.employeeBusinessId) aliases.add(String(identity.employeeBusinessId));
+    if (identity.employee?.empId) aliases.add(String(identity.employee.empId));
+    if (identity.employee?.sourceId) {
+      aliases.add(`EMP-${identity.employee.sourceId}`);
+      aliases.add(String(identity.employee.sourceId));
+    }
+  }
+
+  const aliasArray = Array.from(aliases).filter(Boolean);
   const where = {
     [Op.or]: [
       { requesterId: { [Op.in]: aliasArray } },
       { employeeId: { [Op.in]: aliasArray } }
     ]
   };
-  if (email) {
-    where[Op.or].push(
-      sequelize.where(
-        sequelize.literal(`"customFieldValues"->>'employeeEmail'`),
-        email
-      )
-    );
+
+  // Check verified email from authoritative identity lookup (not user-editable field)
+  const email = await resolveEmailForUser(userId);
+  if (email && typeof email === 'string' && email.trim() !== '') {
+    where[Op.or].push({ employeeEmail: email.trim() });
+    where[Op.or].push({ requesterEmail: email.trim() });
   }
+
   return where;
 };
 
+import { buildDateFilterClause } from '../utils/dateFilterUtils.js';
+
+export { buildDateFilterClause };
+
+export function buildSearchQueryClause(searchQuery) {
+  if (!searchQuery || !String(searchQuery).trim()) return null;
+  const query = String(searchQuery).trim();
+  return {
+    [Op.or]: [
+      { id: { [Op.iLike]: `%${query}%` } },
+      { title: { [Op.iLike]: `%${query}%` } },
+      { category: { [Op.iLike]: `%${query}%` } },
+      { subCategory: { [Op.iLike]: `%${query}%` } }
+    ]
+  };
+}
+
+export function buildStatusFilterClause(status) {
+  if (!status || String(status).toLowerCase() === 'all') return null;
+  const stLower = String(status).toLowerCase();
+  if (stLower === 'pending') {
+    return { status: { [Op.iLike]: '%pending%' } };
+  } else if (stLower === 'approved') {
+    return { status: 'Approved' };
+  } else if (stLower === 'in progress' || stLower === 'implemented') {
+    return { status: { [Op.or]: ['In progress', 'Scheduled', 'Implemented'] } };
+  } else if (stLower === 'rejected') {
+    return { status: 'Rejected' };
+  } else if (stLower === 'draft') {
+    return { [Op.or]: [{ status: { [Op.iLike]: '%draft%' } }, { isDraft: true }] };
+  }
+  return { status: { [Op.iLike]: `%${status}%` } };
+}
+
 // ---------- Dashboard ----------------------------------
 
-export const getMetricsService = async (userId = null) => {
+export const getMetricsService = async (userId = null, { dateFilter = null, startDate = null, endDate = null, status = null, searchQuery = null } = {}) => {
   try {
     const userWhere = await getDashboardScopeWhere(userId);
-    const activeWhere = (userWhere && Object.keys(userWhere).length > 0)
-      ? {
-          [Op.and]: [
-            userWhere,
-            {
-              isDraft: false,
-              status: { [Op.notIn]: ['Draft', 'draft', 'Deleted', 'deleted', 'Cancelled', 'cancelled'] }
-            }
-          ]
-        }
-      : {
-          isDraft: false,
-          status: { [Op.notIn]: ['Draft', 'draft', 'Deleted', 'deleted', 'Cancelled', 'cancelled'] }
-        };
+    const dateClause = buildDateFilterClause(dateFilter, startDate, endDate);
+    const statusClause = buildStatusFilterClause(status);
+    const searchClause = buildSearchQueryClause(searchQuery);
+
+    const andClauses = [
+      {
+        isDraft: false,
+        status: { [Op.notIn]: ['Draft', 'draft', 'Deleted', 'deleted', 'Cancelled', 'cancelled'] }
+      }
+    ];
+    if (userWhere && Object.keys(userWhere).length > 0) andClauses.push(userWhere);
+    if (dateClause) andClauses.push(dateClause);
+    if (statusClause) andClauses.push(statusClause);
+    if (searchClause) andClauses.push(searchClause);
+
+    const activeWhere = { [Op.and]: andClauses };
 
     // One grouped query replaces five counts on every dashboard refresh.
     const grouped = await ChangeRequest.findAll({
@@ -164,6 +178,7 @@ export const getMetricsService = async (userId = null) => {
       group: ['status'],
       raw: true
     });
+
     const counts = grouped.reduce((map, row) => {
       map[String(row.status || '').toLowerCase()] = Number(row.count) || 0;
       return map;
@@ -171,15 +186,12 @@ export const getMetricsService = async (userId = null) => {
     const total = Object.values(counts).reduce((sum, count) => sum + count, 0);
     const pending = (counts.pending || 0) + (counts.open || 0) + (counts.submitted || 0);
     const approved = counts.approved || 0;
-    const implemented = (counts.implemented || 0) + (counts['in progress'] || 0);
+    const implemented = (counts.implemented || 0) + (counts['in progress'] || 0) + (counts.scheduled || 0);
     const rejected = counts.rejected || 0;
-
-    const approvedPercent = total > 0 ? Math.round((approved / total) * 100) : 0;
 
     return [
       { title: 'Total Change Requests', value: total, count: total, change: `${total} Total Request(s)`, iconBg: '#EBF5FF', iconColor: '#2563EB', isTotal: true },
-      { title: 'Pending Approval', value: pending, count: pending, change: 'Awaiting review', iconBg: '#FEF3C7', iconColor: '#D97706', isPending: true },
-      { title: 'Approved', value: approved, count: approved, change: `${approvedPercent}% of Total`, iconBg: '#D1FAE5', iconColor: '#059669', isApproved: true },
+      { title: 'Pending Approvals', value: pending, count: pending, change: 'Awaiting review', iconBg: '#FEF3C7', iconColor: '#D97706', isPending: true },
       { title: 'Implemented', value: implemented, count: implemented, change: `${implemented} Completed`, iconBg: '#F3E8FF', iconColor: '#7C3AED', isImplemented: true, isInProgress: true },
       { title: 'Rejected', value: rejected, count: rejected, change: `${rejected} Rejected`, iconBg: '#FEE2E2', iconColor: '#DC2626', isRejected: true }
     ];
@@ -187,16 +199,18 @@ export const getMetricsService = async (userId = null) => {
     console.warn('[dashboardService] getMetricsService DB warning:', err.message);
     return [
       { title: 'Total Change Requests', value: 0, count: 0, change: '0 Total Request(s)', iconBg: '#EBF5FF', iconColor: '#2563EB', isTotal: true },
-      { title: 'Pending Approval', value: 0, count: 0, change: 'Awaiting review', iconBg: '#FEF3C7', iconColor: '#D97706', isPending: true },
-      { title: 'Approved', value: 0, count: 0, change: '0% of Total', iconBg: '#D1FAE5', iconColor: '#059669', isApproved: true },
+      { title: 'Pending Approvals', value: 0, count: 0, change: 'Awaiting review', iconBg: '#FEF3C7', iconColor: '#D97706', isPending: true },
       { title: 'Implemented', value: 0, count: 0, change: '0 Completed', iconBg: '#F3E8FF', iconColor: '#7C3AED', isImplemented: true, isInProgress: true },
       { title: 'Rejected', value: 0, count: 0, change: '0 Rejected', iconBg: '#FEE2E2', iconColor: '#DC2626', isRejected: true }
     ];
   }
 };
 
-export const getCategoryMetricsService = async (userId = null) => {
+export const getCategoryMetricsService = async (userId = null, { dateFilter = null, startDate = null, endDate = null, status = null, searchQuery = null } = {}) => {
   const userWhere = await getDashboardScopeWhere(userId);
+  const dateClause = buildDateFilterClause(dateFilter, startDate, endDate);
+  const statusClause = buildStatusFilterClause(status);
+  const searchClause = buildSearchQueryClause(searchQuery);
   const palette = ['#2563EB', '#0D9488', '#7C3AED', '#D97706', '#475569', '#DC2626'];
 
   // Canonical categories list in exact order
@@ -210,20 +224,18 @@ export const getCategoryMetricsService = async (userId = null) => {
   ];
 
   // Base exclusion: strictly exclude drafts, deleted, and cancelled tickets
-  const activeWhere = (userWhere && Object.keys(userWhere).length > 0)
-    ? {
-        [Op.and]: [
-          userWhere,
-          {
-            isDraft: false,
-            status: { [Op.notIn]: ['Draft', 'draft', 'Deleted', 'deleted', 'Cancelled', 'cancelled'] }
-          }
-        ]
-      }
-    : {
-        isDraft: false,
-        status: { [Op.notIn]: ['Draft', 'draft', 'Deleted', 'deleted', 'Cancelled', 'cancelled'] }
-      };
+  const andClauses = [
+    {
+      isDraft: false,
+      status: { [Op.notIn]: ['Draft', 'draft', 'Deleted', 'deleted', 'Cancelled', 'cancelled'] }
+    }
+  ];
+  if (userWhere && Object.keys(userWhere).length > 0) andClauses.push(userWhere);
+  if (dateClause) andClauses.push(dateClause);
+  if (statusClause) andClauses.push(statusClause);
+  if (searchClause) andClauses.push(searchClause);
+
+  const activeWhere = { [Op.and]: andClauses };
 
   const grouped = await ChangeRequest.findAll({
     where: activeWhere,
@@ -253,18 +265,31 @@ export const getCategoryMetricsService = async (userId = null) => {
   return results;
 };
 
-export const getStatusBreakdownService = async (userId = null) => {
+export const getStatusBreakdownService = async (userId = null, { dateFilter = null, startDate = null, endDate = null, status = null, searchQuery = null } = {}) => {
   const userWhere = await getDashboardScopeWhere(userId);
+  const dateClause = buildDateFilterClause(dateFilter, startDate, endDate);
+  const statusClause = buildStatusFilterClause(status);
+  const searchClause = buildSearchQueryClause(searchQuery);
   const statuses = [
-    { status: 'Approved', color: '#059669' },
-    { status: 'Pending', color: '#D97706' },
-    { status: 'Implemented', color: '#7C3AED' },
-    { status: 'Rejected', color: '#DC2626' },
-    { status: 'Draft', color: '#64748B' }
+    { status: 'Pending', label: 'Pending Approvals', color: '#D97706' },
+    { status: 'Implemented', label: 'Implemented', color: '#7C3AED' },
+    { status: 'Rejected', label: 'Rejected', color: '#DC2626' }
   ];
 
+  const andClauses = [
+    {
+      isDraft: false,
+      status: { [Op.notIn]: ['Draft', 'draft', 'Deleted', 'deleted', 'Cancelled', 'cancelled'] }
+    }
+  ];
+  if (userWhere && Object.keys(userWhere).length > 0) andClauses.push(userWhere);
+  if (dateClause) andClauses.push(dateClause);
+  if (statusClause) andClauses.push(statusClause);
+  if (searchClause) andClauses.push(searchClause);
+  const activeWhere = { [Op.and]: andClauses };
+
   const grouped = await ChangeRequest.findAll({
-    where: userWhere,
+    where: activeWhere,
     attributes: ['status', 'isDraft', [fn('COUNT', col('id')), 'count']],
     group: ['status', 'isDraft'],
     raw: true
@@ -274,10 +299,8 @@ export const getStatusBreakdownService = async (userId = null) => {
   ), 0);
   return statuses.map((s) => ({
     status: s.status,
-    label: s.status,
-    count: s.status === 'Draft'
-      ? grouped.reduce((sum, row) => (row.isDraft || String(row.status || '').toLowerCase() === 'draft' ? sum + (Number(row.count) || 0) : sum), 0)
-      : countFor(s.status === 'Pending' ? ['pending', 'submitted'] : s.status === 'Implemented' ? ['implemented', 'in progress', 'scheduled'] : [s.status.toLowerCase()]),
+    label: s.label || s.status,
+    count: countFor(s.status === 'Pending' ? ['pending', 'submitted'] : s.status === 'Implemented' ? ['implemented', 'in progress', 'scheduled'] : [s.status.toLowerCase()]),
     color: s.color
   }));
 };
@@ -308,8 +331,15 @@ export const getFilteredChangeRequests = async ({
 
   const andClauses = [];
 
-  if (userId) {
-    andClauses.push({ requesterId: userId });
+  if (!organizationScope) {
+    if (!userId) {
+      andClauses.push({ id: 'NONE' });
+    } else {
+      const userWhere = await getDashboardScopeWhere(userId);
+      if (userWhere && Object.keys(userWhere).length > 0) {
+        andClauses.push(userWhere);
+      }
+    }
   }
 
   if (isWorklist) {
@@ -320,8 +350,9 @@ export const getFilteredChangeRequests = async ({
       const roleId = identity?.roleId || null;
       const isSuperOrAdmin = roleId === 'role-1' || roleId === 'role-2';
       const isChangeManager = roleId === 'role-3';
+      const isChangeImplementer = roleId === 'role-5';
 
-      // Rule: No user (Admin, Super Admin, Change Manager) sees their own requests in My Worklist
+      // Rule: No user (Admin, Super Admin, Change Manager, Change Implementer) sees their own requests in My Worklist
       if (!organizationScope) {
         const ownIds = new Set([actingUserId]);
         if (identity) {
@@ -338,17 +369,18 @@ export const getFilteredChangeRequests = async ({
         }
       }
 
-      // Rule: Change Managers only see requests belonging to their assigned categories
-      if (!organizationScope && isChangeManager && !isSuperOrAdmin) {
-        let assignedCategoryIds = identity?.cmCategories || [];
+      // Rule: Change Managers and Change Implementers only see requests belonging to their assigned categories
+      if (!organizationScope && (isChangeManager || isChangeImplementer) && !isSuperOrAdmin) {
+        let assignedCategoryIds = isChangeImplementer ? (identity?.ciCategories || []) : (identity?.cmCategories || []);
         if (!assignedCategoryIds || assignedCategoryIds.length === 0) {
-          const assignments = await ChangeManagerCategory.findAll({
+          const ModelToQuery = isChangeImplementer ? ChangeImplementerCategory : ChangeManagerCategory;
+          const assignments = await ModelToQuery.findAll({
             where: {
               [Op.or]: [
                 { userId: actingUserId },
                 ...(identity?.userKey ? [{ userId: identity.userKey }] : []),
                 ...(identity?.employeeBusinessId ? [{ userId: identity.employeeBusinessId }] : []),
-                ...(identity?.sourceId ? [{ userId: `EMP-${identity.sourceId}` }, { userId: String(identity.sourceId) }] : [])
+                ...(identity?.sourceId ? [{ userId: `EMP-${identity.sourceId}` }, { userId: `S8-${identity.sourceId}` }, { userId: String(identity.sourceId) }] : [])
               ]
             }
           });
@@ -356,7 +388,7 @@ export const getFilteredChangeRequests = async ({
         }
 
         if (!assignedCategoryIds || assignedCategoryIds.length === 0) {
-          // If no categories are assigned, the Change Manager sees no requests
+          // If no categories are assigned, the user sees no requests
           andClauses.push({ id: 'NONE' });
         } else {
           const assignedCategories = await CatalogCategory.findAll({
@@ -390,61 +422,8 @@ export const getFilteredChangeRequests = async ({
   }
 
   if (dateFilter && dateFilter !== 'overall') {
-    const now = new Date();
-    const buildDateClause = (dateCond) => ({
-      [Op.or]: [
-        { submittedAt: dateCond },
-        { [Op.and]: [{ submittedAt: null }, { createdAt: dateCond }] }
-      ]
-    });
-
-    if (dateFilter === 'last_7_days') {
-      const sevenDaysAgo = new Date();
-      sevenDaysAgo.setDate(now.getDate() - 7);
-      andClauses.push(buildDateClause({ [Op.gte]: sevenDaysAgo }));
-    } else if (dateFilter === 'this_month') {
-      const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-      const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
-      andClauses.push(buildDateClause({ [Op.gte]: startOfMonth, [Op.lt]: endOfMonth }));
-    } else if (dateFilter === 'last_month') {
-      const startOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-      const endOfLastMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-      andClauses.push(buildDateClause({ [Op.gte]: startOfLastMonth, [Op.lt]: endOfLastMonth }));
-    } else if (dateFilter === 'custom' && (startDate || endDate)) {
-      const parseFlexibleDate = (str, isEnd = false) => {
-        if (!str) return null;
-        const s = String(str).trim();
-        let d = null;
-        if (/^\d{4}-\d{2}-\d{2}/.test(s)) {
-          const parts = s.split('T')[0].split('-');
-          d = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
-        } else if (/^\d{2}[-\/]\d{2}[-\/]\d{4}/.test(s)) {
-          const parts = s.split(/[-\/]/);
-          d = new Date(parseInt(parts[2], 10), parseInt(parts[1], 10) - 1, parseInt(parts[0], 10));
-        } else {
-          d = new Date(s);
-        }
-        if (d && !isNaN(d.getTime())) {
-          if (isEnd) {
-            d.setHours(23, 59, 59, 999);
-          } else {
-            d.setHours(0, 0, 0, 0);
-          }
-          return d;
-        }
-        return null;
-      };
-
-      const sDate = parseFlexibleDate(startDate, false);
-      const eDate = parseFlexibleDate(endDate, true);
-      const dateCond = {};
-      if (sDate) dateCond[Op.gte] = sDate;
-      if (eDate) dateCond[Op.lte] = eDate;
-
-      if (Object.keys(dateCond).length > 0) {
-        andClauses.push(buildDateClause(dateCond));
-      }
-    }
+    const dateClause = buildDateFilterClause(dateFilter, startDate, endDate);
+    if (dateClause) andClauses.push(dateClause);
   }
 
   if (searchQuery && String(searchQuery).trim()) {
@@ -487,7 +466,10 @@ export const getFilteredChangeRequests = async ({
 
     if (st === 'pending' || st === 'submitted') statusCounts.Pending += count;
     else if (st === 'approved') statusCounts.Approved += count;
-    else if (st === 'in progress' || st === 'scheduled' || st === 'implemented') {
+    else if (st === 'implemented') {
+      statusCounts.Implemented += count;
+    }
+    else if (st === 'in progress' || st === 'scheduled') {
       statusCounts['In progress'] += count;
       statusCounts.Implemented += count;
     }
@@ -565,7 +547,11 @@ export const getFilteredChangeRequests = async ({
     const roleId = identityRes.status === 'SUCCESS' ? identityRes.identity.roleId : null;
     isSuperOrAdmin = roleId === 'role-1' || roleId === 'role-2';
     isChangeManager = roleId === 'role-3';
-    assignedCategoryIds = new Set(identityRes.status === 'SUCCESS' ? (identityRes.identity.cmCategories || []) : []);
+    const isChangeImplementer = roleId === 'role-5';
+    const activeCatIds = isChangeImplementer
+      ? (identityRes.identity.ciCategories || identityRes.identity.categoryIds || [])
+      : (identityRes.identity.cmCategories || identityRes.identity.categoryIds || []);
+    assignedCategoryIds = new Set(identityRes.status === 'SUCCESS' ? activeCatIds : []);
 
     const allCategories = await CatalogCategory.findAll({ attributes: ['id', 'name'] });
     for (const c of allCategories) {
@@ -608,7 +594,7 @@ export const getFilteredChangeRequests = async ({
       const myDecision = userApprovalMap.get(cr.id) || 'Pending';
 
       let isCategoryAssigned = true;
-      if (isChangeManager && !isSuperOrAdmin) {
+      if (!isSuperOrAdmin) {
         const resolvedCategoryId = cr.categoryId || categoryNameToIdMap.get((cr.category || '').toLowerCase().trim());
         isCategoryAssigned = resolvedCategoryId ? assignedCategoryIds.has(resolvedCategoryId) : false;
       }
@@ -879,12 +865,10 @@ export const submitDraftChangeRequestService = async (id, actorId = null) => {
         actorId,
         action: 'Submitted Draft CR',
         ref: id,
-        detail: `Submitted draft Change Request ${id} ${cr.title} for CAB review.`
+        detail: `Submitted draft Change Request ${id} ${cr.title} for Change Manager review.`
       },
       tx
     );
-
-    await createSubmissionNotifications(cr, tx);
   });
 
   const updated = await ChangeRequest.findByPk(id, { include: CR_INCLUDE });
@@ -1058,7 +1042,10 @@ export const createChangeRequestService = async (payload = {}) => {
     title: payload.title || 'Untitled change request',
     category: categoryName,
     subCategory: subCategoryName,
+    subcategoryId: payload.subcategoryId || null,
     employeeId: empIdToStore,
+    employeeName: mergedCustomFields.employeeName || null,
+    employeeEmail: mergedCustomFields.employeeEmail || requesterEmail || null,
     managerEmail: payload.managerEmail || '',
     location: authoritativeLocation || (payload.location && !payload.location.includes('Auto-fetched') && !payload.location.includes('Not specified') ? payload.location : null),
     justification: payload.justification || '',
@@ -1086,16 +1073,14 @@ export const createChangeRequestService = async (payload = {}) => {
       ...m,
       pending: (m.pending || 0) + 1
     }));
-    await createSubmissionNotifications(createdCR);
   }
 
   await addAuditLog({
     actorId: requesterId,
     action: isDraft ? 'Saved Draft Change Request' : 'Created Change Request',
     ref: id,
-    detail: `${isDraft ? 'Saved draft' : 'Submitted'} ${id} ${payload.title || 'Untitled change request'}${
-      isDraft ? '' : ' for CAB review.'
-    }`
+    detail: `${isDraft ? 'Saved draft' : 'Submitted'} ${id} ${payload.title || 'Untitled change request'}${isDraft ? '' : ' for Change Manager review.'
+      }`
   });
 
   const created = await ChangeRequest.findByPk(id, { include: CR_INCLUDE });
@@ -1120,7 +1105,7 @@ export const createChangeRequestService = async (payload = {}) => {
   return serialized;
 };
 
-// ---------- CAB worklist ------------------------------
+// ---------- Change Manager worklist ------------------------------
 
 export const getWorklistService = async (actingUserId = null, page = 1, limit = 10, status = null, dateFilter = null, searchQuery = null) => {
   return getFilteredChangeRequests({
@@ -1184,49 +1169,86 @@ export const applyWorklistActionService = async ({ id, action, rejectionReason =
   }
   const isAdminOrSuperAdmin = roleId === 'role-1' || roleId === 'role-2';
   const isChangeManager = roleId === 'role-3';
-  const assignedCategoryIds = identityRes.status === 'SUCCESS' ? (identityRes.identity.cmCategories || []) : [];
+  const isChangeImplementer = roleId === 'role-5';
+  const assignedCategoryIds = identityRes.status === 'SUCCESS' ? (identityRes.identity.cmCategories || identityRes.identity.ciCategories || identityRes.identity.categoryIds || []) : [];
 
   if (action === 'implement') {
-    if (!isAdminOrSuperAdmin) {
-      const err = new Error('Unauthorized: Only Admins and Super Admins can mark a Change Request as Implemented.');
+    let canImplement = isAdminOrSuperAdmin;
+    if (!canImplement && isChangeImplementer) {
+      let ciAssignedIds = identity?.ciCategories || [];
+      if (!ciAssignedIds || ciAssignedIds.length === 0) {
+        const assignments = await ChangeImplementerCategory.findAll({
+          where: {
+            [Op.or]: [
+              { userId: actorId },
+              ...(identity?.userKey ? [{ userId: identity.userKey }] : []),
+              ...(identity?.employeeBusinessId ? [{ userId: identity.employeeBusinessId }] : []),
+              ...(identity?.sourceId ? [{ userId: `EMP-${identity.sourceId}` }, { userId: `S8-${identity.sourceId}` }, { userId: String(identity.sourceId) }] : [])
+            ]
+          }
+        });
+        ciAssignedIds = assignments.map(a => a.categoryId);
+      }
+
+      const assignedCategories = await CatalogCategory.findAll({
+        where: { id: { [Op.in]: ciAssignedIds } }
+      });
+      const categoryNames = assignedCategories.map(c => c.name.toLowerCase().trim());
+      const crCategory = (targetCR.category || '').toLowerCase().trim();
+      const crCategoryId = targetCR.categoryId || '';
+
+      canImplement = ciAssignedIds.includes(crCategoryId) || categoryNames.some(cn => crCategory.includes(cn) || cn.includes(crCategory));
+    }
+
+    if (!canImplement) {
+      const err = new Error('Unauthorized: Only Admins, Super Admins, or assigned Change Implementers can mark a Change Request as Implemented.');
       err.statusCode = 403;
       throw err;
     }
 
     await sequelize.transaction(async (tx) => {
-      const cr = await ChangeRequest.findByPk(id, { transaction: tx });
-      if (cr) {
-        cr.status = 'Implemented';
-        cr.closedAt = new Date();
-        const existingComments = Array.isArray(cr.comments) ? [...cr.comments] : [];
-        if (actionComment) {
-          existingComments.push({
-            id: `cmt-${Date.now()}`,
-            authorName: actorName,
-            authorRole: actorRoleName,
-            text: actionComment,
-            action: 'Implemented',
-            createdAt: new Date().toISOString()
-          });
-          cr.comments = existingComments;
-          const currentCustom = cr.customFieldValues && typeof cr.customFieldValues === 'object' ? { ...cr.customFieldValues } : {};
-          currentCustom.comments = existingComments;
-          currentCustom.implementedComment = actionComment;
-          cr.customFieldValues = currentCustom;
-          if (typeof cr.changed === 'function') cr.changed('customFieldValues', true);
-        }
-        await cr.save({ transaction: tx });
-        await updateConfig('cr_approval_comments', (map) => ({
-          ...map,
-          [id]: {
-            ...(map[id] || {}),
-            implementedComment: actionComment,
-            implementedBy: actorName
-          }
-        }), tx);
-        await addAuditLog({ actorId, action: 'CR Implemented', ref: id, detail: `Marked Change Request ${id} as Implemented. Comment: ${actionComment || 'None'}` }, tx);
-        await createWorklistActionNotifications(cr, 'implement', actorId, tx);
+      // Re-fetch under lock / transaction to prevent race conditions on concurrent implementation attempts
+      const cr = await ChangeRequest.findByPk(id, { transaction: tx, lock: tx.LOCK?.UPDATE });
+      if (!cr) {
+        const err = new Error(`Change Request ${id} not found.`);
+        err.statusCode = 404;
+        throw err;
       }
+      if (cr.status !== 'Approved') {
+        const err = new Error(`Cannot implement request: Current status is ${cr.status}, must be Approved.`);
+        err.statusCode = 400;
+        throw err;
+      }
+
+      cr.status = 'Implemented';
+      cr.closedAt = new Date();
+      const existingComments = Array.isArray(cr.comments) ? [...cr.comments] : [];
+      if (actionComment) {
+        existingComments.push({
+          id: `cmt-${Date.now()}`,
+          authorName: actorName,
+          authorRole: actorRoleName,
+          text: actionComment,
+          action: 'Implemented',
+          createdAt: new Date().toISOString()
+        });
+        cr.comments = existingComments;
+        const currentCustom = cr.customFieldValues && typeof cr.customFieldValues === 'object' ? { ...cr.customFieldValues } : {};
+        currentCustom.comments = existingComments;
+        currentCustom.implementedComment = actionComment;
+        cr.customFieldValues = currentCustom;
+        if (typeof cr.changed === 'function') cr.changed('customFieldValues', true);
+      }
+      await cr.save({ transaction: tx });
+      await updateConfig('cr_approval_comments', (map) => ({
+        ...map,
+        [id]: {
+          ...(map[id] || {}),
+          implementedComment: actionComment,
+          implementedBy: actorName
+        }
+      }), tx);
+      await addAuditLog({ actorId, action: 'CR Implemented', ref: id, detail: `Marked Change Request ${id} as Implemented. Comment: ${actionComment || 'None'}` }, tx);
     });
 
     const metrics = await getConfig('worklist_metrics');
@@ -1300,7 +1322,7 @@ export const applyWorklistActionService = async ({ id, action, rejectionReason =
       changeRequest.status = finalStatus;
       if (finalStatus === 'Rejected') {
         changeRequest.closedAt = new Date();
-        changeRequest.rejectionReason = actionComment || 'This change request was rejected during CAB review.';
+        changeRequest.rejectionReason = actionComment || 'This change request was rejected during Change Manager review.';
       }
       const existingComments = Array.isArray(changeRequest.comments) ? [...changeRequest.comments] : [];
       if (actionComment) {
@@ -1338,8 +1360,6 @@ export const applyWorklistActionService = async ({ id, action, rejectionReason =
           ...(decision === 'Rejected' ? { rejectedComment: actionComment, rejectionReason: actionComment, rejectedBy: actorName, rejectedDate: new Date().toISOString() } : {})
         }
       }), t);
-
-      await createWorklistActionNotifications(changeRequest, action, actorId, t);
     }
 
     await addAuditLog(
@@ -1640,11 +1660,12 @@ export const createWorkflowService = async (payload = {}, actorId = null) => {
 };
 
 export const getSettingsUsersService = async () => {
-  const [s8Users, employees, appRoles, cmAssignments] = await Promise.all([
+  const [s8Users, employees, appRoles, cmAssignments, ciAssignments] = await Promise.all([
     UserS8.findAll({ raw: true }),
     Employee.findAll({ raw: true }),
     UserAppRole.findAll({ raw: true }),
-    ChangeManagerCategory.findAll({ raw: true })
+    ChangeManagerCategory.findAll({ raw: true }),
+    ChangeImplementerCategory.findAll({ raw: true })
   ]);
 
   const roleMap = new Map();
@@ -1657,11 +1678,19 @@ export const getSettingsUsersService = async () => {
     cmMap.get(key).push(c.categoryId || c.category_id);
   });
 
+  const ciMap = new Map();
+  ciAssignments.forEach((c) => {
+    const key = c.userId || c.user_id;
+    if (!ciMap.has(key)) ciMap.set(key, []);
+    ciMap.get(key).push(c.categoryId || c.category_id);
+  });
+
   const ROLE_NAMES = {
     'role-1': 'Super Admin',
     'role-2': 'Admin',
     'role-3': 'Change Manager',
-    'role-4': 'Requester'
+    'role-4': 'Requester',
+    'role-5': 'Change Implementer'
   };
 
   const results = [];
@@ -1680,6 +1709,10 @@ export const getSettingsUsersService = async () => {
     const linkedEmp = emailKey ? empByEmail.get(emailKey) : null;
     const empId = linkedEmp ? (linkedEmp.emp_id || linkedEmp.empId) : null;
 
+    const assignedCats = roleId === 'role-5'
+      ? (ciMap.get(userKey) || ciMap.get(`S8-${u.id}`) || ciMap.get(String(u.id)) || [])
+      : (cmMap.get(userKey) || cmMap.get(`S8-${u.id}`) || cmMap.get(String(u.id)) || []);
+
     results.push({
       id: userKey,
       userKey,
@@ -1692,9 +1725,9 @@ export const getSettingsUsersService = async () => {
       employeeBusinessId: empId,
       roleId: roleId || null,
       role: roleId ? ROLE_NAMES[roleId] : 'Unassigned',
-      applicationRole: roleId === 'role-1' ? 'SUPER_ADMIN' : roleId === 'role-2' ? 'ADMIN' : roleId === 'role-3' ? 'CHANGE_MANAGER' : roleId === 'role-4' ? 'REQUESTER' : 'UNASSIGNED',
+      applicationRole: roleId === 'role-1' ? 'SUPER_ADMIN' : roleId === 'role-2' ? 'ADMIN' : roleId === 'role-3' ? 'CHANGE_MANAGER' : roleId === 'role-4' ? 'REQUESTER' : roleId === 'role-5' ? 'CHANGE_IMPLEMENTER' : 'UNASSIGNED',
       status: u.is_active || u.isActive ? 'Active' : 'Inactive',
-      categoryIds: cmMap.get(userKey) || cmMap.get(`S8-${u.id}`) || cmMap.get(String(u.id)) || [],
+      categoryIds: assignedCats,
       isInUserTable: true
     });
   }
@@ -1720,18 +1753,20 @@ export const updateSettingsUserService = async (userKey, payload = {}, meta = {}
       admin: 'role-2',
       'change manager': 'role-3',
       requester: 'role-4',
+      'change implementer': 'role-5',
       'role-1': 'role-1',
       'role-2': 'role-2',
       'role-3': 'role-3',
-      'role-4': 'role-4'
+      'role-4': 'role-4',
+      'role-5': 'role-5'
     };
     newRoleId = rMap[String(payload.role).toLowerCase()];
   }
 
   if (newRoleId) {
-    const validRoleIds = ['role-1', 'role-2', 'role-3', 'role-4'];
+    const validRoleIds = ['role-1', 'role-2', 'role-3', 'role-4', 'role-5'];
     if (!validRoleIds.includes(newRoleId)) {
-      const err = new Error('Valid ChangeDesk role is required (role-1, role-2, role-3, role-4)');
+      const err = new Error('Valid ChangeDesk role is required (role-1, role-2, role-3, role-4, role-5)');
       err.statusCode = 400;
       throw err;
     }
@@ -1755,8 +1790,12 @@ export const updateSettingsUserService = async (userKey, payload = {}, meta = {}
     }
   }
 
-  if (payload.categoryIds && Array.isArray(payload.categoryIds) && (newRoleId === 'role-3' || identity.roleId === 'role-3')) {
-    await updateChangeManagerCategoriesService(userKey, payload.categoryIds);
+  if (payload.categoryIds && Array.isArray(payload.categoryIds)) {
+    if (newRoleId === 'role-3' || identity.roleId === 'role-3') {
+      await updateChangeManagerCategoriesService(userKey, payload.categoryIds);
+    } else if (newRoleId === 'role-5' || identity.roleId === 'role-5') {
+      await updateChangeImplementerCategoriesService(userKey, payload.categoryIds);
+    }
   }
 
   await addAuditLog({
@@ -1784,16 +1823,18 @@ export const createSettingsUserService = async (payload = {}, meta = {}) => {
     admin: 'role-2',
     'change manager': 'role-3',
     requester: 'role-4',
+    'change implementer': 'role-5',
     'role-1': 'role-1',
     'role-2': 'role-2',
     'role-3': 'role-3',
-    'role-4': 'role-4'
+    'role-4': 'role-4',
+    'role-5': 'role-5'
   };
   const roleId = rMap[String(payload.roleId || payload.role || '').toLowerCase()];
 
-  const validRoleIds = ['role-1', 'role-2', 'role-3', 'role-4'];
+  const validRoleIds = ['role-1', 'role-2', 'role-3', 'role-4', 'role-5'];
   if (!roleId || !validRoleIds.includes(roleId)) {
-    const e = new Error('Valid ChangeDesk role is required (role-1, role-2, role-3, role-4)');
+    const e = new Error('Valid ChangeDesk role is required (role-1, role-2, role-3, role-4, role-5)');
     e.statusCode = 400;
     throw e;
   }
@@ -1869,13 +1910,17 @@ export const createSettingsUserService = async (payload = {}, meta = {}) => {
   if (roleId === 'role-3' && Array.isArray(payload.categoryIds) && payload.categoryIds.length > 0) {
     await updateChangeManagerCategoriesService(s8Key, payload.categoryIds);
     await updateChangeManagerCategoriesService(empKey, payload.categoryIds);
+  } else if (roleId === 'role-5' && Array.isArray(payload.categoryIds) && payload.categoryIds.length > 0) {
+    await updateChangeImplementerCategoriesService(s8Key, payload.categoryIds);
+    await updateChangeImplementerCategoriesService(empKey, payload.categoryIds);
   }
 
   const ROLE_NAMES = {
     'role-1': 'Super Admin',
     'role-2': 'Admin',
     'role-3': 'Change Manager',
-    'role-4': 'Requester'
+    'role-4': 'Requester',
+    'role-5': 'Change Implementer'
   };
 
   await addAuditLog({
@@ -2023,286 +2068,7 @@ export const getSettingsAuditLogsService = async (filter = 'All activity') => {
   return key === 'all activity' || !AUDIT_FILTERS[key] ? logs : logs.filter(AUDIT_FILTERS[key]);
 };
 
-// ---------- Reports -------------------------------
-
-export const getReportsMetricsService = async (dateFilter = 'overall', startDate = null, endDate = null) => {
-  let dateWhere = '';
-  const replacements = {};
-
-  if (dateFilter === 'last_7_days') {
-    dateWhere = "WHERE COALESCE(submitted_at, created_at) >= NOW() - INTERVAL '7 days'";
-  } else if (dateFilter === 'this_month') {
-    dateWhere = "WHERE DATE_TRUNC('month', COALESCE(submitted_at, created_at)) = DATE_TRUNC('month', CURRENT_DATE)";
-  } else if (dateFilter === 'last_month') {
-    dateWhere = "WHERE COALESCE(submitted_at, created_at) >= DATE_TRUNC('month', CURRENT_DATE - INTERVAL '1 month') AND COALESCE(submitted_at, created_at) < DATE_TRUNC('month', CURRENT_DATE)";
-  } else if (dateFilter === 'custom' && startDate) {
-    if (isNaN(Date.parse(startDate))) {
-      const err = new Error('Invalid start date format.');
-      err.statusCode = 400;
-      throw err;
-    }
-
-    const cleanStart = String(startDate).trim().split('T')[0];
-    const formattedStart = `${cleanStart} 00:00:00`;
-
-    if (endDate) {
-      if (isNaN(Date.parse(endDate))) {
-        const err = new Error('Invalid end date format.');
-        err.statusCode = 400;
-        throw err;
-      }
-      const cleanEnd = String(endDate).trim().split('T')[0];
-      const formattedEnd = `${cleanEnd} 23:59:59`;
-      dateWhere = 'WHERE COALESCE(submitted_at, created_at) >= :start AND COALESCE(submitted_at, created_at) <= :end';
-      replacements.start = formattedStart;
-      replacements.end = formattedEnd;
-    } else {
-      dateWhere = 'WHERE COALESCE(submitted_at, created_at) >= :start';
-      replacements.start = formattedStart;
-    }
-  }
-
-  const [metricsConfig, [countsRes]] = await Promise.all([
-    getConfig('report_metrics'),
-    sequelize.query(`
-      SELECT
-        COUNT(*)::int AS total_crs,
-        COUNT(*) FILTER (WHERE status = 'Approved')::int AS approved_crs,
-        COUNT(*) FILTER (WHERE category ILIKE '%Emergency%' OR category ILIKE '%Urgent%' OR risk = 'High')::int AS emergency_crs,
-        COUNT(*) FILTER (WHERE status = 'Rejected')::int AS rejected_crs
-      FROM change_requests
-      ${dateWhere}
-    `, { replacements, type: QueryTypes.SELECT })
-  ]);
-
-  const totalCRs = countsRes?.total_crs || 0;
-  const approvedCRs = countsRes?.approved_crs || 0;
-  const emergencyCRs = countsRes?.emergency_crs || 0;
-
-  // Live average approval turnaround time query
-  const avgWhere = dateWhere
-    ? `${dateWhere} AND status IN ('Approved', 'Rejected') AND submitted_at IS NOT NULL`
-    : "WHERE status IN ('Approved', 'Rejected') AND submitted_at IS NOT NULL";
-
-  const [avgTimeRes] = await sequelize.query(`
-    SELECT
-      COALESCE(ROUND(AVG(EXTRACT(EPOCH FROM (COALESCE(closed_at, updated_at) - submitted_at)) / 86400.0)::numeric, 1), 0.1)::float AS avg_days
-    FROM change_requests
-    ${avgWhere}
-  `, { replacements, type: QueryTypes.SELECT });
-
-  const avgApprovalDays = avgTimeRes?.avg_days ? `${avgTimeRes.avg_days} days` : '0.1 days';
-
-  // Monthly volume — count all tickets grouped by month
-  const monthlyVolume = await sequelize.query(`
-    SELECT
-      TO_CHAR(COALESCE(submitted_at, created_at), 'Mon') AS month,
-      EXTRACT(MONTH FROM COALESCE(submitted_at, created_at)) AS sort_index,
-      COUNT(*)::int AS count
-    FROM change_requests
-    ${dateWhere}
-    GROUP BY month, sort_index
-    ORDER BY sort_index
-  `, { replacements, type: QueryTypes.SELECT });
-
-  // Location breakdown query
-  const locationBreakdown = await sequelize.query(`
-    SELECT
-      COALESCE(NULLIF(location, ''), 'Not specified') AS location,
-      COUNT(*)::int AS count
-    FROM change_requests
-    ${dateWhere}
-    GROUP BY location
-    ORDER BY count DESC
-  `, {
-    replacements,
-    type: QueryTypes.SELECT
-  });
-
-  const totalLocationCRs = locationBreakdown.reduce((sum, item) => sum + item.count, 0);
-  const locationData = locationBreakdown.map((item, idx) => {
-    const colors = ['#0D9488', '#2563EB', '#7C3AED', '#D97706', '#DC2626', '#475569'];
-    return {
-      location: item.location,
-      count: item.count,
-      percentage: totalLocationCRs > 0 ? Math.round((item.count / totalLocationCRs) * 100) : 0,
-      color: colors[idx % colors.length]
-    };
-  });
-
-  const computedSuccessRate = totalCRs > 0 ? `${Math.round((approvedCRs / totalCRs) * 100)}%` : '65%';
-
-  const metrics = {
-    ...metricsConfig,
-    successRate: computedSuccessRate,
-    successChange: metricsConfig?.successChange || '▲ 2.1% vs last quarter',
-    avgApprovalTime: avgApprovalDays,
-    approvalChange: metricsConfig?.approvalChange || '▼ 0.4 days faster',
-    emergencyCount: emergencyCRs,
-    emergencyVolume: `${emergencyCRs} emergency request(s)`,
-    incidentCount: metricsConfig?.incidentCount ?? 0,
-    incidentChange: metricsConfig?.incidentChange || '0 post-change incident(s)'
-  };
-
-  const monthlyData = monthlyVolume.map(({ month, count }) => ({ month, count }));
-
-  return { metrics, monthlyData, locationData };
-};
-
-// ---------- Notifications -----------------------------
-
-const getApproverUsers = async (tx) => {
-  const appRoles = await UserAppRole.findAll({
-    where: { roleId: { [Op.in]: ['role-1', 'role-2', 'role-3'] } },
-    transaction: tx
-  });
-  const users = [];
-  for (const r of appRoles) {
-    const res = await IdentityResolver.resolveByKey(r.userKey);
-    if (res.status === 'SUCCESS') {
-      users.push(res.identity);
-    }
-  }
-  return users;
-};
-
-export const createSubmissionNotifications = async (changeRequest, tx) => {
-  try {
-    const approvers = await getVotersForCategory(changeRequest.categoryId, tx);
-    const reqRes = await IdentityResolver.resolveByKey(changeRequest.requesterId);
-    const requesterName = changeRequest.employeeName || reqRes?.identity?.displayName || reqRes?.identity?.name || 'an employee';
-
-    const notifications = approvers
-      .filter((a) => a.id !== changeRequest.requesterId)
-      .map((a) => ({
-        userId: a.id,
-        changeRequestId: changeRequest.id,
-        type: 'CR_SUBMITTED',
-        title: 'New request waiting for approval',
-        message: `New Change Request ${changeRequest.id} ('${changeRequest.title}') submitted by ${requesterName} is waiting for your approval.`,
-        isRead: false,
-        isStale: false
-      }));
-    if (notifications.length > 0) {
-      await Notification.bulkCreate(notifications, { transaction: tx });
-    }
-  } catch (err) {
-    console.error('[Notification] Failed to create submission notifications:', err.message);
-  }
-};
-
-export const createWorklistActionNotifications = async (changeRequest, action, actorId, tx) => {
-  try {
-    const actorRes = await IdentityResolver.resolveByKey(actorId);
-    const actorName = actorRes?.identity?.displayName || actorRes?.identity?.name || 'an approver';
-    const reqRes = await IdentityResolver.resolveByKey(changeRequest.requesterId);
-    const requesterName = changeRequest.employeeName || reqRes?.identity?.displayName || reqRes?.identity?.name || 'an employee';
-
-    const verb = action === 'approve' ? 'Approved' : action === 'reject' ? 'Rejected' : action === 'implement' ? 'Implemented' : 'Sent back';
-    const type = action === 'approve' ? 'CR_APPROVED' : action === 'reject' ? 'CR_REJECTED' : action === 'implement' ? 'CR_IMPLEMENTED' : 'CR_SENT_BACK';
-
-    // 1. Notification for Requester
-    if (changeRequest.requesterId) {
-      await Notification.create(
-        {
-          userId: changeRequest.requesterId,
-          changeRequestId: changeRequest.id,
-          type,
-          title: `Request ${verb} by ${actorName}`,
-          message: `Your Change Request ${changeRequest.id} ('${changeRequest.title}') was ${verb.toLowerCase()} by ${actorName}.`,
-          isRead: false,
-          isStale: false
-        },
-        { transaction: tx }
-      );
-    }
-
-    // 2. Notification for other assigned voters & Admins
-    const approvers = await getVotersForCategory(changeRequest.categoryId, tx);
-    const otherApprovers = approvers.filter((a) => a.id !== actorId && a.id !== changeRequest.requesterId);
-
-    const peerNotifications = otherApprovers.map((a) => ({
-      userId: a.id,
-      changeRequestId: changeRequest.id,
-      type: `PEER_${type}`,
-      title: `Request ${verb} by ${actorName}`,
-      message: `Change Request ${changeRequest.id} ('${changeRequest.title}') submitted by ${requesterName} was ${verb.toLowerCase()} by ${actorName}.`,
-      isRead: false,
-      isStale: true
-    }));
-
-    if (peerNotifications.length > 0) {
-      await Notification.bulkCreate(peerNotifications, { transaction: tx });
-    }
-
-    // Mark previous "waiting for approval" notifications as stale
-    await Notification.update(
-      { isStale: true },
-      {
-        where: {
-          changeRequestId: changeRequest.id,
-          type: 'CR_SUBMITTED'
-        },
-        transaction: tx
-      }
-    );
-  } catch (err) {
-    console.error('[Notification] Failed to create worklist action notifications:', err.message);
-  }
-};
-
-export const getUserNotificationsService = async (userId = null) => {
-  if (!userId) return { data: [], unreadCount: 0 };
-
-  const identityRes = await IdentityResolver.resolveByKey(userId);
-  const roleId = identityRes.status === 'SUCCESS' ? identityRes.identity.roleId : null;
-  const isSuperOrAdmin = roleId === 'role-1' || roleId === 'role-2';
-  const isChangeManager = roleId === 'role-3';
-  const assignedCategoryIds = new Set(identityRes.status === 'SUCCESS' ? (identityRes.identity.cmCategories || []) : []);
-
-  const rows = await Notification.findAll({
-    where: { userId },
-    include: [{ model: ChangeRequest, as: 'changeRequest', required: false }],
-    order: [['createdAt', 'DESC']],
-    limit: 50
-  });
-
-  let filteredRows = rows;
-
-  if (isChangeManager && !isSuperOrAdmin) {
-    const allCategories = await CatalogCategory.findAll({ attributes: ['id', 'name'] });
-    const categoryNameToIdMap = new Map();
-    for (const c of allCategories) {
-      categoryNameToIdMap.set(c.id, c.id);
-      if (c.name) {
-        categoryNameToIdMap.set(c.name.toLowerCase().trim(), c.id);
-      }
-    }
-
-    filteredRows = rows.filter(n => {
-      if (!n.changeRequest) return true;
-      const cr = n.changeRequest;
-      const resolvedCategoryId = cr.categoryId || categoryNameToIdMap.get((cr.category || '').toLowerCase().trim());
-      return resolvedCategoryId ? assignedCategoryIds.has(resolvedCategoryId) : false;
-    });
-  }
-
-  const unreadCount = filteredRows.filter((n) => !n.isRead).length;
-
-  return { data: filteredRows.map((n) => n.get({ plain: true })), unreadCount };
-};
-
-export const markNotificationAsReadService = async (id, userId = null) => {
-  if (!userId) return { data: [], unreadCount: 0 };
-  await Notification.update({ isRead: true, isStale: true }, { where: { id, userId } });
-  return getUserNotificationsService(userId);
-};
-
-export const markAllNotificationsAsReadService = async (userId = null) => {
-  if (!userId) return { data: [], unreadCount: 0 };
-  await Notification.update({ isRead: true, isStale: true }, { where: { userId, isRead: false } });
-  return getUserNotificationsService(userId);
-};
+// ---------- Change Manager Categories -----------------
 
 
 export const getChangeManagerCategoriesService = async (userId) => {
@@ -2353,9 +2119,65 @@ export const updateChangeManagerCategoriesService = async (userId, categoryIds =
 
   for (const cid of toAdd) {
     const id = `cmc-${userId}-${cid}`;
-    await ChangeManagerCategory.upsert({ id, userId, categoryId: cid }).catch(() => {});
+    await ChangeManagerCategory.upsert({ id, userId, categoryId: cid }).catch(() => { });
   }
 
   return getChangeManagerCategoriesService(userId);
+};
+
+// ---------- Change Implementer Categories -----------------
+
+export const getChangeImplementerCategoriesService = async (userId) => {
+  if (!userId) {
+    const assignments = await ChangeImplementerCategory.findAll({ raw: true });
+    return assignments.map((a) => ({ userId: a.userId, categoryId: a.categoryId }));
+  }
+  const normalizedKeys = [userId];
+  if (typeof userId === 'string' && userId.startsWith('EMP-')) {
+    normalizedKeys.push(userId.replace('EMP-', ''));
+  } else if (typeof userId === 'string' && userId.startsWith('S8-')) {
+    normalizedKeys.push(userId.replace('S8-', ''));
+  } else if (!isNaN(Number(userId))) {
+    normalizedKeys.push(`EMP-${userId}`);
+    normalizedKeys.push(`S8-${userId}`);
+  }
+  const assignments = await ChangeImplementerCategory.findAll({
+    where: { userId: { [Op.in]: normalizedKeys } },
+    raw: true
+  });
+  return assignments.map((a) => ({ userId: a.userId, categoryId: a.categoryId }));
+};
+
+export const updateChangeImplementerCategoriesService = async (userId, categoryIds = []) => {
+  const normalizedKeys = [userId];
+  if (typeof userId === 'string' && userId.startsWith('EMP-')) {
+    normalizedKeys.push(userId.replace('EMP-', ''));
+  } else if (typeof userId === 'string' && userId.startsWith('S8-')) {
+    normalizedKeys.push(userId.replace('S8-', ''));
+  } else if (!isNaN(Number(userId))) {
+    normalizedKeys.push(`EMP-${userId}`);
+    normalizedKeys.push(`S8-${userId}`);
+  }
+
+  const current = await ChangeImplementerCategory.findAll({
+    where: { userId: { [Op.in]: normalizedKeys } }
+  });
+  const currentCatIds = current.map((c) => c.categoryId);
+
+  const toAdd = categoryIds.filter((cid) => !currentCatIds.includes(cid));
+  const toRemove = currentCatIds.filter((cid) => !categoryIds.includes(cid));
+
+  if (toRemove.length > 0) {
+    await ChangeImplementerCategory.destroy({
+      where: { userId: { [Op.in]: normalizedKeys }, categoryId: { [Op.in]: toRemove } }
+    });
+  }
+
+  for (const cid of toAdd) {
+    const id = `cic-${userId}-${cid}`;
+    await ChangeImplementerCategory.upsert({ id, userId, categoryId: cid }).catch(() => { });
+  }
+
+  return getChangeImplementerCategoriesService(userId);
 };
 

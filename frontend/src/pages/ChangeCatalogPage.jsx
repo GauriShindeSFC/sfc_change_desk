@@ -38,7 +38,17 @@ function ChangeCatalogPage({ onNavigate, searchQuery = '', initialData }) {
     { id: 'subcat-sec-oth', title: 'Other Security Changes', category: 'Security Tools & Policies', description: 'Other security policy, DLP, & SIEM rule change requests.', sla: '3 business days', risk: 'High', riskColor: '#DC2626', riskBars: 3, iconBg: '#FEE2E2', iconColor: '#DC2626' }
   ];
 
+  const DEFAULT_CATEGORIES = [
+    { id: 'cat-srv', name: 'Server & Infra' },
+    { id: 'cat-net', name: 'Network & Connectivity' },
+    { id: 'cat-acc', name: 'Access & Security' },
+    { id: 'cat-asset', name: 'IT Asset' },
+    { id: 'cat-o365', name: 'Office 365 & Collaboration' },
+    { id: 'cat-sec', name: 'Security Tools & Policies' }
+  ];
+
   const [items, setItems] = useState(defaultItems);
+  const [categories, setCategories] = useState(DEFAULT_CATEGORIES);
   const [activeCategory, setActiveCategory] = useState(initialData?.activeCategory || initialData?.category || 'Server & Infra');
   const [loadFailed, setLoadFailed] = useState(false);
   const [hoveredCardId, setHoveredCardId] = useState(null);
@@ -110,29 +120,24 @@ function ChangeCatalogPage({ onNavigate, searchQuery = '', initialData }) {
               setLoadFailed(false);
             }
             const catList = body.data.map(cat => ({ id: cat.id, name: cat.name }));
-            setCategories(catList);
-            if (!initialData?.activeCategory && !initialData?.category && catList.length > 0) {
-              setActiveCategory(catList[0].name);
+            if (catList.length > 0) {
+              setCategories(catList);
+              if (!initialData?.activeCategory && !initialData?.category) {
+                setActiveCategory(catList[0].name);
+              }
             }
-          } else {
-            setLoadFailed(true);
           }
-        } else {
-          setLoadFailed(true);
         }
       } catch (err) {
-        console.error('Failed to load catalog:', err);
-        setLoadFailed(true);
+        console.warn('Catalog fetch notice:', err);
       }
     };
     fetchCatalog();
   }, []);
 
-  const [categories, setCategories] = useState([]);
-
   const filteredItems = items.filter(item => {
-    const matchesCat = !activeCategory || activeCategory === 'All items' || (item.category && item.category.toLowerCase() === activeCategory.toLowerCase());
-    const q = searchQuery.trim().toLowerCase();
+    const matchesCat = !activeCategory || activeCategory === 'All items' || (item.category && item.category.trim().toLowerCase() === (activeCategory || '').trim().toLowerCase());
+    const q = (searchQuery || '').trim().toLowerCase();
     const matchesQuery = !q ||
       (item.title || '').toLowerCase().includes(q) ||
       (item.category || '').toLowerCase().includes(q) ||
@@ -146,8 +151,8 @@ function ChangeCatalogPage({ onNavigate, searchQuery = '', initialData }) {
       {/* Header Row */}
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: '1rem' }}>
         <div>
-          <h1 style={{ fontSize: '1.45rem', fontWeight: 700, color: 'var(--text-primary)', lineHeight: 1.2 }}>
-            Change Catalog
+          <h1 style={{ fontSize: '1.45rem', fontWeight: 700, color: 'var(--text-primary)', lineHeight: 1.2, margin: 0 }}>
+            Change Request
           </h1>
           <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginTop: '0.2rem' }}>
             Pre-approved templates for standardized changes · select a category to start your request

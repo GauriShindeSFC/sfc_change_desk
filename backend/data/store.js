@@ -12,8 +12,9 @@ export const RISK_STYLES = {
 export const STATUS_STYLES = {
   Draft: { statusBg: 'var(--input-bg)', statusColor: 'var(--text-secondary)', statusDot: '#94A0B0' },
   Pending: { statusBg: '#FEF3C7', statusColor: '#D97706', statusDot: '#D97706' },
-  Approved: { statusBg: '#D1FAE5', statusColor: '#059669', statusDot: '#059669' },
+  Approved: { statusBg: '#FEF3C7', statusColor: '#D97706', statusDot: '#D97706' },
   'In progress': { statusBg: '#F3E8FF', statusColor: '#7C3AED', statusDot: '#7C3AED' },
+  Implemented: { statusBg: '#F3E8FF', statusColor: '#7C3AED', statusDot: '#7C3AED' },
   Rejected: { statusBg: '#FEE2E2', statusColor: '#DC2626', statusDot: '#DC2626' },
   Closed: { statusBg: 'var(--input-bg)', statusColor: 'var(--text-secondary)', statusDot: '#94A0B0' }
 };

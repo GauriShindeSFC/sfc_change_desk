@@ -16,8 +16,7 @@ function MyRequestsPage({ onNavigate, searchQuery = '', initialData, user }) {
     Pending: 0,
     Approved: 0,
     'In progress': 0,
-    Rejected: 0,
-    Draft: 0
+    Rejected: 0
   });
 
   const [activeFilter, setActiveFilter] = useState(() => {
@@ -36,10 +35,19 @@ function MyRequestsPage({ onNavigate, searchQuery = '', initialData, user }) {
     }
   }, [initialData]);
 
+  const fetchSeqRef = React.useRef(0);
+
   // Server-Side Database Query Fetch
   useEffect(() => {
+    // Do not fetch custom date filter if dates are incomplete
+    if (dateFilter === 'custom' && (!startDate || !endDate)) {
+      return;
+    }
+
+    const currentSeq = ++fetchSeqRef.current;
+    setIsLoading(true);
+
     const fetchData = async () => {
-      setIsLoading(true);
       try {
         const params = new URLSearchParams({
           ...(activeFilter !== 'All' && { status: activeFilter }),
@@ -53,6 +61,7 @@ function MyRequestsPage({ onNavigate, searchQuery = '', initialData, user }) {
             ...(user?.id ? { 'x-user-id': user.id } : {})
           }
         });
+        if (currentSeq !== fetchSeqRef.current) return;
         if (res.ok) {
           const body = await res.json();
           if (body.data && Array.isArray(body.data)) setRequests(body.data);
@@ -61,7 +70,9 @@ function MyRequestsPage({ onNavigate, searchQuery = '', initialData, user }) {
       } catch (err) {
         console.warn('Backend API offline, using default requests:', err);
       } finally {
-        setIsLoading(false);
+        if (currentSeq === fetchSeqRef.current) {
+          setIsLoading(false);
+        }
       }
     };
     fetchData();
@@ -72,24 +83,8 @@ function MyRequestsPage({ onNavigate, searchQuery = '', initialData, user }) {
     { id: 'Pending', label: `Pending (${statusCounts.Pending || 0})` },
     { id: 'Approved', label: `Approved (${statusCounts.Approved || 0})` },
     { id: 'In progress', label: `In Progress (${statusCounts['In progress'] || statusCounts['In Progress'] || 0})` },
-    { id: 'Rejected', label: `Rejected (${statusCounts.Rejected || 0})` },
-    { id: 'Draft', label: `Draft (${statusCounts.Draft || 0})` }
+    { id: 'Rejected', label: `Rejected (${statusCounts.Rejected || 0})` }
   ];
-
-  const handleSubmitDraft = async (crId) => {
-    try {
-      const res = await apiFetch(`/change-requests/${crId}/submit`, {
-        method: 'PATCH'
-      });
-      if (res.ok) {
-        setRequests(prev => prev.map(r => r.id === crId ? { ...r, status: 'Pending', isDraft: false, statusBg: '#FEF3C7', statusColor: '#D97706', statusDot: '#D97706' } : r));
-        setSelectedRequest(null);
-        setActiveFilter('Pending');
-      }
-    } catch (err) {
-      console.warn('Failed to submit draft on server:', err);
-    }
-  };
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
@@ -138,6 +133,9 @@ function MyRequestsPage({ onNavigate, searchQuery = '', initialData, user }) {
           setDateFilter(val);
           if (val === 'custom') {
             initCustomDateRange({ startDate, endDate, setStartDate, setEndDate });
+          } else {
+            setStartDate('');
+            setEndDate('');
           }
         }}
         startDate={startDate}
@@ -183,36 +181,18 @@ function MyRequestsPage({ onNavigate, searchQuery = '', initialData, user }) {
                         gap: '0.35rem',
                         padding: '0.2rem 0.65rem',
                         borderRadius: 'var(--radius-lg)',
-                        backgroundColor: cr.statusBg || ((cr.status || '').toLowerCase() === 'draft' ? 'var(--input-bg)' : '#FEF3C7'),
-                        color: cr.statusColor || ((cr.status || '').toLowerCase() === 'draft' ? 'var(--text-secondary)' : '#D97706'),
+                        backgroundColor: cr.statusBg || '#FEF3C7',
+                        color: cr.statusColor || '#D97706',
                         fontSize: '0.775rem',
                         fontWeight: 500,
                         whiteSpace: 'nowrap'
                       }}>
-                        <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: cr.statusDot || ((cr.status || '').toLowerCase() === 'draft' ? '#94A0B0' : '#D97706') }} />
+                        <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: cr.statusDot || '#D97706' }} />
                         <span style={{ whiteSpace: 'nowrap' }}>{cr.status}</span>
                       </div>
                     </td>
                     <td style={{ padding: '0.85rem 1rem', textAlign: 'right', whiteSpace: 'nowrap' }}>
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '0.6rem' }}>
-                        {(cr.status || '').toLowerCase() === 'draft' && (
-                          <button
-                            type="button"
-                            onClick={() => onNavigate && onNavigate('Change Request', cr)}
-                            style={{
-                              padding: '0.3rem 0.65rem',
-                              backgroundColor: '#E6F4F1',
-                              color: 'var(--brand-primary)',
-                              border: '1px solid #A7F3D0',
-                              borderRadius: '6px',
-                              fontWeight: 500,
-                              cursor: 'pointer',
-                              fontSize: '0.775rem'
-                            }}
-                          >
-                            Edit Draft
-                          </button>
-                        )}
                         <button
                           type="button"
                           onClick={() => setSelectedRequest(cr)}
@@ -261,7 +241,6 @@ function MyRequestsPage({ onNavigate, searchQuery = '', initialData, user }) {
           onApprove={null}
           onReject={null}
           onSendBack={null}
-          onSubmitForApproval={handleSubmitDraft}
           onImplement={null}
         />
       )}

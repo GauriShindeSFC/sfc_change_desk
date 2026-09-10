@@ -9,6 +9,22 @@ const DATE_OPTIONS = [
   { value: 'custom', label: 'Custom' }
 ];
 
+export function validateCustomRange(startDate, endDate) {
+  if (!startDate || !endDate) return 'Please select both start date and end date.';
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(startDate) || !/^\d{4}-\d{2}-\d{2}$/.test(endDate)) {
+    return 'Invalid date format. Expected YYYY-MM-DD.';
+  }
+  const s = new Date(`${startDate}T00:00:00Z`);
+  const e = new Date(`${endDate}T00:00:00Z`);
+  if (isNaN(s.getTime()) || isNaN(e.getTime())) {
+    return 'Invalid calendar date selected.';
+  }
+  if (s > e) {
+    return 'Start date cannot be later than end date.';
+  }
+  return null;
+}
+
 /**
  * Shared filter bar: a row of status/category pill-tabs on the left,
  * an optional date-range control on the right. Used the same way on
@@ -30,6 +46,7 @@ export default function FilterBar({
   variant = 'row'
 }) {
   const showDate = typeof dateValue !== 'undefined' && onDateChange;
+  const customError = dateValue === 'custom' ? validateCustomRange(startDate, endDate) : null;
 
   return (
     <div
@@ -87,7 +104,7 @@ export default function FilterBar({
       )}
 
       {showDate && (
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '0.4rem' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '0.35rem' }}>
           <div
             style={{
               display: 'inline-flex',
@@ -127,36 +144,43 @@ export default function FilterBar({
           </div>
 
           {dateValue === 'custom' && onStartDateChange && onEndDateChange && (
-            <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}>
-              <input
-                type="date"
-                value={startDate}
-                onChange={(e) => onStartDateChange(e.target.value)}
-                style={{
-                  backgroundColor: 'var(--card-bg)',
-                  border: '1px solid var(--border-color)',
-                  borderRadius: 'var(--radius-md)',
-                  padding: '0.3rem 0.6rem',
-                  fontSize: '0.775rem',
-                  color: 'var(--text-primary)',
-                  outline: 'none'
-                }}
-              />
-              <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>to</span>
-              <input
-                type="date"
-                value={endDate}
-                onChange={(e) => onEndDateChange(e.target.value)}
-                style={{
-                  backgroundColor: 'var(--card-bg)',
-                  border: '1px solid var(--border-color)',
-                  borderRadius: 'var(--radius-md)',
-                  padding: '0.3rem 0.6rem',
-                  fontSize: '0.775rem',
-                  color: 'var(--text-primary)',
-                  outline: 'none'
-                }}
-              />
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '0.25rem' }}>
+              <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}>
+                <input
+                  type="date"
+                  value={startDate || ''}
+                  onChange={(e) => onStartDateChange(e.target.value)}
+                  style={{
+                    backgroundColor: 'var(--card-bg)',
+                    border: `1px solid ${customError ? '#DC2626' : 'var(--border-color)'}`,
+                    borderRadius: 'var(--radius-md)',
+                    padding: '0.3rem 0.6rem',
+                    fontSize: '0.775rem',
+                    color: 'var(--text-primary)',
+                    outline: 'none'
+                  }}
+                />
+                <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>to</span>
+                <input
+                  type="date"
+                  value={endDate || ''}
+                  onChange={(e) => onEndDateChange(e.target.value)}
+                  style={{
+                    backgroundColor: 'var(--card-bg)',
+                    border: `1px solid ${customError ? '#DC2626' : 'var(--border-color)'}`,
+                    borderRadius: 'var(--radius-md)',
+                    padding: '0.3rem 0.6rem',
+                    fontSize: '0.775rem',
+                    color: 'var(--text-primary)',
+                    outline: 'none'
+                  }}
+                />
+              </div>
+              {customError && (
+                <span style={{ fontSize: '0.725rem', color: '#DC2626', fontWeight: 500 }}>
+                  {customError}
+                </span>
+              )}
             </div>
           )}
         </div>
@@ -170,7 +194,7 @@ export function initCustomDateRange({ startDate, endDate, setStartDate, setEndDa
     d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
   if (!startDate) {
     const d = new Date();
-    d.setDate(d.getDate() - 7);
+    d.setDate(d.getDate() - 6);
     setStartDate(formatDate(d));
   }
   if (!endDate) {

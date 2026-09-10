@@ -1,16 +1,18 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
-  FileText, Clock, CheckCircle2, RotateCw, XCircle, Layers, PieChart,
-  TrendingUp, TrendingDown, Minus, Sunrise, Sun, Moon
+  FileText, Clock, RotateCw, XCircle, Layers, PieChart,
+  TrendingUp, TrendingDown, Minus, Sunrise, Sun, Moon, Plus
 } from 'lucide-react';
+import FilterBar, { initCustomDateRange } from '../components/ui/FilterBar';
+import ChangeRequestModal from '../components/ui/ChangeRequestModal';
 import { apiFetch } from '../lib/apiFetch';
+import { fetchMe } from '../lib/auth';
 
 const METRIC_STYLES = [
-  { match: (m) => m.isTotal || m.title.includes('Total'), icon: FileText, color: '#2563EB', tint: '#EFF6FF' },
-  { match: (m) => m.isPending || m.title.includes('Pending'), icon: Clock, color: '#D97706', tint: '#FFFBEB' },
-  { match: (m) => m.isApproved || m.title.includes('Approved'), icon: CheckCircle2, color: '#059669', tint: '#ECFDF5' },
-  { match: (m) => m.isInProgress || m.isImplemented || m.title.includes('Progress') || m.title.includes('Implemented'), icon: RotateCw, color: '#7C3AED', tint: '#F5F3FF' },
-  { match: () => true, icon: XCircle, color: '#DC2626', tint: '#FEF2F2' }
+  { match: (m) => m.isTotal || m.title.includes('Total'), icon: FileText, color: '#2563EB', tint: '#EFF6FF', filterKey: 'All' },
+  { match: (m) => m.isPending || m.title.includes('Pending'), icon: Clock, color: '#D97706', tint: '#FFFBEB', filterKey: 'Pending' },
+  { match: (m) => m.isInProgress || m.isImplemented || m.title.includes('Progress') || m.title.includes('Implemented'), icon: RotateCw, color: '#7C3AED', tint: '#F5F3FF', filterKey: 'Implemented' },
+  { match: () => true, icon: XCircle, color: '#DC2626', tint: '#FEF2F2', filterKey: 'Rejected' }
 ];
 const getMetricStyle = (m) => METRIC_STYLES.find((s) => s.match(m)) || METRIC_STYLES[METRIC_STYLES.length - 1];
 
@@ -21,97 +23,212 @@ const getGreeting = () => {
   return { text: 'Good Evening', Icon: Moon };
 };
 
-function DashboardPage({ onNavigate, user, isOrgDashboard }) {
+const CANONICAL_CATEGORIES = [
+  { category: 'Server & Infra', label: 'Server & Infra', count: 0, color: '#2563EB', percentage: 0 },
+  { category: 'Network & Connectivity', label: 'Network & Connectivity', count: 0, color: '#0D9488', percentage: 0 },
+  { category: 'Access & Security', label: 'Access & Security', count: 0, color: '#7C3AED', percentage: 0 },
+  { category: 'IT Asset', label: 'IT Asset', count: 0, color: '#D97706', percentage: 0 },
+  { category: 'Office 365 & Collaboration', label: 'Office 365 & Collaboration', count: 0, color: '#475569', percentage: 0 },
+  { category: 'Security Tools & Policies', label: 'Security Tools & Policies', count: 0, color: '#DC2626', percentage: 0 }
+];
+
+const CANONICAL_STATUSES = [
+  { status: 'Pending', label: 'Pending Approvals', count: 0, color: '#D97706' },
+  { status: 'Implemented', label: 'Implemented', count: 0, color: '#7C3AED' },
+  { status: 'Rejected', label: 'Rejected', count: 0, color: '#DC2626' }
+];
+
+function DashboardPage({ onNavigate, user, isOrgDashboard = false, searchQuery = '' }) {
   const [metrics, setMetrics] = useState([]);
   const [categoryData, setCategoryData] = useState([]);
   const [statusBreakdown, setStatusBreakdown] = useState([]);
   const [hoveredStatus, setHoveredStatus] = useState(null);
-  const dashboardRequestInFlight = useRef(false);
+
+  // Unified Filter State
+  const [activeFilter, setActiveFilter] = useState('All');
+  const [dateFilter, setDateFilter] = useState('last_7_days');
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
+
+  // Requests Table State
+  const [requests, setRequests] = useState([]);
+  const [statusCounts, setStatusCounts] = useState({
+    All: 0,
+    Pending: 0,
+    Implemented: 0,
+    Rejected: 0
+  });
+  const [isLoadingRequests, setIsLoadingRequests] = useState(false);
+  const [selectedRequest, setSelectedRequest] = useState(null);
+
+  const requestInFlight = useRef(false);
+  const fetchSeqRef = useRef(0);
+
+  const fetchData = useCallback(async () => {
+    if (document.hidden) return;
+
+    // Do not fetch custom date filter if dates are incomplete
+    if (dateFilter === 'custom' && (!startDate || !endDate)) {
+      return;
+    }
+
+    const currentSeq = ++fetchSeqRef.current;
+    requestInFlight.current = true;
+    setIsLoadingRequests(true);
+
+    try {
+      const analyticsParams = new URLSearchParams({
+        ...(isOrgDashboard && { scope: 'organization' }),
+        ...(activeFilter !== 'All' && { status: activeFilter }),
+        ...(dateFilter !== 'overall' && { dateFilter }),
+        ...(dateFilter === 'custom' && startDate && { startDate }),
+        ...(dateFilter === 'custom' && endDate && { endDate }),
+        ...(searchQuery && { search: searchQuery })
+      });
+
+      const requestParams = new URLSearchParams({
+        ...(isOrgDashboard && { scope: 'organization' }),
+        ...(activeFilter !== 'All' && { status: activeFilter }),
+        ...(dateFilter !== 'overall' && { dateFilter }),
+        ...(dateFilter === 'custom' && startDate && { startDate }),
+        ...(dateFilter === 'custom' && endDate && { endDate }),
+        ...(searchQuery && { search: searchQuery })
+      });
+
+      // 1. First fetch /me and /my-requests
+      let effectiveUserId = user?.id;
+      try {
+        const activeUser = await fetchMe();
+        if (activeUser?.id) effectiveUserId = activeUser.id;
+      } catch {
+        /* fallback to user.id */
+      }
+
+      const headers = effectiveUserId ? { 'x-user-id': effectiveUserId } : {};
+
+      const rRes = await apiFetch(`/my-requests?${requestParams}`, { headers });
+      if (currentSeq !== fetchSeqRef.current) return;
+
+      if (rRes.ok) {
+        const rData = await rRes.json();
+        if (rData.data && Array.isArray(rData.data)) setRequests(rData.data);
+        if (rData.statusCounts) {
+          setStatusCounts({
+            All: rData.statusCounts.All || 0,
+            Pending: rData.statusCounts.Pending || 0,
+            Implemented: rData.statusCounts.Implemented || 0,
+            Rejected: rData.statusCounts.Rejected || 0
+          });
+        }
+      }
+
+      // 2. Then load the rest of the analytics APIs
+      const [mRes, cRes, sRes] = await Promise.all([
+        apiFetch(`/metrics?${analyticsParams}`, { headers }),
+        apiFetch(`/categories?${analyticsParams}`, { headers }),
+        apiFetch(`/status-breakdown?${analyticsParams}`, { headers })
+      ]);
+
+      if (currentSeq !== fetchSeqRef.current) return;
+
+      if (mRes.ok) {
+        const mData = await mRes.json();
+        if (mData.data && Array.isArray(mData.data)) setMetrics(mData.data);
+      }
+      if (cRes.ok) {
+        const cData = await cRes.json();
+        if (cData.data && Array.isArray(cData.data)) setCategoryData(cData.data);
+      }
+      if (sRes.ok) {
+        const sData = await sRes.json();
+        if (sData.data && Array.isArray(sData.data)) setStatusBreakdown(sData.data);
+      }
+    } catch (err) {
+      console.warn('Dashboard API error:', err);
+    } finally {
+      if (currentSeq === fetchSeqRef.current) {
+        requestInFlight.current = false;
+        setIsLoadingRequests(false);
+      }
+    }
+  }, [isOrgDashboard, activeFilter, dateFilter, startDate, endDate, searchQuery, user?.id]);
 
   useEffect(() => {
-    const fetchDashboardData = async () => {
-      if (document.hidden || dashboardRequestInFlight.current) return;
-      dashboardRequestInFlight.current = true;
-      try {
-        const query = isOrgDashboard ? '?scope=organization' : '';
-        const [mRes, cRes, sRes] = await Promise.all([
-          apiFetch(`/metrics${query}`),
-          apiFetch(`/categories${query}`),
-          apiFetch(`/status-breakdown${query}`)
-        ]);
-        if (mRes.ok) {
-          const mData = await mRes.json();
-          if (mData.data && Array.isArray(mData.data)) setMetrics(mData.data);
-        }
-        if (cRes.ok) {
-          const cData = await cRes.json();
-          if (cData.data && Array.isArray(cData.data)) setCategoryData(cData.data);
-        }
-        if (sRes.ok) {
-          const sData = await sRes.json();
-          if (sData.data && Array.isArray(sData.data)) setStatusBreakdown(sData.data);
-        }
-      } catch (err) {
-        console.warn('Backend API offline, using default dashboard data:', err);
-      } finally {
-        dashboardRequestInFlight.current = false;
-      }
-    };
-    fetchDashboardData();
-    const interval = setInterval(fetchDashboardData, 30000);
-    window.addEventListener('focus', fetchDashboardData);
+    fetchData();
+    const interval = setInterval(fetchData, 30000);
+    window.addEventListener('focus', fetchData);
     return () => {
       clearInterval(interval);
-      window.removeEventListener('focus', fetchDashboardData);
+      window.removeEventListener('focus', fetchData);
     };
-  }, [isOrgDashboard]);
+  }, [fetchData]);
 
-  const DEFAULT_CATEGORIES = [
-    { category: 'Server & Infra', label: 'Server & Infra', count: 0, color: '#2563EB', percentage: 0 },
-    { category: 'Network & Connectivity', label: 'Network & Connectivity', count: 0, color: '#0D9488', percentage: 0 },
-    { category: 'Access & Security', label: 'Access & Security', count: 0, color: '#7C3AED', percentage: 0 },
-    { category: 'IT Asset', label: 'IT Asset', count: 0, color: '#D97706', percentage: 0 },
-    { category: 'Office 365 & Collaboration', label: 'Office 365 & Collaboration', count: 0, color: '#475569', percentage: 0 },
-    { category: 'Security Tools & Policies', label: 'Security Tools & Policies', count: 0, color: '#DC2626', percentage: 0 }
-  ];
-
-  const DEFAULT_STATUSES = [
-    { status: 'Approved', label: 'Approved', count: 0, color: '#059669' },
-    { status: 'Pending', label: 'Pending', count: 0, color: '#D97706' },
-    { status: 'Implemented', label: 'Implemented', count: 0, color: '#7C3AED' },
-    { status: 'Rejected', label: 'Rejected', count: 0, color: '#DC2626' },
-    { status: 'Draft', label: 'Draft', count: 0, color: '#64748B' }
-  ];
-
-  // Align categories strictly with the 6 canonical categories in exact order
-  const displayCategories = DEFAULT_CATEGORIES.map((def) => {
+  // Aligned Categories
+  const displayCategories = CANONICAL_CATEGORIES.map((def) => {
     const found = categoryData.find(
       (c) => (c.name || c.category || c.label || '').trim().toLowerCase() === def.category.toLowerCase()
     );
     return found ? { ...def, ...found } : def;
   });
-
-  const displayStatuses = statusBreakdown.length > 0 ? statusBreakdown : DEFAULT_STATUSES;
-  const totalCRs = statusBreakdown.reduce((sum, item) => sum + (item.count || 0), 0);
   const totalCategoryCount = displayCategories.reduce((sum, c) => sum + (c.count || 0), 0);
 
-  const { text: greetingText, Icon: GreetingIcon } = getGreeting();
+  // Aligned Statuses
+  const displayStatuses = CANONICAL_STATUSES.map((def) => {
+    const found = statusBreakdown.find(
+      (s) => (s.status || s.label || '').trim().toLowerCase() === def.status.toLowerCase()
+    );
+    return found ? { ...def, count: found.count || 0 } : def;
+  });
+  const totalCRs = displayStatuses.reduce((sum, item) => sum + (item.count || 0), 0);
+
+  // Filter Tabs (Only 3 statuses + All)
+  const filterTabs = [
+    { id: 'All', label: 'All', count: statusCounts.All || totalCRs },
+    { id: 'Pending', label: 'Pending Approvals', count: statusCounts.Pending },
+    { id: 'Implemented', label: 'Implemented', count: statusCounts.Implemented },
+    { id: 'Rejected', label: 'Rejected', count: statusCounts.Rejected }
+  ];
+
+  const { text: greetingText } = getGreeting();
   const firstName = (user?.name || '').split(' ')[0] || '';
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
 
-      {/* Page Header */}
-      <div>
-        <h1 style={{ fontSize: '1.45rem', fontWeight: 700, color: 'var(--text-primary)', lineHeight: 1.2, margin: 0 }}>
-          {isOrgDashboard ? 'Organization Dashboard' : `${greetingText}${firstName ? `, ${firstName}` : ''}`}
-        </h1>
-        <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginTop: '0.3rem' }}>
-          {isOrgDashboard
-            ? 'Overall company-wide change request metrics and analytics · updated just now'
-            : 'Snapshot across your submitted change requests · updated just now'}
-        </p>
+      {/* Top Header Row */}
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: '1rem' }}>
+        <div>
+          <h1 style={{ fontSize: '1.45rem', fontWeight: 700, color: 'var(--text-primary)', lineHeight: 1.2, margin: 0 }}>
+            {isOrgDashboard ? 'Organization Dashboard' : `${greetingText}${firstName ? `, ${firstName}` : ''}`}
+          </h1>
+          <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginTop: '0.3rem' }}>
+            {isOrgDashboard
+              ? 'Overall company-wide change request metrics and analytics · updated just now'
+              : 'Snapshot across your submitted change requests · updated just now'}
+          </p>
+        </div>
       </div>
+
+      {/* Single Unified Filter Bar */}
+      <FilterBar
+        tabs={filterTabs}
+        activeTab={activeFilter}
+        onTabChange={setActiveFilter}
+        dateValue={dateFilter}
+        onDateChange={(val) => {
+          setDateFilter(val);
+          if (val === 'custom') {
+            initCustomDateRange({ startDate, endDate, setStartDate, setEndDate });
+          } else {
+            setStartDate('');
+            setEndDate('');
+          }
+        }}
+        startDate={startDate}
+        endDate={endDate}
+        onStartDateChange={setStartDate}
+        onEndDateChange={setEndDate}
+      />
 
       {/* KPI Metric Cards Grid */}
       <div style={{
@@ -120,16 +237,6 @@ function DashboardPage({ onNavigate, user, isOrgDashboard }) {
         gap: '1rem'
       }}>
         {metrics.map((m, idx) => {
-          const filterMap = {
-            'Total Change Requests': 'All',
-            'Pending Approval': 'Pending',
-            'Approved': 'Approved',
-            'In Progress': 'Implemented',
-            'Implemented': 'Implemented',
-            'Rejected': 'Rejected',
-            'Drafts': 'Draft'
-          };
-          const targetFilter = filterMap[m.title] || 'All';
           const style = getMetricStyle(m);
           const Icon = style.icon;
           const changeStr = m.change || '';
@@ -138,27 +245,46 @@ function DashboardPage({ onNavigate, user, isOrgDashboard }) {
           const TrendIcon = isUp ? TrendingUp : isDown ? TrendingDown : Minus;
           const trendColor = isUp ? '#059669' : isDown ? '#DC2626' : 'var(--text-secondary)';
           const trendText = changeStr.replace('▲', '').replace('▼', '').trim();
+          const isSelected = activeFilter === style.filterKey;
 
           return (
             <div
               key={idx}
               className="cd-card-hover"
-              onClick={() => onNavigate && onNavigate(isOrgDashboard ? 'Organization worklist' : 'My Requests', { filter: targetFilter })}
+              onClick={() => setActiveFilter(style.filterKey)}
               style={{
                 backgroundColor: 'var(--card-bg)',
-                border: '1px solid var(--border-color)',
-                borderTop: `3px solid ${style.color}`,
+                border: isSelected ? `1.5px solid ${style.color}` : '1px solid var(--border-color)',
                 borderRadius: 'var(--radius-lg)',
                 padding: '1.1rem 1.15rem',
                 display: 'flex',
                 flexDirection: 'column',
                 justifyContent: 'space-between',
-                boxShadow: 'var(--shadow-card)',
+                boxShadow: isSelected ? '0 2px 8px rgba(0, 0, 0, 0.08)' : 'var(--shadow-card)',
                 minHeight: '125px',
-                cursor: 'pointer'
+                cursor: 'pointer',
+                transition: 'all 0.15s ease',
+                position: 'relative',
+                overflow: 'hidden'
               }}
             >
-              <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
+              {/* Top Colored Accent Stripe for non-selected cards */}
+              {!isSelected && (
+                <div
+                  style={{
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    height: '3px',
+                    backgroundColor: style.color,
+                    borderTopLeftRadius: 'inherit',
+                    borderTopRightRadius: 'inherit'
+                  }}
+                />
+              )}
+
+              <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginTop: '0.2rem' }}>
                 <span style={{ fontSize: '0.825rem', fontWeight: 500, color: 'var(--text-primary)', lineHeight: 1.25, maxWidth: '100%' }}>
                   {m.title}
                 </span>
@@ -200,7 +326,7 @@ function DashboardPage({ onNavigate, user, isOrgDashboard }) {
         })}
       </div>
 
-      {/* Middle Row: Tickets by Category & Status Breakdown Side-by-Side (Always Displayed) */}
+      {/* Middle Row: Tickets by Category & Status Breakdown Side-by-Side */}
       <div style={{
         display: 'grid',
         gridTemplateColumns: '1fr 1fr',
@@ -230,7 +356,7 @@ function DashboardPage({ onNavigate, user, isOrgDashboard }) {
                 </h3>
               </div>
               <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', fontWeight: 600 }}>
-                Last 30 days
+                {totalCategoryCount} Total
               </span>
             </div>
 
@@ -304,10 +430,17 @@ function DashboardPage({ onNavigate, user, isOrgDashboard }) {
               </span>
             </div>
 
-            {/* SVG Donut Ring Chart with Center Text */}
-            <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', margin: '0.85rem 0' }}>
-              <div style={{ position: 'relative', width: '150px', height: '150px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <svg width="150" height="150" viewBox="0 0 42 42">
+            {/* Donut Chart on Left, Legend Content on Right */}
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: '1.5rem',
+              marginTop: '0.85rem'
+            }}>
+              {/* Left: SVG Donut Ring Chart with Center Text */}
+              <div style={{ position: 'relative', width: '140px', height: '140px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                <svg width="140" height="140" viewBox="0 0 42 42">
                   <circle cx="21" cy="21" r="15.91549430918954" fill="transparent" stroke="var(--border-color)" strokeWidth="4.5" />
                   {(() => {
                     let accumPercent = 0;
@@ -341,49 +474,169 @@ function DashboardPage({ onNavigate, user, isOrgDashboard }) {
                 </svg>
 
                 <div style={{ position: 'absolute', textAlign: 'center' }}>
-                  <div style={{ fontSize: '1.5rem', fontWeight: 700, color: 'var(--text-primary)', lineHeight: 1 }}>{totalCRs}</div>
-                  <div style={{ fontSize: '0.725rem', color: 'var(--text-primary)', fontWeight: 500 }}>Total CRs</div>
+                  <div style={{ fontSize: '1.45rem', fontWeight: 700, color: 'var(--text-primary)', lineHeight: 1 }}>{totalCRs}</div>
+                  <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', fontWeight: 500, marginTop: '0.15rem' }}>Total CRs</div>
                 </div>
               </div>
-            </div>
 
-            {/* Status Breakdown Legend List */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem', marginTop: '0.5rem' }}>
-              {displayStatuses.map((sb, sbIdx) => {
-                const statusText = sb.status || sb.label || sb.name || `Status ${sbIdx + 1}`;
-                const pct = totalCRs > 0 ? Math.round((sb.count / totalCRs) * 100) : 0;
-                return (
-                  <div
-                    key={statusText}
-                    onMouseEnter={() => setHoveredStatus(sb.status || sb.label)}
-                    onMouseLeave={() => setHoveredStatus(null)}
-                    style={{
-                      display: 'grid',
-                      gridTemplateColumns: '16px 1fr 80px',
-                      alignItems: 'center',
-                      gap: '0.65rem',
-                      padding: '0.25rem 0.45rem',
-                      margin: '0 -0.45rem',
-                      borderRadius: 'var(--radius-md)',
-                      backgroundColor: hoveredStatus === (sb.status || sb.label) ? 'var(--input-bg)' : 'transparent',
-                      transition: 'background-color 0.15s ease',
-                      cursor: 'default'
-                    }}
-                  >
-                    <div style={{ width: '10px', height: '10px', borderRadius: '3px', backgroundColor: sb.color || 'var(--brand-primary)', flexShrink: 0 }} />
-                    <span style={{ color: 'var(--text-primary)', fontSize: '0.875rem', fontWeight: 500, whiteSpace: 'nowrap' }}>
-                      {statusText}
-                    </span>
-                    <span style={{ fontSize: '0.875rem', fontWeight: 600, color: 'var(--text-primary)', textAlign: 'right', whiteSpace: 'nowrap' }}>
-                      {sb.count} <span style={{ color: 'var(--text-secondary)', fontWeight: 500, fontSize: '0.8rem' }}>({pct}%)</span>
-                    </span>
-                  </div>
-                );
-              })}
+              {/* Right: Status Breakdown Legend List */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', flex: 1, minWidth: 0 }}>
+                {displayStatuses.map((sb, sbIdx) => {
+                  const statusText = sb.label || sb.status || sb.name || `Status ${sbIdx + 1}`;
+                  const pct = totalCRs > 0 ? Math.round((sb.count / totalCRs) * 100) : 0;
+                  return (
+                    <div
+                      key={statusText}
+                      onMouseEnter={() => setHoveredStatus(sb.status || sb.label)}
+                      onMouseLeave={() => setHoveredStatus(null)}
+                      onClick={() => setActiveFilter(sb.status)}
+                      style={{
+                        display: 'grid',
+                        gridTemplateColumns: '14px 1fr auto',
+                        alignItems: 'center',
+                        gap: '0.65rem',
+                        padding: '0.35rem 0.5rem',
+                        borderRadius: 'var(--radius-md)',
+                        backgroundColor: hoveredStatus === (sb.status || sb.label) ? 'var(--input-bg)' : 'transparent',
+                        transition: 'background-color 0.15s ease',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      <div style={{ width: '10px', height: '10px', borderRadius: '3px', backgroundColor: sb.color || 'var(--brand-primary)', flexShrink: 0 }} />
+                      <span style={{ color: 'var(--text-primary)', fontSize: '0.85rem', fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                        {statusText}
+                      </span>
+                      <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-primary)', textAlign: 'right', whiteSpace: 'nowrap' }}>
+                        {sb.count} <span style={{ color: 'var(--text-secondary)', fontWeight: 500, fontSize: '0.775rem' }}>({pct}%)</span>
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           </div>
         </div>
       </div>
+
+      {/* Bottom Section: Change Requests Table */}
+      <div style={{
+        backgroundColor: 'var(--card-bg)',
+        border: '1px solid var(--border-color)',
+        borderRadius: 'var(--radius-lg)',
+        overflow: 'hidden',
+        boxShadow: 'var(--shadow-card)'
+      }}>
+        <div style={{
+          padding: '1rem 1.25rem',
+          borderBottom: '1px solid var(--border-color)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between'
+        }}>
+          <div>
+            <h3 style={{ fontSize: '1rem', fontWeight: 600, color: 'var(--text-primary)', margin: 0 }}>
+              {isOrgDashboard ? 'Organization Change Requests' : 'My Change Requests'}
+            </h3>
+            <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', margin: '0.2rem 0 0 0' }}>
+              Showing {requests.length} ticket{requests.length === 1 ? '' : 's'} matching current filters
+            </p>
+          </div>
+        </div>
+
+        <div style={{ overflowX: 'auto' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.85rem' }}>
+            <thead>
+              <tr style={{ backgroundColor: 'var(--input-bg)', borderBottom: '1px solid var(--border-color)' }}>
+                <th style={{ padding: '0.75rem 1rem', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', fontSize: '0.725rem', letterSpacing: '0.05em', whiteSpace: 'nowrap' }}>CR ID</th>
+                <th style={{ padding: '0.75rem 1rem', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', fontSize: '0.725rem', letterSpacing: '0.05em' }}>Title</th>
+                <th style={{ padding: '0.75rem 1rem', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', fontSize: '0.725rem', letterSpacing: '0.05em' }}>Category</th>
+                <th style={{ padding: '0.75rem 1rem', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', fontSize: '0.725rem', letterSpacing: '0.05em', whiteSpace: 'nowrap' }}>Raised Date</th>
+                <th style={{ padding: '0.75rem 1rem', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', fontSize: '0.725rem', letterSpacing: '0.05em', whiteSpace: 'nowrap' }}>Closed Date</th>
+                <th style={{ padding: '0.75rem 1rem', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', fontSize: '0.725rem', letterSpacing: '0.05em', whiteSpace: 'nowrap' }}>Status</th>
+                <th style={{ padding: '0.75rem 1rem', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', fontSize: '0.725rem', letterSpacing: '0.05em', textAlign: 'right', whiteSpace: 'nowrap' }}>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {requests.length > 0 ? (
+                requests.map(cr => (
+                  <tr key={cr.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
+                    <td style={{ padding: '0.85rem 1rem', fontWeight: 500, color: 'var(--text-primary)', fontFamily: 'var(--font-mono)', whiteSpace: 'nowrap' }}>{cr.id}</td>
+                    <td style={{ padding: '0.85rem 1rem', fontWeight: 500, color: 'var(--text-primary)', maxWidth: '280px', wordBreak: 'break-word' }}>{cr.title}</td>
+                    <td style={{ padding: '0.85rem 1rem', color: 'var(--text-secondary)', wordBreak: 'break-word' }}>{cr.category}</td>
+                    <td style={{ padding: '0.85rem 1rem', color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)', fontSize: '0.8rem', whiteSpace: 'nowrap' }}>{cr.raisedDate}</td>
+                    <td style={{ padding: '0.85rem 1rem', color: 'var(--text-secondary)', fontSize: '0.8rem', whiteSpace: 'nowrap' }}>{cr.closedDate || '—'}</td>
+                    <td style={{ padding: '0.85rem 1rem', whiteSpace: 'nowrap' }}>
+                      <div style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '0.35rem',
+                        padding: '0.2rem 0.65rem',
+                        borderRadius: 'var(--radius-lg)',
+                        backgroundColor: cr.statusBg || '#FEF3C7',
+                        color: cr.statusColor || '#D97706',
+                        fontSize: '0.775rem',
+                        fontWeight: 500,
+                        whiteSpace: 'nowrap'
+                      }}>
+                        <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: cr.statusDot || '#D97706' }} />
+                        <span style={{ whiteSpace: 'nowrap' }}>
+                          {(cr.status || '').toLowerCase() === 'pending' ? 'Pending Approvals' : cr.status}
+                        </span>
+                      </div>
+                    </td>
+                    <td style={{ padding: '0.85rem 1rem', textAlign: 'right', whiteSpace: 'nowrap' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '0.6rem' }}>
+                        <button
+                          type="button"
+                          onClick={() => setSelectedRequest(cr)}
+                          style={{
+                            background: 'none',
+                            border: 'none',
+                            color: 'var(--brand-primary)',
+                            fontWeight: 500,
+                            cursor: 'pointer',
+                            fontSize: '0.825rem'
+                          }}
+                        >
+                          Details
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))
+              ) : isLoadingRequests ? (
+                <tr>
+                  <td colSpan={7} style={{ padding: '2.5rem', textAlign: 'center', color: 'var(--text-secondary)' }}>
+                    <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', fontWeight: 600, fontSize: '0.875rem' }}>
+                      <span style={{ display: 'inline-block', width: '16px', height: '16px', border: '2px solid var(--border-color)', borderTopColor: 'var(--brand-primary)', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
+                      <span>Loading change requests...</span>
+                    </div>
+                  </td>
+                </tr>
+              ) : (
+                <tr>
+                  <td colSpan={7} style={{ padding: '2.5rem', textAlign: 'center', color: 'var(--text-secondary)' }}>
+                    No change requests found for status "{activeFilter}".
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* Change Request Details Modal */}
+      {selectedRequest && (
+        <ChangeRequestModal
+          cr={selectedRequest}
+          user={user}
+          onClose={() => setSelectedRequest(null)}
+          onApprove={null}
+          onReject={null}
+          onSendBack={null}
+          onImplement={null}
+        />
+      )}
 
     </div>
   );

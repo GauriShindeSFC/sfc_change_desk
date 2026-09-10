@@ -17,6 +17,9 @@ export const RESTRICTED_ACTIONS = [
 ];
 
 export const getFieldOptions = (field, currentUser) => {
+  if (field?.fieldKey === 'hostingType') {
+    return ['AWS Cloud', 'Azure Cloud', 'GCP', 'Other Private Cloud', 'On Premise'];
+  }
   let opts = field?.options ? [...field.options] : [];
   if (field?.fieldKey === 'actionRequired' && !opts.includes('Other')) {
     opts.push('Other');
@@ -25,6 +28,31 @@ export const getFieldOptions = (field, currentUser) => {
     opts = opts.filter(opt => !RESTRICTED_ACTIONS.includes(String(opt).trim().toLowerCase()));
   }
   return opts;
+};
+
+const READONLY_FIELD_STYLE = {
+  width: '100%',
+  padding: '0.65rem 0.85rem',
+  backgroundColor: '#F1F5F9',
+  border: '1px solid var(--border-color)',
+  borderRadius: '8px',
+  fontSize: '0.85rem',
+  color: '#64748B',
+  outline: 'none',
+  cursor: 'not-allowed',
+  boxSizing: 'border-box'
+};
+
+const ACTIVE_FIELD_STYLE = {
+  width: '100%',
+  padding: '0.65rem 0.85rem',
+  backgroundColor: '#FFFFFF',
+  border: '1px solid var(--border-color)',
+  borderRadius: '8px',
+  fontSize: '0.85rem',
+  color: 'var(--text-primary)',
+  outline: 'none',
+  boxSizing: 'border-box'
 };
 
 function ChangeRequestFormPage({ onNavigate, initialData, user }) {
@@ -102,8 +130,6 @@ function ChangeRequestFormPage({ onNavigate, initialData, user }) {
   const [fieldsLoading, setFieldsLoading] = useState(false);
   const [customFieldValues, setCustomFieldValues] = useState({});
 
-  const isEditingDraft = Boolean(initialData?.id && initialData?.isDraft);
-
   const [currentSessionUser, setCurrentSessionUser] = useState(() => user || getSession()?.user);
   const activeSessionUser = currentSessionUser || user || getSession()?.user;
 
@@ -166,7 +192,6 @@ function ChangeRequestFormPage({ onNavigate, initialData, user }) {
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitSuccess, setSubmitSuccess] = useState(false);
-  const [isDraftSubmission, setIsDraftSubmission] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
 
   // 1. Load Categories on mount
@@ -241,25 +266,11 @@ function ChangeRequestFormPage({ onNavigate, initialData, user }) {
             setFields(body.data);
             const initialVals = { ...(initialData?.customFieldValues || {}) };
             const isOtherSubcat = selectedSubcategory?.name?.toLowerCase() === 'other' || selectedSubcategoryId?.endsWith('-oth');
-            body.data.forEach((f) => {
-              if (initialVals[f.fieldKey] === undefined || initialVals[f.fieldKey] === '') {
-                if (f.fieldType === 'dropdown') {
-                  const opts = getFieldOptions(f, activeSessionUser);
-                  initialVals[f.fieldKey] = isOtherSubcat && f.fieldKey === 'actionRequired' ? 'Other' : (opts[0] || '');
-                } else if (f.fieldType === 'boolean') {
-                  initialVals[f.fieldKey] = false;
-                } else {
-                  initialVals[f.fieldKey] = '';
-                }
-              }
-            });
-            if (isOtherSubcat) {
-              initialVals.actionRequired = 'Other';
-            }
+            
             setCustomFieldValues(prev => {
-              const newCustomVals = {};
-              const isOtherSubcat = selectedSubcategory?.name?.toLowerCase() === 'other' || selectedSubcategoryId?.endsWith('-oth');
-              
+              const newCustomVals = { ...prev };
+              const currentAction = prev.actionRequired || initialVals.actionRequired || (isOtherSubcat ? 'Other' : '');
+
               body.data.forEach((f) => {
                 let defaultVal = '';
                 if (f.fieldType === 'dropdown') {
@@ -269,8 +280,10 @@ function ChangeRequestFormPage({ onNavigate, initialData, user }) {
                   defaultVal = false;
                 }
 
-                const existingVal = prev[f.fieldKey];
-                if (existingVal !== undefined && existingVal !== '') {
+                // Check in prev, then fallback to initialData
+                const existingVal = prev[f.fieldKey] !== undefined ? prev[f.fieldKey] : initialVals[f.fieldKey];
+
+                if (existingVal !== undefined && existingVal !== null && existingVal !== '') {
                   if (f.fieldType === 'dropdown') {
                     const opts = getFieldOptions(f, activeSessionUser);
                     const isValid = opts.includes(existingVal);
@@ -279,12 +292,19 @@ function ChangeRequestFormPage({ onNavigate, initialData, user }) {
                     newCustomVals[f.fieldKey] = existingVal;
                   }
                 } else {
-                  newCustomVals[f.fieldKey] = defaultVal;
+                  if (newCustomVals[f.fieldKey] === undefined) {
+                    newCustomVals[f.fieldKey] = defaultVal;
+                  }
                 }
               });
 
-              if (prev.employeeEmail) newCustomVals.employeeEmail = prev.employeeEmail;
-              if (prev.employeeId) newCustomVals.employeeId = prev.employeeId;
+              if (isOtherSubcat) {
+                newCustomVals.actionRequired = 'Other';
+              }
+
+              if (initialVals.otherAction && !newCustomVals.otherAction) {
+                newCustomVals.otherAction = initialVals.otherAction;
+              }
 
               return newCustomVals;
             });
@@ -338,21 +358,23 @@ function ChangeRequestFormPage({ onNavigate, initialData, user }) {
     setFormData((prev) => ({ ...prev, [field]: value }));
   };
 
-  const handleSubmit = async (e, isDraft = false) => {
+  const handleSubmit = async (e) => {
     if (e) e.preventDefault();
+    if (isSubmitting) return;
     setIsSubmitting(true);
-    setIsDraftSubmission(isDraft);
     setErrorMessage('');
 
-    if (!isDraft && customFieldValues.actionRequired === 'Other' && !customFieldValues.otherAction?.trim()) {
+    if (customFieldValues.actionRequired === 'Other' && !customFieldValues.otherAction?.trim()) {
       setErrorMessage('Please specify the details for the Other action option.');
       setIsSubmitting(false);
       return;
     }
 
     const finalCustomValues = { ...customFieldValues };
+    const currentAction = finalCustomValues.actionRequired || '';
     fields.forEach((f) => {
-      if (f.fieldType === 'dropdown') {
+      const applies = !f.appliesToActions || !Array.isArray(f.appliesToActions) || f.appliesToActions.includes(currentAction);
+      if (applies && f.fieldType === 'dropdown') {
         const opts = getFieldOptions(f, activeSessionUser);
         if (!finalCustomValues[f.fieldKey] || !opts.includes(finalCustomValues[f.fieldKey])) {
           finalCustomValues[f.fieldKey] = opts[0] || '';
@@ -371,13 +393,13 @@ function ChangeRequestFormPage({ onNavigate, initialData, user }) {
       subcategoryId: selectedSubcategoryId,
       actionRequired: finalCustomValues.actionRequired || '',
       customFieldValues: finalCustomValues,
-      isDraft,
+      isDraft: false,
       risk: selectedSubcategory?.risk || formData.risk
     };
 
     try {
-      const endpoint = isEditingDraft ? `/change-requests/${initialData.id}` : '/change-requests';
-      const method = isEditingDraft ? 'PATCH' : 'POST';
+      const endpoint = '/change-requests';
+      const method = 'POST';
 
       const res = await apiFetch(endpoint, {
         method,
@@ -385,9 +407,6 @@ function ChangeRequestFormPage({ onNavigate, initialData, user }) {
         body: JSON.stringify(payload)
       });
       if (res.ok) {
-        if (isEditingDraft && !isDraft) {
-          await apiFetch(`/change-requests/${initialData.id}/submit`, { method: 'PATCH' });
-        }
         setSubmitSuccess(true);
       } else {
         const errBody = await res.json();
@@ -427,18 +446,16 @@ function ChangeRequestFormPage({ onNavigate, initialData, user }) {
           <Check size={28} />
         </div>
         <h2 style={{ fontSize: '1.4rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '0.5rem' }}>
-          {isDraftSubmission ? 'Change Request Saved as Draft!' : 'Change Request Submitted Successfully!'}
+          Change Request Submitted Successfully!
         </h2>
         <p style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', maxWidth: '460px', margin: '0 auto 1.75rem auto' }}>
-          {isDraftSubmission
-            ? 'Your request has been saved in your drafts. You can review and submit it anytime from My Requests.'
-            : 'Your change request has been routed to Change Managers for review.'}
+          Your change request has been routed to Change Managers for review.
         </p>
 
         <div style={{ display: 'flex', justifyContent: 'center', gap: '0.75rem' }}>
           <button
             type="button"
-            onClick={() => onNavigate('My Requests', { filter: isDraftSubmission ? 'Draft' : 'Pending' })}
+            onClick={() => onNavigate('My Requests', { filter: 'Pending' })}
             style={{
               padding: '0.65rem 1.35rem',
               backgroundColor: 'var(--brand-primary)',
@@ -450,7 +467,7 @@ function ChangeRequestFormPage({ onNavigate, initialData, user }) {
               cursor: 'pointer'
             }}
           >
-            {isDraftSubmission ? 'Go to My Drafts' : 'View My Requests'}
+            View My Requests
           </button>
         </div>
       </div>
@@ -471,43 +488,44 @@ function ChangeRequestFormPage({ onNavigate, initialData, user }) {
   };
 
   return (
-    <form onSubmit={(e) => handleSubmit(e, false)} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+    <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
       
-      {/* Top Header with Back Navigation */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
+      {/* Top Header with Change Category Button on the Top Right */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '1rem' }}>
+        <div>
+          <h1 style={{ fontSize: '1.45rem', fontWeight: 800, color: 'var(--text-primary)', lineHeight: 1.2, margin: 0 }}>
+            Create Change Request
+          </h1>
+          <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginTop: '0.2rem', margin: 0 }}>
+            Fill in employee and change details, then submit for Change Manager approval
+          </p>
+        </div>
+
         <button
           type="button"
           onClick={handleGoBack}
+          disabled={isSubmitting}
           style={{
             display: 'inline-flex',
             alignItems: 'center',
             gap: '0.45rem',
-            padding: '0.5rem 0.9rem',
+            padding: '0.55rem 1rem',
             backgroundColor: 'var(--card-bg)',
             color: 'var(--text-primary)',
             border: '1px solid var(--border-color)',
             borderRadius: '8px',
             fontSize: '0.825rem',
-            fontWeight: 700,
-            cursor: 'pointer',
+            fontWeight: 600,
+            cursor: isSubmitting ? 'not-allowed' : 'pointer',
+            opacity: isSubmitting ? 0.6 : 1,
             boxShadow: '0 1px 3px rgba(0, 0, 0, 0.05)',
             transition: 'background-color 0.15s ease'
           }}
-          onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--input-bg)'}
-          onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'var(--card-bg)'}
+          onMouseEnter={(e) => !isSubmitting && (e.currentTarget.style.backgroundColor = 'var(--input-bg)')}
+          onMouseLeave={(e) => !isSubmitting && (e.currentTarget.style.backgroundColor = 'var(--card-bg)')}
         >
-          <ArrowLeft size={16} />
-          <span>Back</span>
+          <span>Change Category</span>
         </button>
-
-        <div>
-          <h1 style={{ fontSize: '1.45rem', fontWeight: 800, color: 'var(--text-primary)', lineHeight: 1.2, margin: 0 }}>
-            Create Change Request
-          </h1>
-          <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginTop: '0.15rem', margin: 0 }}>
-            Fill in employee and change details, then submit for Change Manager approval
-          </p>
-        </div>
       </div>
 
       {errorMessage && (
@@ -536,11 +554,11 @@ function ChangeRequestFormPage({ onNavigate, initialData, user }) {
         boxShadow: '0 1px 3px rgba(16, 21, 30, 0.04)'
       }}>
         
-        {/* Section 1: Employee Details */}
+        {/* Section 1: Requester Details */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <h3 style={{ fontSize: '1rem', fontWeight: 500, color: 'var(--text-primary)', margin: 0 }}>
-              Employee Details
+              Requester Details
             </h3>
             <span style={{ fontSize: '0.775rem', fontWeight: 600, color: 'var(--text-secondary)' }}>
               Section 1 of 2
@@ -550,13 +568,14 @@ function ChangeRequestFormPage({ onNavigate, initialData, user }) {
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1.25rem' }}>
             <div>
               <label style={{ display: 'block', fontSize: '0.825rem', fontWeight: 500, color: 'var(--text-primary)', marginBottom: '0.4rem' }}>
-                Employee Name
+                Requester Name
               </label>
               <input
                 type="text"
                 readOnly
+                disabled
                 value={formData.employeeName}
-                style={{ width: '100%', padding: '0.65rem 0.85rem', backgroundColor: 'var(--input-bg)', border: '1px solid var(--border-color)', borderRadius: '8px', fontSize: '0.85rem', color: 'var(--text-secondary)', outline: 'none', cursor: 'not-allowed', opacity: 0.8 }}
+                style={READONLY_FIELD_STYLE}
               />
             </div>
             <div>
@@ -566,9 +585,10 @@ function ChangeRequestFormPage({ onNavigate, initialData, user }) {
               <input
                 type="email"
                 readOnly
+                disabled
                 placeholder="e.g. employee@company.com"
                 value={formData.employeeEmail}
-                style={{ width: '100%', padding: '0.65rem 0.85rem', backgroundColor: 'var(--input-bg)', border: '1px solid var(--border-color)', borderRadius: '8px', fontSize: '0.85rem', color: 'var(--text-secondary)', outline: 'none', cursor: 'not-allowed', opacity: 0.8 }}
+                style={READONLY_FIELD_STYLE}
               />
             </div>
             <div>
@@ -578,9 +598,10 @@ function ChangeRequestFormPage({ onNavigate, initialData, user }) {
               <input
                 type="text"
                 readOnly
+                disabled
                 placeholder="e.g. SFC-0083"
                 value={formData.employeeId}
-                style={{ width: '100%', padding: '0.65rem 0.85rem', backgroundColor: 'var(--input-bg)', border: '1px solid var(--border-color)', borderRadius: '8px', fontSize: '0.85rem', color: 'var(--text-secondary)', outline: 'none', cursor: 'not-allowed', opacity: 0.8 }}
+                style={READONLY_FIELD_STYLE}
               />
             </div>
             <div>
@@ -590,9 +611,10 @@ function ChangeRequestFormPage({ onNavigate, initialData, user }) {
               <input
                 type="text"
                 readOnly
-                placeholder="Not specified"
+                disabled
+                placeholder="e.g. Mumbai DC, Ahmedabad HQ, Remote"
                 value={formData.location || resolveEmpLocation(activeSessionUser) || ''}
-                style={{ width: '100%', padding: '0.65rem 0.85rem', backgroundColor: 'var(--input-bg)', border: '1px solid var(--border-color)', borderRadius: '8px', fontSize: '0.85rem', color: 'var(--text-secondary)', outline: 'none', cursor: 'not-allowed', opacity: 0.8 }}
+                style={READONLY_FIELD_STYLE}
               />
             </div>
             <div>
@@ -605,7 +627,7 @@ function ChangeRequestFormPage({ onNavigate, initialData, user }) {
                 placeholder="e.g. manager@company.com"
                 value={formData.managerEmail}
                 onChange={(e) => handleInputChange('managerEmail', e.target.value)}
-                style={{ width: '100%', padding: '0.65rem 0.85rem', backgroundColor: 'var(--input-bg)', border: '1px solid var(--border-color)', borderRadius: '8px', fontSize: '0.85rem', color: 'var(--text-primary)', outline: 'none' }}
+                style={ACTIVE_FIELD_STYLE}
               />
             </div>
           </div>
@@ -634,101 +656,57 @@ function ChangeRequestFormPage({ onNavigate, initialData, user }) {
               <input
                 type="text"
                 required
-                placeholder="e.g. Upgrade payment-gateway API to v4"
+                placeholder="e.g. Create a New Server - Server Lifecycle"
                 value={formData.title}
                 onChange={(e) => handleInputChange('title', e.target.value)}
-                style={{
-                  width: '100%',
-                  padding: '0.65rem 0.85rem',
-                  backgroundColor: 'var(--input-bg)',
-                  border: '1px solid var(--border-color)',
-                  borderRadius: '8px',
-                  fontSize: '0.85rem',
-                  color: 'var(--text-primary)',
-                  outline: 'none'
-                }}
+                style={ACTIVE_FIELD_STYLE}
               />
             </div>
 
-            {/* Category Dropdown */}
+            {/* Category (Locked to Catalog Selection) */}
             <div>
               <label style={{ display: 'block', fontSize: '0.825rem', fontWeight: 500, color: 'var(--text-primary)', marginBottom: '0.4rem' }}>
-                Category *
+                Category
               </label>
-              <select
-                value={selectedCategoryId}
-                onChange={(e) => handleCategoryChange(e.target.value)}
-                style={{
-                  width: '100%',
-                  padding: '0.65rem 0.85rem',
-                  backgroundColor: 'var(--input-bg)',
-                  border: '1px solid var(--border-color)',
-                  borderRadius: '8px',
-                  fontSize: '0.85rem',
-                  color: 'var(--text-primary)',
-                  outline: 'none'
-                }}
-              >
-                {categories.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.name}
-                  </option>
-                ))}
-              </select>
+              <input
+                type="text"
+                readOnly
+                disabled
+                value={categories.find((c) => c.id === selectedCategoryId)?.name || initialData?.category || 'Server & Infra'}
+                style={READONLY_FIELD_STYLE}
+              />
             </div>
 
-            {/* Sub-Category Dropdown */}
+            {/* Sub-category (Locked to Catalog Selection) */}
             <div>
               <label style={{ display: 'block', fontSize: '0.825rem', fontWeight: 500, color: 'var(--text-primary)', marginBottom: '0.4rem' }}>
-                Sub-category *
+                Sub-category
               </label>
-              <select
-                value={selectedSubcategoryId}
-                onChange={(e) => handleSubcategoryChange(e.target.value)}
-                style={{
-                  width: '100%',
-                  padding: '0.65rem 0.85rem',
-                  backgroundColor: 'var(--input-bg)',
-                  border: '1px solid var(--border-color)',
-                  borderRadius: '8px',
-                  fontSize: '0.85rem',
-                  color: 'var(--text-primary)',
-                  outline: 'none'
-                }}
-              >
-                {subcategories.map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.name}
-                  </option>
-                ))}
-              </select>
+              <input
+                type="text"
+                readOnly
+                disabled
+                value={selectedSubcategory?.name || initialData?.subCategory || 'Server Lifecycle'}
+                style={READONLY_FIELD_STYLE}
+              />
             </div>
 
-            {/* Preferred Change Date */}
+            {/* Start Date */}
             <div>
               <label style={{ display: 'block', fontSize: '0.825rem', fontWeight: 500, color: 'var(--text-primary)', marginBottom: '0.4rem' }}>
-                Preferred Change Date (Start Date)
+                Start Date
               </label>
               <input
                 type="date"
                 value={formData.startDate}
                 onChange={(e) => handleInputChange('startDate', e.target.value)}
-                style={{
-                  width: '100%',
-                  padding: '0.65rem 0.85rem',
-                  backgroundColor: 'var(--input-bg)',
-                  border: '1px solid var(--border-color)',
-                  borderRadius: '8px',
-                  fontSize: '0.85rem',
-                  color: 'var(--text-primary)',
-                  outline: 'none'
-                }}
+                style={ACTIVE_FIELD_STYLE}
               />
             </div>
 
             {/* Dynamic Fields Renderer */}
             {visibleFields.length > 0 && (
-              <div style={{ gridColumn: '1 / -1', display: 'flex', flexDirection: 'column', gap: '1rem', padding: '1rem', backgroundColor: 'var(--input-bg)', borderRadius: '10px', border: '1px solid var(--border-color)' }}>
+              <div style={{ gridColumn: '1 / -1', display: 'flex', flexDirection: 'column', gap: '1rem', padding: '1rem', backgroundColor: 'var(--card-bg, #FFFFFF)', borderRadius: '10px', border: '1px solid var(--border-color)' }}>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1rem' }}>
                   {visibleFields.map((field) => {
                     const isActionRequiredOther = field.fieldKey === 'actionRequired' && customFieldValues.actionRequired === 'Other';
@@ -745,16 +723,7 @@ function ChangeRequestFormPage({ onNavigate, initialData, user }) {
                               type="text"
                               disabled
                               value="Other"
-                              style={{
-                                width: '100%',
-                                padding: '0.65rem 0.85rem',
-                                backgroundColor: 'var(--input-bg)',
-                                border: '1px solid var(--border-color)',
-                                borderRadius: '8px',
-                                fontSize: '0.85rem',
-                                color: 'var(--text-secondary)',
-                                outline: 'none'
-                              }}
+                              style={READONLY_FIELD_STYLE}
                             />
                           </div>
                           <div>
@@ -764,19 +733,10 @@ function ChangeRequestFormPage({ onNavigate, initialData, user }) {
                             <input
                               type="text"
                               required
-                              placeholder="Enter custom action title / details..."
+                              placeholder="Enter custom action......"
                               value={customFieldValues.otherAction || ''}
                               onChange={(e) => handleCustomFieldChange('otherAction', e.target.value)}
-                              style={{
-                                width: '100%',
-                                padding: '0.65rem 0.85rem',
-                                backgroundColor: 'var(--card-bg)',
-                                border: '1px solid var(--border-color)',
-                                borderRadius: '8px',
-                                fontSize: '0.85rem',
-                                color: 'var(--text-primary)',
-                                outline: 'none'
-                              }}
+                              style={ACTIVE_FIELD_STYLE}
                             />
                           </div>
                         </div>
@@ -795,18 +755,7 @@ function ChangeRequestFormPage({ onNavigate, initialData, user }) {
                               disabled={isDisabled}
                               value={customFieldValues[field.fieldKey] || ''}
                               onChange={(e) => handleCustomFieldChange(field.fieldKey, e.target.value)}
-                              style={{
-                                width: '100%',
-                                padding: '0.65rem 0.85rem',
-                                backgroundColor: isDisabled ? 'var(--input-bg)' : 'var(--card-bg)',
-                                border: '1px solid var(--border-color)',
-                                borderRadius: '8px',
-                                fontSize: '0.85rem',
-                                color: isDisabled ? 'var(--text-secondary)' : 'var(--text-primary)',
-                                outline: 'none',
-                                opacity: isDisabled ? 0.7 : 1,
-                                cursor: isDisabled ? 'not-allowed' : 'pointer'
-                              }}
+                              style={isDisabled ? READONLY_FIELD_STYLE : ACTIVE_FIELD_STYLE}
                             >
                               {isDisabled ? (
                                 <option value="">Loading options...</option>
@@ -825,24 +774,17 @@ function ChangeRequestFormPage({ onNavigate, initialData, user }) {
                             <input
                               type="text"
                               required
-                              placeholder="Enter custom action title / details..."
+                              placeholder="Enter custom action......"
                               value={customFieldValues.otherAction || ''}
                               onChange={(e) => handleCustomFieldChange('otherAction', e.target.value)}
-                              style={{
-                                width: '100%',
-                                padding: '0.65rem 0.85rem',
-                                backgroundColor: 'var(--card-bg)',
-                                border: '1px solid var(--border-color)',
-                                borderRadius: '8px',
-                                fontSize: '0.85rem',
-                                color: 'var(--text-primary)',
-                                outline: 'none'
-                              }}
+                              style={ACTIVE_FIELD_STYLE}
                             />
                           </div>
                         </div>
                       );
-                    }                    return (
+                    }
+
+                    return (
                       <div key={field.id || field.fieldKey}>
                         <label style={{ display: 'block', fontSize: '0.825rem', fontWeight: 500, color: 'var(--text-primary)', marginBottom: '0.35rem' }}>
                           {field.fieldLabel} {field.isRequired ? '*' : ''}
@@ -855,18 +797,7 @@ function ChangeRequestFormPage({ onNavigate, initialData, user }) {
                                 disabled={isDisabled}
                                 value={customFieldValues[field.fieldKey] || ''}
                                 onChange={(e) => handleCustomFieldChange(field.fieldKey, e.target.value)}
-                                style={{
-                                  width: '100%',
-                                  padding: '0.65rem 0.85rem',
-                                  backgroundColor: isDisabled ? 'var(--input-bg)' : 'var(--card-bg)',
-                                  border: '1px solid var(--border-color)',
-                                  borderRadius: '8px',
-                                  fontSize: '0.85rem',
-                                  color: isDisabled ? 'var(--text-secondary)' : 'var(--text-primary)',
-                                  outline: 'none',
-                                  opacity: isDisabled ? 0.7 : 1,
-                                  cursor: isDisabled ? 'not-allowed' : 'pointer'
-                                }}
+                                style={isDisabled ? READONLY_FIELD_STYLE : ACTIVE_FIELD_STYLE}
                               >
                                 {isDisabled ? (
                                   <option value="">Loading options...</option>
@@ -881,7 +812,7 @@ function ChangeRequestFormPage({ onNavigate, initialData, user }) {
 
                           if (field.fieldType === 'boolean') {
                             return (
-                              <label style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
+                              <label style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', marginTop: '0.5rem' }}>
                                 <input
                                   type="checkbox"
                                   checked={Boolean(customFieldValues[field.fieldKey])}
@@ -898,36 +829,44 @@ function ChangeRequestFormPage({ onNavigate, initialData, user }) {
                                 type="date"
                                 value={customFieldValues[field.fieldKey] || ''}
                                 onChange={(e) => handleCustomFieldChange(field.fieldKey, e.target.value)}
+                                style={ACTIVE_FIELD_STYLE}
+                              />
+                            );
+                          }
+
+                          if (field.fieldType === 'textarea') {
+                            return (
+                              <textarea
+                                rows={3}
+                                placeholder={`Enter ${field.fieldLabel}`}
+                                value={customFieldValues[field.fieldKey] || ''}
+                                onChange={(e) => handleCustomFieldChange(field.fieldKey, e.target.value)}
                                 style={{
-                                  width: '100%',
-                                  padding: '0.65rem 0.85rem',
-                                  backgroundColor: 'var(--card-bg)',
-                                  border: '1px solid var(--border-color)',
-                                  borderRadius: '8px',
-                                  fontSize: '0.85rem',
-                                  color: 'var(--text-primary)',
-                                  outline: 'none'
+                                  ...ACTIVE_FIELD_STYLE,
+                                  resize: 'vertical'
                                 }}
                               />
                             );
                           }
 
+                          const cleanLabel = field.fieldLabel || '';
+                          const placeholderText = cleanLabel.toLowerCase().includes('cve')
+                            ? 'Enter KB/CVE (if applicable)'
+                            : cleanLabel.toLowerCase().includes('current os')
+                            ? 'Enter current OS/Version'
+                            : cleanLabel.toLowerCase().includes('target version')
+                            ? 'Enter target Version/Patch'
+                            : cleanLabel.toLowerCase().includes('ip address')
+                            ? 'Enter IP address'
+                            : `Enter ${cleanLabel}`;
+
                           return (
                             <input
                               type="text"
-                              placeholder={`Enter ${field.fieldLabel.toLowerCase()}`}
+                              placeholder={placeholderText}
                               value={customFieldValues[field.fieldKey] || ''}
                               onChange={(e) => handleCustomFieldChange(field.fieldKey, e.target.value)}
-                              style={{
-                                width: '100%',
-                                padding: '0.65rem 0.85rem',
-                                backgroundColor: 'var(--card-bg)',
-                                border: '1px solid var(--border-color)',
-                                borderRadius: '8px',
-                                fontSize: '0.85rem',
-                                color: 'var(--text-primary)',
-                                outline: 'none'
-                              }}
+                              style={ACTIVE_FIELD_STYLE}
                             />
                           );
                         })()}
@@ -950,14 +889,7 @@ function ChangeRequestFormPage({ onNavigate, initialData, user }) {
                 value={formData.justification}
                 onChange={(e) => handleInputChange('justification', e.target.value)}
                 style={{
-                  width: '100%',
-                  padding: '0.65rem 0.85rem',
-                  backgroundColor: 'var(--input-bg)',
-                  border: '1px solid var(--border-color)',
-                  borderRadius: '8px',
-                  fontSize: '0.85rem',
-                  color: 'var(--text-primary)',
-                  outline: 'none',
+                  ...ACTIVE_FIELD_STYLE,
                   resize: 'vertical'
                 }}
               />
@@ -968,61 +900,75 @@ function ChangeRequestFormPage({ onNavigate, initialData, user }) {
       </div>
 
       {/* Bottom Action Footer */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '0.5rem', paddingTop: '1.25rem', borderTop: '1px solid var(--border-color)' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.75rem', marginTop: '0.5rem', paddingTop: '1.25rem', borderTop: '1px solid var(--border-color)' }}>
         <button
           type="button"
-          onClick={() => onNavigate('Change Catalog', { activeCategory: initialData?.fromCategory || initialData?.activeCategory || initialData?.category || 'Server & Infra' })}
-          style={{
-            padding: '0.6rem 1.25rem',
-            backgroundColor: 'var(--card-bg)',
-            color: 'var(--text-secondary)',
-            border: '1px solid var(--border-color)',
-            borderRadius: '8px',
-            fontSize: '0.85rem',
-            fontWeight: 600,
-            cursor: 'pointer'
-          }}
-        >
-          Cancel
-        </button>
-        <button
-          type="button"
-          onClick={(e) => handleSubmit(e, true)}
+          onClick={handleGoBack}
           disabled={isSubmitting}
           style={{
-            padding: '0.6rem 1.25rem',
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '0.45rem',
+            padding: '0.6rem 1.15rem',
             backgroundColor: 'var(--card-bg)',
             color: 'var(--text-primary)',
             border: '1px solid var(--border-color)',
             borderRadius: '8px',
             fontSize: '0.85rem',
             fontWeight: 600,
-            cursor: 'pointer'
+            cursor: isSubmitting ? 'not-allowed' : 'pointer',
+            opacity: isSubmitting ? 0.6 : 1,
+            transition: 'background-color 0.15s ease'
           }}
+          onMouseEnter={(e) => !isSubmitting && (e.currentTarget.style.backgroundColor = 'var(--input-bg)')}
+          onMouseLeave={(e) => !isSubmitting && (e.currentTarget.style.backgroundColor = 'var(--card-bg)')}
         >
-          Save as draft
+          <ArrowLeft size={16} />
+          <span>Back</span>
         </button>
-        <button
-          type="submit"
-          disabled={isSubmitting}
-          style={{
-            padding: '0.6rem 1.35rem',
-            backgroundColor: 'var(--brand-primary)',
-            color: '#FFFFFF',
-            border: 'none',
-            borderRadius: '8px',
-            fontSize: '0.85rem',
-            fontWeight: 500,
-            cursor: 'pointer',
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: '0.45rem',
-            boxShadow: '0 1px 3px rgba(0, 0, 0, 0.2)'
-          }}
-        >
-          <Send size={16} />
-          <span>{isSubmitting ? 'Submitting...' : 'Submit for approval'}</span>
-        </button>
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+          <button
+            type="button"
+            onClick={handleGoBack}
+            disabled={isSubmitting}
+            style={{
+              padding: '0.6rem 1.25rem',
+              backgroundColor: 'var(--card-bg)',
+              color: 'var(--text-secondary)',
+              border: '1px solid var(--border-color)',
+              borderRadius: '8px',
+              fontSize: '0.85rem',
+              fontWeight: 600,
+              cursor: isSubmitting ? 'not-allowed' : 'pointer',
+              opacity: isSubmitting ? 0.6 : 1
+            }}
+          >
+            Cancel
+          </button>
+          <button
+            type="submit"
+            disabled={isSubmitting}
+            style={{
+              padding: '0.6rem 1.35rem',
+              backgroundColor: isSubmitting ? 'var(--border-color)' : 'var(--brand-primary)',
+              color: '#FFFFFF',
+              border: 'none',
+              borderRadius: '8px',
+              fontSize: '0.85rem',
+              fontWeight: 500,
+              cursor: isSubmitting ? 'not-allowed' : 'pointer',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '0.45rem',
+              boxShadow: '0 1px 3px rgba(0, 0, 0, 0.2)',
+              opacity: isSubmitting ? 0.7 : 1
+            }}
+          >
+            <Send size={16} />
+            <span>{isSubmitting ? 'Submitting...' : 'Submit for approval'}</span>
+          </button>
+        </div>
       </div>
 
     </form>

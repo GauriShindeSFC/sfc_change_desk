@@ -47,7 +47,12 @@ export const ChangeRequest = sequelize.define(
     closedAt: { type: DataTypes.DATE, allowNull: true },
     requesterId: { type: DataTypes.STRING, allowNull: false },
     approverId: { type: DataTypes.STRING, allowNull: true },
-    workflowId: { type: DataTypes.STRING, allowNull: false }
+    workflowId: { type: DataTypes.STRING, allowNull: false },
+    subcategoryId: { type: DataTypes.STRING, allowNull: true },
+    employeeName: { type: DataTypes.STRING, allowNull: true },
+    employeeEmail: { type: DataTypes.STRING, allowNull: true },
+    rejectionReason: { type: DataTypes.TEXT, allowNull: true },
+    customFieldValues: { type: DataTypes.JSONB, allowNull: true, defaultValue: {} }
   },
   {
     tableName: 'change_requests',
@@ -81,29 +86,6 @@ export const AuditLog = sequelize.define(
   }
 );
 
-// ---------- Notifications ---------------------------------
-export const Notification = sequelize.define(
-  'Notification',
-  {
-    id: { type: DataTypes.BIGINT, primaryKey: true, autoIncrement: true },
-    userId: { type: DataTypes.STRING, allowNull: false, field: 'user_id' },
-    changeRequestId: { type: DataTypes.STRING, allowNull: true, field: 'change_request_id' },
-    type: { type: DataTypes.STRING, allowNull: false },
-    title: { type: DataTypes.STRING, allowNull: false },
-    message: { type: DataTypes.TEXT, allowNull: false },
-    isRead: { type: DataTypes.BOOLEAN, defaultValue: false, field: 'is_read' },
-    isStale: { type: DataTypes.BOOLEAN, defaultValue: false, field: 'is_stale' }
-  },
-  {
-    tableName: 'notifications',
-    timestamps: true,
-    underscored: true,
-    indexes: [
-      { fields: ['user_id', 'created_at'] }
-    ]
-  }
-);
-
 // ---------- App Config -----------------------------------
 export const AppConfig = sequelize.define(
   'AppConfig',
@@ -117,9 +99,6 @@ export const AppConfig = sequelize.define(
 // ---------- Associations ------------------------------
 Workflow.hasMany(ChangeRequest, { as: 'changeRequests', foreignKey: 'workflowId' });
 ChangeRequest.belongsTo(Workflow, { as: 'workflow', foreignKey: 'workflowId', onDelete: 'SET NULL', onUpdate: 'CASCADE' });
-
-ChangeRequest.hasMany(Notification, { as: 'notifications', foreignKey: 'changeRequestId' });
-Notification.belongsTo(ChangeRequest, { as: 'changeRequest', foreignKey: 'changeRequestId', onDelete: 'SET NULL', onUpdate: 'CASCADE' });
 
 import { ChangeRequestApproval } from './ChangeRequestApproval.js';
 import { CatalogCategory } from './CatalogCategory.js';
@@ -162,8 +141,14 @@ export const ChangeManagerCategory = sequelize.define(
   }
 );
 
+import { ChangeImplementerCategory } from './ChangeImplementerCategory.js';
+export { ChangeImplementerCategory };
+
 CatalogCategory.hasMany(ChangeManagerCategory, { foreignKey: 'categoryId', as: 'assignedManagers' });
 ChangeManagerCategory.belongsTo(CatalogCategory, { foreignKey: 'categoryId' });
+
+CatalogCategory.hasMany(ChangeImplementerCategory, { foreignKey: 'categoryId', as: 'assignedImplementers' });
+ChangeImplementerCategory.belongsTo(CatalogCategory, { foreignKey: 'categoryId' });
 
 export const models = {
   Role,
@@ -174,9 +159,9 @@ export const models = {
   ChangeRequest,
   ChangeRequestApproval,
   AuditLog,
-  Notification,
   AppConfig,
   ChangeManagerCategory,
+  ChangeImplementerCategory,
   Employee,
   UserS8,
   UserAppRole

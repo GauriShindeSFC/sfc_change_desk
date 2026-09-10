@@ -8,10 +8,8 @@ import { authenticateUser, requireOrganizationScopeRole } from '../middlewares/a
 
 import changeRequestsRouter from './changeRequests.js';
 import worklistRouter from './worklist.js';
-import reportsRouter from './reports.js';
 import settingsRouter from './settings.js';
 import catalogueRouter from './catalogue.js';
-import notificationsRouter from './notifications.js';
 
 const router = express.Router();
 
@@ -26,9 +24,7 @@ router.get('/status-breakdown', requireOrganizationScopeRole, getStatusBreakdown
 // Modular Domain Routers
 router.use('/', changeRequestsRouter);
 router.use('/', worklistRouter);
-router.use('/', reportsRouter);
 router.use('/', settingsRouter);
 router.use('/', catalogueRouter);
-router.use('/', notificationsRouter);
 
 export default router;

@@ -1,7 +1,7 @@
 import { UserS8 } from '../models/UserS8.js';
 import { Employee } from '../models/Employee.js';
 import { UserAppRole } from '../models/userAppRole.js';
-import { Role, ChangeManagerCategory } from '../models/index.js';
+import { Role, ChangeManagerCategory, ChangeImplementerCategory } from '../models/index.js';
 import { Op } from 'sequelize';
 import { sequelize } from '../config/database.js';
 
@@ -9,14 +9,16 @@ const ROLE_NAME_MAP = {
   'role-1': 'Super Admin',
   'role-2': 'Admin',
   'role-3': 'Change Manager',
-  'role-4': 'Requester'
+  'role-4': 'Requester',
+  'role-5': 'Change Implementer'
 };
 
 const APP_ROLE_MAP = {
   'role-1': 'SUPER_ADMIN',
   'role-2': 'ADMIN',
   'role-3': 'CHANGE_MANAGER',
-  'role-4': 'REQUESTER'
+  'role-4': 'REQUESTER',
+  'role-5': 'CHANGE_IMPLEMENTER'
 };
 
 export class IdentityResolver {
@@ -249,7 +251,7 @@ export class IdentityResolver {
     const isExplicitRole = Boolean(roleMapping);
 
     // Validate valid application roles
-    if (!['role-1', 'role-2', 'role-3', 'role-4'].includes(roleId)) {
+    if (!['role-1', 'role-2', 'role-3', 'role-4', 'role-5'].includes(roleId)) {
       console.error(`[IdentityResolver] Invalid role ${roleId} assigned to ${userKey}`);
       return {
         status: 'INVALID_ROLE_COMBINATION',
@@ -261,6 +263,7 @@ export class IdentityResolver {
     const roleName = ROLE_NAME_MAP[roleId] || 'Requester';
 
     let cmCategories = [];
+    let ciCategories = [];
 
     // Fetch CM category assignments if role-3 (Change Manager)
     if (roleId === 'role-3') {
@@ -270,6 +273,13 @@ export class IdentityResolver {
         }
       });
       cmCategories = assignments.map(a => a.categoryId);
+    } else if (roleId === 'role-5') {
+      const assignments = await ChangeImplementerCategory.findAll({
+        where: {
+          userId: { [Op.in]: Array.from(roleKeys) }
+        }
+      });
+      ciCategories = assignments.map(a => a.categoryId);
     }
 
     const dto = {
@@ -289,6 +299,8 @@ export class IdentityResolver {
       location,
       employee: employeeObj,
       cmCategories,
+      ciCategories,
+      categoryIds: roleId === 'role-5' ? ciCategories : cmCategories,
       aliases: Array.from(roleKeys),
       isInUserTable: identityType === 'S8_USER'
     };

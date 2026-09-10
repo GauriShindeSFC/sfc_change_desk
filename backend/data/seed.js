@@ -22,7 +22,8 @@ export const roles = [
   { id: 'role-1', name: 'Super Admin', description: 'Ultimate system control across all modules, role & permission management, system audit, database & user management.', permissions: ['Full System Control', 'Manage Roles & Permissions', 'Manage Users', 'View System Audit Logs', 'Override Approvals'] },
   { id: 'role-2', name: 'Admin', description: 'System administration, user onboarding, and system reporting.', permissions: ['Manage Users', 'Export Reports', 'System Settings'] },
   { id: 'role-3', name: 'Change Manager', description: 'Full lifecycle oversight: review, approve, reject, or request information on change requests.', permissions: ['Approve / Reject CRs', 'Lifecycle Oversight', 'Request Info (Send Back)', 'View Worklist & Metrics'] },
-  { id: 'role-4', name: 'Requester', description: 'Standard employee permission to raise change requests, track progress, and update own draft submissions.', permissions: ['Create change requests', 'View own requests', 'Save draft CRs'] }
+  { id: 'role-4', name: 'Requester', description: 'Standard employee permission to raise change requests, track progress, and update own draft submissions.', permissions: ['Create change requests', 'View own requests', 'Save draft CRs'] },
+  { id: 'role-5', name: 'Change Implementer', description: 'Implementation oversight: mark approved change requests as implemented within assigned categories.', permissions: ['Implement Approved CRs', 'View Worklist & Metrics'] }
 ];
 
 // ---------- users (roleId -> roles.id) --------------------
@@ -303,7 +304,7 @@ export const catalogSubcategoryFields = [
   // ── 1. Server Lifecycle ──
   { id: 'f-srv-act', subcategoryId: 'subcat-srv-lc', fieldKey: 'actionRequired', fieldLabel: 'Action Required', fieldType: 'dropdown', isRequired: true, sortOrder: 0, appliesToActions: null, options: ['Create a New Server', 'Change / Modify an Existing Server', 'Migrate a Server', 'Decommission a Server', 'Other'] },
   { id: 'f-srv-purpose', subcategoryId: 'subcat-srv-lc', fieldKey: 'purpose', fieldLabel: 'Purpose', fieldType: 'text', isRequired: true, sortOrder: 1, appliesToActions: ['Create a New Server'], options: null },
-  { id: 'f-srv-hosting', subcategoryId: 'subcat-srv-lc', fieldKey: 'hostingType', fieldLabel: 'Hosting Type', fieldType: 'dropdown', isRequired: true, sortOrder: 2, appliesToActions: ['Create a New Server', 'Change / Modify an Existing Server', 'Migrate a Server'], options: ['On-Premise DC', 'AWS Cloud', 'Azure Cloud', 'Private Cloud'] },
+  { id: 'f-srv-hosting', subcategoryId: 'subcat-srv-lc', fieldKey: 'hostingType', fieldLabel: 'Hosting Type', fieldType: 'dropdown', isRequired: true, sortOrder: 2, appliesToActions: ['Create a New Server', 'Change / Modify an Existing Server', 'Migrate a Server'], options: ['AWS Cloud', 'Azure Cloud', 'GCP', 'Other Private Cloud', 'On Premise'] },
   { id: 'f-srv-os', subcategoryId: 'subcat-srv-lc', fieldKey: 'operatingSystem', fieldLabel: 'OS', fieldType: 'text', isRequired: true, sortOrder: 3, appliesToActions: ['Create a New Server', 'Change / Modify an Existing Server'], options: null },
   { id: 'f-srv-cpu', subcategoryId: 'subcat-srv-lc', fieldKey: 'cpu', fieldLabel: 'CPU', fieldType: 'text', isRequired: true, sortOrder: 4, appliesToActions: ['Create a New Server', 'Change / Modify an Existing Server'], options: null },
   { id: 'f-srv-ram', subcategoryId: 'subcat-srv-lc', fieldKey: 'ram', fieldLabel: 'RAM', fieldType: 'text', isRequired: true, sortOrder: 5, appliesToActions: ['Create a New Server', 'Change / Modify an Existing Server'], options: null },

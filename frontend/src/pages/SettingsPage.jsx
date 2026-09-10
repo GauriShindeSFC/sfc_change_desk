@@ -16,7 +16,7 @@ function SettingsPage({ user }) {
       actor: 'Aashini Shah',
       action: 'Submitted change request',
       reference: 'CR-2049',
-      details: 'Software Deployment · auto-routed to CAB — Application Board',
+      details: 'Software Deployment · auto-routed to Change Manager review',
       category: 'Change requests'
     },
     {
@@ -129,7 +129,8 @@ function SettingsPage({ user }) {
     'Super Admin': 'role-1',
     'Admin': 'role-2',
     'Change Manager': 'role-3',
-    'Requester': 'role-4'
+    'Requester': 'role-4',
+    'Change Implementer': 'role-5'
   };
 
   const handleOpenManageUser = async (targetUser) => {
@@ -139,12 +140,14 @@ function SettingsPage({ user }) {
       id: targetUser.id,
       name: targetUser.name || '',
       empId: targetUser.empId || targetUser.employeeId || 'EMP-10432',
-      role: targetUser.role === 'Unassigned' ? 'Change Manager' : (targetUser.role || 'Change Manager'),
-      status: targetUser.status || 'Enabled'
+      role: targetUser.role === 'Unassigned' ? 'Change Manager' : (targetUser.role || 'Change Manager')
     });
     setEditingUserCategories(initialCats);
     try {
-      const res = await apiFetch(`/settings/change-manager-categories/${targetUser.id}`);
+      const endpoint = targetUser.role === 'Change Implementer'
+        ? `/settings/change-implementer-categories/${targetUser.id}`
+        : `/settings/change-manager-categories/${targetUser.id}`;
+      const res = await apiFetch(endpoint);
       if (res.ok) {
         const body = await res.json();
         if (body.data && Array.isArray(body.data) && body.data.length > 0) {
@@ -160,16 +163,15 @@ function SettingsPage({ user }) {
     if (e) e.preventDefault();
     if (!editingUser) return;
 
-    const roleId = ROLE_TO_ID[editingUser.role] || (editingUser.role === 'Change Manager' ? 'role-3' : 'role-4');
-    const categoryIds = editingUser.role === 'Change Manager' ? editingUserCategories : [];
+    const roleId = ROLE_TO_ID[editingUser.role] || (editingUser.role === 'Change Manager' ? 'role-3' : editingUser.role === 'Change Implementer' ? 'role-5' : 'role-4');
+    const categoryIds = (editingUser.role === 'Change Manager' || editingUser.role === 'Change Implementer') ? editingUserCategories : [];
 
     const updatedUserObj = {
       name: editingUser.name,
       empId: editingUser.empId,
       role: editingUser.role,
       roleId,
-      categoryIds,
-      status: editingUser.status
+      categoryIds
     };
 
     try {
@@ -191,6 +193,14 @@ function SettingsPage({ user }) {
         if (!cmRes.ok) {
           console.warn('Failed to update change manager categories:', cmRes.status);
         }
+      } else if (editingUser.role === 'Change Implementer') {
+        const ciRes = await apiFetch(`/settings/change-implementer-categories/${editingUser.id}`, {
+          method: 'PUT',
+          body: JSON.stringify({ categoryIds: editingUserCategories })
+        });
+        if (!ciRes.ok) {
+          console.warn('Failed to update change implementer categories:', ciRes.status);
+        }
       }
 
       const usersRes = await apiFetch('/settings/users');
@@ -210,8 +220,7 @@ function SettingsPage({ user }) {
     name: '',
     email: '',
     empId: '',
-    role: 'Admin',
-    status: 'Enabled'
+    role: 'Admin'
   });
 
   useEffect(() => {
@@ -249,14 +258,17 @@ function SettingsPage({ user }) {
     e.preventDefault();
     if (!newUser.name || !newUser.email) return;
 
+    const roleId = ROLE_TO_ID[newUser.role] || (newUser.role === 'Change Manager' ? 'role-3' : newUser.role === 'Change Implementer' ? 'role-5' : 'role-4');
+    const categoryIds = (newUser.role === 'Change Manager' || newUser.role === 'Change Implementer') ? newUserCategories : [];
+
     const invitePayload = {
       name: newUser.name,
       email: newUser.email,
       empId: newUser.empId || undefined,
       employeeId: newUser.empId || undefined,
       role: newUser.role,
-      roleId: ROLE_TO_ID[newUser.role] || (newUser.role === 'Change Manager' ? 'role-3' : 'role-4'),
-      categoryIds: newUser.role === 'Change Manager' ? newUserCategories : [],
+      roleId,
+      categoryIds,
       status: newUser.status
     };
 
@@ -277,6 +289,11 @@ function SettingsPage({ user }) {
 
       if (newUser.role === 'Change Manager' && savedUserId && newUserCategories.length > 0) {
         await apiFetch(`/settings/change-manager-categories/${savedUserId}`, {
+          method: 'PUT',
+          body: JSON.stringify({ categoryIds: newUserCategories })
+        });
+      } else if (newUser.role === 'Change Implementer' && savedUserId && newUserCategories.length > 0) {
+        await apiFetch(`/settings/change-implementer-categories/${savedUserId}`, {
           method: 'PUT',
           body: JSON.stringify({ categoryIds: newUserCategories })
         });
@@ -479,7 +496,6 @@ function SettingsPage({ user }) {
                 <th style={{ padding: '0.75rem 0.85rem' }}>USER</th>
                 <th style={{ padding: '0.75rem 0.85rem' }}>EMAIL ID</th>
                 <th style={{ padding: '0.75rem 0.85rem' }}>ROLE</th>
-                <th style={{ padding: '0.75rem 0.85rem' }}>STATUS</th>
                 <th style={{ padding: '0.75rem 0.85rem', textAlign: 'right' }}>ACTIONS</th>
               </tr>
             </thead>
@@ -489,18 +505,6 @@ function SettingsPage({ user }) {
                   <td style={{ padding: '0.75rem 0.85rem', fontSize: '0.875rem', fontWeight: 500, color: 'var(--text-primary)' }}>{u.name}</td>
                   <td style={{ padding: '0.75rem 0.85rem', fontSize: '0.825rem', color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)' }}>{u.email}</td>
                   <td style={{ padding: '0.75rem 0.85rem', fontSize: '0.825rem', color: 'var(--text-primary)', fontWeight: 600 }}>{u.role}</td>
-                  <td style={{ padding: '0.75rem 0.85rem' }}>
-                    <span style={{
-                      padding: '0.2rem 0.55rem',
-                      borderRadius: 'var(--radius-lg)',
-                      fontSize: '0.75rem',
-                      fontWeight: 500,
-                      backgroundColor: u.status === 'Enabled' ? '#D1FAE5' : 'var(--input-bg)',
-                      color: u.status === 'Enabled' ? '#059669' : 'var(--text-secondary)'
-                    }}>
-                      {u.status}
-                    </span>
-                  </td>
                   <td style={{ padding: '0.75rem 0.85rem', textAlign: 'right' }}>
                     <button
                       type="button"
@@ -720,15 +724,16 @@ function SettingsPage({ user }) {
                     <option value="Super Admin">Super Admin</option>
                     <option value="Admin">Admin</option>
                     <option value="Change Manager">Change Manager</option>
+                    <option value="Change Implementer">Change Implementer</option>
                     <option value="Requester">Requester</option>
                   </select>
                 </div>
 
-              {/* Dynamic Category Assignment Dropdown for Change Manager */}
-              {newUser.role === 'Change Manager' && (
+              {/* Dynamic Category Assignment Dropdown for Change Manager or Change Implementer */}
+              {(newUser.role === 'Change Manager' || newUser.role === 'Change Implementer') && (
                 <div style={{ marginBottom: '1.25rem' }}>
                   <label style={{ display: 'block', fontSize: '0.825rem', fontWeight: 500, color: 'var(--text-primary)', marginBottom: '0.4rem' }}>
-                    Appointed Categories (Change Manager) *
+                    Appointed Categories ({newUser.role}) *
                   </label>
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem', backgroundColor: 'var(--input-bg)', padding: '0.75rem', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
                     {categories.map((cat) => {
@@ -753,37 +758,6 @@ function SettingsPage({ user }) {
                   </div>
                 </div>
               )}
-
-              {/* Status Selector */}
-              <div>
-                <label style={{ display: 'block', fontSize: '0.825rem', fontWeight: 500, color: 'var(--text-primary)', marginBottom: '0.4rem' }}>
-                  Status
-                </label>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
-                  {['Enabled', 'Disabled'].map(statusOpt => {
-                    const isSelected = newUser.status === statusOpt;
-                    return (
-                      <button
-                        key={statusOpt}
-                        type="button"
-                        onClick={() => setNewUser(prev => ({ ...prev, status: statusOpt }))}
-                        style={{
-                          padding: '0.65rem',
-                          borderRadius: '8px',
-                          border: isSelected ? '1px solid var(--brand-primary)' : '1px solid var(--border-color)',
-                          backgroundColor: isSelected ? '#E6F4F1' : 'var(--card-bg)',
-                          color: isSelected ? 'var(--brand-primary)' : 'var(--text-primary)',
-                          fontSize: '0.85rem',
-                          fontWeight: 500,
-                          cursor: 'pointer'
-                        }}
-                      >
-                        {statusOpt}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
 
               {/* Modal Footer Actions */}
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid var(--border-color)' }}>
@@ -942,15 +916,16 @@ function SettingsPage({ user }) {
                     <option value="Super Admin">Super Admin</option>
                     <option value="Admin">Admin</option>
                     <option value="Change Manager">Change Manager</option>
+                    <option value="Change Implementer">Change Implementer</option>
                     <option value="Requester">Requester</option>
                   </select>
                 </div>
 
-              {/* Dynamic Category Assignment Dropdown for Change Manager */}
-              {editingUser.role === 'Change Manager' && (
+              {/* Dynamic Category Assignment Dropdown for Change Manager or Change Implementer */}
+              {(editingUser.role === 'Change Manager' || editingUser.role === 'Change Implementer') && (
                 <div style={{ marginBottom: '1.25rem' }}>
                   <label style={{ display: 'block', fontSize: '0.825rem', fontWeight: 500, color: 'var(--text-primary)', marginBottom: '0.4rem' }}>
-                    Appointed Categories (Change Manager) *
+                    Appointed Categories ({editingUser.role}) *
                   </label>
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem', backgroundColor: 'var(--input-bg)', padding: '0.75rem', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
                     {categories.map((cat) => {
@@ -975,47 +950,6 @@ function SettingsPage({ user }) {
                   </div>
                 </div>
               )}
-
-              {/* Status Section */}
-              <div>
-                <label style={{ display: 'block', fontSize: '0.825rem', fontWeight: 500, color: 'var(--text-primary)', marginBottom: '0.5rem' }}>
-                  Status
-                </label>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
-                  <button
-                    type="button"
-                    onClick={() => setEditingUser(prev => ({ ...prev, status: 'Enabled' }))}
-                    style={{
-                      padding: '0.65rem',
-                      borderRadius: '8px',
-                      border: editingUser.status === 'Enabled' ? '1.5px solid #059669' : '1px solid var(--border-color)',
-                      backgroundColor: editingUser.status === 'Enabled' ? '#E6F4EA' : 'var(--input-bg)',
-                      color: editingUser.status === 'Enabled' ? '#059669' : 'var(--text-secondary)',
-                      fontWeight: 500,
-                      fontSize: '0.85rem',
-                      cursor: 'pointer'
-                    }}
-                  >
-                    Enabled
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setEditingUser(prev => ({ ...prev, status: 'Disabled' }))}
-                    style={{
-                      padding: '0.65rem',
-                      borderRadius: '8px',
-                      border: editingUser.status === 'Disabled' ? '1.5px solid #DC2626' : '1px solid var(--border-color)',
-                      backgroundColor: editingUser.status === 'Disabled' ? '#FEE2E2' : 'var(--input-bg)',
-                      color: editingUser.status === 'Disabled' ? '#DC2626' : 'var(--text-secondary)',
-                      fontWeight: 500,
-                      fontSize: '0.85rem',
-                      cursor: 'pointer'
-                    }}
-                  >
-                    Disabled
-                  </button>
-                </div>
-              </div>
 
               {/* Actions Footer */}
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '0.5rem' }}>

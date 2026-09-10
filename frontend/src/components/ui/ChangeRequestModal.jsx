@@ -10,7 +10,16 @@ export default function ChangeRequestModal({ cr, onClose, onApprove, onReject, o
   const userRoleId = currentUser?.roleId || '';
   const isAdminOrSuperAdmin = ['role-1', 'role-2'].includes(userRoleId) || userRoleName.includes('admin') || userRoleName.includes('super');
   const isChangeManager = userRoleId === 'role-3' || userRoleName.includes('manager');
-  const isRequester = !isAdminOrSuperAdmin && !isChangeManager;
+  const isChangeImplementer = userRoleId === 'role-5' || userRoleName.includes('implementer');
+  const userAssignedCats = currentUser?.ciCategories || currentUser?.categoryIds || currentUser?.cmCategories || [];
+  const crCatName = (cr.category || '').toLowerCase().trim();
+  const crCatId = cr.categoryId || '';
+  const isImplementerAssigned = isChangeImplementer && (
+    userAssignedCats.includes(crCatId) ||
+    userAssignedCats.some(cid => crCatName.includes(cid.toLowerCase()) || cid.toLowerCase().includes(crCatName))
+  );
+  const canMarkImplemented = (isAdminOrSuperAdmin || isImplementerAssigned);
+  const isRequester = !isAdminOrSuperAdmin && !isChangeManager && !isChangeImplementer;
   const isSelfRequest = Boolean(
     (cr.requesterId && currentUser?.id && (String(cr.requesterId) === String(currentUser.id) || String(cr.requesterId) === String(currentUser?.userKey))) ||
     (cr.employeeId && currentUser?.employeeId && String(cr.employeeId).trim().toLowerCase() === String(currentUser.employeeId).trim().toLowerCase()) ||
@@ -22,6 +31,7 @@ export default function ChangeRequestModal({ cr, onClose, onApprove, onReject, o
   const [actionPrompt, setActionPrompt] = useState(null); // { action: 'approve'|'reject'|'implement', title: string, color: string }
   const [actionCommentInput, setActionCommentInput] = useState('');
   const [actionCommentError, setActionCommentError] = useState('');
+  const [isSubmittingAction, setIsSubmittingAction] = useState(false);
   const [hoveredStepIdx, setHoveredStepIdx] = useState(null);
 
   const initialComments = Array.isArray(cr.comments)
@@ -77,8 +87,62 @@ export default function ChangeRequestModal({ cr, onClose, onApprove, onReject, o
     }
   };
 
+  const formatCleanDate = (d) => {
+    if (!d) return 'Not specified';
+    const str = String(d).trim();
+    if (str.includes('T')) {
+      const [datePart] = str.split('T');
+      const parts = datePart.split('-');
+      if (parts.length === 3) {
+        return `${parts[2]}-${parts[1]}-${parts[0]}`;
+      }
+    }
+    const parsed = new Date(d);
+    if (!isNaN(parsed.getTime())) {
+      return parsed.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+    }
+    return str;
+  };
+
+  const formatCleanTime = (d) => {
+    if (!d) return '';
+    const parsed = new Date(d);
+    if (!isNaN(parsed.getTime())) {
+      const hasTime = (typeof d === 'string' && (d.includes(':') || (d.includes('T') && !d.endsWith('T00:00:00.000Z')))) || typeof d === 'number' || d instanceof Date;
+      if (hasTime) {
+        return parsed.toLocaleTimeString('en-GB', {
+          hour: '2-digit',
+          minute: '2-digit',
+          second: '2-digit',
+          hour12: true
+        });
+      }
+    }
+    return '';
+  };
+
+  const ignoredKeys = [
+    'comments',
+    'employeeEmail',
+    'employeeId',
+    'employeeName',
+    'location',
+    'managerEmail',
+    'title',
+    'category',
+    'subCategory',
+    'startDate',
+    'justification',
+    'workflow'
+  ];
+
   const customFields = cr.customFieldValues && typeof cr.customFieldValues === 'object'
-    ? Object.entries(cr.customFieldValues).filter(([key, val]) => val !== undefined && val !== null && val !== '' && key !== 'comments')
+    ? Object.entries(cr.customFieldValues).filter(([key, val]) => {
+        if (ignoredKeys.includes(key)) return false;
+        if (val === undefined || val === null) return false;
+        if (typeof val === 'string' && val.trim() === '') return false;
+        return true;
+      })
     : [];
 
   const statusLower = (cr.status || '').toLowerCase();
@@ -87,12 +151,11 @@ export default function ChangeRequestModal({ cr, onClose, onApprove, onReject, o
   const isImplemented = statusLower === 'implemented';
   const isRejected = statusLower === 'rejected' || decisionLower === 'rejected';
   const isApproved = (statusLower === 'approved' || decisionLower === 'approved') && !isImplemented;
-  const isDraft = statusLower === 'draft';
 
-  const statusLabel = isImplemented ? 'Implemented' : isRejected ? 'Rejected' : isApproved ? 'Approved' : isDraft ? 'Draft' : (cr.status || 'Pending');
-  const statusBg = isImplemented ? '#E0F2FE' : isRejected ? '#FEE2E2' : isApproved ? '#D1FAE5' : isDraft ? 'var(--input-bg)' : '#FEF3C7';
-  const statusColor = isImplemented ? '#0284C7' : isRejected ? '#DC2626' : isApproved ? '#059669' : isDraft ? 'var(--text-secondary)' : '#D97706';
-  const statusDot = isImplemented ? '#0284C7' : isRejected ? '#DC2626' : isApproved ? '#059669' : isDraft ? '#94A0B0' : '#D97706';
+  const statusLabel = isImplemented ? 'Implemented' : isRejected ? 'Rejected' : isApproved ? 'Approved' : (cr.status || 'Pending');
+  const statusBg = isImplemented ? '#F3E8FF' : isRejected ? '#FEE2E2' : isApproved ? '#FEF3C7' : '#FEF3C7';
+  const statusColor = isImplemented ? '#7C3AED' : isRejected ? '#DC2626' : isApproved ? '#D97706' : '#D97706';
+  const statusDot = isImplemented ? '#7C3AED' : isRejected ? '#DC2626' : isApproved ? '#D97706' : '#D97706';
 
   const steps = isRejected
     ? ['Requested', 'Rejected']
@@ -105,9 +168,9 @@ export default function ChangeRequestModal({ cr, onClose, onApprove, onReject, o
 
   const progressPercent = Math.min(100, Math.max(0, (currentStepIdx / (steps.length - 1)) * 100));
 
-  const activeColor = isRejected ? '#DC2626' : isImplemented ? '#0284C7' : isDraft ? '#7C3AED' : 'var(--brand-primary)';
+  const activeColor = isRejected ? '#DC2626' : isImplemented ? '#7C3AED' : isApproved ? '#D97706' : 'var(--brand-primary)';
 
-  const canAct = cr.canAct !== false && !isApproved && !isRejected && !isDraft && !isImplemented && !isSelfRequest;
+  const canAct = cr.canAct !== false && !isApproved && !isRejected && !isImplemented && !isSelfRequest;
 
   const getStepDate = (stepName) => {
     const todayFormatted = new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
@@ -139,10 +202,10 @@ export default function ChangeRequestModal({ cr, onClose, onApprove, onReject, o
           return act === 'approved' || act === 'approve';
         })?.text) ||
         (Array.isArray(cr.approvals) ? cr.approvals.find(a => (a.decision || '').toLowerCase() === 'approved')?.rationale : null) ||
-        'Change request approved during CAB review.';
+        'Change request approved during Change Manager review.';
 
       return {
-        title: 'CAB Approval',
+        title: 'Change Manager Approval',
         author: cr.approvedBy || cr.decidedBy || 'Approver',
         comment: approvalComment,
         date: sDate
@@ -160,10 +223,10 @@ export default function ChangeRequestModal({ cr, onClose, onApprove, onReject, o
           return act === 'rejected' || act === 'reject';
         })?.text) ||
         (Array.isArray(cr.approvals) ? cr.approvals.find(a => (a.decision || '').toLowerCase() === 'rejected')?.rationale : null) ||
-        'Change request rejected during CAB review.';
+        'Change request rejected during Change Manager review.';
 
       return {
-        title: 'CAB Rejection',
+        title: 'Change Manager Rejection',
         author: cr.rejectedBy || cr.decidedBy || 'Approver',
         comment: rejectionComment,
         date: sDate
@@ -274,7 +337,7 @@ export default function ChangeRequestModal({ cr, onClose, onApprove, onReject, o
                 </span>
               </div>
               <p style={{ fontSize: '0.9rem', fontWeight: 500, color: '#991B1B', margin: 0, lineHeight: 1.5, wordBreak: 'break-word', overflowWrap: 'anywhere' }}>
-                {cr.rejectionReason || cr.rejection_reason || cr.customFieldValues?.rejectionReason || 'This change request was rejected during CAB review.'}
+                {cr.rejectionReason || cr.rejection_reason || cr.customFieldValues?.rejectionReason || 'This change request was rejected during Change Manager review.'}
               </p>
             </div>
           </div>
@@ -350,8 +413,7 @@ export default function ChangeRequestModal({ cr, onClose, onApprove, onReject, o
                         {stepDate}
                       </span>
                     )}
-
-                    {/* Hover Tooltip Popover */}
+                    {/* Hover Tooltip Popover (Only comment shown) */}
                     {hoveredStepIdx === idx && tooltipInfo && isStepCompleted && (
                       <div style={{
                         position: 'absolute',
@@ -359,10 +421,10 @@ export default function ChangeRequestModal({ cr, onClose, onApprove, onReject, o
                         backgroundColor: 'var(--card-bg)',
                         border: '1px solid var(--border-color)',
                         borderRadius: '10px',
-                        padding: '0.75rem 0.95rem',
+                        padding: '0.65rem 0.85rem',
                         boxShadow: '0 10px 25px rgba(0, 0, 0, 0.25)',
                         zIndex: 300,
-                        width: '230px',
+                        width: '220px',
                         pointerEvents: 'none',
                         ...(idx === 0
                           ? { left: '0px', transform: 'none' }
@@ -370,20 +432,12 @@ export default function ChangeRequestModal({ cr, onClose, onApprove, onReject, o
                           ? { right: '0px', left: 'auto', transform: 'none' }
                           : { left: '50%', transform: 'translateX(-50%)' })
                       }}>
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.35rem', marginBottom: '0.4rem' }}>
+                        <div style={{ paddingBottom: '0.25rem', marginBottom: '0.3rem', borderBottom: '1px solid var(--border-color)' }}>
                           <span style={{ fontSize: '0.725rem', fontWeight: 800, color: stepColor, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
                             {tooltipInfo.title}
                           </span>
-                          {tooltipInfo.date && (
-                            <span style={{ fontSize: '0.675rem', fontWeight: 700, color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)' }}>
-                              {tooltipInfo.date}
-                            </span>
-                          )}
                         </div>
-                        <div style={{ fontSize: '0.8rem', fontWeight: 800, color: 'var(--text-primary)' }}>
-                          {tooltipInfo.author}
-                        </div>
-                        <p style={{ fontSize: '0.775rem', color: 'var(--text-secondary)', margin: '0.3rem 0 0 0', lineHeight: 1.4, wordBreak: 'break-word', overflowWrap: 'anywhere' }}>
+                        <p style={{ fontSize: '0.8rem', color: 'var(--text-primary)', fontWeight: 500, margin: 0, lineHeight: 1.45, wordBreak: 'break-word', overflowWrap: 'anywhere' }}>
                           "{tooltipInfo.comment}"
                         </p>
                       </div>
@@ -406,10 +460,27 @@ export default function ChangeRequestModal({ cr, onClose, onApprove, onReject, o
           </div>
         </div>
 
-        {/* Section 1: Employee Details */}
+        {/* Form Submission Timestamp Banner */}
+        <div style={{
+          padding: '0.75rem 1.75rem',
+          backgroundColor: 'var(--input-bg)',
+          borderBottom: '1px solid var(--border-color)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between'
+        }}>
+          <span style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-secondary)' }}>
+            Form Submitted Time:
+          </span>
+          <span style={{ fontSize: '0.825rem', fontWeight: 700, color: 'var(--text-primary)', fontFamily: 'var(--font-mono)' }}>
+            {formatCleanTime(cr.submittedAt || cr.createdAt) || 'Recently'}
+          </span>
+        </div>
+
+        {/* Section 1: Requester Details */}
         <div style={{ padding: '1.25rem 1.75rem', borderBottom: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <h3 style={{ fontSize: '0.9rem', fontWeight: 500, color: 'var(--text-primary)', margin: 0 }}>Section 1: Employee Details</h3>
+            <h3 style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--text-primary)', margin: 0 }}>Section 1: Requester Details</h3>
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '1rem' }}>
             <div>
@@ -444,36 +515,67 @@ export default function ChangeRequestModal({ cr, onClose, onApprove, onReject, o
         </div>
 
         {/* Section 2: Change Details */}
-        <div style={{ padding: '1.25rem 1.75rem 0.5rem 1.75rem' }}>
-          <h3 style={{ fontSize: '0.9rem', fontWeight: 500, color: 'var(--text-primary)', margin: '0 0 1rem 0' }}>Section 2: Change Details</h3>
-        </div>
+        <div style={{ padding: '1.25rem 1.75rem 0.75rem 1.75rem', borderBottom: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+          <div>
+            <h3 style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--text-primary)', margin: 0 }}>Section 2: Change Details</h3>
+          </div>
 
-        {/* Dynamic Sub-category Attributes Block */}
-        {customFields.length > 0 && (
-          <div style={{ padding: '0 1.75rem 1.25rem 1.75rem' }}>
+          {/* Core Change Request Form Fields */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem' }}>
+            <div style={{ gridColumn: '1 / -1' }}>
+              <div style={{ fontSize: '0.8rem', fontWeight: 500, color: 'var(--text-primary)', marginBottom: '0.25rem' }}>Change Title</div>
+              <div style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--text-primary)' }}>{cr.title || 'Untitled Request'}</div>
+            </div>
+
+            <div>
+              <div style={{ fontSize: '0.8rem', fontWeight: 500, color: 'var(--text-primary)', marginBottom: '0.25rem' }}>Category</div>
+              <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>{cr.category || 'Server & Infra'}</div>
+            </div>
+
+            <div>
+              <div style={{ fontSize: '0.8rem', fontWeight: 500, color: 'var(--text-primary)', marginBottom: '0.25rem' }}>Sub-category</div>
+              <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>{cr.subCategory || 'Server Lifecycle'}</div>
+            </div>
+
+            <div>
+              <div style={{ fontSize: '0.8rem', fontWeight: 500, color: 'var(--text-primary)', marginBottom: '0.25rem' }}>Start Date</div>
+              <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)' }}>{formatCleanDate(cr.startDate)}</div>
+            </div>
+          </div>
+
+          {/* Action-specific and Custom Form Fields */}
+          {customFields.length > 0 && (
             <div style={{
-              padding: '1rem 1.25rem',
+              padding: '1.1rem 1.25rem',
               backgroundColor: 'var(--input-bg)',
               borderRadius: '10px',
               border: '1px solid var(--border-color)',
               display: 'flex',
               flexDirection: 'column',
-              gap: '0.75rem'
+              gap: '0.85rem'
             }}>
-              <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--brand-primary)', letterSpacing: '0.05em' }}>
-                Filled Form Attributes
+              <span style={{ fontSize: '0.775rem', fontWeight: 700, color: 'var(--brand-primary)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                Action & Specification Details
               </span>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '0.85rem' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '1rem' }}>
                 {customFields.map(([key, val]) => {
                   const formattedKey = key
                     .replace(/([A-Z])/g, ' $1')
-                    .replace(/^./, (str) => str.toUpperCase());
+                    .replace(/^./, (str) => str.toUpperCase())
+                    .replace(/Ip /g, 'IP ')
+                    .replace(/Os/g, 'OS')
+                    .replace(/Cpu/g, 'CPU')
+                    .replace(/Ram/g, 'RAM')
+                    .replace(/Kb /g, 'KB ')
+                    .replace(/Cve/g, 'CVE')
+                    .replace(/Vlan/g, 'VLAN');
+
                   return (
                     <div key={key}>
                       <div style={{ fontSize: '0.75rem', fontWeight: 500, color: 'var(--text-secondary)' }}>
                         {formattedKey}
                       </div>
-                      <div style={{ fontSize: '0.85rem', fontWeight: 500, color: 'var(--text-primary)', marginTop: '0.15rem' }}>
+                      <div style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-primary)', marginTop: '0.15rem', wordBreak: 'break-word' }}>
                         {String(val)}
                       </div>
                     </div>
@@ -481,157 +583,49 @@ export default function ChangeRequestModal({ cr, onClose, onApprove, onReject, o
                 })}
               </div>
             </div>
-          </div>
-        )}
+          )}
 
-        {/* Dynamic Status-Aware Dates Grid */}
-        <div style={{ padding: '0 1.75rem 1.25rem 1.75rem', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '1.25rem' }}>
-          <div>
-            <div style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '0.25rem' }}>Raised Date</div>
-            <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)' }}>{getStepDate('Requested') || cr.raisedDate || 'Recently'}</div>
-          </div>
+          {/* Dynamic Status-Aware Dates */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '1.25rem' }}>
+            <div>
+              <div style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '0.25rem' }}>Raised Date</div>
+              <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)' }}>{getStepDate('Requested') || cr.raisedDate || 'Recently'}</div>
+            </div>
 
-          {isImplemented ? (
-            <>
+            {isImplemented ? (
+              <>
+                <div>
+                  <div style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '0.25rem' }}>Approved Date</div>
+                  <div style={{ fontSize: '0.85rem', color: '#059669', fontWeight: 700, fontFamily: 'var(--font-mono)' }}>{getStepDate('Approved') || cr.approvedDate || 'Approved'}</div>
+                </div>
+                <div>
+                  <div style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '0.25rem' }}>Implemented Date</div>
+                  <div style={{ fontSize: '0.85rem', color: '#0284C7', fontWeight: 700, fontFamily: 'var(--font-mono)' }}>{getStepDate('Implemented') || cr.implementedDate || cr.closedDate || 'Implemented'}</div>
+                </div>
+              </>
+            ) : isApproved ? (
               <div>
                 <div style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '0.25rem' }}>Approved Date</div>
                 <div style={{ fontSize: '0.85rem', color: '#059669', fontWeight: 700, fontFamily: 'var(--font-mono)' }}>{getStepDate('Approved') || cr.approvedDate || 'Approved'}</div>
               </div>
+            ) : isRejected ? (
               <div>
-                <div style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '0.25rem' }}>Implemented Date</div>
-                <div style={{ fontSize: '0.85rem', color: '#0284C7', fontWeight: 700, fontFamily: 'var(--font-mono)' }}>{getStepDate('Implemented') || cr.implementedDate || cr.closedDate || 'Implemented'}</div>
+                <div style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '0.25rem' }}>Rejected Date</div>
+                <div style={{ fontSize: '0.85rem', color: '#DC2626', fontWeight: 700, fontFamily: 'var(--font-mono)' }}>{getStepDate('Rejected') || cr.rejectedDate || cr.closedDate || 'Rejected'}</div>
               </div>
-            </>
-          ) : isApproved ? (
-            <div>
-              <div style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '0.25rem' }}>Approved Date</div>
-              <div style={{ fontSize: '0.85rem', color: '#059669', fontWeight: 700, fontFamily: 'var(--font-mono)' }}>{getStepDate('Approved') || cr.approvedDate || 'Approved'}</div>
-            </div>
-          ) : isRejected ? (
-            <div>
-              <div style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '0.25rem' }}>Rejected Date</div>
-              <div style={{ fontSize: '0.85rem', color: '#DC2626', fontWeight: 700, fontFamily: 'var(--font-mono)' }}>{getStepDate('Rejected') || cr.rejectedDate || cr.closedDate || 'Rejected'}</div>
-            </div>
-          ) : null}
-
-          <div>
-            <div style={{ fontSize: '0.8rem', fontWeight: 500, color: 'var(--text-primary)', marginBottom: '0.25rem' }}>Start Date</div>
-            <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)' }}>{cr.startDate || 'Not specified'}</div>
+            ) : null}
           </div>
-        </div>
 
-        {/* Business Justification & Workflow */}
-        <div style={{ padding: '0 1.75rem 1.25rem 1.75rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-          <div>
-            <div style={{ fontSize: '0.8rem', fontWeight: 500, color: 'var(--text-primary)', marginBottom: '0.35rem' }}>Business Justification</div>
-            <div style={{ fontSize: '0.825rem', color: 'var(--text-secondary)', lineHeight: 1.45, wordBreak: 'break-word', overflowWrap: 'anywhere' }}>
-              {cr.justification || 'No business justification provided.'}
-            </div>
-          </div>
-          <div>
-            <div style={{ fontSize: '0.8rem', fontWeight: 500, color: 'var(--text-primary)', marginBottom: '0.35rem' }}>Assigned Workflow</div>
-            <div style={{ fontSize: '0.825rem', color: 'var(--text-secondary)' }}>
-              {cr.workflow || 'Standard Change Workflow'}
+          {/* Business Justification */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+            <div>
+              <div style={{ fontSize: '0.8rem', fontWeight: 500, color: 'var(--text-primary)', marginBottom: '0.35rem' }}>Business Justification</div>
+              <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', lineHeight: 1.45, wordBreak: 'break-word', overflowWrap: 'anywhere' }}>
+                {cr.justification || 'No business justification provided.'}
+              </div>
             </div>
           </div>
         </div>
-
-        {/* Comments / Admin Notes Section (Hidden for Requester) */}
-        {!isRequester && (
-          <div style={{ padding: '1.25rem 1.75rem', borderTop: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <h3 style={{ fontSize: '0.9rem', fontWeight: 500, color: 'var(--text-primary)', margin: 0, display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
-                <MessageSquare size={16} color="var(--brand-primary)" />
-                <span>Comments & Admin Notes</span>
-              </h3>
-              <span style={{ fontSize: '0.75rem', fontWeight: 500, color: 'var(--text-secondary)' }}>
-                {commentsList.length} {commentsList.length === 1 ? 'comment' : 'comments'}
-              </span>
-            </div>
-
-            {/* Existing comments list */}
-            {commentsList.length > 0 ? (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                {commentsList.map((cmt, idx) => (
-                  <div key={cmt.id || idx} style={{ padding: '0.85rem 1rem', backgroundColor: 'var(--input-bg)', borderRadius: '10px', border: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column', gap: '0.35rem', overflow: 'hidden' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem', flexWrap: 'wrap' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
-                        <span style={{ fontSize: '0.825rem', fontWeight: 500, color: 'var(--text-primary)' }}>{cmt.authorName || 'Admin'}</span>
-                        <span style={{ fontSize: '0.7rem', fontWeight: 500, padding: '0.15rem 0.45rem', borderRadius: '4px', backgroundColor: '#EDE9FE', color: '#6D28D9' }}>{cmt.authorRole || 'Admin'}</span>
-                      </div>
-                      <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)' }}>
-                        {cmt.createdAt ? new Date(cmt.createdAt).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' }) : ''}
-                      </span>
-                    </div>
-                    <p style={{
-                      fontSize: '0.85rem',
-                      color: 'var(--text-primary)',
-                      margin: 0,
-                      lineHeight: 1.45,
-                      whiteSpace: 'pre-wrap',
-                      wordBreak: 'break-word',
-                      overflowWrap: 'anywhere',
-                      maxWidth: '100%'
-                    }}>
-                      {cmt.text}
-                    </p>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', fontStyle: 'italic' }}>
-                No comments posted yet.
-              </div>
-            )}
-
-            {/* Composer */}
-            {isAdminOrSuperAdmin ? (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginTop: '0.25rem' }}>
-                <textarea
-                  rows={2}
-                  placeholder="Add an admin note or implementation comment..."
-                  value={commentInput}
-                  onChange={(e) => setCommentInput(e.target.value)}
-                  style={{
-                    width: '100%',
-                    padding: '0.65rem 0.85rem',
-                    backgroundColor: 'var(--input-bg)',
-                    border: '1px solid var(--border-color)',
-                    borderRadius: '8px',
-                    fontSize: '0.85rem',
-                    color: 'var(--text-primary)',
-                    outline: 'none',
-                    resize: 'vertical'
-                  }}
-                />
-                {commentError && <span style={{ fontSize: '0.775rem', fontWeight: 500, color: '#DC2626' }}>{commentError}</span>}
-                <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-                  <button
-                    type="button"
-                    onClick={handlePostComment}
-                    disabled={isPostingComment || !commentInput.trim()}
-                    style={{
-                      padding: '0.45rem 1rem',
-                      backgroundColor: isPostingComment || !commentInput.trim() ? 'var(--border-color)' : 'var(--brand-primary)',
-                      color: '#FFFFFF',
-                      border: 'none',
-                      borderRadius: '6px',
-                      fontSize: '0.8rem',
-                      fontWeight: 500,
-                      cursor: isPostingComment || !commentInput.trim() ? 'not-allowed' : 'pointer'
-                    }}
-                  >
-                    {isPostingComment ? 'Posting...' : 'Post Comment'}
-                  </button>
-                </div>
-              </div>
-            ) : (
-              <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', fontStyle: 'italic', padding: '0.5rem', backgroundColor: 'var(--input-bg)', borderRadius: '6px' }}>
-                Only Admins and Super Admins can add comments to this change request.
-              </div>
-            )}
-          </div>
-        )}
 
         {/* Action Confirmation Modal Popup (Approve / Reject / Implement) */}
         {actionPrompt && (
@@ -662,16 +656,20 @@ export default function ChangeRequestModal({ cr, onClose, onApprove, onReject, o
             }}>
               <div>
                 <h3 style={{ fontSize: '1.05rem', fontWeight: 800, color: actionPrompt.color, margin: 0 }}>
-                  {actionPrompt.title} - Mandatory Comment *
+                  {actionPrompt.title}
                 </h3>
                 <p style={{ fontSize: '0.825rem', color: 'var(--text-secondary)', marginTop: '0.35rem', margin: 0, lineHeight: 1.4 }}>
-                  Please specify a mandatory rationale or description of what was done before completing this action.
+                  {actionPrompt.action === 'implement'
+                    ? 'A comment explaining what has been done'
+                    : actionPrompt.action === 'reject'
+                    ? 'Please provide the reason for rejection.'
+                    : 'A comment explaining what has been done'}
                 </p>
               </div>
 
               <textarea
                 rows={4}
-                placeholder={`Enter comment/rationale for ${actionPrompt.action} action...`}
+                placeholder="Enter comment..."
                 value={actionCommentInput}
                 onChange={(e) => {
                   setActionCommentInput(e.target.value);
@@ -699,43 +697,74 @@ export default function ChangeRequestModal({ cr, onClose, onApprove, onReject, o
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '0.25rem' }}>
                 <button
                   type="button"
+                  disabled={isSubmittingAction}
                   onClick={() => {
                     setActionPrompt(null);
                     setActionCommentInput('');
                     setActionCommentError('');
                   }}
-                  style={{ padding: '0.55rem 1.1rem', backgroundColor: 'var(--card-bg)', border: '1px solid var(--border-color)', borderRadius: '8px', fontSize: '0.825rem', fontWeight: 600, color: 'var(--text-primary)', cursor: 'pointer' }}
+                  style={{
+                    padding: '0.55rem 1.1rem',
+                    backgroundColor: 'var(--card-bg)',
+                    border: '1px solid var(--border-color)',
+                    borderRadius: '8px',
+                    fontSize: '0.825rem',
+                    fontWeight: 600,
+                    color: 'var(--text-primary)',
+                    cursor: isSubmittingAction ? 'not-allowed' : 'pointer',
+                    opacity: isSubmittingAction ? 0.6 : 1
+                  }}
                 >
                   Cancel
                 </button>
                 <button
                   type="button"
-                  onClick={() => {
+                  disabled={isSubmittingAction}
+                  onClick={async () => {
+                    if (isSubmittingAction) return;
                     if (!actionCommentInput.trim()) {
-                      setActionCommentError('A comment describing what was done is mandatory.');
+                      setActionCommentError('Please enter a comment.');
                       return;
                     }
+                    setIsSubmittingAction(true);
                     const commentText = actionCommentInput.trim();
-                    if (actionPrompt.action === 'approve' && onApprove) {
-                      cr.approvedComment = commentText;
-                      cr.approvedBy = currentUser.name || 'Approver';
-                      onApprove(cr.id, commentText);
-                    } else if (actionPrompt.action === 'reject' && onReject) {
-                      cr.rejectedComment = commentText;
-                      cr.rejectionReason = commentText;
-                      cr.rejectedBy = currentUser.name || 'Approver';
-                      onReject(cr.id, commentText);
-                    } else if (actionPrompt.action === 'implement' && onImplement) {
-                      cr.implementedComment = commentText;
-                      onImplement(cr.id, commentText);
+                    try {
+                      if (actionPrompt.action === 'approve' && onApprove) {
+                        cr.approvedComment = commentText;
+                        cr.approvedBy = currentUser.name || 'Approver';
+                        await onApprove(cr.id, commentText);
+                      } else if (actionPrompt.action === 'reject' && onReject) {
+                        cr.rejectedComment = commentText;
+                        cr.rejectionReason = commentText;
+                        cr.rejectedBy = currentUser.name || 'Approver';
+                        await onReject(cr.id, commentText);
+                      } else if (actionPrompt.action === 'implement' && onImplement) {
+                        cr.implementedComment = commentText;
+                        await onImplement(cr.id, commentText);
+                      }
+                      setActionPrompt(null);
+                      setActionCommentInput('');
+                      onClose();
+                    } catch (err) {
+                      setActionCommentError(err.message || 'Action failed');
+                    } finally {
+                      setIsSubmittingAction(false);
                     }
-                    setActionPrompt(null);
-                    setActionCommentInput('');
-                    onClose();
                   }}
-                  style={{ padding: '0.55rem 1.25rem', backgroundColor: actionPrompt.color, color: '#FFFFFF', border: 'none', borderRadius: '8px', fontSize: '0.825rem', fontWeight: 700, cursor: 'pointer', boxShadow: '0 2px 6px rgba(0,0,0,0.2)' }}
+                  style={{
+                    padding: '0.55rem 1.25rem',
+                    backgroundColor: isSubmittingAction ? 'var(--border-color)' : actionPrompt.color,
+                    color: '#FFFFFF',
+                    border: 'none',
+                    borderRadius: '8px',
+                    fontSize: '0.825rem',
+                    fontWeight: 700,
+                    cursor: isSubmittingAction ? 'not-allowed' : 'pointer',
+                    opacity: isSubmittingAction ? 0.7 : 1,
+                    boxShadow: '0 2px 6px rgba(0,0,0,0.2)'
+                  }}
                 >
-                  Confirm {actionPrompt.action.charAt(0).toUpperCase() + actionPrompt.action.slice(1)}
+                  {isSubmittingAction ? 'Processing...' : actionPrompt.action === 'implement' ? 'Submit for Implement' : 'Submit'}
                 </button>
               </div>
             </div>
@@ -744,39 +773,69 @@ export default function ChangeRequestModal({ cr, onClose, onApprove, onReject, o
 
         {/* Footer Actions */}
         <div style={{ padding: '1rem 1.75rem 1.5rem 1.75rem', borderTop: '1px solid var(--border-color)', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '0.75rem', backgroundColor: 'var(--card-bg)', position: 'sticky', bottom: 0 }}>
-            <button onClick={onClose} style={{ padding: '0.55rem 1.1rem', backgroundColor: 'var(--card-bg)', border: '1px solid var(--border-color)', borderRadius: '8px', fontSize: '0.825rem', fontWeight: 600, color: 'var(--text-primary)', cursor: 'pointer' }}>Close</button>
+            <button
+              onClick={onClose}
+              disabled={isSubmittingAction}
+              style={{
+                padding: '0.55rem 1.1rem',
+                backgroundColor: 'var(--card-bg)',
+                border: '1px solid var(--border-color)',
+                borderRadius: '8px',
+                fontSize: '0.825rem',
+                fontWeight: 600,
+                color: 'var(--text-primary)',
+                cursor: isSubmittingAction ? 'not-allowed' : 'pointer',
+                opacity: isSubmittingAction ? 0.6 : 1
+              }}
+            >
+              Close
+            </button>
             
-            {isDraft ? (
-              <button
-                onClick={() => {
-                  if (onSubmitForApproval) onSubmitForApproval(cr.id);
-                  onClose();
-                }}
-                style={{
-                  padding: '0.55rem 1.25rem',
-                  backgroundColor: 'var(--brand-primary)',
-                  color: '#FFFFFF',
-                  border: 'none',
-                  borderRadius: '8px',
-                  fontSize: '0.825rem',
-                  fontWeight: 500,
-                  cursor: 'pointer',
-                  boxShadow: '0 1px 3px rgba(0, 0, 0, 0.2)'
-                }}
-              >
-                Submit for Approval
-              </button>
-            ) : canAct ? (
+            {canAct ? (
               <>
                 {onReject && (
-                  <button onClick={() => { setActionPrompt({ action: 'reject', title: 'Reject Change Request', color: '#DC2626' }); setActionCommentInput(''); }} style={{ padding: '0.55rem 1.1rem', backgroundColor: '#FEF2F2', color: '#DC2626', border: '1px solid #FCA5A5', borderRadius: '8px', fontSize: '0.825rem', fontWeight: 700, cursor: 'pointer' }}>Reject</button>
+                  <button
+                    disabled={isSubmittingAction}
+                    onClick={() => { setActionPrompt({ action: 'reject', title: 'Reject Change Request', color: '#DC2626' }); setActionCommentInput(''); }}
+                    style={{
+                      padding: '0.55rem 1.1rem',
+                      backgroundColor: '#FEF2F2',
+                      color: '#DC2626',
+                      border: '1px solid #FCA5A5',
+                      borderRadius: '8px',
+                      fontSize: '0.825rem',
+                      fontWeight: 700,
+                      cursor: isSubmittingAction ? 'not-allowed' : 'pointer',
+                      opacity: isSubmittingAction ? 0.6 : 1
+                    }}
+                  >
+                    Reject
+                  </button>
                 )}
                 {onApprove && (
-                  <button onClick={() => { setActionPrompt({ action: 'approve', title: 'Approve Change Request', color: '#0D9488' }); setActionCommentInput(''); }} style={{ padding: '0.55rem 1.25rem', backgroundColor: '#0D9488', color: '#FFFFFF', border: 'none', borderRadius: '8px', fontSize: '0.825rem', fontWeight: 700, cursor: 'pointer', boxShadow: '0 1px 3px rgba(13, 148, 136, 0.2)' }}>Approve</button>
+                  <button
+                    disabled={isSubmittingAction}
+                    onClick={() => { setActionPrompt({ action: 'approve', title: 'Approve Change Request', color: '#0D9488' }); setActionCommentInput(''); }}
+                    style={{
+                      padding: '0.55rem 1.25rem',
+                      backgroundColor: '#0D9488',
+                      color: '#FFFFFF',
+                      border: 'none',
+                      borderRadius: '8px',
+                      fontSize: '0.825rem',
+                      fontWeight: 700,
+                      cursor: isSubmittingAction ? 'not-allowed' : 'pointer',
+                      opacity: isSubmittingAction ? 0.6 : 1,
+                      boxShadow: '0 1px 3px rgba(13, 148, 136, 0.2)'
+                    }}
+                  >
+                    Approve
+                  </button>
                 )}
               </>
-            ) : isApproved && isAdminOrSuperAdmin && !isSelfRequest ? (
+            ) : isApproved && canMarkImplemented && !isSelfRequest ? (
               <button
+                disabled={isSubmittingAction}
                 onClick={() => {
                   setActionPrompt({ action: 'implement', title: 'Mark as Implemented', color: '#0D9488' });
                   setActionCommentInput('');
@@ -789,7 +848,8 @@ export default function ChangeRequestModal({ cr, onClose, onApprove, onReject, o
                   borderRadius: '8px',
                   fontSize: '0.825rem',
                   fontWeight: 500,
-                  cursor: 'pointer',
+                  cursor: isSubmittingAction ? 'not-allowed' : 'pointer',
+                  opacity: isSubmittingAction ? 0.6 : 1,
                   boxShadow: '0 1px 3px rgba(0, 0, 0, 0.2)'
                 }}
               >

@@ -9,7 +9,8 @@ function MyWorklistPage({ onNavigate, searchQuery = '', user, isOrgWorklist = fa
   const roleId = user?.roleId || '';
   const isSuperAdmin = roleId === 'role-1' || roleName.includes('super');
   const isAdmin = isSuperAdmin || roleId === 'role-2' || roleName.includes('admin');
-  const isApprover = (user?.roleId && ['role-1', 'role-2', 'role-3'].includes(user.roleId)) || roleName.includes('manager') || roleName.includes('admin');
+  const isImplementer = roleId === 'role-5' || roleName.includes('implementer');
+  const isApprover = (user?.roleId && ['role-1', 'role-2', 'role-3', 'role-5'].includes(user.roleId)) || roleName.includes('manager') || roleName.includes('admin') || roleName.includes('implementer');
   const isRequester = !isApprover;
 
   const [items, setItems] = useState([]);
@@ -127,10 +128,19 @@ function MyWorklistPage({ onNavigate, searchQuery = '', user, isOrgWorklist = fa
     Rejected: 0
   });
 
+  const fetchSeqRef = React.useRef(0);
+
   // Server-Side Database Query Fetch with date & search filter support
   useEffect(() => {
+    // Do not fetch custom date filter if dates are incomplete
+    if (dateFilter === 'custom' && (!startDate || !endDate)) {
+      return;
+    }
+
+    const currentSeq = ++fetchSeqRef.current;
+    setIsLoading(true);
+
     const fetchData = async () => {
-      setIsLoading(true);
       try {
         const params = new URLSearchParams({
           ...(activeFilter !== 'All' && { status: activeFilter }),
@@ -145,6 +155,7 @@ function MyWorklistPage({ onNavigate, searchQuery = '', user, isOrgWorklist = fa
             ...(user?.id ? { 'x-user-id': user.id } : {})
           }
         });
+        if (currentSeq !== fetchSeqRef.current) return;
         if (res.ok) {
           const body = await res.json();
           if (body.data && Array.isArray(body.data)) setItems(body.data);
@@ -154,11 +165,13 @@ function MyWorklistPage({ onNavigate, searchQuery = '', user, isOrgWorklist = fa
       } catch (err) {
         console.warn('Backend API offline, using default worklist data:', err);
       } finally {
-        setIsLoading(false);
+        if (currentSeq === fetchSeqRef.current) {
+          setIsLoading(false);
+        }
       }
     };
     fetchData();
-  }, [activeFilter, dateFilter, startDate, endDate, searchQuery, user?.id]);
+  }, [activeFilter, dateFilter, startDate, endDate, searchQuery, user?.id, isOrgWorklist]);
 
   const getStatus = (r) => (r.status || 'Pending').toLowerCase();
 
@@ -166,7 +179,7 @@ function MyWorklistPage({ onNavigate, searchQuery = '', user, isOrgWorklist = fa
     { id: 'All', label: `All (${statusCounts.All || 0})` },
     { id: 'Pending', label: `Pending (${statusCounts.Pending || 0})` },
     { id: 'Approved', label: `Approved (${statusCounts.Approved || 0})` },
-    { id: 'Implemented', label: `Implemented (${statusCounts.Implemented || statusCounts['In progress'] || statusCounts['In Progress'] || 0})` },
+    { id: 'Implemented', label: `Implemented (${statusCounts.Implemented || 0})` },
     { id: 'Rejected', label: `Rejected (${statusCounts.Rejected || 0})` }
   ];
 
@@ -174,7 +187,7 @@ function MyWorklistPage({ onNavigate, searchQuery = '', user, isOrgWorklist = fa
     { id: 'pending', title: 'Pending Review', count: metrics?.pending ?? statusCounts.Pending ?? 0, subtext: 'In Queue Right Now', subtextColor: 'var(--text-secondary)', icon: Clock, iconBg: '#FEF3C7', iconColor: '#D97706' },
     { id: 'approved', title: 'Approved', count: metrics?.approved ?? statusCounts.Approved ?? 0, subtext: 'Last 30 Days', subtextColor: '#059669', icon: Check, iconBg: '#D1FAE5', iconColor: '#059669' },
     { id: 'rejected', title: 'Rejected', count: metrics?.rejected ?? statusCounts.Rejected ?? 0, subtext: 'Last 30 Days', subtextColor: 'var(--text-secondary)', icon: X, iconBg: '#FEE2E2', iconColor: '#DC2626' },
-    { id: 'implemented', title: 'Implemented', count: metrics?.implemented ?? statusCounts.Implemented ?? statusCounts['In progress'] ?? 0, subtext: 'Last 30 Days', subtextColor: 'var(--text-secondary)', icon: RotateCw, iconBg: '#F3E8FF', iconColor: '#7C3AED' }
+    { id: 'implemented', title: 'Implemented', count: metrics?.implemented ?? statusCounts.Implemented ?? 0, subtext: 'Last 30 Days', subtextColor: 'var(--text-secondary)', icon: RotateCw, iconBg: '#F3E8FF', iconColor: '#7C3AED' }
   ];
 
   return (
@@ -183,11 +196,13 @@ function MyWorklistPage({ onNavigate, searchQuery = '', user, isOrgWorklist = fa
       {/* Header Row */}
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: '1rem' }}>
         <div>
-          <h1 style={{ fontSize: '1.45rem', fontWeight: 700, color: 'var(--text-primary)', lineHeight: 1.2 }}>
-            {roleName.includes('admin') ? 'Organization worklist' : 'My Worklist'}
+          <h1 style={{ fontSize: '1.45rem', fontWeight: 700, color: 'var(--text-primary)', lineHeight: 1.2, margin: 0 }}>
+            {isOrgWorklist ? 'Organization worklist' : 'My Worklist'}
           </h1>
           <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginTop: '0.2rem' }}>
-            {isApprover ? 'Change requests awaiting CAB & manager sign-off' : 'All change requests across the organization'}
+            {isOrgWorklist
+              ? 'All change requests requiring Change Manager oversight across the organization'
+              : (isApprover ? 'Change requests awaiting your review and Change Manager sign-off' : 'Change requests in your worklist')}
           </p>
         </div>
 
@@ -235,6 +250,9 @@ function MyWorklistPage({ onNavigate, searchQuery = '', user, isOrgWorklist = fa
           setDateFilter(val);
           if (val === 'custom') {
             initCustomDateRange({ startDate, endDate, setStartDate, setEndDate });
+          } else {
+            setStartDate('');
+            setEndDate('');
           }
         }}
         startDate={startDate}
@@ -252,11 +270,11 @@ function MyWorklistPage({ onNavigate, searchQuery = '', user, isOrgWorklist = fa
                 <th style={{ padding: '0.9rem 1.1rem', minWidth: '100px', whiteSpace: 'nowrap' }}>CR ID</th>
                 <th style={{ padding: '0.9rem 1.1rem', minWidth: '280px' }}>Title</th>
                 <th style={{ padding: '0.9rem 1.1rem', minWidth: '180px' }}>Category</th>
-                <th style={{ padding: '0.9rem 1.1rem', minWidth: '180px', whiteSpace: 'nowrap' }}>Employee Details</th>
+                <th style={{ padding: '0.9rem 1.1rem', minWidth: '180px', whiteSpace: 'nowrap' }}>Requester Details</th>
                 <th style={{ padding: '0.9rem 1.1rem', minWidth: '120px', whiteSpace: 'nowrap' }}>Raised Date</th>
                 <th style={{ padding: '0.9rem 1.1rem', minWidth: '120px', whiteSpace: 'nowrap' }}>Closed Date</th>
                 <th style={{ padding: '0.9rem 1.1rem', minWidth: '130px', whiteSpace: 'nowrap' }}>Approved By</th>
-                <th style={{ padding: '0.9rem 1.1rem', minWidth: '160px', textAlign: 'right', whiteSpace: 'nowrap' }}>Actions</th>
+                <th style={{ padding: '0.9rem 1.1rem', minWidth: '160px', textAlign: 'left', whiteSpace: 'nowrap' }}>Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -307,8 +325,8 @@ function MyWorklistPage({ onNavigate, searchQuery = '', user, isOrgWorklist = fa
                       <td style={{ padding: '1rem 1.1rem', color: 'var(--text-primary)', fontWeight: 600, whiteSpace: 'nowrap' }}>
                         {item.decidedBy || (isItemApproved || isItemRejected ? (user?.name || 'Approver') : '—')}
                       </td>
-                      <td style={{ padding: '1rem 1.1rem', textAlign: 'right', whiteSpace: 'nowrap' }}>
-                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', justifyContent: 'flex-end' }}>
+                      <td style={{ padding: '1rem 1.1rem', textAlign: 'left', whiteSpace: 'nowrap' }}>
+                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', justifyContent: 'flex-start' }}>
                           <button
                             type="button"
                             onClick={() => setSelectedCr(item)}
@@ -341,7 +359,7 @@ function MyWorklistPage({ onNavigate, searchQuery = '', user, isOrgWorklist = fa
                                 Approve
                               </button>
                             </>
-                          ) : isItemApproved && status !== 'implemented' && isAdmin && !isSelfRequest ? (
+                          ) : isItemApproved && status !== 'implemented' && (isAdmin || isImplementer) && !isSelfRequest ? (
                             <button
                               type="button"
                               onClick={() => {
@@ -359,8 +377,8 @@ function MyWorklistPage({ onNavigate, searchQuery = '', user, isOrgWorklist = fa
                               borderRadius: 'var(--radius-lg)',
                               fontSize: '0.75rem',
                               fontWeight: 500,
-                              backgroundColor: status === 'implemented' ? '#E0F2FE' : isItemApproved ? '#D1FAE5' : isItemRejected ? '#FEE2E2' : '#FEF3C7',
-                              color: status === 'implemented' ? '#0284C7' : isItemApproved ? '#059669' : isItemRejected ? '#DC2626' : '#D97706'
+                              backgroundColor: status === 'implemented' ? '#F3E8FF' : isItemApproved ? '#FEF3C7' : isItemRejected ? '#FEE2E2' : '#FEF3C7',
+                              color: status === 'implemented' ? '#7C3AED' : isItemApproved ? '#D97706' : isItemRejected ? '#DC2626' : '#D97706'
                             }}>
                               {status === 'implemented'
                                 ? 'Implemented'
@@ -428,16 +446,20 @@ function MyWorklistPage({ onNavigate, searchQuery = '', user, isOrgWorklist = fa
           }}>
             <div>
               <h3 style={{ fontSize: '1.1rem', fontWeight: 800, color: rowActionPrompt.color, margin: 0 }}>
-                {rowActionPrompt.title} ({rowActionPrompt.item.id})
+                {rowActionPrompt.title}
               </h3>
               <p style={{ fontSize: '0.825rem', color: 'var(--text-secondary)', marginTop: '0.35rem', margin: 0 }}>
-                A comment explaining what has been done / rationale is mandatory before confirming.
+                {rowActionPrompt.action === 'implement'
+                  ? 'A comment explaining what has been done'
+                  : rowActionPrompt.action === 'reject'
+                  ? 'Please provide the reason for rejection.'
+                  : 'A comment explaining what has been done'}
               </p>
             </div>
 
             <textarea
               rows={3}
-              placeholder={`Enter comment/rationale for ${rowActionPrompt.action} action...`}
+              placeholder="Enter comment..."
               value={rowActionCommentInput}
               onChange={(e) => {
                 setRowActionCommentInput(e.target.value);
@@ -477,7 +499,7 @@ function MyWorklistPage({ onNavigate, searchQuery = '', user, isOrgWorklist = fa
                 type="button"
                 onClick={() => {
                   if (!rowActionCommentInput.trim()) {
-                    setRowActionCommentError('A comment describing what was done is mandatory.');
+                    setRowActionCommentError('Please enter a comment.');
                     return;
                   }
                   handleAction(rowActionPrompt.item.id, rowActionPrompt.action, rowActionCommentInput.trim());
@@ -487,7 +509,7 @@ function MyWorklistPage({ onNavigate, searchQuery = '', user, isOrgWorklist = fa
                 }}
                 style={{ padding: '0.5rem 1.15rem', backgroundColor: rowActionPrompt.color, color: '#FFFFFF', border: 'none', borderRadius: '6px', fontSize: '0.825rem', fontWeight: 700, cursor: 'pointer', boxShadow: '0 1px 3px rgba(0,0,0,0.15)' }}
               >
-                Confirm {rowActionPrompt.action.charAt(0).toUpperCase() + rowActionPrompt.action.slice(1)}
+                {rowActionPrompt.action === 'implement' ? 'Submit for Implement' : 'Submit'}
               </button>
             </div>
           </div>
