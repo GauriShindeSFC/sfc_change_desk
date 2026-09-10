@@ -8,7 +8,7 @@ if (!DATABASE_URI) {
 }
 
 const maxPool = Number(process.env.DB_POOL_MAX) || 5;
-const minPool = Number(process.env.DB_POOL_MIN) || 0;
+const minPool = Number(process.env.DB_POOL_MIN) || 1;
 
 export const sequelize = new Sequelize(DATABASE_URI, {
   dialect: 'postgres',
@@ -17,7 +17,8 @@ export const sequelize = new Sequelize(DATABASE_URI, {
     underscored: true, // camelCase attributes -> snake_case columns
     freezeTableName: true // use the exact tableName we give each model
   },
-  pool: { max: maxPool, min: minPool, acquire: 30000, idle: 10000 },
+  // Keep one remote/TLS connection warm across the UI's 30-second polls.
+  pool: { max: maxPool, min: minPool, acquire: 30000, idle: 60000, evict: 5000 },
   dialectOptions: {
     // Supabase (and most managed Postgres) require TLS
     ssl: { require: true, rejectUnauthorized: false }

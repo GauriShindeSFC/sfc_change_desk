@@ -18,19 +18,70 @@ export const serializeChangeRequest = (row) => {
   const rejApproval = Array.isArray(approvals) ? approvals.find(a => (a.decision === 'Rejected' || a.action === 'Rejected') && (a.rationale || a.comments)) : null;
   const rationale = cr.rejectionReason || cr.rejection_reason || rejApproval?.rationale || rejApproval?.comments || cr.customFieldValues?.rejectionReason || (cr.status === 'Rejected' ? 'This change request was rejected during CAB review.' : null);
 
+  const decidedApproval = Array.isArray(approvals) ? approvals.find(a => (a.decision === 'Approved' || a.decision === 'Rejected' || a.action === 'Approved' || a.action === 'Rejected')) : null;
+  const decidedBy = decidedApproval?.approver?.name || cr.decidedBy || null;
+  const decidedAt = decidedApproval?.decidedAt || decidedApproval?.updatedAt || null;
+
+  const allComments = Array.isArray(cr.comments)
+    ? cr.comments
+    : Array.isArray(cr.customFieldValues?.comments)
+    ? cr.customFieldValues.comments
+    : [];
+
+  const foundAppComment = [...allComments].reverse().find(c => {
+    const act = (c.action || c.type || c.decision || '').toLowerCase();
+    return act === 'approved' || act === 'approve';
+  })?.text;
+
+  const foundRejComment = [...allComments].reverse().find(c => {
+    const act = (c.action || c.type || c.decision || '').toLowerCase();
+    return act === 'rejected' || act === 'reject';
+  })?.text;
+
+  const foundImpComment = [...allComments].reverse().find(c => {
+    const act = (c.action || c.type || c.decision || '').toLowerCase();
+    return act === 'implemented' || act === 'implement';
+  })?.text;
+
+  const appApproval = Array.isArray(approvals) ? approvals.find(a => a.decision === 'Approved' || a.action === 'Approved') : null;
+  const approvedBy = cr.approvedBy || appApproval?.approver?.name || decidedBy || null;
+  const approvedDate = appApproval ? formatDate(new Date(appApproval.decidedAt || appApproval.updatedAt)) : (cr.status === 'Approved' || cr.status === 'Implemented' ? formatDate(new Date(decidedAt || cr.updatedAt)) : null);
+  const approvedComment = cr.approvedComment || cr.approved_comment || cr.approvalRationale || cr.approval_rationale || appApproval?.rationale || appApproval?.comments || appApproval?.comment || foundAppComment || null;
+
+  const rejectedBy = cr.rejectedBy || rejApproval?.approver?.name || decidedBy || null;
+  const rejectedDate = rejApproval ? formatDate(new Date(rejApproval.decidedAt || rejApproval.updatedAt)) : (cr.status === 'Rejected' ? formatDate(new Date(decidedAt || closedAt || cr.updatedAt)) : null);
+  const rejectedComment = cr.rejectedComment || cr.rejected_comment || cr.rejectionReason || cr.rejection_reason || rejApproval?.rationale || rejApproval?.comments || rejApproval?.comment || foundRejComment || rationale;
+
+  const implementedDate = cr.status === 'Implemented' ? formatDate(new Date(closedAt || cr.updatedAt)) : null;
+  const implementedComment = cr.implementedComment || cr.implemented_comment || foundImpComment || (Array.isArray(cr.comments) ? cr.comments.find(c => c.action === 'Implemented')?.text || null : null);
+
   return {
     ...rest,
+    requesterId: requesterId || cr.requester_id || cr.requesterId || null,
+    approverId: approverId || cr.approver_id || cr.approverId || null,
+    workflowId: workflowId || cr.workflow_id || cr.workflowId || null,
+    approvals: approvals || [],
+    decidedBy,
+    decidedAt,
+    approvedBy,
+    approvedDate,
+    approvedComment,
+    rejectedBy,
+    rejectedDate,
+    rejectedComment,
+    implementedDate,
+    implementedComment,
     requester: requester?.name ?? cr.employeeName ?? null,
     employeeName: cr.employeeName || cr.customFieldValues?.employeeName || requester?.name || null,
     employeeEmail: cr.employeeEmail || cr.customFieldValues?.employeeEmail || requester?.email || null,
     employeeId: cr.employeeId || cr.customFieldValues?.employeeId || requester?.employeeId || null,
-    location: cr.location || cr.customFieldValues?.location || 'Ahmedabad HQ',
+    location: cr.location || cr.customFieldValues?.location || null,
     managerEmail: cr.managerEmail || cr.customFieldValues?.managerEmail || null,
     hostname: cr.customFieldValues?.hostname || cr.customFieldValues?.assetId || null,
     environment: cr.customFieldValues?.environment || 'Production',
     approver: approver?.name ?? null,
     workflow: workflow?.name ?? null,
-    raisedDate: submittedAt ? formatDate(new Date(submittedAt)) : '',
+    raisedDate: submittedAt ? formatDate(new Date(submittedAt)) : (createdAt ? formatDate(new Date(createdAt)) : ''),
     closedDate: closedAt ? formatDate(new Date(closedAt)) : 'Open',
     comments: cr.comments || cr.customFieldValues?.comments || [],
     rejectionReason: rationale,
@@ -45,6 +96,43 @@ export const serializeWorklistEntry = (row) => {
   const cr = plain(row);
   const rejApproval = Array.isArray(cr.approvals) ? cr.approvals.find(a => (a.decision === 'Rejected' || a.action === 'Rejected') && (a.rationale || a.comments)) : null;
   const rationale = cr.rejectionReason || cr.rejection_reason || rejApproval?.rationale || rejApproval?.comments || cr.customFieldValues?.rejectionReason || (cr.status === 'Rejected' ? 'This change request was rejected during CAB review.' : null);
+
+  const decidedApproval = Array.isArray(cr.approvals) ? cr.approvals.find(a => (a.decision === 'Approved' || a.decision === 'Rejected' || a.action === 'Approved' || a.action === 'Rejected')) : null;
+  const decidedBy = decidedApproval?.approver?.name || cr.decidedBy || null;
+  const decidedAt = decidedApproval?.decidedAt || decidedApproval?.updatedAt || null;
+
+  const allComments = Array.isArray(cr.comments)
+    ? cr.comments
+    : Array.isArray(cr.customFieldValues?.comments)
+    ? cr.customFieldValues.comments
+    : [];
+
+  const foundAppComment = [...allComments].reverse().find(c => {
+    const act = (c.action || c.type || c.decision || '').toLowerCase();
+    return act === 'approved' || act === 'approve';
+  })?.text;
+
+  const foundRejComment = [...allComments].reverse().find(c => {
+    const act = (c.action || c.type || c.decision || '').toLowerCase();
+    return act === 'rejected' || act === 'reject';
+  })?.text;
+
+  const foundImpComment = [...allComments].reverse().find(c => {
+    const act = (c.action || c.type || c.decision || '').toLowerCase();
+    return act === 'implemented' || act === 'implement';
+  })?.text;
+
+  const appApproval = Array.isArray(cr.approvals) ? cr.approvals.find(a => a.decision === 'Approved' || a.action === 'Approved') : null;
+  const approvedBy = cr.approvedBy || appApproval?.approver?.name || decidedBy || null;
+  const approvedDate = appApproval ? formatDate(new Date(appApproval.decidedAt || appApproval.updatedAt)) : (cr.status === 'Approved' || cr.status === 'Implemented' ? formatDate(new Date(decidedAt || cr.updatedAt)) : null);
+  const approvedComment = cr.approvedComment || cr.approved_comment || cr.approvalRationale || cr.approval_rationale || appApproval?.rationale || appApproval?.comments || appApproval?.comment || foundAppComment || null;
+
+  const rejectedBy = cr.rejectedBy || rejApproval?.approver?.name || decidedBy || null;
+  const rejectedDate = rejApproval ? formatDate(new Date(rejApproval.decidedAt || rejApproval.updatedAt)) : (cr.status === 'Rejected' ? formatDate(new Date(decidedAt || cr.closedAt || cr.updatedAt)) : null);
+  const rejectedComment = cr.rejectedComment || cr.rejected_comment || cr.rejectionReason || cr.rejection_reason || rejApproval?.rationale || rejApproval?.comments || rejApproval?.comment || foundRejComment || rationale;
+
+  const implementedDate = cr.status === 'Implemented' ? formatDate(new Date(cr.closedAt || cr.updatedAt)) : null;
+  const implementedComment = cr.implementedComment || cr.implemented_comment || foundImpComment || (Array.isArray(cr.comments) ? cr.comments.find(c => c.action === 'Implemented')?.text || null : null);
 
   return {
     id: cr.id,
@@ -72,6 +160,17 @@ export const serializeWorklistEntry = (row) => {
     requester: cr.requester?.name || cr.employeeName || 'Requester',
     submittedTime: `submitted ${relativeTime(cr.submittedAt)}`,
     risk: cr.risk,
+    approvals: cr.approvals || [],
+    decidedBy,
+    decidedAt,
+    approvedBy,
+    approvedDate,
+    approvedComment,
+    rejectedBy,
+    rejectedDate,
+    rejectedComment,
+    implementedDate,
+    implementedComment,
     ...riskStyle(cr.risk),
     ...statusStyle(cr.status)
   };
@@ -110,14 +209,13 @@ export const serializeRole = (row) => {
   return {
     id: r.id,
     name: r.name,
-    usersCount: Array.isArray(r.users) ? r.users.length : 0,
+    usersCount: Array.isArray(r.users) ? r.users.length : (r.usersCount ?? 0),
     description: r.description,
     permissions: r.permissions
   };
 };
 
-// Needs include: actor
-export const serializeAuditLog = (row) => {
+export const serializeAuditLog = (row, actorIdentity = null) => {
   const l = plain(row);
   const act = l.action || '';
   let category = 'User & role changes';
@@ -130,13 +228,33 @@ export const serializeAuditLog = (row) => {
   } else if (/Catalog|Subcategory|Workflow/i.test(act)) {
     category = 'Catalog & workflow';
   }
+
+  let actorName = null;
+  if (actorIdentity?.displayName || actorIdentity?.name) {
+    actorName = actorIdentity.displayName || actorIdentity.name;
+  } else if (l.actor?.name) {
+    actorName = l.actor.name;
+  } else if (l.actorId) {
+    // Honest representation if an actor key exists but has no directory name
+    actorName = l.actorId;
+  } else {
+    // Genuinely unrecorded / null actor ID
+    const isHumanAction = /CR|Approved|Rejected|Created|Updated|Submitted|Sent Back|Draft/i.test(act);
+    actorName = isHumanAction ? 'Unknown' : 'System';
+  }
+
+  const employeeEmail = actorIdentity?.email || l.actor?.email || null;
+  const employeeId = actorIdentity?.employeeBusinessId || actorIdentity?.empId || null;
+
   return {
     id: l.id,
     timestamp: l.timestamp ? String(l.timestamp) : formatDate(new Date(l.createdAt || Date.now())),
-    actor: l.actor?.name ?? 'Gauri Shinde',
+    actor: actorName,
+    actorId: l.actorId || null,
+    employeeId,
     action: l.action,
     reference: l.ref || '—',
-    employeeEmail: l.actor?.email || 'gauri.shinde@stfox.com',
+    employeeEmail,
     category
   };
 };

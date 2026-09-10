@@ -1,60 +1,36 @@
 import jwt from 'jsonwebtoken';
-import { User, Role } from '../models/index.js';
+import { verifyToken, publicUser } from '../services/authService.js';
+import { IdentityResolver } from '../services/IdentityResolver.js';
 
-const SECRET = process.env.JWT_SECRET || 'dev-change-desk-secret';
+if (!process.env.JWT_SECRET) {
+  throw new Error('JWT_SECRET environment variable is required and not set.');
+}
+const SECRET = process.env.JWT_SECRET;
 
 export const authenticateUser = async (req, res, next) => {
   const authHeader = req.headers['authorization'];
-  const token = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : null;
-  const headerUserId = req.headers['x-user-id'];
+  const token = authHeader?.startsWith('Bearer ') ? authHeader.slice(7).trim() : null;
 
   if (token) {
     try {
-      const payload = jwt.verify(token, SECRET);
-      const userId = payload.sub || payload.id;
-      const user = await User.findByPk(userId, {
-        include: [{ model: Role, as: 'role', attributes: ['id', 'name'] }]
-      });
+      const payload = verifyToken(token);
+      const userKey = payload.sub;
+      const result = await IdentityResolver.resolveByKey(userKey);
 
-      if (user && user.status === 'Active') {
-        req.user = {
-          id: user.id,
-          name: user.name,
-          role: user.role?.name || 'Requester',
-          roleId: user.roleId,
-          employeeId: user.employeeId || 'EMP-10432'
-        };
+      if (result.status === 'SUCCESS' && result.identity) {
+        req.user = publicUser(result.identity);
         return next();
       }
     } catch (err) {
-      // Invalid/expired JWT token - proceed to fallback below
+      // Token verification failed
     }
   }
 
-  // Fallback to x-user-id header or default user
-  const targetId = headerUserId || 'usr-1';
-  try {
-    const user = await User.findByPk(targetId, {
-      include: [{ model: Role, as: 'role', attributes: ['id', 'name'] }]
-    });
-    req.user = {
-      id: user?.id || targetId,
-      name: user?.name || 'User',
-      role: user?.role?.name || 'Requester',
-      roleId: user?.roleId || 'role-4',
-      employeeId: user?.employeeId || 'EMP-10000'
-    };
-    next();
-  } catch (err) {
-    req.user = {
-      id: targetId || 'usr-2',
-      name: 'Requester User',
-      role: 'Requester',
-      roleId: 'role-4',
-      employeeId: 'EMP-10000'
-    };
-    next();
-  }
+  // Without a valid JWT, access is denied
+  return res.status(401).json({
+    success: false,
+    message: 'Authentication required. Please log in.'
+  });
 };
 
 export const requireRole = (allowedRoles = []) => {
@@ -63,9 +39,17 @@ export const requireRole = (allowedRoles = []) => {
   return (req, res, next) => {
     const userRole = req.user?.role || '';
     const userRoleId = req.user?.roleId || '';
+    const appRole = req.user?.applicationRole || '';
 
-    // Super Admin (role-1) has superuser access across ALL endpoints
-    if (userRole === 'Super Admin' || userRoleId === 'role-1' || rolesList.includes(userRole) || rolesList.includes(userRoleId)) {
+    // Super Admin (role-1 / SUPER_ADMIN) has superuser access across ALL endpoints
+    if (
+      userRole === 'Super Admin' ||
+      userRoleId === 'role-1' ||
+      appRole === 'SUPER_ADMIN' ||
+      rolesList.includes(userRole) ||
+      rolesList.includes(userRoleId) ||
+      rolesList.includes(appRole)
+    ) {
       return next();
     }
 
@@ -74,4 +58,10 @@ export const requireRole = (allowedRoles = []) => {
       message: `Access denied. Role "${userRole}" lacks permissions for this action. Required: [${rolesList.join(', ')}]`
     });
   };
+};
+
+export const requireOrganizationScopeRole = (req, res, next) => {
+  const scope = String(req.query.scope || '').toLowerCase();
+  if (scope !== 'organization' && scope !== 'org') return next();
+  return requireRole(['Admin', 'Super Admin'])(req, res, next);
 };

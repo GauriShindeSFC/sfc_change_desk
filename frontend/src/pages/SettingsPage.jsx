@@ -7,14 +7,7 @@ function SettingsPage({ user }) {
   const isSuperAdmin = user?.roleId === 'role-1' || (user?.role || '').toLowerCase() === 'super admin';
   const isRequester = !isSuperAdmin && (user?.roleId === 'role-4' || user?.role === 'Requester');
 
-  const defaultUsers = [
-    { id: 'usr-0', name: 'Ashish SFC', email: 'ashish.sfc@company.com', empId: 'EMP-10001', role: 'Super Admin', status: 'Enabled' },
-    { id: 'usr-1', name: 'Gauri Shinde', email: 'gauri.shinde@company.com', empId: 'EMP-10432', role: 'Change Manager', status: 'Enabled' },
-    { id: 'usr-2', name: 'Priya Nair', email: 'priya.nair@company.com', empId: 'EMP-10433', role: 'Requester', status: 'Enabled' },
-    { id: 'usr-3', name: 'Arjun Mehta', email: 'arjun.mehta@company.com', empId: 'EMP-10434', role: 'Admin', status: 'Enabled' },
-    { id: 'usr-4', name: 'Sana Iqbal', email: 'sana.iqbal@company.com', empId: 'EMP-10435', role: 'Super Admin', status: 'Enabled' },
-    { id: 'usr-5', name: 'Rahul Verma', email: 'rahul.verma@company.com', empId: 'EMP-10436', role: 'Change Manager', status: 'Enabled' }
-  ];
+  const defaultUsers = [];
 
   const defaultAuditLogs = [
     {
@@ -132,6 +125,13 @@ function SettingsPage({ user }) {
     fetchCatalogCategories();
   }, []);
 
+  const ROLE_TO_ID = {
+    'Super Admin': 'role-1',
+    'Admin': 'role-2',
+    'Change Manager': 'role-3',
+    'Requester': 'role-4'
+  };
+
   const handleOpenManageUser = async (targetUser) => {
     if (isRequester) return; // Block role-4 Requester from opening Manage User modal
     const initialCats = targetUser.categoryIds || [];
@@ -139,7 +139,7 @@ function SettingsPage({ user }) {
       id: targetUser.id,
       name: targetUser.name || '',
       empId: targetUser.empId || targetUser.employeeId || 'EMP-10432',
-      role: targetUser.role || 'Change Manager',
+      role: targetUser.role === 'Unassigned' ? 'Change Manager' : (targetUser.role || 'Change Manager'),
       status: targetUser.status || 'Enabled'
     });
     setEditingUserCategories(initialCats);
@@ -147,7 +147,7 @@ function SettingsPage({ user }) {
       const res = await apiFetch(`/settings/change-manager-categories/${targetUser.id}`);
       if (res.ok) {
         const body = await res.json();
-        if (body.data && Array.isArray(body.data)) {
+        if (body.data && Array.isArray(body.data) && body.data.length > 0) {
           setEditingUserCategories(body.data.map(d => d.categoryId));
         }
       }
@@ -160,24 +160,37 @@ function SettingsPage({ user }) {
     if (e) e.preventDefault();
     if (!editingUser) return;
 
+    const roleId = ROLE_TO_ID[editingUser.role] || (editingUser.role === 'Change Manager' ? 'role-3' : 'role-4');
+    const categoryIds = editingUser.role === 'Change Manager' ? editingUserCategories : [];
+
     const updatedUserObj = {
       name: editingUser.name,
       empId: editingUser.empId,
       role: editingUser.role,
+      roleId,
+      categoryIds,
       status: editingUser.status
     };
 
     try {
-      await apiFetch(`/settings/users/${editingUser.id}`, {
+      const res = await apiFetch(`/settings/users/${editingUser.id}`, {
         method: 'PATCH',
         body: JSON.stringify(updatedUserObj)
       });
 
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}));
+        throw new Error(errorData.message || errorData.error || `Failed to update user (${res.status})`);
+      }
+
       if (editingUser.role === 'Change Manager') {
-        await apiFetch(`/settings/change-manager-categories/${editingUser.id}`, {
+        const cmRes = await apiFetch(`/settings/change-manager-categories/${editingUser.id}`, {
           method: 'PUT',
           body: JSON.stringify({ categoryIds: editingUserCategories })
         });
+        if (!cmRes.ok) {
+          console.warn('Failed to update change manager categories:', cmRes.status);
+        }
       }
 
       const usersRes = await apiFetch('/settings/users');
@@ -185,11 +198,11 @@ function SettingsPage({ user }) {
         const body = await usersRes.json();
         if (body.data && Array.isArray(body.data)) setUsers(body.data);
       }
+      setEditingUser(null);
     } catch (err) {
-      console.warn('Failed to update user via API:', err);
+      console.error('Failed to update user via API:', err);
+      alert(`Error updating user: ${err.message}`);
     }
-
-    setEditingUser(null);
   };
 
   // Invite User Modal Form State
@@ -236,29 +249,33 @@ function SettingsPage({ user }) {
     e.preventDefault();
     if (!newUser.name || !newUser.email) return;
 
-    const createdUser = {
-      id: `usr-${Date.now()}`,
+    const invitePayload = {
       name: newUser.name,
       email: newUser.email,
-      empId: newUser.empId || `EMP-${10500 + users.length}`,
-      employeeId: newUser.empId || `EMP-${10500 + users.length}`,
+      empId: newUser.empId || undefined,
+      employeeId: newUser.empId || undefined,
       role: newUser.role,
+      roleId: ROLE_TO_ID[newUser.role] || (newUser.role === 'Change Manager' ? 'role-3' : 'role-4'),
+      categoryIds: newUser.role === 'Change Manager' ? newUserCategories : [],
       status: newUser.status
     };
 
     try {
       const res = await apiFetch('/settings/users', {
         method: 'POST',
-        body: JSON.stringify(createdUser)
+        body: JSON.stringify(invitePayload)
       });
 
-      let savedUserId = createdUser.id;
-      if (res.ok) {
-        const body = await res.json();
-        if (body.data && body.data.id) savedUserId = body.data.id;
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}));
+        throw new Error(errorData.message || errorData.error || `Failed to invite user (${res.status})`);
       }
 
-      if (newUser.role === 'Change Manager') {
+      const body = await res.json();
+      const savedUser = body.data;
+      const savedUserId = savedUser?.id || savedUser?.userKey;
+
+      if (newUser.role === 'Change Manager' && savedUserId && newUserCategories.length > 0) {
         await apiFetch(`/settings/change-manager-categories/${savedUserId}`, {
           method: 'PUT',
           body: JSON.stringify({ categoryIds: newUserCategories })
@@ -267,17 +284,17 @@ function SettingsPage({ user }) {
 
       const usersRes = await apiFetch('/settings/users');
       if (usersRes.ok) {
-        const body = await usersRes.json();
-        if (body.data && Array.isArray(body.data)) setUsers(body.data);
+        const usersBody = await usersRes.json();
+        if (usersBody.data && Array.isArray(usersBody.data)) setUsers(usersBody.data);
       }
-    } catch (err) {
-      console.warn('Failed to post invited user to backend:', err);
-      setUsers(prev => [createdUser, ...prev]);
-    }
 
-    setIsInviteModalOpen(false);
-    setNewUser({ name: '', email: '', empId: '', role: 'Admin', status: 'Enabled' });
-    setNewUserCategories([]);
+      setIsInviteModalOpen(false);
+      setNewUser({ name: '', email: '', empId: '', role: 'Admin', status: 'Enabled' });
+      setNewUserCategories([]);
+    } catch (err) {
+      console.error('Failed to invite user via API:', err);
+      alert(`Error inviting user: ${err.message}`);
+    }
   };
 
   const handleExportAuditExcel = async () => {
@@ -549,7 +566,7 @@ function SettingsPage({ user }) {
                       {log.reference}
                     </td>
                     <td style={{ padding: '0.85rem 1rem', fontSize: '0.825rem', color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)' }}>
-                      {log.employeeEmail || 'gauri.shinde@stfox.com'}
+                      {log.employeeEmail || '—'}
                     </td>
                   </tr>
                 ))}

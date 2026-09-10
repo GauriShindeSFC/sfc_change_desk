@@ -4,9 +4,9 @@ import {
   ChangeRequestApproval,
   AuditLog,
   CatalogCategory,
-  CatalogSubcategory,
-  User
+  CatalogSubcategory
 } from '../models/index.js';
+import { IdentityResolver } from './IdentityResolver.js';
 
 /**
  * Shared category & date filtering function for ChangeRequests.
@@ -68,7 +68,6 @@ export const getChangeRequestsByCategoryFilter = async ({
   return await ChangeRequest.findAll({
     where,
     include: [
-      { model: User, as: 'requester', attributes: ['id', 'name', 'email'] },
       { model: ChangeRequestApproval, as: 'approvals' }
     ],
     order: [['submittedAt', 'DESC']]
@@ -200,19 +199,32 @@ export const getEmergencyChangeLog = async (fromDate, toDate) => {
 
   const tickets = await ChangeRequest.findAll({
     where,
-    include: [{ model: User, as: 'requester', attributes: ['id', 'name', 'email'] }],
     order: [['submittedAt', 'DESC']]
   });
 
-  const log = tickets.map(t => ({
-    id: t.id,
-    title: t.title,
-    requesterName: t.requester?.name || 'Gauri Shinde',
-    requesterEmail: t.requester?.email || 'gauri.shinde@stfox.com',
-    status: t.status,
-    submittedAt: t.submittedAt,
-    closedAt: t.closedAt
-  }));
+  const requesterKeys = [...new Set(tickets.map(t => t.requesterId).filter(Boolean))];
+  const identityMap = new Map();
+  await Promise.all(
+    requesterKeys.map(async (k) => {
+      const res = await IdentityResolver.resolveByKey(k);
+      if (res.status === 'SUCCESS' && res.identity) {
+        identityMap.set(k, res.identity);
+      }
+    })
+  );
+
+  const log = tickets.map(t => {
+    const requester = identityMap.get(t.requesterId);
+    return {
+      id: t.id,
+      title: t.title,
+      requesterName: requester?.displayName || requester?.name || null,
+      requesterEmail: requester?.email || null,
+      status: t.status,
+      submittedAt: t.submittedAt,
+      closedAt: t.closedAt
+    };
+  });
 
   return {
     totalEmergencyCount: log.length,
@@ -236,19 +248,32 @@ export const getAuditTrailExport = async (fromDate, toDate) => {
 
   const rows = await AuditLog.findAll({
     where,
-    include: [{ model: User, as: 'actor', attributes: ['id', 'name', 'email'] }],
     order: [['id', 'DESC']]
   });
 
-  const logs = rows.map(r => ({
-    id: r.id,
-    actorName: r.actor?.name || 'Gauri Shinde',
-    actorEmail: r.actor?.email || 'gauri.shinde@stfox.com',
-    action: r.action,
-    ref: r.ref || '—',
-    detail: r.detail,
-    timestamp: r.timestamp || String(r.createdAt)
-  }));
+  const actorKeys = [...new Set(rows.map(r => r.actorId).filter(Boolean))];
+  const identityMap = new Map();
+  await Promise.all(
+    actorKeys.map(async (k) => {
+      const res = await IdentityResolver.resolveByKey(k);
+      if (res.status === 'SUCCESS' && res.identity) {
+        identityMap.set(k, res.identity);
+      }
+    })
+  );
+
+  const logs = rows.map(r => {
+    const actor = identityMap.get(r.actorId);
+    return {
+      id: r.id,
+      actorName: actor?.displayName || actor?.name || null,
+      actorEmail: actor?.email || null,
+      action: r.action,
+      ref: r.ref || '—',
+      detail: r.detail,
+      timestamp: r.timestamp || String(r.createdAt)
+    };
+  });
 
   return {
     totalLogs: logs.length,

@@ -4,7 +4,7 @@ import {
   getCategories,
   getStatusBreakdown
 } from '../controllers/dashboardController.js';
-import { authenticateUser } from '../middlewares/authMiddleware.js';
+import { authenticateUser, requireOrganizationScopeRole } from '../middlewares/authMiddleware.js';
 
 import changeRequestsRouter from './changeRequests.js';
 import worklistRouter from './worklist.js';
@@ -19,9 +19,9 @@ const router = express.Router();
 router.use(authenticateUser);
 
 // Core Dashboard analytics
-router.get('/metrics', getMetrics);
-router.get('/categories', getCategories);
-router.get('/status-breakdown', getStatusBreakdown);
+router.get('/metrics', requireOrganizationScopeRole, getMetrics);
+router.get('/categories', requireOrganizationScopeRole, getCategories);
+router.get('/status-breakdown', requireOrganizationScopeRole, getStatusBreakdown);
 
 // Modular Domain Routers
 router.use('/', changeRequestsRouter);

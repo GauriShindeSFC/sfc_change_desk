@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import Sidebar from './layout/Sidebar';
 import Header from './layout/Header';
 import DashboardPage from '../pages/DashboardPage';
@@ -7,7 +7,6 @@ import ChangeCatalogPage from '../pages/ChangeCatalogPage';
 import ChangeRequestFormPage from '../pages/ChangeRequestFormPage';
 import MyWorklistPage from '../pages/MyWorklistPage';
 import SettingsPage from '../pages/SettingsPage';
-import CatalogueManagementPage from '../pages/CatalogueManagementPage';
 import ReportsPage from '../pages/ReportsPage';
 import { useIsMobile } from '../lib/useIsMobile';
 
@@ -31,6 +30,7 @@ export default function Dashboard({ user, onLogout }) {
   const [searchQuery, setSearchQuery] = useState('');
   const [myRequestsCount, setMyRequestsCount] = useState(0);
   const [worklistCount, setWorklistCount] = useState(0);
+  const badgeRequestInFlight = useRef(false);
 
   const roleName = (user?.role || '').toLowerCase();
   const roleId = user?.roleId || '';
@@ -55,6 +55,8 @@ export default function Dashboard({ user, onLogout }) {
   // Live polling for Sidebar badge counters
   useEffect(() => {
     const fetchBadgeCounts = async () => {
+      if (document.hidden || badgeRequestInFlight.current) return;
+      badgeRequestInFlight.current = true;
       try {
         const requests = [apiFetch('/my-requests')];
         if (canSeeWorklist) requests.push(apiFetch('/worklist'));
@@ -62,22 +64,24 @@ export default function Dashboard({ user, onLogout }) {
         if (reqRes.ok) {
           const reqBody = await reqRes.json();
           if (reqBody.data && Array.isArray(reqBody.data)) {
-            setMyRequestsCount(reqBody.data.length);
+            setMyRequestsCount(reqBody.total ?? reqBody.data.length);
           }
         }
         if (workRes?.ok) {
           const workBody = await workRes.json();
           if (workBody.data && Array.isArray(workBody.data)) {
-            setWorklistCount(workBody.data.length);
+            setWorklistCount(workBody.total ?? workBody.data.length);
           }
         }
       } catch (err) {
         // Polling catch - silent
+      } finally {
+        badgeRequestInFlight.current = false;
       }
     };
 
     fetchBadgeCounts();
-    const interval = setInterval(fetchBadgeCounts, 10000);
+    const interval = setInterval(fetchBadgeCounts, 30000);
     return () => clearInterval(interval);
   }, [user?.id, activeItem, canSeeWorklist]);
 
@@ -131,7 +135,6 @@ export default function Dashboard({ user, onLogout }) {
   if (!isSuperAdmin && currentItem === 'Settings') {
     currentItem = 'Dashboard';
   }
-
   const pages = {
     Dashboard: DashboardPage,
     'Organization Dashboard': DashboardPage,
@@ -142,7 +145,6 @@ export default function Dashboard({ user, onLogout }) {
     'Org Worklist': MyWorklistPage,
     'Organization worklist': MyWorklistPage,
     Settings: SettingsPage,
-    'Catalogue Management': CatalogueManagementPage,
     Reports: ReportsPage
   };
   const ActivePage = pages[currentItem];
@@ -185,7 +187,7 @@ export default function Dashboard({ user, onLogout }) {
         {/* Workspace Content Canvas */}
         <main style={{ flex: 1, padding: isMobile ? '1rem' : '1.25rem 1.5rem' }}>
           {ActivePage ? (
-            <ActivePage onNavigate={handleNavigate} initialData={navigationPayload} searchQuery={searchQuery} user={user} isOrgDashboard={activeItem === 'Organization Dashboard'} />
+            <ActivePage onNavigate={handleNavigate} initialData={navigationPayload} searchQuery={searchQuery} user={user} isOrgDashboard={activeItem === 'Organization Dashboard'} isOrgWorklist={activeItem === 'Organization worklist' || activeItem === 'Org Worklist'} />
           ) : (
             <div
               style={{

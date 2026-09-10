@@ -161,7 +161,6 @@ function MyRequestsPage({ onNavigate, searchQuery = '', initialData, user }) {
                 <th style={{ padding: '0.75rem 1rem', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', fontSize: '0.725rem', letterSpacing: '0.05em', whiteSpace: 'nowrap' }}>CR ID</th>
                 <th style={{ padding: '0.75rem 1rem', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', fontSize: '0.725rem', letterSpacing: '0.05em' }}>Title</th>
                 <th style={{ padding: '0.75rem 1rem', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', fontSize: '0.725rem', letterSpacing: '0.05em' }}>Category</th>
-                <th style={{ padding: '0.75rem 1rem', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', fontSize: '0.725rem', letterSpacing: '0.05em', whiteSpace: 'nowrap' }}>Risk</th>
                 <th style={{ padding: '0.75rem 1rem', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', fontSize: '0.725rem', letterSpacing: '0.05em', whiteSpace: 'nowrap' }}>Raised Date</th>
                 <th style={{ padding: '0.75rem 1rem', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', fontSize: '0.725rem', letterSpacing: '0.05em', whiteSpace: 'nowrap' }}>Closed Date</th>
                 <th style={{ padding: '0.75rem 1rem', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', fontSize: '0.725rem', letterSpacing: '0.05em', whiteSpace: 'nowrap' }}>Status</th>
@@ -175,16 +174,6 @@ function MyRequestsPage({ onNavigate, searchQuery = '', initialData, user }) {
                     <td style={{ padding: '0.85rem 1rem', fontWeight: 500, color: 'var(--text-primary)', fontFamily: 'var(--font-mono)', whiteSpace: 'nowrap' }}>{cr.id}</td>
                     <td style={{ padding: '0.85rem 1rem', fontWeight: 500, color: 'var(--text-primary)', maxWidth: '280px', wordBreak: 'break-word' }}>{cr.title}</td>
                     <td style={{ padding: '0.85rem 1rem', color: 'var(--text-secondary)', wordBreak: 'break-word' }}>{cr.category}</td>
-                    <td style={{ padding: '0.85rem 1rem', whiteSpace: 'nowrap' }}>
-                      <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', whiteSpace: 'nowrap' }}>
-                        <div style={{ display: 'flex', gap: '2px', alignItems: 'center' }}>
-                          {[1, 2, 3].map(bar => (
-                            <div key={bar} style={{ width: '3px', height: '12px', borderRadius: '1px', backgroundColor: bar <= (cr.riskBars || 2) ? (cr.riskColor || '#D97706') : 'var(--border-color)' }} />
-                          ))}
-                        </div>
-                        <span style={{ fontWeight: 500, color: cr.riskColor || '#D97706', fontSize: '0.8rem', whiteSpace: 'nowrap' }}>{cr.risk || 'Medium'}</span>
-                      </div>
-                    </td>
                     <td style={{ padding: '0.85rem 1rem', color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)', fontSize: '0.8rem', whiteSpace: 'nowrap' }}>{cr.raisedDate}</td>
                     <td style={{ padding: '0.85rem 1rem', color: 'var(--text-secondary)', fontSize: '0.8rem', whiteSpace: 'nowrap' }}>{cr.closedDate}</td>
                     <td style={{ padding: '0.85rem 1rem', whiteSpace: 'nowrap' }}>
@@ -264,42 +253,18 @@ function MyRequestsPage({ onNavigate, searchQuery = '', initialData, user }) {
       </div>
 
       {/* Change Request Details Modal */}
-      {selectedRequest && (() => {
-        const roleName = (user?.role || '').toLowerCase();
-        const isApprover = (user?.roleId && ['role-1', 'role-2', 'role-3'].includes(user.roleId)) || roleName.includes('manager') || roleName.includes('admin');
-        return (
-          <ChangeRequestModal
-            cr={selectedRequest}
-            user={user}
-            onClose={() => setSelectedRequest(null)}
-            onApprove={isApprover ? () => setSelectedRequest(null) : null}
-            onReject={isApprover ? () => setSelectedRequest(null) : null}
-            onSendBack={isApprover ? () => setSelectedRequest(null) : null}
-            onSubmitForApproval={handleSubmitDraft}
-            onImplement={async (id) => {
-              try {
-                const res = await apiFetch('/worklist/action', {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({ id, action: 'implement' })
-                });
-                if (res.ok) {
-                  const closedDateStr = new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
-                  setRequests(prev => prev.map(r => r.id === id ? { ...r, status: 'Implemented', closedDate: closedDateStr } : r));
-                  setSelectedRequest(null);
-                } else {
-                  const data = await res.json().catch(() => ({}));
-                  console.warn('Failed to mark as implemented:', data.message || res.statusText);
-                  alert(data.message || 'Failed to mark as implemented');
-                }
-              } catch (err) {
-                console.error('Failed to mark as implemented:', err);
-                alert(err.message || 'Failed to mark as implemented');
-              }
-            }}
-          />
-        );
-      })()}
+      {selectedRequest && (
+        <ChangeRequestModal
+          cr={selectedRequest}
+          user={user}
+          onClose={() => setSelectedRequest(null)}
+          onApprove={null}
+          onReject={null}
+          onSendBack={null}
+          onSubmitForApproval={handleSubmitDraft}
+          onImplement={null}
+        />
+      )}
 
     </div>
   );

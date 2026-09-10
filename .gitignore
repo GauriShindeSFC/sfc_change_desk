@@ -25,3 +25,5 @@ backend/dist/
 Thumbs.db
 .vscode/
 .idea/
+frontend/src/pages/CatalogueManagementPage.jsx
+

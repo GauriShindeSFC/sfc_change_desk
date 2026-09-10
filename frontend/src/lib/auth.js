@@ -32,11 +32,11 @@ export const clearSession = () => {
 
 export const getToken = () => getSession()?.token || null;
 
-export const login = async (email, password) => {
+export const login = async (email) => {
   const res = await fetch(`${AUTH_BASE_URL}/login`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email, password })
+    body: JSON.stringify({ email })
   });
   const body = await res.json().catch(() => ({}));
   if (!res.ok || !body.success) {

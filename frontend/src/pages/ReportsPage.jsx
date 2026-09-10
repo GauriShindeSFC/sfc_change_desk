@@ -203,8 +203,8 @@ function ReportsPage() {
       {/* EXECUTIVE OVERVIEW */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
         
-        {/* 4 Performance Metric Cards Grid */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: '1rem' }}>
+        {/* Performance Metric Cards Grid */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '1rem' }}>
           <div style={{ backgroundColor: 'var(--card-bg)', border: '1px solid var(--border-color)', borderRadius: '12px', padding: '1.25rem' }}>
             <div style={{ fontSize: '0.775rem', color: 'var(--text-secondary)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
               Change Success Rate
@@ -229,29 +229,6 @@ function ReportsPage() {
             </div>
           </div>
 
-          <div style={{ backgroundColor: 'var(--card-bg)', border: '1px solid var(--border-color)', borderRadius: '12px', padding: '1.25rem' }}>
-            <div style={{ fontSize: '0.775rem', color: 'var(--text-secondary)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-              Emergency Changes
-            </div>
-            <div style={{ fontSize: '1.75rem', fontWeight: 700, color: 'var(--text-primary)', marginTop: '0.35rem' }}>
-              {metrics.emergencyCount}
-            </div>
-            <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', fontWeight: 500, marginTop: '0.35rem' }}>
-              {metrics.emergencyVolume}
-            </div>
-          </div>
-
-          <div style={{ backgroundColor: 'var(--card-bg)', border: '1px solid var(--border-color)', borderRadius: '12px', padding: '1.25rem' }}>
-            <div style={{ fontSize: '0.775rem', color: 'var(--text-secondary)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-              Post-Change Incidents
-            </div>
-            <div style={{ fontSize: '1.75rem', fontWeight: 700, color: 'var(--text-primary)', marginTop: '0.35rem' }}>
-              {metrics.incidentCount ?? 0}
-            </div>
-            <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', fontWeight: 500, marginTop: '0.35rem' }}>
-              {metrics.incidentChange || '0 post-change incident(s)'}
-            </div>
-          </div>
         </div>
 
         {/* Charts Vertical Stack */}

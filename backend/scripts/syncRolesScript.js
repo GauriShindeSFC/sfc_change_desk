@@ -1,5 +1,5 @@
 import '../config/env.js';
-import { sequelize, Role, User } from '../models/index.js';
+import { sequelize, Role } from '../models/index.js';
 import { roles } from '../data/seed.js';
 import { Op } from 'sequelize';
 

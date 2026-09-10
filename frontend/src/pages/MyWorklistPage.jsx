@@ -4,7 +4,7 @@ import ChangeRequestModal from '../components/ui/ChangeRequestModal';
 import FilterBar, { initCustomDateRange } from '../components/ui/FilterBar';
 import { apiFetch } from '../lib/apiFetch';
 
-function MyWorklistPage({ onNavigate, searchQuery = '', user }) {
+function MyWorklistPage({ onNavigate, searchQuery = '', user, isOrgWorklist = false }) {
   const roleName = (user?.role || '').toLowerCase();
   const roleId = user?.roleId || '';
   const isSuperAdmin = roleId === 'role-1' || roleName.includes('super');
@@ -26,26 +26,50 @@ function MyWorklistPage({ onNavigate, searchQuery = '', user }) {
     implemented: 0
   });
 
+  const [rowActionPrompt, setRowActionPrompt] = useState(null); // { item, action, title, color }
+  const [rowActionCommentInput, setRowActionCommentInput] = useState('');
+  const [rowActionCommentError, setRowActionCommentError] = useState('');
+
   const handleAction = async (id, action, rejectionReason = '') => {
     try {
       const res = await apiFetch('/worklist/action', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id, action, rejectionReason })
+        body: JSON.stringify({ id, action, rejectionReason, comment: rejectionReason })
       });
       if (res.ok) {
+        const data = await res.json().catch(() => ({}));
         const decision = action === 'approve' ? 'Approved' : action === 'reject' ? 'Rejected' : action === 'implement' ? 'Implemented' : 'Draft';
         const newStatus = action === 'approve' ? 'Approved' : action === 'reject' ? 'Rejected' : action === 'implement' ? 'Implemented' : 'Pending';
-        const closedDate = action === 'implement' ? new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : null;
+        const closedDate = (action === 'implement' || action === 'reject') ? new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : null;
+        const approvedDate = (action === 'approve' || action === 'implement') ? new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : null;
+
+        const actionCommentText = rejectionReason || data?.data?.approvedComment || data?.data?.comment || '';
+
+        const newCommentObj = actionCommentText ? {
+          id: `cmt-${Date.now()}`,
+          authorName: user?.name || 'Approver',
+          authorRole: user?.role || 'Approver',
+          text: actionCommentText,
+          action: decision,
+          createdAt: new Date().toISOString()
+        } : null;
 
         setItems(prev => prev.map(item => {
           if (item.id === id) {
+            const updatedComments = newCommentObj ? [...(item.comments || []), newCommentObj] : (item.comments || []);
             return {
               ...item,
               status: newStatus,
               myDecision: decision,
-              decidedBy: user?.name || 'Gauri Shinde',
-              rejectionReason: action === 'reject' ? rejectionReason : item.rejectionReason,
+              decidedBy: user?.name || 'Approver',
+              approvedBy: action === 'approve' ? (user?.name || 'Approver') : item.approvedBy,
+              approvedDate: approvedDate || item.approvedDate,
+              approvedComment: action === 'approve' ? actionCommentText : item.approvedComment,
+              rejectedComment: action === 'reject' ? actionCommentText : item.rejectedComment,
+              rejectionReason: action === 'reject' ? actionCommentText : item.rejectionReason,
+              implementedComment: action === 'implement' ? actionCommentText : item.implementedComment,
+              comments: updatedComments,
               closedDate: closedDate || item.closedDate,
               canAct: false
             };
@@ -55,12 +79,19 @@ function MyWorklistPage({ onNavigate, searchQuery = '', user }) {
 
         setSelectedCr(prev => {
           if (prev && prev.id === id) {
+            const updatedComments = newCommentObj ? [...(prev.comments || []), newCommentObj] : (prev.comments || []);
             return {
               ...prev,
               status: newStatus,
               myDecision: decision,
-              decidedBy: user?.name || 'Gauri Shinde',
-              rejectionReason: action === 'reject' ? rejectionReason : prev.rejectionReason,
+              decidedBy: user?.name || 'Approver',
+              approvedBy: action === 'approve' ? (user?.name || 'Approver') : prev.approvedBy,
+              approvedDate: approvedDate || prev.approvedDate,
+              approvedComment: action === 'approve' ? actionCommentText : prev.approvedComment,
+              rejectedComment: action === 'reject' ? actionCommentText : prev.rejectedComment,
+              rejectionReason: action === 'reject' ? actionCommentText : prev.rejectionReason,
+              implementedComment: action === 'implement' ? actionCommentText : prev.implementedComment,
+              comments: updatedComments,
               closedDate: closedDate || prev.closedDate,
               canAct: false
             };
@@ -106,7 +137,8 @@ function MyWorklistPage({ onNavigate, searchQuery = '', user }) {
           ...(dateFilter !== 'overall' && { dateFilter }),
           ...(dateFilter === 'custom' && startDate && { startDate }),
           ...(dateFilter === 'custom' && endDate && { endDate }),
-          ...(searchQuery && { search: searchQuery })
+          ...(searchQuery && { search: searchQuery }),
+          ...(isOrgWorklist && { scope: 'organization' })
         });
         const res = await apiFetch(`/worklist?${params}`, {
           headers: {
@@ -234,8 +266,12 @@ function MyWorklistPage({ onNavigate, searchQuery = '', user }) {
                   const isItemApproved = status === 'approved' || item.myDecision === 'Approved';
                   const isItemRejected = status === 'rejected' || item.myDecision === 'Rejected';
 
-                  const isSelfRequest = (item.requesterId && user?.id && String(item.requesterId) === String(user.id)) ||
-                    (item.employeeEmail && user?.email && item.employeeEmail.toLowerCase() === user.email.toLowerCase());
+                  const isSelfRequest = Boolean(
+                    (item.requesterId && (String(item.requesterId) === String(user?.id) || String(item.requesterId) === String(user?.userKey))) ||
+                    (item.employeeId && user?.employeeId && String(item.employeeId).trim().toLowerCase() === String(user.employeeId).trim().toLowerCase()) ||
+                    (item.employeeEmail && user?.email && item.employeeEmail.trim().toLowerCase() === user.email.trim().toLowerCase()) ||
+                    (item.requesterEmail && user?.email && item.requesterEmail.trim().toLowerCase() === user.email.trim().toLowerCase())
+                  );
 
                   const emailVal = item.employeeEmail || item.managerEmail || item.requesterEmail || '';
                   const displayName = item.employeeName || item.requester || item.requesterName || (emailVal ? emailVal.split('@')[0].replace(/[\._]/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) : '—');
@@ -269,7 +305,7 @@ function MyWorklistPage({ onNavigate, searchQuery = '', user }) {
                         {item.closedDate || (item.closedAt ? new Date(item.closedAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : (isItemApproved || isItemRejected ? 'Closed' : 'Open'))}
                       </td>
                       <td style={{ padding: '1rem 1.1rem', color: 'var(--text-primary)', fontWeight: 600, whiteSpace: 'nowrap' }}>
-                        {item.decidedBy || (isItemApproved || isItemRejected ? (user?.name || 'Gauri Shinde') : '—')}
+                        {item.decidedBy || (isItemApproved || isItemRejected ? (user?.name || 'Approver') : '—')}
                       </td>
                       <td style={{ padding: '1rem 1.1rem', textAlign: 'right', whiteSpace: 'nowrap' }}>
                         <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', justifyContent: 'flex-end' }}>
@@ -284,15 +320,23 @@ function MyWorklistPage({ onNavigate, searchQuery = '', user }) {
                             <>
                               <button
                                 type="button"
-                                onClick={() => setSelectedCr(item)}
-                                style={{ padding: '0.4rem 0.8rem', backgroundColor: '#FEF2F2', color: '#DC2626', border: '1px solid #FCA5A5', borderRadius: '6px', fontSize: '0.8rem', fontWeight: 500, cursor: 'pointer' }}
+                                onClick={() => {
+                                  setRowActionPrompt({ item, action: 'reject', title: 'Reject Change Request', color: '#DC2626' });
+                                  setRowActionCommentInput('');
+                                  setRowActionCommentError('');
+                                }}
+                                style={{ padding: '0.4rem 0.8rem', backgroundColor: '#FEF2F2', color: '#DC2626', border: '1px solid #FCA5A5', borderRadius: '6px', fontSize: '0.8rem', fontWeight: 700, cursor: 'pointer' }}
                               >
                                 Reject
                               </button>
                               <button
                                 type="button"
-                                onClick={() => handleAction(item.id, 'approve')}
-                                style={{ padding: '0.4rem 0.95rem', backgroundColor: 'var(--brand-primary)', color: '#FFFFFF', border: 'none', borderRadius: '6px', fontSize: '0.8rem', fontWeight: 500, cursor: 'pointer', boxShadow: '0 1px 2px rgba(0, 0, 0, 0.2)' }}
+                                onClick={() => {
+                                  setRowActionPrompt({ item, action: 'approve', title: 'Approve Change Request', color: '#0D9488' });
+                                  setRowActionCommentInput('');
+                                  setRowActionCommentError('');
+                                }}
+                                style={{ padding: '0.4rem 0.95rem', backgroundColor: '#0D9488', color: '#FFFFFF', border: 'none', borderRadius: '6px', fontSize: '0.8rem', fontWeight: 700, cursor: 'pointer', boxShadow: '0 1px 2px rgba(13, 148, 136, 0.2)' }}
                               >
                                 Approve
                               </button>
@@ -300,8 +344,12 @@ function MyWorklistPage({ onNavigate, searchQuery = '', user }) {
                           ) : isItemApproved && status !== 'implemented' && isAdmin && !isSelfRequest ? (
                             <button
                               type="button"
-                              onClick={() => handleAction(item.id, 'implement')}
-                              style={{ padding: '0.4rem 0.95rem', backgroundColor: 'var(--brand-primary)', color: '#FFFFFF', border: 'none', borderRadius: '6px', fontSize: '0.8rem', fontWeight: 500, cursor: 'pointer', boxShadow: '0 1px 2px rgba(0, 0, 0, 0.2)' }}
+                              onClick={() => {
+                                setRowActionPrompt({ item, action: 'implement', title: 'Mark as Implemented', color: '#0D9488' });
+                                setRowActionCommentInput('');
+                                setRowActionCommentError('');
+                              }}
+                              style={{ padding: '0.4rem 0.95rem', backgroundColor: '#0D9488', color: '#FFFFFF', border: 'none', borderRadius: '6px', fontSize: '0.8rem', fontWeight: 700, cursor: 'pointer', boxShadow: '0 1px 2px rgba(13, 148, 136, 0.2)' }}
                             >
                               Implement
                             </button>
@@ -314,7 +362,15 @@ function MyWorklistPage({ onNavigate, searchQuery = '', user }) {
                               backgroundColor: status === 'implemented' ? '#E0F2FE' : isItemApproved ? '#D1FAE5' : isItemRejected ? '#FEE2E2' : '#FEF3C7',
                               color: status === 'implemented' ? '#0284C7' : isItemApproved ? '#059669' : isItemRejected ? '#DC2626' : '#D97706'
                             }}>
-                              {status === 'implemented' ? 'Implemented' : isItemApproved ? 'Approved' : isItemRejected ? 'Rejected' : 'Pending'}
+                              {status === 'implemented'
+                                ? 'Implemented'
+                                : item.myDecision === 'Moot'
+                                ? (isItemApproved ? `Approved by ${item.decidedBy || 'Approver'}` : `Rejected by ${item.decidedBy || 'Approver'}`)
+                                : isItemApproved
+                                ? 'Approved'
+                                : isItemRejected
+                                ? 'Rejected'
+                                : 'Pending'}
                             </span>
                           )}
                         </div>
@@ -343,18 +399,121 @@ function MyWorklistPage({ onNavigate, searchQuery = '', user }) {
         </div>
       </div>
 
-      {/* Details Modal */}
-      {selectedCr && (
-        <ChangeRequestModal
-          cr={selectedCr}
-          user={user}
-          onClose={() => setSelectedCr(null)}
-          onApprove={isRequester ? null : (id) => handleAction(id, 'approve')}
-          onReject={isRequester ? null : (id, reason) => handleAction(id, 'reject', reason)}
-          onSendBack={isRequester ? null : (id) => handleAction(id, 'sendback')}
-          onImplement={(id) => handleAction(id, 'implement')}
-        />
+      {/* Table Row Action Mandatory Comment Modal */}
+      {rowActionPrompt && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 250,
+          padding: '1rem'
+        }}>
+          <div style={{
+            backgroundColor: 'var(--card-bg)',
+            border: '1px solid var(--border-color)',
+            borderRadius: '14px',
+            width: '100%',
+            maxWidth: '520px',
+            padding: '1.5rem',
+            boxShadow: '0 20px 40px rgba(0, 0, 0, 0.2)',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '1rem'
+          }}>
+            <div>
+              <h3 style={{ fontSize: '1.1rem', fontWeight: 800, color: rowActionPrompt.color, margin: 0 }}>
+                {rowActionPrompt.title} ({rowActionPrompt.item.id})
+              </h3>
+              <p style={{ fontSize: '0.825rem', color: 'var(--text-secondary)', marginTop: '0.35rem', margin: 0 }}>
+                A comment explaining what has been done / rationale is mandatory before confirming.
+              </p>
+            </div>
+
+            <textarea
+              rows={3}
+              placeholder={`Enter comment/rationale for ${rowActionPrompt.action} action...`}
+              value={rowActionCommentInput}
+              onChange={(e) => {
+                setRowActionCommentInput(e.target.value);
+                if (rowActionCommentError) setRowActionCommentError('');
+              }}
+              style={{
+                width: '100%',
+                padding: '0.65rem 0.85rem',
+                backgroundColor: 'var(--input-bg)',
+                border: `1px solid ${rowActionCommentError ? '#DC2626' : 'var(--border-color)'}`,
+                borderRadius: '8px',
+                fontSize: '0.85rem',
+                color: 'var(--text-primary)',
+                outline: 'none'
+              }}
+            />
+
+            {rowActionCommentError && (
+              <span style={{ fontSize: '0.775rem', fontWeight: 700, color: '#DC2626' }}>
+                {rowActionCommentError}
+              </span>
+            )}
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.65rem' }}>
+              <button
+                type="button"
+                onClick={() => {
+                  setRowActionPrompt(null);
+                  setRowActionCommentInput('');
+                  setRowActionCommentError('');
+                }}
+                style={{ padding: '0.5rem 1rem', backgroundColor: 'var(--card-bg)', border: '1px solid var(--border-color)', borderRadius: '6px', fontSize: '0.825rem', fontWeight: 600, cursor: 'pointer' }}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  if (!rowActionCommentInput.trim()) {
+                    setRowActionCommentError('A comment describing what was done is mandatory.');
+                    return;
+                  }
+                  handleAction(rowActionPrompt.item.id, rowActionPrompt.action, rowActionCommentInput.trim());
+                  setRowActionPrompt(null);
+                  setRowActionCommentInput('');
+                  setRowActionCommentError('');
+                }}
+                style={{ padding: '0.5rem 1.15rem', backgroundColor: rowActionPrompt.color, color: '#FFFFFF', border: 'none', borderRadius: '6px', fontSize: '0.825rem', fontWeight: 700, cursor: 'pointer', boxShadow: '0 1px 3px rgba(0,0,0,0.15)' }}
+              >
+                Confirm {rowActionPrompt.action.charAt(0).toUpperCase() + rowActionPrompt.action.slice(1)}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
+
+      {/* Details Modal */}
+      {selectedCr && (() => {
+        const isSelf = Boolean(
+          (selectedCr.requesterId && (String(selectedCr.requesterId) === String(user?.id) || String(selectedCr.requesterId) === String(user?.userKey))) ||
+          (selectedCr.employeeId && user?.employeeId && String(selectedCr.employeeId).trim().toLowerCase() === String(user.employeeId).trim().toLowerCase()) ||
+          (selectedCr.employeeEmail && user?.email && selectedCr.employeeEmail.trim().toLowerCase() === user.email.trim().toLowerCase()) ||
+          (selectedCr.requesterEmail && user?.email && selectedCr.requesterEmail.trim().toLowerCase() === user.email.trim().toLowerCase())
+        );
+        return (
+          <ChangeRequestModal
+            cr={selectedCr}
+            user={user}
+            onClose={() => setSelectedCr(null)}
+            onApprove={(isRequester || selectedCr.canAct === false || isSelf) ? null : (id, comment) => handleAction(id, 'approve', comment)}
+            onReject={(isRequester || selectedCr.canAct === false || isSelf) ? null : (id, reason) => handleAction(id, 'reject', reason)}
+            onSendBack={(isRequester || selectedCr.canAct === false || isSelf) ? null : (id) => handleAction(id, 'sendback')}
+            onImplement={isSelf ? null : (id, comment) => handleAction(id, 'implement', comment)}
+          />
+        );
+      })()}
 
     </div>
   );

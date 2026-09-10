@@ -1,11 +1,12 @@
 import { asyncHandler } from '../utils/asyncHandler.js';
-import { authenticate, issueToken, publicUser } from '../services/authService.js';
+import { authenticate, issueToken, publicUserAsync } from '../services/authService.js';
 
-// POST /api/auth/login  { email, password } -> { token, user }
+// POST /api/auth/login  { email } -> { token, user }
 export const login = asyncHandler(async (req, res) => {
-  const { email, password } = req.body || {};
-  const user = await authenticate(email, password);
-  res.json({ success: true, token: issueToken(user), user: publicUser(user) });
+  const { email } = req.body || {};
+  const user = await authenticate(email);
+  const userData = await publicUserAsync(user);
+  res.json({ success: true, token: issueToken(user), user: userData });
 });
 
 // GET /api/auth/me  (requireAuth) -> { user }

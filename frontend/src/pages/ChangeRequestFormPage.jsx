@@ -3,6 +3,30 @@ import { Send, ArrowLeft, Check } from 'lucide-react';
 import { apiFetch } from '../lib/apiFetch';
 import { getSession } from '../lib/auth';
 
+export const RESTRICTED_ACTIONS = [
+  'create an email id',
+  'disable / revoke mailbox',
+  'request m365 license',
+  'remove m365 license',
+  'request for procurement of laptop / desktop',
+  'repair request',
+  'dispose request',
+  'request for procurement of it hardware / accessories',
+  'request physical access',
+  'revoke physical access'
+];
+
+export const getFieldOptions = (field, currentUser) => {
+  let opts = field?.options ? [...field.options] : [];
+  if (field?.fieldKey === 'actionRequired' && !opts.includes('Other')) {
+    opts.push('Other');
+  }
+  if (field?.fieldKey === 'actionRequired' && currentUser && currentUser.isInUserTable === false) {
+    opts = opts.filter(opt => !RESTRICTED_ACTIONS.includes(String(opt).trim().toLowerCase()));
+  }
+  return opts;
+};
+
 function ChangeRequestFormPage({ onNavigate, initialData, user }) {
   const defaultCategories = [
     {
@@ -12,7 +36,7 @@ function ChangeRequestFormPage({ onNavigate, initialData, user }) {
       subcategories: [
         { id: 'subcat-srv-lc', name: 'Server Lifecycle', sla: '3 business days', risk: 'Medium' },
         { id: 'subcat-srv-patch', name: 'OS / Patching', sla: '5 business days', risk: 'High' },
-        { id: 'subcat-srv-oth', name: 'Other', sla: '3 business days', risk: 'Medium' }
+        { id: 'subcat-srv-oth', name: 'Other Server Changes', sla: '3 business days', risk: 'Medium' }
       ]
     },
     {
@@ -23,7 +47,7 @@ function ChangeRequestFormPage({ onNavigate, initialData, user }) {
         { id: 'subcat-net-fw', name: 'Firewall / Port', sla: '2 business days', risk: 'Medium' },
         { id: 'subcat-net-proxy', name: 'Proxy / URL Access', sla: '1 business day', risk: 'Low' },
         { id: 'subcat-net-vpn', name: 'VPN', sla: '2 business days', risk: 'Medium' },
-        { id: 'subcat-net-oth', name: 'Other', sla: '3 business days', risk: 'Medium' }
+        { id: 'subcat-net-oth', name: 'Other Network Changes', sla: '3 business days', risk: 'Medium' }
       ]
     },
     {
@@ -33,7 +57,7 @@ function ChangeRequestFormPage({ onNavigate, initialData, user }) {
       subcategories: [
         { id: 'subcat-acc-app', name: 'Application Access', sla: '1 business day', risk: 'Low' },
         { id: 'subcat-acc-phys', name: 'Physical Access', sla: '1 business day', risk: 'Low' },
-        { id: 'subcat-acc-oth', name: 'Other', sla: '2 business days', risk: 'Medium' }
+        { id: 'subcat-acc-oth', name: 'Other Access Requests', sla: '2 business days', risk: 'Medium' }
       ]
     },
     {
@@ -45,7 +69,7 @@ function ChangeRequestFormPage({ onNavigate, initialData, user }) {
         { id: 'subcat-asset-hw', name: 'Other IT Hardware', sla: '5 business days', risk: 'Low' },
         { id: 'subcat-asset-sw', name: 'Software', sla: '3 business days', risk: 'Medium' },
         { id: 'subcat-asset-lic', name: 'License', sla: '2 business days', risk: 'Low' },
-        { id: 'subcat-asset-oth', name: 'Other', sla: '3 business days', risk: 'Low' }
+        { id: 'subcat-asset-oth', name: 'Other IT Asset Requests', sla: '3 business days', risk: 'Low' }
       ]
     },
     {
@@ -55,7 +79,7 @@ function ChangeRequestFormPage({ onNavigate, initialData, user }) {
       subcategories: [
         { id: 'subcat-o365-mb', name: 'Mailbox', sla: '1 business day', risk: 'Low' },
         { id: 'subcat-o365-lic', name: 'M365 License', sla: '1 business day', risk: 'Low' },
-        { id: 'subcat-o365-oth', name: 'Other', sla: '2 business days', risk: 'Low' }
+        { id: 'subcat-o365-oth', name: 'Other Email / M365 Requests', sla: '2 business days', risk: 'Low' }
       ]
     },
     {
@@ -64,7 +88,7 @@ function ChangeRequestFormPage({ onNavigate, initialData, user }) {
       description: 'Endpoint security agents, policies, and exemption requests',
       subcategories: [
         { id: 'subcat-sec-ep', name: 'End Point Agent', sla: '2 business days', risk: 'High' },
-        { id: 'subcat-sec-oth', name: 'Other', sla: '3 business days', risk: 'High' }
+        { id: 'subcat-sec-oth', name: 'Other Security Changes', sla: '3 business days', risk: 'High' }
       ]
     }
   ];
@@ -80,32 +104,64 @@ function ChangeRequestFormPage({ onNavigate, initialData, user }) {
 
   const isEditingDraft = Boolean(initialData?.id && initialData?.isDraft);
 
-  const activeSessionUser = user || getSession()?.user;
+  const [currentSessionUser, setCurrentSessionUser] = useState(() => user || getSession()?.user);
+  const activeSessionUser = currentSessionUser || user || getSession()?.user;
+
+  const resolveEmpBusinessId = (u, initialVal) => {
+    if (initialVal && typeof initialVal === 'string' && !initialVal.startsWith('S8-') && !initialVal.startsWith('EMP-')) return initialVal;
+    if (u?.employee?.empId) return u.employee.empId;
+    if (u?.employee?.employeeBusinessId) return u.employee.employeeBusinessId;
+    if (u?.employeeBusinessId) return u.employeeBusinessId;
+    if (u?.employeeId && typeof u.employeeId === 'string' && !u.employeeId.startsWith('S8-') && !u.employeeId.startsWith('EMP-')) return u.employeeId;
+    if (u?.empId && typeof u.empId === 'string' && !u.empId.startsWith('S8-') && !u.empId.startsWith('EMP-')) return u.empId;
+    return '';
+  };
+
+  const resolveEmpLocation = (u, initialVal) => {
+    if (initialVal && typeof initialVal === 'string' && !initialVal.includes('Auto-fetched') && !initialVal.includes('Not specified')) return initialVal;
+    if (u?.employee?.location) return u.employee.location;
+    if (u?.location) return u.location;
+    return '';
+  };
 
   const [formData, setFormData] = useState(() => ({
     title: initialData?.title || '',
     startDate: initialData?.startDate || '',
     endDate: initialData?.endDate || '',
     justification: initialData?.justification || initialData?.description || '',
-    employeeName: initialData?.employeeName || activeSessionUser?.name || '',
-    employeeEmail: initialData?.employeeEmail || activeSessionUser?.email || '',
-    employeeId: initialData?.employeeId || activeSessionUser?.employeeId || activeSessionUser?.empId || 'EMP-10432',
-    location: initialData?.location || 'Ahmedabad HQ',
+    employeeName: initialData?.employeeName || activeSessionUser?.employee?.name || activeSessionUser?.name || '',
+    employeeEmail: initialData?.employeeEmail || activeSessionUser?.employee?.email || activeSessionUser?.email || '',
+    employeeId: resolveEmpBusinessId(activeSessionUser, initialData?.employeeId),
+    location: resolveEmpLocation(activeSessionUser, initialData?.location),
     managerEmail: initialData?.managerEmail || '',
     risk: initialData?.risk || 'Medium'
   }));
 
-  // Sync logged in user details if loaded async
+  // Sync logged in user details if loaded async or refetched
   useEffect(() => {
-    const currentUser = user || getSession()?.user;
-    if (currentUser) {
-      setFormData((prev) => ({
-        ...prev,
-        employeeName: prev.employeeName || currentUser.name || '',
-        employeeEmail: prev.employeeEmail || currentUser.email || '',
-        employeeId: prev.employeeId || currentUser.employeeId || currentUser.empId || 'EMP-10432'
-      }));
-    }
+    const syncUser = async () => {
+      let currentUser = user || getSession()?.user;
+      try {
+        const res = await apiFetch('/me');
+        if (res.ok) {
+          const body = await res.json();
+          if (body.data || body.user) currentUser = body.data || body.user;
+        }
+      } catch (err) {
+        /* fallback to current session */
+      }
+      if (currentUser) {
+        setCurrentSessionUser(currentUser);
+        setFormData((prev) => ({
+          ...prev,
+          employeeName: prev.employeeName || currentUser.employee?.name || currentUser.name || '',
+          employeeEmail: prev.employeeEmail || currentUser.employee?.email || currentUser.email || '',
+          employeeId: resolveEmpBusinessId(currentUser, prev.employeeId),
+          location: resolveEmpLocation(currentUser, prev.location)
+        }));
+      }
+    };
+    syncUser();
   }, [user]);
 
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -157,6 +213,7 @@ function ChangeRequestFormPage({ onNavigate, initialData, user }) {
   // 2. Handle Category selection change
   const handleCategoryChange = (catId) => {
     setSelectedCategoryId(catId);
+    setCustomFieldValues({});
     const cat = categories.find((c) => c.id === catId);
     if (cat && cat.subcategories && cat.subcategories.length > 0) {
       setSubcategories(cat.subcategories);
@@ -186,8 +243,9 @@ function ChangeRequestFormPage({ onNavigate, initialData, user }) {
             const isOtherSubcat = selectedSubcategory?.name?.toLowerCase() === 'other' || selectedSubcategoryId?.endsWith('-oth');
             body.data.forEach((f) => {
               if (initialVals[f.fieldKey] === undefined || initialVals[f.fieldKey] === '') {
-                if (f.fieldType === 'dropdown' && f.options && f.options.length > 0) {
-                  initialVals[f.fieldKey] = isOtherSubcat && f.fieldKey === 'actionRequired' ? 'Other' : f.options[0];
+                if (f.fieldType === 'dropdown') {
+                  const opts = getFieldOptions(f, activeSessionUser);
+                  initialVals[f.fieldKey] = isOtherSubcat && f.fieldKey === 'actionRequired' ? 'Other' : (opts[0] || '');
                 } else if (f.fieldType === 'boolean') {
                   initialVals[f.fieldKey] = false;
                 } else {
@@ -199,19 +257,36 @@ function ChangeRequestFormPage({ onNavigate, initialData, user }) {
               initialVals.actionRequired = 'Other';
             }
             setCustomFieldValues(prev => {
-              const merged = { ...initialVals };
-              Object.keys(prev).forEach((key) => {
-                if (prev[key] === undefined || prev[key] === '') return;
-                const fieldDef = body.data.find(f => f.fieldKey === key);
-                const isValidDropdownValue =
-                  fieldDef?.fieldType === 'dropdown'
-                    ? (fieldDef.options?.includes(prev[key]) || (key === 'actionRequired' && prev[key] === 'Other'))
-                    : true;
-                if (isValidDropdownValue) {
-                  merged[key] = prev[key];
+              const newCustomVals = {};
+              const isOtherSubcat = selectedSubcategory?.name?.toLowerCase() === 'other' || selectedSubcategoryId?.endsWith('-oth');
+              
+              body.data.forEach((f) => {
+                let defaultVal = '';
+                if (f.fieldType === 'dropdown') {
+                  const opts = getFieldOptions(f, activeSessionUser);
+                  defaultVal = isOtherSubcat && f.fieldKey === 'actionRequired' ? 'Other' : (opts[0] || '');
+                } else if (f.fieldType === 'boolean') {
+                  defaultVal = false;
+                }
+
+                const existingVal = prev[f.fieldKey];
+                if (existingVal !== undefined && existingVal !== '') {
+                  if (f.fieldType === 'dropdown') {
+                    const opts = getFieldOptions(f, activeSessionUser);
+                    const isValid = opts.includes(existingVal);
+                    newCustomVals[f.fieldKey] = isValid ? existingVal : defaultVal;
+                  } else {
+                    newCustomVals[f.fieldKey] = existingVal;
+                  }
+                } else {
+                  newCustomVals[f.fieldKey] = defaultVal;
                 }
               });
-              return merged;
+
+              if (prev.employeeEmail) newCustomVals.employeeEmail = prev.employeeEmail;
+              if (prev.employeeId) newCustomVals.employeeId = prev.employeeId;
+
+              return newCustomVals;
             });
           }
         }
@@ -222,12 +297,13 @@ function ChangeRequestFormPage({ onNavigate, initialData, user }) {
       }
     };
     fetchFields();
-  }, [selectedSubcategoryId, initialData]);
+  }, [selectedSubcategoryId, initialData, activeSessionUser?.isInUserTable]);
 
   const handleSubcategoryChange = (subId) => {
     setSelectedSubcategoryId(subId);
     const sub = subcategories.find((s) => s.id === subId);
     setSelectedSubcategory(sub || null);
+    setCustomFieldValues({});
   };
 
   // Auto-generate title based on Action Required & Subcategory
@@ -244,12 +320,12 @@ function ChangeRequestFormPage({ onNavigate, initialData, user }) {
     if (actionText && subName) {
       setFormData((prev) => ({
         ...prev,
-        title: `[${actionText}] - ${subName}`
+        title: `${actionText} - ${subName}`
       }));
     } else if (subName) {
       setFormData((prev) => ({
         ...prev,
-        title: `[Change Request] - ${subName}`
+        title: `Change Request - ${subName}`
       }));
     }
   }, [selectedSubcategory, customFieldValues.actionRequired, customFieldValues.otherAction]);
@@ -276,20 +352,24 @@ function ChangeRequestFormPage({ onNavigate, initialData, user }) {
 
     const finalCustomValues = { ...customFieldValues };
     fields.forEach((f) => {
-      if (f.fieldType === 'dropdown' && f.options && f.options.length > 0) {
-        if (!finalCustomValues[f.fieldKey] || finalCustomValues[f.fieldKey] === '') {
-          finalCustomValues[f.fieldKey] = f.options[0];
+      if (f.fieldType === 'dropdown') {
+        const opts = getFieldOptions(f, activeSessionUser);
+        if (!finalCustomValues[f.fieldKey] || !opts.includes(finalCustomValues[f.fieldKey])) {
+          finalCustomValues[f.fieldKey] = opts[0] || '';
         }
       }
     });
 
     const selectedCat = categories.find((c) => c.id === selectedCategoryId);
+    const todayStr = new Date().toISOString().split('T')[0];
 
     const payload = {
       ...formData,
+      startDate: formData.startDate || todayStr,
       category: selectedCat?.name || formData.category || 'Software Deployment',
       subCategory: selectedSubcategory?.name || formData.subCategory || '',
       subcategoryId: selectedSubcategoryId,
+      actionRequired: finalCustomValues.actionRequired || '',
       customFieldValues: finalCustomValues,
       isDraft,
       risk: selectedSubcategory?.risk || formData.risk
@@ -383,17 +463,49 @@ function ChangeRequestFormPage({ onNavigate, initialData, user }) {
     return f.appliesToActions.includes(actionRequiredValue);
   });
 
+  const handleGoBack = () => {
+    if (onNavigate) {
+      const targetCategory = initialData?.fromCategory || initialData?.activeCategory || initialData?.category || 'Server & Infra';
+      onNavigate('Change Catalog', { activeCategory: targetCategory });
+    }
+  };
+
   return (
     <form onSubmit={(e) => handleSubmit(e, false)} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
       
-      {/* Top Header */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+      {/* Top Header with Back Navigation */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
+        <button
+          type="button"
+          onClick={handleGoBack}
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '0.45rem',
+            padding: '0.5rem 0.9rem',
+            backgroundColor: 'var(--card-bg)',
+            color: 'var(--text-primary)',
+            border: '1px solid var(--border-color)',
+            borderRadius: '8px',
+            fontSize: '0.825rem',
+            fontWeight: 700,
+            cursor: 'pointer',
+            boxShadow: '0 1px 3px rgba(0, 0, 0, 0.05)',
+            transition: 'background-color 0.15s ease'
+          }}
+          onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--input-bg)'}
+          onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'var(--card-bg)'}
+        >
+          <ArrowLeft size={16} />
+          <span>Back</span>
+        </button>
+
         <div>
-          <h1 style={{ fontSize: '1.45rem', fontWeight: 700, color: 'var(--text-primary)', lineHeight: 1.2 }}>
+          <h1 style={{ fontSize: '1.45rem', fontWeight: 800, color: 'var(--text-primary)', lineHeight: 1.2, margin: 0 }}>
             Create Change Request
           </h1>
-          <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginTop: '0.15rem' }}>
-            Fill in employee and change details, then submit for CAB approval
+          <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginTop: '0.15rem', margin: 0 }}>
+            Fill in employee and change details, then submit for Change Manager approval
           </p>
         </div>
       </div>
@@ -438,25 +550,25 @@ function ChangeRequestFormPage({ onNavigate, initialData, user }) {
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1.25rem' }}>
             <div>
               <label style={{ display: 'block', fontSize: '0.825rem', fontWeight: 500, color: 'var(--text-primary)', marginBottom: '0.4rem' }}>
-                Employee name
+                Employee Name
               </label>
               <input
                 type="text"
+                readOnly
                 value={formData.employeeName}
-                onChange={(e) => handleInputChange('employeeName', e.target.value)}
-                style={{ width: '100%', padding: '0.65rem 0.85rem', backgroundColor: 'var(--input-bg)', border: '1px solid var(--border-color)', borderRadius: '8px', fontSize: '0.85rem', color: 'var(--text-primary)', outline: 'none' }}
+                style={{ width: '100%', padding: '0.65rem 0.85rem', backgroundColor: 'var(--input-bg)', border: '1px solid var(--border-color)', borderRadius: '8px', fontSize: '0.85rem', color: 'var(--text-secondary)', outline: 'none', cursor: 'not-allowed', opacity: 0.8 }}
               />
             </div>
             <div>
               <label style={{ display: 'block', fontSize: '0.825rem', fontWeight: 500, color: 'var(--text-primary)', marginBottom: '0.4rem' }}>
-                Employee email
+                Employee Email
               </label>
               <input
                 type="email"
+                readOnly
                 placeholder="e.g. employee@company.com"
                 value={formData.employeeEmail}
-                onChange={(e) => handleInputChange('employeeEmail', e.target.value)}
-                style={{ width: '100%', padding: '0.65rem 0.85rem', backgroundColor: 'var(--input-bg)', border: '1px solid var(--border-color)', borderRadius: '8px', fontSize: '0.85rem', color: 'var(--text-primary)', outline: 'none' }}
+                style={{ width: '100%', padding: '0.65rem 0.85rem', backgroundColor: 'var(--input-bg)', border: '1px solid var(--border-color)', borderRadius: '8px', fontSize: '0.85rem', color: 'var(--text-secondary)', outline: 'none', cursor: 'not-allowed', opacity: 0.8 }}
               />
             </div>
             <div>
@@ -465,27 +577,23 @@ function ChangeRequestFormPage({ onNavigate, initialData, user }) {
               </label>
               <input
                 type="text"
-                placeholder="e.g. EMP-10432"
+                readOnly
+                placeholder="e.g. SFC-0083"
                 value={formData.employeeId}
-                onChange={(e) => handleInputChange('employeeId', e.target.value)}
-                style={{ width: '100%', padding: '0.65rem 0.85rem', backgroundColor: 'var(--input-bg)', border: '1px solid var(--border-color)', borderRadius: '8px', fontSize: '0.85rem', color: 'var(--text-primary)', outline: 'none' }}
+                style={{ width: '100%', padding: '0.65rem 0.85rem', backgroundColor: 'var(--input-bg)', border: '1px solid var(--border-color)', borderRadius: '8px', fontSize: '0.85rem', color: 'var(--text-secondary)', outline: 'none', cursor: 'not-allowed', opacity: 0.8 }}
               />
             </div>
             <div>
               <label style={{ display: 'block', fontSize: '0.825rem', fontWeight: 500, color: 'var(--text-primary)', marginBottom: '0.4rem' }}>
-                Location *
+                Location
               </label>
-              <select
-                value={formData.location}
-                onChange={(e) => handleInputChange('location', e.target.value)}
-                style={{ width: '100%', padding: '0.65rem 0.85rem', backgroundColor: 'var(--input-bg)', border: '1px solid var(--border-color)', borderRadius: '8px', fontSize: '0.85rem', color: 'var(--text-primary)', outline: 'none' }}
-              >
-                <option value="Ahmedabad HQ">Ahmedabad HQ</option>
-                <option value="Mumbai DC">Mumbai DC</option>
-                <option value="Bangalore Office">Bangalore Office</option>
-                <option value="Delhi Regional">Delhi Regional</option>
-                <option value="Remote">Remote</option>
-              </select>
+              <input
+                type="text"
+                readOnly
+                placeholder="Not specified"
+                value={formData.location || resolveEmpLocation(activeSessionUser) || ''}
+                style={{ width: '100%', padding: '0.65rem 0.85rem', backgroundColor: 'var(--input-bg)', border: '1px solid var(--border-color)', borderRadius: '8px', fontSize: '0.85rem', color: 'var(--text-secondary)', outline: 'none', cursor: 'not-allowed', opacity: 0.8 }}
+              />
             </div>
             <div>
               <label style={{ display: 'block', fontSize: '0.825rem', fontWeight: 500, color: 'var(--text-primary)', marginBottom: '0.4rem' }}>
@@ -521,7 +629,7 @@ function ChangeRequestFormPage({ onNavigate, initialData, user }) {
             {/* Change Title */}
             <div>
               <label style={{ display: 'block', fontSize: '0.825rem', fontWeight: 500, color: 'var(--text-primary)', marginBottom: '0.4rem' }}>
-                Change title *
+                Change Title *
               </label>
               <input
                 type="text"
@@ -621,9 +729,6 @@ function ChangeRequestFormPage({ onNavigate, initialData, user }) {
             {/* Dynamic Fields Renderer */}
             {visibleFields.length > 0 && (
               <div style={{ gridColumn: '1 / -1', display: 'flex', flexDirection: 'column', gap: '1rem', padding: '1rem', backgroundColor: 'var(--input-bg)', borderRadius: '10px', border: '1px solid var(--border-color)' }}>
-                <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--brand-primary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                  Sub-category Dynamic Attributes
-                </span>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1rem' }}>
                   {visibleFields.map((field) => {
                     const isActionRequiredOther = field.fieldKey === 'actionRequired' && customFieldValues.actionRequired === 'Other';
@@ -706,15 +811,9 @@ function ChangeRequestFormPage({ onNavigate, initialData, user }) {
                               {isDisabled ? (
                                 <option value="">Loading options...</option>
                               ) : (
-                                (() => {
-                                  const opts = field.options ? [...field.options] : [];
-                                  if (field.fieldKey === 'actionRequired' && !opts.includes('Other')) {
-                                    opts.push('Other');
-                                  }
-                                  return opts.map((opt) => (
-                                    <option key={opt} value={opt}>{opt}</option>
-                                  ));
-                                })()
+                                getFieldOptions(field, activeSessionUser).map((opt) => (
+                                  <option key={opt} value={opt}>{opt}</option>
+                                ))
                               )}
                             </select>
                           </div>
@@ -772,15 +871,9 @@ function ChangeRequestFormPage({ onNavigate, initialData, user }) {
                                 {isDisabled ? (
                                   <option value="">Loading options...</option>
                                 ) : (
-                                  (() => {
-                                    const opts = field.options ? [...field.options] : [];
-                                    if (field.fieldKey === 'actionRequired' && !opts.includes('Other')) {
-                                      opts.push('Other');
-                                    }
-                                    return opts.map((opt) => (
-                                      <option key={opt} value={opt}>{opt}</option>
-                                    ));
-                                  })()
+                                  getFieldOptions(field, activeSessionUser).map((opt) => (
+                                    <option key={opt} value={opt}>{opt}</option>
+                                  ))
                                 )}
                               </select>
                             );
@@ -848,7 +941,7 @@ function ChangeRequestFormPage({ onNavigate, initialData, user }) {
             {/* Business justification */}
             <div style={{ gridColumn: '1 / -1' }}>
               <label style={{ display: 'block', fontSize: '0.825rem', fontWeight: 500, color: 'var(--text-primary)', marginBottom: '0.4rem' }}>
-                Business justification *
+                Business Justification *
               </label>
               <textarea
                 rows={4}

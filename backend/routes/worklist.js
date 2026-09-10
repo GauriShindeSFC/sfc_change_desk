@@ -4,12 +4,12 @@ import {
   handleWorklistAction,
   addChangeRequestComment
 } from '../controllers/dashboardController.js';
-import { requireRole } from '../middlewares/authMiddleware.js';
+import { requireRole, requireOrganizationScopeRole } from '../middlewares/authMiddleware.js';
 
 const router = express.Router();
 
-router.get('/worklist', requireRole(['Change Manager', 'Admin', 'Super Admin']), getWorklist);
-router.get('/my-worklist', requireRole(['Change Manager', 'Admin', 'Super Admin']), getWorklist);
+router.get('/worklist', requireRole(['Change Manager', 'Admin', 'Super Admin']), requireOrganizationScopeRole, getWorklist);
+router.get('/my-worklist', requireRole(['Change Manager', 'Admin', 'Super Admin']), requireOrganizationScopeRole, getWorklist);
 router.post('/worklist/action', requireRole(['Change Manager', 'Admin', 'Super Admin']), handleWorklistAction);
 router.post('/worklist/comment', requireRole(['Admin', 'Super Admin']), addChangeRequestComment);
 

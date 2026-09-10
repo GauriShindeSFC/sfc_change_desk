@@ -29,7 +29,7 @@ export default function LoginPage({ onLogin, onLoginSuccess }) {
     setError('');
     setIsLoading(true);
     try {
-      const session = await login(email.trim(), password);
+      const session = await login(email.trim());
       if (onLogin) onLogin(session);
       else if (onLoginSuccess) onLoginSuccess(session);
     } catch (err) {
@@ -149,7 +149,7 @@ export default function LoginPage({ onLogin, onLoginSuccess }) {
           <div style={{ flex: 1, height: '1px', backgroundColor: 'var(--border-color)' }} />
         </div>
 
-        {/* Email + Password Sign-in Form */}
+        {/* Email Sign-in Form (Development Email-Only) */}
         <form onSubmit={handleLogin} style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
           {error && (
             <div
@@ -171,32 +171,14 @@ export default function LoginPage({ onLogin, onLoginSuccess }) {
           )}
 
           <input
+            id="login-email"
+            name="email"
             type="email"
             required
             autoComplete="email"
             placeholder="you@stfox.com"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            style={{
-              width: '100%',
-              padding: '0.85rem 1rem',
-              backgroundColor: 'var(--input-bg)',
-              border: '1px solid var(--border-color)',
-              borderRadius: 'var(--radius-md)',
-              fontSize: '0.9rem',
-              fontFamily: 'var(--font-family)',
-              color: 'var(--text-primary)',
-              outline: 'none'
-            }}
-          />
-
-          <input
-            type="password"
-            required
-            autoComplete="current-password"
-            placeholder="Password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
             style={{
               width: '100%',
               padding: '0.85rem 1rem',
@@ -246,7 +228,7 @@ export default function LoginPage({ onLogin, onLoginSuccess }) {
         </p>
 
         <p style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', textAlign: 'center', margin: 0 }}>
-          Demo: <strong>gauri.shinde@company.com</strong> · <strong>changedesk123</strong>
+          Development login: Enter any registered directory email
         </p>
 
       </div>

@@ -20,7 +20,7 @@ const hoursAgo = (n) => new Date(NOW - n * 3_600_000);
 // ---------- roles ------------------------------------------
 export const roles = [
   { id: 'role-1', name: 'Super Admin', description: 'Ultimate system control across all modules, role & permission management, system audit, database & user management.', permissions: ['Full System Control', 'Manage Roles & Permissions', 'Manage Users', 'View System Audit Logs', 'Override Approvals'] },
-  { id: 'role-2', name: 'Admin', description: 'System administration, workflow configuration, catalog management, user onboarding, and system reporting.', permissions: ['Manage Users', 'Configure Workflows', 'Manage Catalog', 'Export Reports', 'System Settings'] },
+  { id: 'role-2', name: 'Admin', description: 'System administration, user onboarding, and system reporting.', permissions: ['Manage Users', 'Export Reports', 'System Settings'] },
   { id: 'role-3', name: 'Change Manager', description: 'Full lifecycle oversight: review, approve, reject, or request information on change requests.', permissions: ['Approve / Reject CRs', 'Lifecycle Oversight', 'Request Info (Send Back)', 'View Worklist & Metrics'] },
   { id: 'role-4', name: 'Requester', description: 'Standard employee permission to raise change requests, track progress, and update own draft submissions.', permissions: ['Create change requests', 'View own requests', 'Save draft CRs'] }
 ];
@@ -284,7 +284,7 @@ export const catalogSubcategories = [
 
   // 4. IT Asset
   { id: 'subcat-asset-dev', categoryId: 'cat-asset', name: 'Laptop / Desktop', sla: '5 business days', risk: 'Low', workflowId: 'wf-1', status: 'Active' },
-  { id: 'subcat-asset-hw', categoryId: 'cat-asset', name: 'Hardware Accessories', sla: '5 business days', risk: 'Low', workflowId: 'wf-1', status: 'Active' },
+  { id: 'subcat-asset-hw', categoryId: 'cat-asset', name: 'Other IT Hardware', sla: '5 business days', risk: 'Low', workflowId: 'wf-1', status: 'Active' },
   { id: 'subcat-asset-sw', categoryId: 'cat-asset', name: 'Software', sla: '3 business days', risk: 'Medium', workflowId: 'wf-1', status: 'Active' },
   { id: 'subcat-asset-lic', categoryId: 'cat-asset', name: 'License', sla: '2 business days', risk: 'Low', workflowId: 'wf-3', status: 'Active' },
   { id: 'subcat-asset-oth', categoryId: 'cat-asset', name: 'Other IT Asset Requests', sla: '3 business days', risk: 'Low', workflowId: 'wf-1', status: 'Active' },
@@ -461,7 +461,7 @@ export const catalogSubcategoryFields = [
 
 export async function seedDatabase({ force = false } = {}) {
   const {
-    Role, User, Workflow, CatalogCategory, CatalogSubcategory, CatalogSubcategoryField,
+    Role, UserS8, Workflow, CatalogCategory, CatalogSubcategory, CatalogSubcategoryField,
     ChangeRequest, ChangeRequestApproval, AuditLog, AppConfig, ChangeManagerCategory
   } = models;
 
@@ -488,14 +488,12 @@ export async function seedDatabase({ force = false } = {}) {
 
   const results = [];
   results.push(await fill(Role, roles));
-  results.push(await fill(User, users));
-
-  for (const u of users) {
-    await User.update(
-      { passwordHash: u.passwordHash, authProvider: u.authProvider },
-      { where: { id: u.id } }
-    );
-  }
+  const s8Users = users.map(({ name, email, status }) => ({
+    displayName: name,
+    email,
+    isActive: status === 'Active'
+  }));
+  results.push(await fill(UserS8, s8Users));
 
   results.push(await fill(Workflow, workflows));
   results.push(await fill(CatalogCategory, catalogCategories));

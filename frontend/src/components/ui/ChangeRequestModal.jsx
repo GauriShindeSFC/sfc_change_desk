@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { X, MessageSquare } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { X, MessageSquare, Check } from 'lucide-react';
 import { apiFetch } from '../../lib/apiFetch';
 
 export default function ChangeRequestModal({ cr, onClose, onApprove, onReject, onSendBack, onSubmitForApproval, onImplement, onAddComment, user }) {
@@ -11,12 +11,18 @@ export default function ChangeRequestModal({ cr, onClose, onApprove, onReject, o
   const isAdminOrSuperAdmin = ['role-1', 'role-2'].includes(userRoleId) || userRoleName.includes('admin') || userRoleName.includes('super');
   const isChangeManager = userRoleId === 'role-3' || userRoleName.includes('manager');
   const isRequester = !isAdminOrSuperAdmin && !isChangeManager;
-  const isSelfRequest = (cr.requesterId && currentUser?.id && String(cr.requesterId) === String(currentUser.id)) ||
-    (cr.employeeEmail && currentUser?.email && cr.employeeEmail.toLowerCase() === currentUser.email.toLowerCase());
+  const isSelfRequest = Boolean(
+    (cr.requesterId && currentUser?.id && (String(cr.requesterId) === String(currentUser.id) || String(cr.requesterId) === String(currentUser?.userKey))) ||
+    (cr.employeeId && currentUser?.employeeId && String(cr.employeeId).trim().toLowerCase() === String(currentUser.employeeId).trim().toLowerCase()) ||
+    (cr.employeeEmail && currentUser?.email && cr.employeeEmail.trim().toLowerCase() === currentUser.email.trim().toLowerCase()) ||
+    (cr.requesterEmail && currentUser?.email && cr.requesterEmail.trim().toLowerCase() === currentUser.email.trim().toLowerCase()) ||
+    (cr.customFieldValues?.employeeEmail && currentUser?.email && String(cr.customFieldValues.employeeEmail).trim().toLowerCase() === currentUser.email.trim().toLowerCase())
+  );
 
-  const [showRejectPrompt, setShowRejectPrompt] = useState(false);
-  const [rejectReasonInput, setRejectReasonInput] = useState('');
-  const [rejectReasonError, setRejectReasonError] = useState('');
+  const [actionPrompt, setActionPrompt] = useState(null); // { action: 'approve'|'reject'|'implement', title: string, color: string }
+  const [actionCommentInput, setActionCommentInput] = useState('');
+  const [actionCommentError, setActionCommentError] = useState('');
+  const [hoveredStepIdx, setHoveredStepIdx] = useState(null);
 
   const initialComments = Array.isArray(cr.comments)
     ? cr.comments
@@ -24,6 +30,15 @@ export default function ChangeRequestModal({ cr, onClose, onApprove, onReject, o
     ? cr.customFieldValues.comments
     : [];
   const [commentsList, setCommentsList] = useState(initialComments);
+
+  useEffect(() => {
+    const nextComments = Array.isArray(cr.comments)
+      ? cr.comments
+      : Array.isArray(cr.customFieldValues?.comments)
+      ? cr.customFieldValues.comments
+      : [];
+    setCommentsList(nextComments);
+  }, [cr.id, cr.comments, cr.customFieldValues?.comments]);
   const [commentInput, setCommentInput] = useState('');
   const [isPostingComment, setIsPostingComment] = useState(false);
   const [commentError, setCommentError] = useState('');
@@ -80,20 +95,100 @@ export default function ChangeRequestModal({ cr, onClose, onApprove, onReject, o
   const statusDot = isImplemented ? '#0284C7' : isRejected ? '#DC2626' : isApproved ? '#059669' : isDraft ? '#94A0B0' : '#D97706';
 
   const steps = isRejected
-    ? ['Draft', 'Change Manager Review', 'Rejected']
-    : ['Draft', 'Change Manager Review', 'Approved', 'Implemented'];
+    ? ['Requested', 'Rejected']
+    : ['Requested', 'Approved', 'Implemented'];
 
-  const currentStepIdx = isRejected ? 2
-    : isImplemented ? 3
-    : isApproved ? 2
-    : isDraft ? 0
-    : 1;
+  const currentStepIdx = isRejected ? 1
+    : isImplemented ? 2
+    : isApproved ? 1
+    : 0;
 
   const progressPercent = Math.min(100, Math.max(0, (currentStepIdx / (steps.length - 1)) * 100));
 
   const activeColor = isRejected ? '#DC2626' : isImplemented ? '#0284C7' : isDraft ? '#7C3AED' : 'var(--brand-primary)';
 
-  const canAct = cr.canAct !== false && !isApproved && !isRejected && !isDraft && !isImplemented;
+  const canAct = cr.canAct !== false && !isApproved && !isRejected && !isDraft && !isImplemented && !isSelfRequest;
+
+  const getStepDate = (stepName) => {
+    const todayFormatted = new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+    if (stepName === 'Requested') return cr.raisedDate || (cr.submittedAt ? new Date(cr.submittedAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : todayFormatted);
+    if (stepName === 'Approved') return (isApproved || isImplemented) ? (cr.approvedDate || (cr.decidedAt ? new Date(cr.decidedAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : (cr.updatedAt ? new Date(cr.updatedAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : cr.raisedDate || todayFormatted))) : '';
+    if (stepName === 'Rejected') return isRejected ? (cr.rejectedDate || (cr.closedAt ? new Date(cr.closedAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : (cr.updatedAt ? new Date(cr.updatedAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : cr.raisedDate || todayFormatted))) : '';
+    if (stepName === 'Implemented') return isImplemented ? (cr.implementedDate || (cr.closedAt ? new Date(cr.closedAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : (cr.updatedAt ? new Date(cr.updatedAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : cr.raisedDate || todayFormatted))) : '';
+    return '';
+  };
+
+  const getStepTooltipInfo = (stepName) => {
+    const sDate = getStepDate(stepName);
+    if (stepName === 'Requested') {
+      return {
+        title: 'Submitted Request',
+        author: cr.employeeName || cr.requester || 'Requester',
+        comment: cr.justification || 'Change request submitted for review.',
+        date: sDate
+      };
+    }
+    if (stepName === 'Approved') {
+      const approvalComment =
+        cr.approvedComment ||
+        cr.approved_comment ||
+        cr.approvalRationale ||
+        cr.approval_rationale ||
+        ([...commentsList].reverse().find(c => {
+          const act = (c.action || c.type || c.decision || '').toLowerCase();
+          return act === 'approved' || act === 'approve';
+        })?.text) ||
+        (Array.isArray(cr.approvals) ? cr.approvals.find(a => (a.decision || '').toLowerCase() === 'approved')?.rationale : null) ||
+        'Change request approved during CAB review.';
+
+      return {
+        title: 'CAB Approval',
+        author: cr.approvedBy || cr.decidedBy || 'Approver',
+        comment: approvalComment,
+        date: sDate
+      };
+    }
+    if (stepName === 'Rejected') {
+      const rejectionComment =
+        cr.rejectedComment ||
+        cr.rejected_comment ||
+        cr.rejectionReason ||
+        cr.rejection_reason ||
+        cr.customFieldValues?.rejectionReason ||
+        ([...commentsList].reverse().find(c => {
+          const act = (c.action || c.type || c.decision || '').toLowerCase();
+          return act === 'rejected' || act === 'reject';
+        })?.text) ||
+        (Array.isArray(cr.approvals) ? cr.approvals.find(a => (a.decision || '').toLowerCase() === 'rejected')?.rationale : null) ||
+        'Change request rejected during CAB review.';
+
+      return {
+        title: 'CAB Rejection',
+        author: cr.rejectedBy || cr.decidedBy || 'Approver',
+        comment: rejectionComment,
+        date: sDate
+      };
+    }
+    if (stepName === 'Implemented') {
+      const implComment =
+        cr.implementedComment ||
+        cr.implemented_comment ||
+        cr.implementationComment ||
+        ([...commentsList].reverse().find(c => {
+          const act = (c.action || c.type || c.decision || '').toLowerCase();
+          return act === 'implemented' || act === 'implement';
+        })?.text) ||
+        'Change implemented and verified.';
+
+      return {
+        title: 'Implementation Completed',
+        author: cr.decidedBy || 'Admin',
+        comment: implComment,
+        date: sDate
+      };
+    }
+    return null;
+  };
 
   return (
     <div style={{
@@ -137,7 +232,7 @@ export default function ChangeRequestModal({ cr, onClose, onApprove, onReject, o
           </button>
         </div>
 
-        {/* Status & Risk */}
+        {/* Status */}
         <div style={{ padding: '1.25rem 1.75rem 0.5rem 1.75rem', display: 'flex', alignItems: 'center', gap: '3rem' }}>
           <div>
             <div style={{ fontSize: '0.8rem', fontWeight: 500, color: 'var(--text-primary)', marginBottom: '0.4rem' }}>Status</div>
@@ -157,19 +252,6 @@ export default function ChangeRequestModal({ cr, onClose, onApprove, onReject, o
             </div>
           </div>
 
-          <div>
-            <div style={{ fontSize: '0.8rem', fontWeight: 500, color: 'var(--text-primary)', marginBottom: '0.4rem' }}>Risk</div>
-            <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}>
-              <div style={{ display: 'flex', gap: '2px', alignItems: 'center' }}>
-                {[1, 2, 3].map(bar => (
-                  <div key={bar} style={{ width: '4px', height: '14px', borderRadius: '1.5px', backgroundColor: bar <= (cr.riskBars || 2) ? (cr.riskColor || '#D97706') : 'var(--border-color)' }} />
-                ))}
-              </div>
-              <span style={{ fontSize: '0.825rem', fontWeight: 500, color: cr.riskColor || '#D97706' }}>
-                {cr.risk || 'Medium'}
-              </span>
-            </div>
-          </div>
         </div>
 
         {/* Rejection Rationale Display Banner */}
@@ -198,40 +280,127 @@ export default function ChangeRequestModal({ cr, onClose, onApprove, onReject, o
           </div>
         )}
 
-        {/* Dynamic Lifecycle Visualizer */}
-        <div style={{ padding: '1.25rem 1.75rem 1.5rem 1.75rem' }}>
-          <div style={{ fontSize: '0.85rem', fontWeight: 500, color: 'var(--text-primary)', marginBottom: '1.25rem' }}>Lifecycle</div>
-          <div style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <div style={{ position: 'absolute', top: '10px', left: '20px', right: '20px', height: '2px', backgroundColor: 'var(--border-color)', zIndex: 1 }} />
-            <div style={{ position: 'absolute', top: '10px', left: '20px', width: `${progressPercent}%`, height: '2px', backgroundColor: activeColor, zIndex: 2, transition: 'width 0.3s ease' }} />
-
+        {/* Dynamic Lifecycle Visualizer with Hover Tooltips & Dates */}
+        <div style={{ padding: '1.25rem 1.75rem 1.75rem 1.75rem' }}>
+          <div style={{ fontSize: '0.85rem', fontWeight: 800, color: 'var(--text-primary)', marginBottom: '1.5rem' }}>Lifecycle</div>
+          <div style={{ display: 'flex', alignItems: 'flex-start', width: '100%', padding: '0 0.5rem' }}>
             {steps.map((step, idx) => {
-              const isCurrent = idx === currentStepIdx;
-              const isReached = idx <= currentStepIdx;
-              const isStepRejected = isRejected && isCurrent;
+              const isLast = idx === steps.length - 1;
+              const isStepCompleted = idx <= currentStepIdx;
+              const isStepRejected = isRejected && idx === currentStepIdx;
 
-              const circleBorder = isStepRejected ? '3px solid #DC2626' : isReached ? `2px solid ${activeColor}` : '2px solid var(--border-color)';
-              const circleBg = isStepRejected ? '#DC2626' : isReached ? activeColor : 'var(--card-bg)';
-              const textColor = isStepRejected ? '#DC2626' : isCurrent ? activeColor : isReached ? 'var(--text-primary)' : 'var(--text-secondary)';
+              const stepColor = isStepRejected ? '#DC2626' : isStepCompleted ? '#10B981' : 'var(--border-color)';
+              const circleBg = isStepRejected ? '#DC2626' : isStepCompleted ? '#10B981' : 'var(--card-bg)';
+              const circleBorder = isStepRejected ? '2px solid #DC2626' : isStepCompleted ? '2px solid #10B981' : '2px solid var(--border-color)';
+              const textColor = isStepRejected ? '#DC2626' : isStepCompleted ? '#10B981' : 'var(--text-secondary)';
+
+              // Connector line color to next step
+              const nextStepCompleted = (idx + 1) <= currentStepIdx;
+              const nextStepRejected = isRejected && (idx + 1) === currentStepIdx;
+              const connectorColor = nextStepRejected ? '#DC2626' : nextStepCompleted ? '#10B981' : 'var(--border-color)';
+
+              const stepDate = getStepDate(step);
+              const tooltipInfo = getStepTooltipInfo(step);
 
               return (
-                <div key={step} style={{ position: 'relative', zIndex: 3, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.4rem' }}>
-                  <div style={{
-                    width: '20px',
-                    height: '20px',
-                    borderRadius: '50%',
-                    backgroundColor: circleBg,
-                    border: circleBorder,
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center'
-                  }}>
-                    {isReached && !isStepRejected && <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: '#FFFFFF' }} />}
+                <React.Fragment key={step}>
+                  {/* Step Node */}
+                  <div
+                    onMouseEnter={() => setHoveredStepIdx(idx)}
+                    onMouseLeave={() => setHoveredStepIdx(null)}
+                    style={{
+                      position: 'relative',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      minWidth: '100px',
+                      zIndex: 3,
+                      cursor: isStepCompleted ? 'pointer' : 'default'
+                    }}
+                  >
+                    {/* Circle Node */}
+                    <div style={{
+                      width: '32px',
+                      height: '32px',
+                      borderRadius: '50%',
+                      backgroundColor: circleBg,
+                      border: circleBorder,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      transition: 'transform 0.15s ease',
+                      transform: hoveredStepIdx === idx ? 'scale(1.15)' : 'scale(1)',
+                      boxShadow: isStepCompleted && !isStepRejected ? '0 0 12px rgba(16, 185, 129, 0.25)' : 'none'
+                    }}>
+                      {isStepRejected ? (
+                        <X size={18} color="#FFFFFF" strokeWidth={3} />
+                      ) : isStepCompleted ? (
+                        <Check size={18} color="#FFFFFF" strokeWidth={3} />
+                      ) : null}
+                    </div>
+
+                    {/* Step Title */}
+                    <span style={{ fontSize: '0.825rem', fontWeight: 800, color: textColor, textAlign: 'center', marginTop: '0.5rem' }}>
+                      {step}
+                    </span>
+
+                    {/* Step Date */}
+                    {stepDate && (
+                      <span style={{ fontSize: '0.725rem', color: isStepCompleted ? '#10B981' : 'var(--text-secondary)', fontFamily: 'var(--font-mono)', textAlign: 'center', marginTop: '0.2rem', fontWeight: 600 }}>
+                        {stepDate}
+                      </span>
+                    )}
+
+                    {/* Hover Tooltip Popover */}
+                    {hoveredStepIdx === idx && tooltipInfo && isStepCompleted && (
+                      <div style={{
+                        position: 'absolute',
+                        bottom: '115%',
+                        backgroundColor: 'var(--card-bg)',
+                        border: '1px solid var(--border-color)',
+                        borderRadius: '10px',
+                        padding: '0.75rem 0.95rem',
+                        boxShadow: '0 10px 25px rgba(0, 0, 0, 0.25)',
+                        zIndex: 300,
+                        width: '230px',
+                        pointerEvents: 'none',
+                        ...(idx === 0
+                          ? { left: '0px', transform: 'none' }
+                          : isLast
+                          ? { right: '0px', left: 'auto', transform: 'none' }
+                          : { left: '50%', transform: 'translateX(-50%)' })
+                      }}>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.35rem', marginBottom: '0.4rem' }}>
+                          <span style={{ fontSize: '0.725rem', fontWeight: 800, color: stepColor, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                            {tooltipInfo.title}
+                          </span>
+                          {tooltipInfo.date && (
+                            <span style={{ fontSize: '0.675rem', fontWeight: 700, color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)' }}>
+                              {tooltipInfo.date}
+                            </span>
+                          )}
+                        </div>
+                        <div style={{ fontSize: '0.8rem', fontWeight: 800, color: 'var(--text-primary)' }}>
+                          {tooltipInfo.author}
+                        </div>
+                        <p style={{ fontSize: '0.775rem', color: 'var(--text-secondary)', margin: '0.3rem 0 0 0', lineHeight: 1.4, wordBreak: 'break-word', overflowWrap: 'anywhere' }}>
+                          "{tooltipInfo.comment}"
+                        </p>
+                      </div>
+                    )}
                   </div>
-                  <span style={{ fontSize: '0.725rem', fontWeight: isCurrent ? 600 : 500, color: textColor }}>
-                    {step}
-                  </span>
-                </div>
+
+                  {/* Connector Line to Next Step (rendered ONLY if NOT the last step) */}
+                  {!isLast && (
+                    <div style={{
+                      flex: 1,
+                      height: '2.5px',
+                      backgroundColor: connectorColor,
+                      marginTop: '15px',
+                      transition: 'background-color 0.3s ease'
+                    }} />
+                  )}
+                </React.Fragment>
               );
             })}
           </div>
@@ -265,7 +434,7 @@ export default function ChangeRequestModal({ cr, onClose, onApprove, onReject, o
             </div>
             <div>
               <div style={{ fontSize: '0.8rem', fontWeight: 500, color: 'var(--text-primary)', marginBottom: '0.25rem' }}>Location</div>
-              <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>{cr.location || 'N/A'}</div>
+              <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>{cr.location || 'Not specified'}</div>
             </div>
             <div>
               <div style={{ fontSize: '0.8rem', fontWeight: 500, color: 'var(--text-primary)', marginBottom: '0.25rem' }}>Manager Email</div>
@@ -291,7 +460,7 @@ export default function ChangeRequestModal({ cr, onClose, onApprove, onReject, o
               flexDirection: 'column',
               gap: '0.75rem'
             }}>
-              <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--brand-primary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+              <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--brand-primary)', letterSpacing: '0.05em' }}>
                 Filled Form Attributes
               </span>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '0.85rem' }}>
@@ -315,18 +484,38 @@ export default function ChangeRequestModal({ cr, onClose, onApprove, onReject, o
           </div>
         )}
 
-        {/* Dates Grid */}
-        <div style={{ padding: '0 1.75rem 1.25rem 1.75rem', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '1.25rem' }}>
+        {/* Dynamic Status-Aware Dates Grid */}
+        <div style={{ padding: '0 1.75rem 1.25rem 1.75rem', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '1.25rem' }}>
           <div>
-            <div style={{ fontSize: '0.8rem', fontWeight: 500, color: 'var(--text-primary)', marginBottom: '0.25rem' }}>Raised date</div>
-            <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)' }}>{cr.raisedDate || 'Recently'}</div>
+            <div style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '0.25rem' }}>Raised Date</div>
+            <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)' }}>{getStepDate('Requested') || cr.raisedDate || 'Recently'}</div>
           </div>
+
+          {isImplemented ? (
+            <>
+              <div>
+                <div style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '0.25rem' }}>Approved Date</div>
+                <div style={{ fontSize: '0.85rem', color: '#059669', fontWeight: 700, fontFamily: 'var(--font-mono)' }}>{getStepDate('Approved') || cr.approvedDate || 'Approved'}</div>
+              </div>
+              <div>
+                <div style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '0.25rem' }}>Implemented Date</div>
+                <div style={{ fontSize: '0.85rem', color: '#0284C7', fontWeight: 700, fontFamily: 'var(--font-mono)' }}>{getStepDate('Implemented') || cr.implementedDate || cr.closedDate || 'Implemented'}</div>
+              </div>
+            </>
+          ) : isApproved ? (
+            <div>
+              <div style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '0.25rem' }}>Approved Date</div>
+              <div style={{ fontSize: '0.85rem', color: '#059669', fontWeight: 700, fontFamily: 'var(--font-mono)' }}>{getStepDate('Approved') || cr.approvedDate || 'Approved'}</div>
+            </div>
+          ) : isRejected ? (
+            <div>
+              <div style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '0.25rem' }}>Rejected Date</div>
+              <div style={{ fontSize: '0.85rem', color: '#DC2626', fontWeight: 700, fontFamily: 'var(--font-mono)' }}>{getStepDate('Rejected') || cr.rejectedDate || cr.closedDate || 'Rejected'}</div>
+            </div>
+          ) : null}
+
           <div>
-            <div style={{ fontSize: '0.8rem', fontWeight: 500, color: 'var(--text-primary)', marginBottom: '0.25rem' }}>Closed date</div>
-            <div style={{ fontSize: '0.85rem', color: isImplemented ? '#0284C7' : 'var(--text-secondary)', fontWeight: isImplemented ? 500 : 400 }}>{cr.closedDate || (isImplemented ? 'Today' : 'Open')}</div>
-          </div>
-          <div>
-            <div style={{ fontSize: '0.8rem', fontWeight: 500, color: 'var(--text-primary)', marginBottom: '0.25rem' }}>Start date</div>
+            <div style={{ fontSize: '0.8rem', fontWeight: 500, color: 'var(--text-primary)', marginBottom: '0.25rem' }}>Start Date</div>
             <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)' }}>{cr.startDate || 'Not specified'}</div>
           </div>
         </div>
@@ -334,13 +523,13 @@ export default function ChangeRequestModal({ cr, onClose, onApprove, onReject, o
         {/* Business Justification & Workflow */}
         <div style={{ padding: '0 1.75rem 1.25rem 1.75rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
           <div>
-            <div style={{ fontSize: '0.8rem', fontWeight: 500, color: 'var(--text-primary)', marginBottom: '0.35rem' }}>Business justification</div>
+            <div style={{ fontSize: '0.8rem', fontWeight: 500, color: 'var(--text-primary)', marginBottom: '0.35rem' }}>Business Justification</div>
             <div style={{ fontSize: '0.825rem', color: 'var(--text-secondary)', lineHeight: 1.45, wordBreak: 'break-word', overflowWrap: 'anywhere' }}>
               {cr.justification || 'No business justification provided.'}
             </div>
           </div>
           <div>
-            <div style={{ fontSize: '0.8rem', fontWeight: 500, color: 'var(--text-primary)', marginBottom: '0.35rem' }}>Assigned workflow</div>
+            <div style={{ fontSize: '0.8rem', fontWeight: 500, color: 'var(--text-primary)', marginBottom: '0.35rem' }}>Assigned Workflow</div>
             <div style={{ fontSize: '0.825rem', color: 'var(--text-secondary)' }}>
               {cr.workflow || 'Standard Change Workflow'}
             </div>
@@ -444,73 +633,117 @@ export default function ChangeRequestModal({ cr, onClose, onApprove, onReject, o
           </div>
         )}
 
-        {/* Rejection Prompt Form Overlay */}
-        {showRejectPrompt && (
+        {/* Action Confirmation Modal Popup (Approve / Reject / Implement) */}
+        {actionPrompt && (
           <div style={{
-            padding: '1.25rem 1.75rem',
-            borderTop: '1px solid #FCA5A5',
-            backgroundColor: '#FEF2F2',
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(0, 0, 0, 0.65)',
             display: 'flex',
-            flexDirection: 'column',
-            gap: '0.75rem'
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 400,
+            padding: '1rem'
           }}>
-            <div style={{ fontSize: '0.85rem', fontWeight: 500, color: '#DC2626' }}>
-              Provide Rejection Reason *
-            </div>
-            <textarea
-              rows={3}
-              placeholder="Please specify the mandatory rationale for rejecting this request..."
-              value={rejectReasonInput}
-              onChange={(e) => {
-                setRejectReasonInput(e.target.value);
-                if (rejectReasonError) setRejectReasonError('');
-              }}
-              style={{
-                width: '100%',
-                padding: '0.65rem 0.85rem',
-                backgroundColor: 'var(--card-bg)',
-                border: '1px solid #FCA5A5',
-                borderRadius: '8px',
-                fontSize: '0.85rem',
-                color: 'var(--text-primary)',
-                outline: 'none'
-              }}
-            />
-            {rejectReasonError && (
-              <span style={{ fontSize: '0.775rem', fontWeight: 500, color: '#DC2626' }}>
-                {rejectReasonError}
-              </span>
-            )}
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.65rem' }}>
-              <button
-                type="button"
-                onClick={() => setShowRejectPrompt(false)}
-                style={{ padding: '0.45rem 0.9rem', backgroundColor: 'var(--card-bg)', border: '1px solid var(--border-color)', borderRadius: '6px', fontSize: '0.8rem', fontWeight: 600, cursor: 'pointer' }}
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  if (!rejectReasonInput.trim()) {
-                    setRejectReasonError('Rejection reason is mandatory.');
-                    return;
-                  }
-                  if (onReject) onReject(cr.id, rejectReasonInput.trim());
-                  setShowRejectPrompt(false);
-                  onClose();
+            <div style={{
+              backgroundColor: 'var(--card-bg)',
+              border: `1px solid ${actionPrompt.color === '#DC2626' ? '#FCA5A5' : 'var(--border-color)'}`,
+              borderRadius: '16px',
+              width: '100%',
+              maxWidth: '500px',
+              padding: '1.5rem 1.75rem',
+              boxShadow: '0 25px 50px rgba(0, 0, 0, 0.4)',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '1rem'
+            }}>
+              <div>
+                <h3 style={{ fontSize: '1.05rem', fontWeight: 800, color: actionPrompt.color, margin: 0 }}>
+                  {actionPrompt.title} - Mandatory Comment *
+                </h3>
+                <p style={{ fontSize: '0.825rem', color: 'var(--text-secondary)', marginTop: '0.35rem', margin: 0, lineHeight: 1.4 }}>
+                  Please specify a mandatory rationale or description of what was done before completing this action.
+                </p>
+              </div>
+
+              <textarea
+                rows={4}
+                placeholder={`Enter comment/rationale for ${actionPrompt.action} action...`}
+                value={actionCommentInput}
+                onChange={(e) => {
+                  setActionCommentInput(e.target.value);
+                  if (actionCommentError) setActionCommentError('');
                 }}
-                style={{ padding: '0.45rem 1rem', backgroundColor: '#DC2626', color: '#FFFFFF', border: 'none', borderRadius: '6px', fontSize: '0.8rem', fontWeight: 500, cursor: 'pointer' }}
-              >
-                Confirm Rejection
-              </button>
+                style={{
+                  width: '100%',
+                  padding: '0.75rem 0.95rem',
+                  backgroundColor: 'var(--input-bg)',
+                  border: `1px solid ${actionCommentError ? '#DC2626' : 'var(--border-color)'}`,
+                  borderRadius: '10px',
+                  fontSize: '0.875rem',
+                  color: 'var(--text-primary)',
+                  outline: 'none',
+                  resize: 'vertical'
+                }}
+              />
+
+              {actionCommentError && (
+                <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#DC2626' }}>
+                  {actionCommentError}
+                </span>
+              )}
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '0.25rem' }}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setActionPrompt(null);
+                    setActionCommentInput('');
+                    setActionCommentError('');
+                  }}
+                  style={{ padding: '0.55rem 1.1rem', backgroundColor: 'var(--card-bg)', border: '1px solid var(--border-color)', borderRadius: '8px', fontSize: '0.825rem', fontWeight: 600, color: 'var(--text-primary)', cursor: 'pointer' }}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (!actionCommentInput.trim()) {
+                      setActionCommentError('A comment describing what was done is mandatory.');
+                      return;
+                    }
+                    const commentText = actionCommentInput.trim();
+                    if (actionPrompt.action === 'approve' && onApprove) {
+                      cr.approvedComment = commentText;
+                      cr.approvedBy = currentUser.name || 'Approver';
+                      onApprove(cr.id, commentText);
+                    } else if (actionPrompt.action === 'reject' && onReject) {
+                      cr.rejectedComment = commentText;
+                      cr.rejectionReason = commentText;
+                      cr.rejectedBy = currentUser.name || 'Approver';
+                      onReject(cr.id, commentText);
+                    } else if (actionPrompt.action === 'implement' && onImplement) {
+                      cr.implementedComment = commentText;
+                      onImplement(cr.id, commentText);
+                    }
+                    setActionPrompt(null);
+                    setActionCommentInput('');
+                    onClose();
+                  }}
+                  style={{ padding: '0.55rem 1.25rem', backgroundColor: actionPrompt.color, color: '#FFFFFF', border: 'none', borderRadius: '8px', fontSize: '0.825rem', fontWeight: 700, cursor: 'pointer', boxShadow: '0 2px 6px rgba(0,0,0,0.2)' }}
+                >
+                  Confirm {actionPrompt.action.charAt(0).toUpperCase() + actionPrompt.action.slice(1)}
+                </button>
+              </div>
             </div>
           </div>
         )}
 
         {/* Footer Actions */}
-        {!showRejectPrompt && (
-          <div style={{ padding: '1rem 1.75rem 1.5rem 1.75rem', borderTop: '1px solid var(--border-color)', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '0.75rem', backgroundColor: 'var(--card-bg)', position: 'sticky', bottom: 0 }}>
+        <div style={{ padding: '1rem 1.75rem 1.5rem 1.75rem', borderTop: '1px solid var(--border-color)', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '0.75rem', backgroundColor: 'var(--card-bg)', position: 'sticky', bottom: 0 }}>
             <button onClick={onClose} style={{ padding: '0.55rem 1.1rem', backgroundColor: 'var(--card-bg)', border: '1px solid var(--border-color)', borderRadius: '8px', fontSize: '0.825rem', fontWeight: 600, color: 'var(--text-primary)', cursor: 'pointer' }}>Close</button>
             
             {isDraft ? (
@@ -536,17 +769,17 @@ export default function ChangeRequestModal({ cr, onClose, onApprove, onReject, o
             ) : canAct ? (
               <>
                 {onReject && (
-                  <button onClick={() => setShowRejectPrompt(true)} style={{ padding: '0.55rem 1.1rem', backgroundColor: '#FEF2F2', color: '#DC2626', border: '1px solid #FCA5A5', borderRadius: '8px', fontSize: '0.825rem', fontWeight: 500, cursor: 'pointer' }}>Reject</button>
+                  <button onClick={() => { setActionPrompt({ action: 'reject', title: 'Reject Change Request', color: '#DC2626' }); setActionCommentInput(''); }} style={{ padding: '0.55rem 1.1rem', backgroundColor: '#FEF2F2', color: '#DC2626', border: '1px solid #FCA5A5', borderRadius: '8px', fontSize: '0.825rem', fontWeight: 700, cursor: 'pointer' }}>Reject</button>
                 )}
                 {onApprove && (
-                  <button onClick={() => { onApprove(cr.id); onClose(); }} style={{ padding: '0.55rem 1.25rem', backgroundColor: 'var(--brand-primary)', color: '#FFFFFF', border: 'none', borderRadius: '8px', fontSize: '0.825rem', fontWeight: 500, cursor: 'pointer', boxShadow: '0 1px 3px rgba(0, 0, 0, 0.2)' }}>Approve</button>
+                  <button onClick={() => { setActionPrompt({ action: 'approve', title: 'Approve Change Request', color: '#0D9488' }); setActionCommentInput(''); }} style={{ padding: '0.55rem 1.25rem', backgroundColor: '#0D9488', color: '#FFFFFF', border: 'none', borderRadius: '8px', fontSize: '0.825rem', fontWeight: 700, cursor: 'pointer', boxShadow: '0 1px 3px rgba(13, 148, 136, 0.2)' }}>Approve</button>
                 )}
               </>
             ) : isApproved && isAdminOrSuperAdmin && !isSelfRequest ? (
               <button
                 onClick={() => {
-                  if (onImplement) onImplement(cr.id);
-                  onClose();
+                  setActionPrompt({ action: 'implement', title: 'Mark as Implemented', color: '#0D9488' });
+                  setActionCommentInput('');
                 }}
                 style={{
                   padding: '0.55rem 1.25rem',
@@ -564,20 +797,26 @@ export default function ChangeRequestModal({ cr, onClose, onApprove, onReject, o
               </button>
             ) : (
               <span style={{
-                padding: '0.4rem 0.9rem',
-                borderRadius: 'var(--radius-lg)',
+                padding: '0.45rem 0.95rem',
+                borderRadius: '8px',
                 fontSize: '0.8rem',
-                fontWeight: 500,
-                backgroundColor: isImplemented ? '#E0F2FE' : isRejected ? '#FEE2E2' : '#D1FAE5',
-                color: isImplemented ? '#0284C7' : isRejected ? '#DC2626' : '#059669'
+                fontWeight: 600,
+                backgroundColor: (isApproved || isImplemented) ? '#D1FAE5' : isRejected ? '#FEE2E2' : '#FEF3C7',
+                color: (isApproved || isImplemented) ? '#059669' : isRejected ? '#DC2626' : '#92400E',
+                border: `1px solid ${(isApproved || isImplemented) ? '#A7F3D0' : isRejected ? '#FCA5A5' : '#FDE68A'}`,
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '0.35rem'
               }}>
-                {isImplemented ? 'Implemented' : decisionLower === 'approved' ? 'You approved' : decisionLower === 'rejected' ? 'You rejected' : isApproved ? 'Approved' : 'Rejected'}
+                {(isApproved || isImplemented)
+                  ? 'Approved'
+                  : isRejected
+                  ? 'Rejected'
+                  : 'Pending'}
               </span>
             )}
           </div>
-        )}
-
+        </div>
       </div>
-    </div>
-  );
-}
+    );
+  }

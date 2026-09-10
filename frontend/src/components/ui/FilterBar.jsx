@@ -44,7 +44,19 @@ export default function FilterBar({
       }}
     >
       {Boolean(tabs?.length) && (
-        <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
+        <div
+          style={{
+            display: 'flex',
+            gap: '0.4rem',
+            flexWrap: 'nowrap',
+            overflowX: 'auto',
+            maxWidth: '100%',
+            scrollbarWidth: 'none',
+            msOverflowStyle: 'none',
+            alignItems: 'center',
+            paddingBottom: '2px'
+          }}
+        >
           {tabs.map((tab) => {
             const isActive = activeTab === tab.id;
             return (
@@ -53,15 +65,17 @@ export default function FilterBar({
                 type="button"
                 onClick={() => onTabChange?.(tab.id)}
                 style={{
-                  padding: '0.45rem 0.95rem',
+                  padding: '0.4rem 0.75rem',
                   backgroundColor: isActive ? 'var(--brand-primary)' : 'transparent',
                   color: isActive ? '#FFFFFF' : 'var(--text-secondary)',
-                  border: isActive ? 'none' : '1px solid var(--border-color)',
+                  border: isActive ? '1px solid var(--brand-primary)' : '1px solid var(--border-color)',
                   borderRadius: 'var(--radius-lg)',
-                  fontSize: '0.825rem',
+                  fontSize: '0.8rem',
                   fontWeight: 500,
                   cursor: 'pointer',
-                  transition: 'all 0.15s ease'
+                  transition: 'all 0.15s ease',
+                  whiteSpace: 'nowrap',
+                  flexShrink: 0
                 }}
               >
                 {tab.label}

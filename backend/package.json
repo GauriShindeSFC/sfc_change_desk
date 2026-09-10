@@ -5,9 +5,10 @@
   "type": "module",
   "scripts": {
     "start": "node server.js",
-    "dev": "node server.js",
+    "dev": "node --watch server.js",
     "db:sync": "node scripts/syncDatabase.js",
-    "db:sync:force": "node scripts/syncDatabase.js --force"
+    "db:sync:force": "node scripts/syncDatabase.js --force",
+    "db:performance-indexes": "node scripts/addPerformanceIndexes.js"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",

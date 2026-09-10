@@ -1,5 +1,6 @@
-// Bearer-token auth guard. Attaches a fresh `req.user` (public shape).
-import { verifyToken, findUserById, publicUser } from '../services/authService.js';
+// Bearer-token auth guard. Resolves token subject via IdentityResolver and attaches normalized req.user.
+import { verifyToken, publicUser } from '../services/authService.js';
+import { IdentityResolver } from '../services/IdentityResolver.js';
 
 export const requireAuth = async (req, res, next) => {
   const header = req.headers.authorization || '';
@@ -16,11 +17,17 @@ export const requireAuth = async (req, res, next) => {
   }
 
   try {
-    const user = await findUserById(payload.sub);
-    if (!user) {
-      return res.status(401).json({ success: false, message: 'Session is no longer valid' });
+    const userKey = payload.sub;
+    const result = await IdentityResolver.resolveByKey(userKey);
+
+    if (result.status !== 'SUCCESS' || !result.identity) {
+      return res.status(401).json({
+        success: false,
+        message: result.message || 'Session is no longer valid or user access revoked'
+      });
     }
-    req.user = publicUser(user);
+
+    req.user = publicUser(result.identity);
     next();
   } catch (dbErr) {
     console.error('[requireAuth] Database connection error:', dbErr.message);

@@ -7,10 +7,8 @@ import {
   CheckCircle2,
   TrendingUp,
   Sun,
-  Layers,
   X,
-  ChevronLeft,
-  ChevronRight
+  PanelLeft
 } from 'lucide-react';
 
 const TOP_NAV = [
@@ -236,8 +234,16 @@ function Sidebar({
               aria-label="Collapse sidebar"
               title="Collapse sidebar"
               style={iconBtnStyle}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = '#1E293B';
+                e.currentTarget.style.color = '#FFFFFF';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = 'transparent';
+                e.currentTarget.style.color = '#94A3B8';
+              }}
             >
-              <ChevronLeft size={16} />
+              <PanelLeft size={18} />
             </button>
           )
         )}
@@ -250,8 +256,16 @@ function Sidebar({
           aria-label="Expand sidebar"
           title="Expand sidebar"
           style={{ ...iconBtnStyle, alignSelf: 'center', margin: '0 auto 1rem auto' }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.backgroundColor = '#1E293B';
+            e.currentTarget.style.color = '#FFFFFF';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.backgroundColor = 'transparent';
+            e.currentTarget.style.color = '#94A3B8';
+          }}
         >
-          <ChevronRight size={16} />
+          <PanelLeft size={18} />
         </button>
       )}
 
@@ -273,7 +287,6 @@ function Sidebar({
         ];
 
         if (isSuperAdmin) {
-          visibleMgmtItems.push({ id: 'Catalogue Management', label: 'Catalogue Management', icon: Layers });
           visibleMgmtItems.push({ id: 'Settings', label: 'Settings', icon: Sun });
         }
 

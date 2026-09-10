@@ -3,11 +3,10 @@
 //  their relationships. Returns data shaped exactly as the frontend
 //  consumes it (see ../utils/serializers.js).
 // ────────────────────────────────────────────────────────────────
-import { Op, QueryTypes } from 'sequelize';
+import { Op, QueryTypes, fn, col } from 'sequelize';
 import {
   sequelize,
   Role,
-  User,
   Workflow,
   CatalogCategory,
   CatalogSubcategory,
@@ -19,9 +18,13 @@ import {
   AppConfig,
   ChangeManagerCategory
 } from '../models/index.js';
+import { Employee } from '../models/Employee.js';
+import { UserAppRole } from '../models/userAppRole.js';
+import { UserS8 } from '../models/UserS8.js';
+import { IdentityResolver, resolveDualSourceIdentities, resolveEmailForUser } from './IdentityResolver.js';
 import bcrypt from 'bcryptjs';
 import { formatTimestamp } from '../data/store.js';
-import { generateTempPassword } from './authService.js';
+import { generateTempPassword, checkUserInUserTable } from './authService.js';
 import { sendChangeRequestCreatedEmail, sendUserInviteEmail } from './mailService.js';
 import {
   serializeChangeRequest,
@@ -35,8 +38,6 @@ import {
 
 // Includes reused across change-request queries.
 const CR_INCLUDE = [
-  { model: User, as: 'requester', attributes: ['id', 'name', 'email'] },
-  { model: User, as: 'approver', attributes: ['id', 'name', 'email'] },
   { model: Workflow, as: 'workflow', attributes: ['id', 'name'] },
   { model: ChangeRequestApproval, as: 'approvals' }
 ];
@@ -68,120 +69,217 @@ export const addAuditLog = async ({ actorId = null, action, ref = '—', detail 
   AuditLog.create({ timestamp: formatTimestamp(), actorId, action, ref, detail }, { transaction: tx });
 
 // Helper to resolve Dashboard scoping: Dashboard metrics are strictly user-scoped for all employees
-const getDashboardScopeWhere = (userId) => {
+const getDashboardScopeWhere = async (userId) => {
   if (!userId) return {};
-  return { requesterId: userId };
+
+  const identityRes = await IdentityResolver.resolveByKey(String(userId));
+  const identity = identityRes.status === 'SUCCESS' ? identityRes.identity : null;
+  if (identity?.roleId === 'role-3') {
+    const assignedCategoryIds = identity.cmCategories || [];
+    if (assignedCategoryIds.length === 0) return { id: 'NONE' };
+
+    const assignedCategories = await CatalogCategory.findAll({
+      where: {
+        [Op.or]: [
+          { id: { [Op.in]: assignedCategoryIds } },
+          { name: { [Op.in]: assignedCategoryIds } }
+        ]
+      },
+      attributes: ['id', 'name']
+    });
+    const categoryConditions = [];
+    for (const category of assignedCategories) {
+      categoryConditions.push({ category: category.id });
+      categoryConditions.push({ category: category.name });
+      categoryConditions.push({ category: { [Op.iLike]: `%${category.name}%` } });
+    }
+    for (const categoryId of assignedCategoryIds) {
+      categoryConditions.push({ category: categoryId });
+    }
+    return categoryConditions.length > 0 ? { [Op.or]: categoryConditions } : { id: 'NONE' };
+  }
+
+  const aliases = new Set([userId]);
+
+  // If S8-{id} or EMP-{id}, also check the bare numeric id
+  const numericMatch = userId.match(/^(S8|EMP)-(\d+)$/);
+  if (numericMatch) {
+    aliases.add(numericMatch[2]);
+  }
+
+  // If this person has a dual-source identity (both S8 and EMP,
+  // per the migration's dual-identity design), resolve and include
+  // BOTH keys — reuse the existing dual-identity lookup logic
+  // already built during the migration, do not write a new one.
+  const linkedKeys = await resolveDualSourceIdentities(userId); // <- reuse existing function
+  linkedKeys.forEach(k => aliases.add(k));
+
+  // Also resolve their real email (via the existing identity
+  // resolver) and check customFieldValues->>employeeEmail, since
+  // some historical tickets may only have the email, not a userKey
+  const email = await resolveEmailForUser(userId); // <- reuse existing function
+  
+  const aliasArray = Array.from(aliases);
+  const where = {
+    [Op.or]: [
+      { requesterId: { [Op.in]: aliasArray } },
+      { employeeId: { [Op.in]: aliasArray } }
+    ]
+  };
+  if (email) {
+    where[Op.or].push(
+      sequelize.where(
+        sequelize.literal(`"customFieldValues"->>'employeeEmail'`),
+        email
+      )
+    );
+  }
+  return where;
 };
 
 // ---------- Dashboard ----------------------------------
 
 export const getMetricsService = async (userId = null) => {
   try {
-    const userWhere = getDashboardScopeWhere(userId);
+    const userWhere = await getDashboardScopeWhere(userId);
+    const activeWhere = (userWhere && Object.keys(userWhere).length > 0)
+      ? {
+          [Op.and]: [
+            userWhere,
+            {
+              isDraft: false,
+              status: { [Op.notIn]: ['Draft', 'draft', 'Deleted', 'deleted', 'Cancelled', 'cancelled'] }
+            }
+          ]
+        }
+      : {
+          isDraft: false,
+          status: { [Op.notIn]: ['Draft', 'draft', 'Deleted', 'deleted', 'Cancelled', 'cancelled'] }
+        };
 
-    const total = await ChangeRequest.count({ where: userWhere });
-    const pending = await ChangeRequest.count({ where: { ...userWhere, status: { [Op.iLike]: '%pending%' } } });
-    const approved = await ChangeRequest.count({ where: { ...userWhere, status: { [Op.iLike]: '%approved%' } } });
-    const implemented = await ChangeRequest.count({ where: { ...userWhere, status: { [Op.or]: [{ [Op.iLike]: '%implemented%' }, { [Op.iLike]: '%in progress%' }] } } });
-    const rejected = await ChangeRequest.count({ where: { ...userWhere, status: { [Op.iLike]: '%rejected%' } } });
+    // One grouped query replaces five counts on every dashboard refresh.
+    const grouped = await ChangeRequest.findAll({
+      where: activeWhere,
+      attributes: ['status', [fn('COUNT', col('id')), 'count']],
+      group: ['status'],
+      raw: true
+    });
+    const counts = grouped.reduce((map, row) => {
+      map[String(row.status || '').toLowerCase()] = Number(row.count) || 0;
+      return map;
+    }, {});
+    const total = Object.values(counts).reduce((sum, count) => sum + count, 0);
+    const pending = (counts.pending || 0) + (counts.open || 0) + (counts.submitted || 0);
+    const approved = counts.approved || 0;
+    const implemented = (counts.implemented || 0) + (counts['in progress'] || 0);
+    const rejected = counts.rejected || 0;
 
     const approvedPercent = total > 0 ? Math.round((approved / total) * 100) : 0;
 
     return [
-      { title: 'Total Change Requests', value: total, count: total, change: `${total} total request(s)`, iconBg: '#EBF5FF', iconColor: '#2563EB', isTotal: true },
+      { title: 'Total Change Requests', value: total, count: total, change: `${total} Total Request(s)`, iconBg: '#EBF5FF', iconColor: '#2563EB', isTotal: true },
       { title: 'Pending Approval', value: pending, count: pending, change: 'Awaiting review', iconBg: '#FEF3C7', iconColor: '#D97706', isPending: true },
-      { title: 'Approved', value: approved, count: approved, change: `${approvedPercent}% of total`, iconBg: '#D1FAE5', iconColor: '#059669', isApproved: true },
-      { title: 'Implemented', value: implemented, count: implemented, change: `${implemented} completed`, iconBg: '#F3E8FF', iconColor: '#7C3AED', isImplemented: true, isInProgress: true },
-      { title: 'Rejected', value: rejected, count: rejected, change: `${rejected} rejected`, iconBg: '#FEE2E2', iconColor: '#DC2626', isRejected: true }
+      { title: 'Approved', value: approved, count: approved, change: `${approvedPercent}% of Total`, iconBg: '#D1FAE5', iconColor: '#059669', isApproved: true },
+      { title: 'Implemented', value: implemented, count: implemented, change: `${implemented} Completed`, iconBg: '#F3E8FF', iconColor: '#7C3AED', isImplemented: true, isInProgress: true },
+      { title: 'Rejected', value: rejected, count: rejected, change: `${rejected} Rejected`, iconBg: '#FEE2E2', iconColor: '#DC2626', isRejected: true }
     ];
   } catch (err) {
     console.warn('[dashboardService] getMetricsService DB warning:', err.message);
     return [
-      { title: 'Total Change Requests', value: 0, count: 0, change: '0 total request(s)', iconBg: '#EBF5FF', iconColor: '#2563EB', isTotal: true },
+      { title: 'Total Change Requests', value: 0, count: 0, change: '0 Total Request(s)', iconBg: '#EBF5FF', iconColor: '#2563EB', isTotal: true },
       { title: 'Pending Approval', value: 0, count: 0, change: 'Awaiting review', iconBg: '#FEF3C7', iconColor: '#D97706', isPending: true },
-      { title: 'Approved', value: 0, count: 0, change: '0% of total', iconBg: '#D1FAE5', iconColor: '#059669', isApproved: true },
-      { title: 'Implemented', value: 0, count: 0, change: '0 completed', iconBg: '#F3E8FF', iconColor: '#7C3AED', isImplemented: true, isInProgress: true },
-      { title: 'Rejected', value: 0, count: 0, change: '0 rejected', iconBg: '#FEE2E2', iconColor: '#DC2626', isRejected: true }
+      { title: 'Approved', value: 0, count: 0, change: '0% of Total', iconBg: '#D1FAE5', iconColor: '#059669', isApproved: true },
+      { title: 'Implemented', value: 0, count: 0, change: '0 Completed', iconBg: '#F3E8FF', iconColor: '#7C3AED', isImplemented: true, isInProgress: true },
+      { title: 'Rejected', value: 0, count: 0, change: '0 Rejected', iconBg: '#FEE2E2', iconColor: '#DC2626', isRejected: true }
     ];
   }
 };
 
 export const getCategoryMetricsService = async (userId = null) => {
-  const userWhere = getDashboardScopeWhere(userId);
-  const total = await ChangeRequest.count({ where: userWhere });
-  const palette = ['#2563EB', '#0D9488', '#7C3AED', '#D97706', '#475569', '#DC2626', '#E11D48', '#0284C7'];
+  const userWhere = await getDashboardScopeWhere(userId);
+  const palette = ['#2563EB', '#0D9488', '#7C3AED', '#D97706', '#475569', '#DC2626'];
 
-  // Fetch real categories from CatalogCategory table
-  const dbCategories = await CatalogCategory.findAll({
-    order: [['sortOrder', 'ASC']]
-  });
+  // Canonical categories list in exact order
+  const CANONICAL_CATEGORIES = [
+    { id: 'cat-srv', name: 'Server & Infra', color: '#2563EB' },
+    { id: 'cat-net', name: 'Network & Connectivity', color: '#0D9488' },
+    { id: 'cat-acc', name: 'Access & Security', color: '#7C3AED' },
+    { id: 'cat-asset', name: 'IT Asset', color: '#D97706' },
+    { id: 'cat-o365', name: 'Office 365 & Collaboration', color: '#475569' },
+    { id: 'cat-sec', name: 'Security Tools & Policies', color: '#DC2626' }
+  ];
 
-  let categoryList = [];
-  if (dbCategories && dbCategories.length > 0) {
-    categoryList = dbCategories.map(c => c.name);
-  } else {
-    // Fallback: Query distinct category names from change_requests table
-    const distinctRows = await ChangeRequest.findAll({
-      attributes: [[sequelize.fn('DISTINCT', sequelize.col('category')), 'category']],
-      where: { ...userWhere, category: { [Op.ne]: '' } }
-    });
-    categoryList = distinctRows.map(r => r.category).filter(Boolean);
-  }
-
-  const results = [];
-  for (let i = 0; i < categoryList.length; i++) {
-    const catName = categoryList[i];
-    const count = await ChangeRequest.count({
-      where: {
-        ...userWhere,
-        [Op.or]: [
-          { category: catName },
-          { category: { [Op.iLike]: `%${catName.split(' ')[0]}%` } }
+  // Base exclusion: strictly exclude drafts, deleted, and cancelled tickets
+  const activeWhere = (userWhere && Object.keys(userWhere).length > 0)
+    ? {
+        [Op.and]: [
+          userWhere,
+          {
+            isDraft: false,
+            status: { [Op.notIn]: ['Draft', 'draft', 'Deleted', 'deleted', 'Cancelled', 'cancelled'] }
+          }
         ]
       }
-    });
+    : {
+        isDraft: false,
+        status: { [Op.notIn]: ['Draft', 'draft', 'Deleted', 'deleted', 'Cancelled', 'cancelled'] }
+      };
 
-    const percentage = total > 0 ? Math.round((count / total) * 100) : 0;
-    const color = palette[i % palette.length];
+  const grouped = await ChangeRequest.findAll({
+    where: activeWhere,
+    attributes: ['category', [fn('COUNT', col('id')), 'count']],
+    group: ['category'],
+    raw: true
+  });
+  const categoryCounts = new Map(grouped.map((row) => [String(row.category || '').toLowerCase(), Number(row.count) || 0]));
+  const results = CANONICAL_CATEGORIES.map((cat, index) => ({
+    categoryId: cat.id,
+    category: cat.name,
+    label: cat.name,
+    name: cat.name,
+    count: (categoryCounts.get(cat.name.toLowerCase()) || 0) + (categoryCounts.get(cat.id.toLowerCase()) || 0),
+    color: cat.color || palette[index % palette.length],
+    percentage: 0
+  }));
+  const totalCount = results.reduce((sum, item) => sum + item.count, 0);
 
-    results.push({
-      category: catName,
-      label: catName,
-      name: catName,
-      count,
-      color,
-      percentage: Math.max(percentage, count > 0 ? 8 : 0)
-    });
+  // Calculate actual percentages strictly based on totalCount of actual tickets
+  for (const item of results) {
+    item.percentage = (item.count > 0 && totalCount > 0)
+      ? Math.round((item.count / totalCount) * 100)
+      : 0;
   }
 
   return results;
 };
 
 export const getStatusBreakdownService = async (userId = null) => {
-  const userWhere = getDashboardScopeWhere(userId);
+  const userWhere = await getDashboardScopeWhere(userId);
   const statuses = [
-    { status: 'Approved', color: '#0D9488' },
+    { status: 'Approved', color: '#059669' },
     { status: 'Pending', color: '#D97706' },
     { status: 'Implemented', color: '#7C3AED' },
-    { status: 'Rejected', color: '#DC2626' }
+    { status: 'Rejected', color: '#DC2626' },
+    { status: 'Draft', color: '#64748B' }
   ];
 
-  const results = [];
-  for (const s of statuses) {
-    const count = await ChangeRequest.count({
-      where: {
-        ...userWhere,
-        status: { [Op.iLike]: `%${s.status.split(' ')[0]}%` }
-      }
-    });
-    results.push({
-      status: s.status,
-      label: s.status,
-      count,
-      color: s.color
-    });
-  }
-  return results;
+  const grouped = await ChangeRequest.findAll({
+    where: userWhere,
+    attributes: ['status', 'isDraft', [fn('COUNT', col('id')), 'count']],
+    group: ['status', 'isDraft'],
+    raw: true
+  });
+  const countFor = (names) => grouped.reduce((sum, row) => (
+    names.includes(String(row.status || '').toLowerCase()) ? sum + (Number(row.count) || 0) : sum
+  ), 0);
+  return statuses.map((s) => ({
+    status: s.status,
+    label: s.status,
+    count: s.status === 'Draft'
+      ? grouped.reduce((sum, row) => (row.isDraft || String(row.status || '').toLowerCase() === 'draft' ? sum + (Number(row.count) || 0) : sum), 0)
+      : countFor(s.status === 'Pending' ? ['pending', 'submitted'] : s.status === 'Implemented' ? ['implemented', 'in progress', 'scheduled'] : [s.status.toLowerCase()]),
+    color: s.color
+  }));
 };
 
 // ---------- Change requests ----------------------------
@@ -200,6 +298,7 @@ export const getFilteredChangeRequests = async ({
   startDate = null,
   endDate = null,
   searchQuery = null,
+  organizationScope = false,
   page = 1,
   limit = 10
 }) => {
@@ -216,58 +315,75 @@ export const getFilteredChangeRequests = async ({
   if (isWorklist) {
     andClauses.push({ status: { [Op.ne]: 'Draft' }, isDraft: false });
     if (actingUserId) {
-      const actingUser = await User.findByPk(actingUserId, {
-        include: [
-          { model: Role, as: 'role' },
-          { model: ChangeManagerCategory, as: 'categoryAssignments' }
-        ]
-      });
-      const roleName = (actingUser?.role?.name || '').toLowerCase();
-      const roleId = actingUser?.roleId || '';
-      const isSuperOrAdmin = ['role-1', 'role-2'].includes(roleId) || roleName.includes('admin') || roleName.includes('super');
-      const isChangeManager = roleId === 'role-3' || roleName.includes('manager') || (actingUser?.categoryAssignments && actingUser?.categoryAssignments.length > 0);
+      const identityRes = await IdentityResolver.resolveByKey(actingUserId);
+      const identity = identityRes.status === 'SUCCESS' ? identityRes.identity : null;
+      const roleId = identity?.roleId || null;
+      const isSuperOrAdmin = roleId === 'role-1' || roleId === 'role-2';
+      const isChangeManager = roleId === 'role-3';
 
-      if (isChangeManager && !isSuperOrAdmin) {
-        const assignedCategoryIds = (actingUser?.categoryAssignments || []).map((c) => c.categoryId);
-        const assignedCategories = await CatalogCategory.findAll({
-          where: { id: { [Op.in]: assignedCategoryIds } }
-        });
+      // Rule: No user (Admin, Super Admin, Change Manager) sees their own requests in My Worklist
+      if (!organizationScope) {
+        const ownIds = new Set([actingUserId]);
+        if (identity) {
+          if (identity.userKey) ownIds.add(identity.userKey);
+          if (identity.employeeBusinessId) ownIds.add(identity.employeeBusinessId);
+          if (identity.sourceId) ownIds.add(String(identity.sourceId));
+          if (identity.id) ownIds.add(String(identity.id));
+        }
+        const excludeIdsList = Array.from(ownIds).filter(Boolean);
+        andClauses.push({ requesterId: { [Op.notIn]: excludeIdsList } });
 
-        const CATEGORY_SYNONYMS = {
-          'cat-srv': ['Server & Infra', 'Server', 'Infra', 'Infrastructure', 'OS', 'Patching'],
-          'cat-net': ['Network & Connectivity', 'Network', 'Connectivity', 'VLAN', 'Firewall', 'Proxy', 'VPN'],
-          'cat-acc': ['Access & Security', 'Access', 'Security', 'Permission', 'Entitlement'],
-          'cat-asset': ['IT Asset', 'Asset', 'Software', 'Hardware', 'Laptop', 'License'],
-          'cat-o365': ['Office 365 & Collaboration', 'Office', '365', 'Collaboration', 'Exchange', 'Mailbox'],
-          'cat-sec': ['Security Tools & Policies', 'Security', 'Policy', 'Policies', 'Endpoint', 'Agent']
-        };
+        if (identity?.employeeBusinessId) {
+          andClauses.push({ employeeId: { [Op.ne]: identity.employeeBusinessId } });
+        }
+      }
 
-        const categoryMatches = new Set();
-        assignedCategoryIds.forEach(id => {
-          if (id) {
-            categoryMatches.add(id);
-            if (CATEGORY_SYNONYMS[id]) {
-              CATEGORY_SYNONYMS[id].forEach(syn => categoryMatches.add(syn));
+      // Rule: Change Managers only see requests belonging to their assigned categories
+      if (!organizationScope && isChangeManager && !isSuperOrAdmin) {
+        let assignedCategoryIds = identity?.cmCategories || [];
+        if (!assignedCategoryIds || assignedCategoryIds.length === 0) {
+          const assignments = await ChangeManagerCategory.findAll({
+            where: {
+              [Op.or]: [
+                { userId: actingUserId },
+                ...(identity?.userKey ? [{ userId: identity.userKey }] : []),
+                ...(identity?.employeeBusinessId ? [{ userId: identity.employeeBusinessId }] : []),
+                ...(identity?.sourceId ? [{ userId: `EMP-${identity.sourceId}` }, { userId: String(identity.sourceId) }] : [])
+              ]
             }
-          }
-        });
-        assignedCategories.forEach(c => {
-          if (c.id) categoryMatches.add(c.id);
-          if (c.name) {
-            categoryMatches.add(c.name);
-            categoryMatches.add(c.name.toLowerCase());
-            const words = c.name.split(/[\s\/\,\-\_\&]+/).filter(w => w.length >= 3);
-            words.forEach(w => categoryMatches.add(w));
-          }
-        });
+          });
+          assignedCategoryIds = assignments.map(a => a.categoryId);
+        }
 
-        const categoryOrConditions = Array.from(categoryMatches).flatMap(val => [
-          { category: { [Op.iLike]: `%${val}%` } }
-        ]);
-        if (categoryOrConditions.length > 0) {
-          andClauses.push({ [Op.or]: categoryOrConditions });
-        } else {
+        if (!assignedCategoryIds || assignedCategoryIds.length === 0) {
+          // If no categories are assigned, the Change Manager sees no requests
           andClauses.push({ id: 'NONE' });
+        } else {
+          const assignedCategories = await CatalogCategory.findAll({
+            where: {
+              [Op.or]: [
+                { id: { [Op.in]: assignedCategoryIds } },
+                { name: { [Op.in]: assignedCategoryIds } }
+              ]
+            }
+          });
+
+          const categoryConditions = [];
+          for (const c of assignedCategories) {
+            categoryConditions.push({ category: c.name });
+            categoryConditions.push({ category: { [Op.iLike]: `%${c.name}%` } });
+            categoryConditions.push({ category: c.id });
+          }
+          for (const idOrName of assignedCategoryIds) {
+            categoryConditions.push({ category: idOrName });
+            categoryConditions.push({ category: { [Op.iLike]: `%${idOrName}%` } });
+          }
+
+          if (categoryConditions.length > 0) {
+            andClauses.push({ [Op.or]: categoryConditions });
+          } else {
+            andClauses.push({ id: 'NONE' });
+          }
         }
       }
     }
@@ -358,38 +474,47 @@ export const getFilteredChangeRequests = async ({
 
   const countRows = await ChangeRequest.findAll({
     where: baseWhere,
-    attributes: ['id', 'status', 'isDraft'],
+    attributes: ['status', 'isDraft', [fn('COUNT', col('id')), 'count']],
+    group: ['status', 'isDraft'],
     raw: true
   });
 
   for (const row of countRows) {
     const st = (row.status || '').toLowerCase();
+    const count = Number(row.count) || 0;
 
-    statusCounts.All += 1;
+    statusCounts.All += count;
 
-    if (st === 'pending' || st === 'submitted') statusCounts.Pending += 1;
-    else if (st === 'approved') statusCounts.Approved += 1;
+    if (st === 'pending' || st === 'submitted') statusCounts.Pending += count;
+    else if (st === 'approved') statusCounts.Approved += count;
     else if (st === 'in progress' || st === 'scheduled' || st === 'implemented') {
-      statusCounts['In progress'] += 1;
-      statusCounts.Implemented += 1;
+      statusCounts['In progress'] += count;
+      statusCounts.Implemented += count;
     }
-    else if (st === 'rejected') statusCounts.Rejected += 1;
-    else if (st === 'draft' || row.isDraft) statusCounts.Draft += 1;
+    else if (st === 'rejected') statusCounts.Rejected += count;
+    else if (st === 'draft' || row.isDraft) statusCounts.Draft += count;
   }
 
-  const queryWhere = { ...baseWhere };
+  let queryWhere = baseWhere;
   if (status && status.toLowerCase() !== 'all') {
     const stLower = status.toLowerCase();
+    let statusClause;
     if (stLower === 'pending') {
-      queryWhere.status = { [Op.iLike]: '%pending%' };
+      statusClause = { status: { [Op.iLike]: '%pending%' } };
     } else if (stLower === 'approved') {
-      queryWhere.status = 'Approved';
+      statusClause = { status: 'Approved' };
     } else if (stLower === 'in progress' || stLower === 'implemented') {
-      queryWhere.status = { [Op.or]: ['In progress', 'Scheduled', 'Implemented'] };
+      statusClause = { status: { [Op.or]: ['In progress', 'Scheduled', 'Implemented'] } };
     } else if (stLower === 'rejected') {
-      queryWhere.status = 'Rejected';
+      statusClause = { status: 'Rejected' };
     } else if (stLower === 'draft') {
-      queryWhere[Op.or] = [{ status: { [Op.iLike]: '%draft%' } }, { isDraft: true }];
+      statusClause = { [Op.or]: [{ status: { [Op.iLike]: '%draft%' } }, { isDraft: true }] };
+    }
+
+    if (statusClause) {
+      queryWhere = (baseWhere && Object.keys(baseWhere).length > 0)
+        ? { [Op.and]: [baseWhere, statusClause] }
+        : statusClause;
     }
   }
 
@@ -397,6 +522,10 @@ export const getFilteredChangeRequests = async ({
     where: queryWhere,
     include: CR_INCLUDE,
     order: [['submittedAt', 'DESC'], ['createdAt', 'DESC'], ['id', 'DESC']]
+    ,
+    distinct: true,
+    limit: l,
+    offset
   });
 
   let userApprovalMap = new Map();
@@ -407,32 +536,36 @@ export const getFilteredChangeRequests = async ({
   let categoryNameToIdMap = new Map();
 
   if (isWorklist && actingUserId) {
+    const pageRequestIds = rows.map((row) => row.id);
     const userApprovals = await ChangeRequestApproval.findAll({
-      where: { approverId: actingUserId }
+      where: { approverId: actingUserId, changeRequestId: { [Op.in]: pageRequestIds } }
     });
     userApprovalMap = new Map(userApprovals.map((a) => [a.changeRequestId, a.decision]));
 
     const allDecidedApprovals = await ChangeRequestApproval.findAll({
-      where: { decision: { [Op.ne]: 'Pending' } },
-      include: [{ model: User, as: 'approver', attributes: ['id', 'name'] }]
+      where: { changeRequestId: { [Op.in]: pageRequestIds }, decision: { [Op.ne]: 'Pending' } }
     });
-    for (const a of allDecidedApprovals) {
-      if (a.approver?.name) decidedByMap.set(a.changeRequestId, a.approver.name);
+    const uniqueApproverIds = [...new Set(allDecidedApprovals.map((a) => a.approverId).filter(Boolean))];
+    const approverResults = await Promise.all(uniqueApproverIds.map(async (approverId) => [
+      approverId,
+      await IdentityResolver.resolveByKey(approverId)
+    ]));
+    const approverNames = new Map(approverResults.map(([approverId, res]) => [
+      approverId,
+      res.status === 'SUCCESS' ? res.identity?.displayName : null
+    ]));
+    for (const approval of allDecidedApprovals) {
+      const name = approverNames.get(approval.approverId);
+      if (name) {
+        decidedByMap.set(approval.changeRequestId, name);
+      }
     }
 
-    const actingUser = await User.findByPk(actingUserId, {
-      include: [
-        { model: Role, as: 'role' },
-        { model: ChangeManagerCategory, as: 'categoryAssignments' }
-      ]
-    });
-
-    const roleName = (actingUser?.role?.name || '').toLowerCase();
-    const roleId = actingUser?.roleId || '';
-    isSuperOrAdmin = ['role-1', 'role-2'].includes(roleId) || roleName.includes('admin') || roleName.includes('super');
-    isChangeManager = roleId === 'role-3' || roleName.includes('manager');
-
-    assignedCategoryIds = new Set((actingUser?.categoryAssignments || []).map((c) => c.categoryId));
+    const identityRes = await IdentityResolver.resolveByKey(actingUserId);
+    const roleId = identityRes.status === 'SUCCESS' ? identityRes.identity.roleId : null;
+    isSuperOrAdmin = roleId === 'role-1' || roleId === 'role-2';
+    isChangeManager = roleId === 'role-3';
+    assignedCategoryIds = new Set(identityRes.status === 'SUCCESS' ? (identityRes.identity.cmCategories || []) : []);
 
     const allCategories = await CatalogCategory.findAll({ attributes: ['id', 'name'] });
     for (const c of allCategories) {
@@ -441,8 +574,35 @@ export const getFilteredChangeRequests = async ({
     }
   }
 
+  const approvalCommentsMap = await getConfig('cr_approval_comments', {});
+
+  const requesterIds = [...new Set(rows.map((cr) => cr.requesterId).filter(Boolean).map(String))];
+  const requesterResults = await Promise.all(requesterIds.map(async (requesterId) => [
+    requesterId,
+    await IdentityResolver.resolveByKey(requesterId)
+  ]));
+  const requesters = new Map(requesterResults);
+
   const data = rows.map((cr) => {
-    const serialized = isWorklist ? serializeWorklistEntry(cr) : serializeChangeRequest(cr);
+    const persisted = approvalCommentsMap[cr.id] || {};
+    const crPlain = typeof cr.get === 'function' ? cr.get({ plain: true }) : { ...cr };
+    if (crPlain.requesterId) {
+      const requesterRes = requesters.get(String(crPlain.requesterId));
+      if (requesterRes.status === 'SUCCESS' && requesterRes.identity) {
+        crPlain.employeeName = crPlain.employeeName || requesterRes.identity.displayName || requesterRes.identity.name;
+        crPlain.employeeEmail = crPlain.employeeEmail || requesterRes.identity.email;
+        crPlain.employeeId = crPlain.employeeId || requesterRes.identity.employeeBusinessId;
+      }
+    }
+    const enrichedCr = {
+      ...crPlain,
+      approvedComment: persisted.approvedComment || crPlain.approvedComment,
+      approvedBy: persisted.approvedBy || crPlain.approvedBy,
+      rejectedComment: persisted.rejectedComment || crPlain.rejectedComment,
+      rejectionReason: persisted.rejectionReason || persisted.rejectedComment || crPlain.rejectionReason,
+      implementedComment: persisted.implementedComment || crPlain.implementedComment
+    };
+    const serialized = isWorklist ? serializeWorklistEntry(enrichedCr) : serializeChangeRequest(enrichedCr);
 
     if (isWorklist) {
       const myDecision = userApprovalMap.get(cr.id) || 'Pending';
@@ -457,9 +617,13 @@ export const getFilteredChangeRequests = async ({
         ? (myDecision === 'Pending' && cr.status === 'Pending')
         : (isCategoryAssigned && myDecision === 'Pending' && cr.status === 'Pending');
 
-      const decidedBy = decidedByMap.get(cr.id) || (cr.status === 'Approved' || cr.status === 'Rejected' ? 'Gauri Shinde' : '—');
+      const decidedBy = persisted.approvedBy || persisted.rejectedBy || decidedByMap.get(cr.id) || serialized.decidedBy || '—';
       return {
         ...serialized,
+        approvedComment: persisted.approvedComment || serialized.approvedComment,
+        approvedBy: persisted.approvedBy || serialized.approvedBy,
+        rejectedComment: persisted.rejectedComment || serialized.rejectedComment,
+        implementedComment: persisted.implementedComment || serialized.implementedComment,
         status: cr.status,
         myDecision,
         decidedBy,
@@ -467,7 +631,13 @@ export const getFilteredChangeRequests = async ({
       };
     }
 
-    return serialized;
+    return {
+      ...serialized,
+      approvedComment: persisted.approvedComment || serialized.approvedComment,
+      approvedBy: persisted.approvedBy || serialized.approvedBy,
+      rejectedComment: persisted.rejectedComment || serialized.rejectedComment,
+      implementedComment: persisted.implementedComment || serialized.implementedComment
+    };
   });
 
   const metrics = {
@@ -517,38 +687,35 @@ const nextChangeRequestId = async (tx) => {
 };
 
 export async function getVotersForCategory(categoryId, tx) {
-  // 1. All active Admins and Super Admins (roleId = 'role-1' or 'role-2' or role name 'Super Admin' or 'Admin')
-  const admins = await User.findAll({
-    where: { status: 'Active' },
-    include: [{ model: Role, as: 'role', where: { [Op.or]: [{ id: 'role-1' }, { id: 'role-2' }, { name: 'Super Admin' }, { name: 'Admin' }] } }],
+  // 1. All Admins and Super Admins (role-1 / role-2) from changedesk_identity_roles
+  const adminRoles = await UserAppRole.findAll({
+    where: { roleId: { [Op.in]: ['role-1', 'role-2'] } },
     transaction: tx
   });
+  const adminKeys = adminRoles.map((r) => r.userKey);
 
-  // 2. Active Change Managers (roleId = 'role-3' or role name 'Change Manager') assigned to this category
-  const changeManagers = await User.findAll({
-    where: { status: 'Active' },
-    include: [
-      { model: Role, as: 'role', where: { [Op.or]: [{ id: 'role-3' }, { name: 'Change Manager' }] } },
-      {
-        model: ChangeManagerCategory,
-        as: 'categoryAssignments',
-        where: categoryId ? { categoryId } : {},
-        required: true
-      }
-    ],
-    transaction: tx
-  });
-
-  if (changeManagers.length === 0) {
-    console.warn(`[Quorum Warning] Category "${categoryId || 'Unspecified'}" has ZERO assigned Change Managers. Routing approval to Admins alone.`);
+  // 2. Change Managers (role-3) assigned to this category
+  let cmKeys = [];
+  if (categoryId) {
+    const cmAssignments = await ChangeManagerCategory.findAll({
+      where: { categoryId },
+      transaction: tx
+    });
+    const cmUserIds = cmAssignments.map((a) => a.userId);
+    if (cmUserIds.length > 0) {
+      const cmRoles = await UserAppRole.findAll({
+        where: {
+          userKey: { [Op.in]: cmUserIds },
+          roleId: 'role-3'
+        },
+        transaction: tx
+      });
+      cmKeys = cmRoles.map((r) => r.userKey);
+    }
   }
 
-  // Combine unique voters by user id
-  const voterMap = new Map();
-  for (const u of [...admins, ...changeManagers]) {
-    voterMap.set(u.id, u);
-  }
-  return Array.from(voterMap.values());
+  const voterKeys = Array.from(new Set([...adminKeys, ...cmKeys]));
+  return voterKeys.map((key) => ({ id: key, userKey: key }));
 }
 
 const createApprovalSnapshot = async (changeRequest, tx) => {
@@ -566,6 +733,16 @@ const createApprovalSnapshot = async (changeRequest, tx) => {
   }
 };
 
+const identityOwnsRequest = async (actorId, requesterId) => {
+  if (!actorId || !requesterId) return false;
+  const identityRes = await IdentityResolver.resolveByKey(String(actorId));
+  if (identityRes.status !== 'SUCCESS') return actorId === requesterId;
+  const identity = identityRes.identity;
+  const keys = new Set([actorId, identity.userKey, identity.id, identity.sourceId, identity.employeeBusinessId]);
+  (identity.aliases || []).forEach((alias) => keys.add(alias));
+  return keys.has(requesterId) || String(requesterId) === String(identity.employeeBusinessId);
+};
+
 export const updateDraftChangeRequestService = async (id, actorId, payload = {}) => {
   const cr = await ChangeRequest.findByPk(id);
   if (!cr) {
@@ -574,7 +751,7 @@ export const updateDraftChangeRequestService = async (id, actorId, payload = {})
     throw err;
   }
 
-  if (actorId && cr.requesterId && cr.requesterId !== actorId) {
+  if (actorId && cr.requesterId && !(await identityOwnsRequest(actorId, cr.requesterId))) {
     const err = new Error('Unauthorized: You can only edit your own draft requests');
     err.statusCode = 403;
     throw err;
@@ -611,7 +788,30 @@ export const updateDraftChangeRequestService = async (id, actorId, payload = {})
   if (payload.startDate) cr.startDate = payload.startDate;
   if (payload.endDate) cr.endDate = payload.endDate;
   if (payload.risk) cr.risk = payload.risk;
-  if (payload.location) cr.location = payload.location;
+  const empKey = actorId || payload.userKey || cr.requesterId;
+  let empRecord = null;
+  if (typeof empKey === 'string' && empKey.startsWith('EMP-')) {
+    const empNumericId = parseInt(empKey.replace('EMP-', ''), 10);
+    if (!isNaN(empNumericId)) empRecord = await Employee.findByPk(empNumericId);
+  }
+  if (!empRecord && (payload.currentUser?.email || cr.employeeEmail)) {
+    const emailToLookup = (payload.currentUser?.email || cr.employeeEmail).trim().toLowerCase();
+    if (emailToLookup) {
+      empRecord = await Employee.findOne({
+        where: sequelize.where(sequelize.fn('LOWER', sequelize.col('email')), emailToLookup)
+      });
+    }
+  }
+  if (empRecord) {
+    if (empRecord.location && String(empRecord.location).trim()) {
+      cr.location = String(empRecord.location).trim();
+    }
+    if (empRecord.empId && String(empRecord.empId).trim()) {
+      cr.employeeId = String(empRecord.empId).trim();
+    }
+  } else if (payload.location && !payload.location.includes('Auto-fetched')) {
+    cr.location = payload.location;
+  }
   if (payload.managerEmail !== undefined) cr.managerEmail = payload.managerEmail;
   if (payload.customFieldValues) cr.customFieldValues = payload.customFieldValues;
   if (workflowId) cr.workflowId = workflowId;
@@ -629,12 +829,23 @@ export const updateDraftChangeRequestService = async (id, actorId, payload = {})
   return serializeChangeRequest(updated);
 };
 
-export const submitDraftChangeRequestService = async (id, actorId = 'usr-1') => {
+export const submitDraftChangeRequestService = async (id, actorId = null) => {
   await sequelize.transaction(async (tx) => {
     const cr = await ChangeRequest.findByPk(id, { transaction: tx });
     if (!cr) {
       const err = new Error(`Change Request ${id} not found`);
       err.statusCode = 404;
+      throw err;
+    }
+
+    if (actorId && !(await identityOwnsRequest(actorId, cr.requesterId))) {
+      const err = new Error('Unauthorized: You can only submit your own draft requests');
+      err.statusCode = 403;
+      throw err;
+    }
+    if (!cr.isDraft || cr.status !== 'Draft') {
+      const err = new Error('Integrity constraint: Only draft requests can be submitted');
+      err.statusCode = 400;
       throw err;
     }
 
@@ -682,20 +893,47 @@ export const submitDraftChangeRequestService = async (id, actorId = 'usr-1') => 
 
 // Emails of active Change Managers, Admins & Super Admins.
 const getApproverEmails = async () => {
-  const rows = await User.findAll({
-    attributes: ['email'],
-    where: { status: 'Active' },
-    include: [{ model: Role, as: 'role', attributes: [], where: { name: { [Op.in]: ['Change Manager', 'Admin', 'Super Admin'] } } }],
+  const roles = await UserAppRole.findAll({
+    where: { roleId: { [Op.in]: ['role-1', 'role-2', 'role-3'] } },
     raw: true
   });
-  return rows.map((r) => r.email).filter(Boolean);
+  const emails = [];
+  for (const r of roles) {
+    const key = r.userKey || r.user_key;
+    const res = await IdentityResolver.resolveByKey(key);
+    if (res.status === 'SUCCESS' && res.identity.email) {
+      emails.push(res.identity.email);
+    }
+  }
+  return Array.from(new Set(emails));
 };
 
-const resolveUserId = async (idOrName, fallback = 'usr-1') => {
+const resolveUserId = async (idOrName, fallback = null) => {
   if (!idOrName) return fallback;
-  const hit = await User.findOne({ where: { [Op.or]: [{ id: idOrName }, { name: idOrName }] } });
-  return hit ? hit.id : fallback;
+  if (typeof idOrName === 'string' && (idOrName.startsWith('S8-') || idOrName.startsWith('EMP-'))) {
+    return idOrName;
+  }
+  const identity = await IdentityResolver.resolveByEmail(idOrName);
+  if (identity.status === 'SUCCESS') {
+    return identity.identity.userKey;
+  }
+  return idOrName || fallback;
 };
+
+export const RESTRICTED_ACTIONS = [
+  { action: 'create an email id', subcategoryId: 'subcat-o365-mb' },
+  { action: 'disable / revoke mailbox', subcategoryId: 'subcat-o365-mb' },
+  { action: 'request m365 license', subcategoryId: 'subcat-o365-lic' },
+  { action: 'remove m365 license', subcategoryId: 'subcat-o365-lic' },
+  { action: 'request for procurement of laptop / desktop', subcategoryId: 'subcat-asset-dev' },
+  { action: 'repair request', subcategoryId: 'subcat-asset-dev' },
+  { action: 'dispose request', subcategoryId: 'subcat-asset-dev' },
+  { action: 'request for procurement of it hardware / accessories', subcategoryId: 'subcat-asset-hw' },
+  { action: 'repair request', subcategoryId: 'subcat-asset-hw' },
+  { action: 'dispose request', subcategoryId: 'subcat-asset-hw' },
+  { action: 'request physical access', subcategoryId: 'subcat-acc-phys' },
+  { action: 'revoke physical access', subcategoryId: 'subcat-acc-phys' }
+];
 
 export const createChangeRequestService = async (payload = {}) => {
   const id = await nextChangeRequestId();
@@ -703,6 +941,22 @@ export const createChangeRequestService = async (payload = {}) => {
   const risk = payload.risk || 'Medium';
   const status = isDraft ? 'Draft' : 'Pending';
   const requesterId = await resolveUserId(payload.requesterId || payload.requester);
+  const requesterRes = requesterId ? await IdentityResolver.resolveByKey(requesterId) : null;
+  const requesterUser = requesterRes?.status === 'SUCCESS' ? requesterRes.identity : null;
+  const requesterEmail = requesterUser?.email || payload.customFieldValues?.employeeEmail || payload.employeeEmail || '';
+
+  const actionValue = payload.customFieldValues?.actionRequired || payload.actionRequired || '';
+  const restrictedAction = RESTRICTED_ACTIONS.some((rule) =>
+    rule.action === String(actionValue).trim().toLowerCase() && rule.subcategoryId === payload.subcategoryId
+  );
+  if (restrictedAction) {
+    const inTable = await checkUserInUserTable(requesterEmail, payload.employeeId || requesterUser?.employeeId);
+    if (!inTable) {
+      const err = new Error(`Action "${actionValue}" is restricted to accounts present in the user table.`);
+      err.statusCode = 403;
+      throw err;
+    }
+  }
 
   let workflowId = payload.workflowId;
   let categoryName = payload.category || 'Software Deployment';
@@ -740,30 +994,73 @@ export const createChangeRequestService = async (payload = {}) => {
   }
 
   if (!workflowId && categoryName) {
-    const catalogHit = await CatalogSubcategory.findOne({
-      where: { name: { [Op.iLike]: `%${categoryName.split(' ')[0]}%` } }
+    const catHit = await CatalogCategory.findOne({
+      where: {
+        [Op.or]: [
+          { name: categoryName },
+          { id: categoryName },
+          { name: { [Op.iLike]: categoryName } }
+        ]
+      },
+      include: [{ model: CatalogSubcategory, as: 'subcategories' }]
     });
-    if (catalogHit && catalogHit.workflowId) {
-      workflowId = catalogHit.workflowId;
+    if (catHit?.subcategories && catHit.subcategories.length > 0) {
+      workflowId = catHit.subcategories[0].workflowId || workflowId;
     }
   }
 
-  const requesterUser = requesterId ? await User.findByPk(requesterId) : null;
-  const requesterEmail = requesterUser?.email || payload.customFieldValues?.employeeEmail || payload.employeeEmail || '';
-
   const mergedCustomFields = {
     ...(payload.customFieldValues || {}),
+    employeeName: payload.customFieldValues?.employeeName || requesterUser?.displayName || payload.employeeName || '',
     employeeEmail: payload.customFieldValues?.employeeEmail || requesterEmail
   };
+
+  // Resolve authoritative employee details (location + emp_id) from employees table
+  let authoritativeLocation = '';
+  let authoritativeEmpBusinessId = '';
+
+  let empRecord = null;
+  const empKey = payload.userKey || payload.requesterId || payload.currentUser?.userKey;
+
+  if (typeof empKey === 'string' && empKey.startsWith('EMP-')) {
+    const empNumericId = parseInt(empKey.replace('EMP-', ''), 10);
+    if (!isNaN(empNumericId)) empRecord = await Employee.findByPk(empNumericId);
+  } else if (payload.currentUser?.sourceId && payload.currentUser.identityType === 'EMPLOYEE') {
+    empRecord = await Employee.findByPk(payload.currentUser.sourceId);
+  }
+
+  if (!empRecord && (payload.currentUser?.email || requesterEmail)) {
+    const emailToLookup = (payload.currentUser?.email || requesterEmail).trim().toLowerCase();
+    if (emailToLookup) {
+      empRecord = await Employee.findOne({
+        where: sequelize.where(sequelize.fn('LOWER', sequelize.col('email')), emailToLookup)
+      });
+    }
+  }
+
+  if (empRecord) {
+    if (empRecord.location && String(empRecord.location).trim()) {
+      authoritativeLocation = String(empRecord.location).trim();
+    }
+    if (empRecord.empId && String(empRecord.empId).trim()) {
+      authoritativeEmpBusinessId = String(empRecord.empId).trim();
+    }
+  }
+
+  const empIdToStore = authoritativeEmpBusinessId || (
+    payload.employeeId && !payload.employeeId.startsWith('S8-') && !payload.employeeId.startsWith('EMP-')
+      ? payload.employeeId
+      : ''
+  );
 
   const createdCR = await ChangeRequest.create({
     id,
     title: payload.title || 'Untitled change request',
     category: categoryName,
     subCategory: subCategoryName,
-    employeeId: payload.employeeId || requesterUser?.employeeId || '',
+    employeeId: empIdToStore,
     managerEmail: payload.managerEmail || '',
-    location: payload.location || 'Ahmedabad HQ',
+    location: authoritativeLocation || (payload.location && !payload.location.includes('Auto-fetched') && !payload.location.includes('Not specified') ? payload.location : null),
     justification: payload.justification || '',
     startDate: payload.startDate || null,
     endDate: payload.endDate || null,
@@ -807,12 +1104,12 @@ export const createChangeRequestService = async (payload = {}) => {
   if (!isDraft) {
     Promise.all([
       getApproverEmails(),
-      User.findByPk(requesterId, { attributes: ['name', 'email'], raw: true })
+      IdentityResolver.resolveByKey(requesterId)
     ])
-      .then(([approverEmails, requester]) =>
+      .then(([approverEmails, requesterRes]) =>
         sendChangeRequestCreatedEmail({
           cr: serialized,
-          requesterName: requester?.name,
+          requesterName: requesterRes?.identity?.displayName || requesterRes?.identity?.name,
           approverEmails,
           managerEmail: payload.managerEmail
         })
@@ -825,7 +1122,7 @@ export const createChangeRequestService = async (payload = {}) => {
 
 // ---------- CAB worklist ------------------------------
 
-export const getWorklistService = async (actingUserId = 'usr-1', page = 1, limit = 10, status = null, dateFilter = null, searchQuery = null) => {
+export const getWorklistService = async (actingUserId = null, page = 1, limit = 10, status = null, dateFilter = null, searchQuery = null) => {
   return getFilteredChangeRequests({
     userId: null,
     isWorklist: true,
@@ -838,29 +1135,56 @@ export const getWorklistService = async (actingUserId = 'usr-1', page = 1, limit
   });
 };
 
-export const applyWorklistActionService = async ({ id, action, rejectionReason = '', actorId = 'usr-1' } = {}) => {
+export const applyWorklistActionService = async ({ id, action, rejectionReason = '', comment = '', actorId = null } = {}) => {
+  const actionComment = comment || rejectionReason || '';
   const targetCR = await ChangeRequest.findByPk(id);
   if (!targetCR) {
     const err = new Error(`Change Request ${id} not found.`);
     err.statusCode = 404;
     throw err;
   }
-  if (actorId && targetCR.requesterId && String(targetCR.requesterId) === String(actorId)) {
+  const identityRes = await IdentityResolver.resolveByKey(actorId);
+  const actorName = identityRes.status === 'SUCCESS' ? identityRes.identity.displayName : 'Approver';
+  const actorRoleName = identityRes.status === 'SUCCESS' ? identityRes.identity.role : 'Approver';
+  const roleId = identityRes.status === 'SUCCESS' ? identityRes.identity.roleId : null;
+  const identity = identityRes.status === 'SUCCESS' ? identityRes.identity : null;
+
+  if (['approve', 'reject'].includes(action) && targetCR.status !== 'Pending') {
+    const err = new Error(`Invalid lifecycle transition: Cannot ${action} a ${targetCR.status} request.`);
+    err.statusCode = 400;
+    throw err;
+  }
+  if (action === 'implement' && targetCR.status !== 'Approved') {
+    const err = new Error('Invalid lifecycle transition: Only approved requests can be implemented.');
+    err.statusCode = 400;
+    throw err;
+  }
+
+  // Strict self-approval restriction: any user should not be able to approve or reject their own changes
+  const actorIds = new Set([actorId].filter(Boolean));
+  if (identity) {
+    if (Array.isArray(identity.aliases)) {
+      identity.aliases.forEach((alias) => actorIds.add(alias));
+    }
+    if (identity.userKey) actorIds.add(identity.userKey);
+    if (identity.employeeBusinessId) actorIds.add(identity.employeeBusinessId);
+    if (identity.sourceId) actorIds.add(String(identity.sourceId));
+    if (identity.id) actorIds.add(String(identity.id));
+  }
+
+  const isSelf = actorIds.has(targetCR.requesterId) ||
+    (identity?.employeeBusinessId && targetCR.employeeId && targetCR.employeeId === identity.employeeBusinessId) ||
+    (identity?.email && targetCR.employeeEmail && targetCR.employeeEmail.toLowerCase() === identity.email.toLowerCase()) ||
+    (identity?.email && targetCR.requesterEmail && targetCR.requesterEmail.toLowerCase() === identity.email.toLowerCase());
+
+  if (isSelf) {
     const err = new Error(`Self-approval prohibited: You cannot ${action} your own Change Request (${id}).`);
     err.statusCode = 403;
     throw err;
   }
-
-  const actor = await User.findByPk(actorId, {
-    include: [
-      { model: Role, as: 'role' },
-      { model: ChangeManagerCategory, as: 'categoryAssignments' }
-    ]
-  });
-  const roleName = (actor?.role?.name || '').toLowerCase();
-  const roleId = actor?.roleId || '';
-  const isAdminOrSuperAdmin = ['role-1', 'role-2'].includes(roleId) || roleName.includes('admin') || roleName.includes('super');
-  const isChangeManager = roleId === 'role-3' || roleName.includes('manager');
+  const isAdminOrSuperAdmin = roleId === 'role-1' || roleId === 'role-2';
+  const isChangeManager = roleId === 'role-3';
+  const assignedCategoryIds = identityRes.status === 'SUCCESS' ? (identityRes.identity.cmCategories || []) : [];
 
   if (action === 'implement') {
     if (!isAdminOrSuperAdmin) {
@@ -874,18 +1198,42 @@ export const applyWorklistActionService = async ({ id, action, rejectionReason =
       if (cr) {
         cr.status = 'Implemented';
         cr.closedAt = new Date();
+        const existingComments = Array.isArray(cr.comments) ? [...cr.comments] : [];
+        if (actionComment) {
+          existingComments.push({
+            id: `cmt-${Date.now()}`,
+            authorName: actorName,
+            authorRole: actorRoleName,
+            text: actionComment,
+            action: 'Implemented',
+            createdAt: new Date().toISOString()
+          });
+          cr.comments = existingComments;
+          const currentCustom = cr.customFieldValues && typeof cr.customFieldValues === 'object' ? { ...cr.customFieldValues } : {};
+          currentCustom.comments = existingComments;
+          currentCustom.implementedComment = actionComment;
+          cr.customFieldValues = currentCustom;
+          if (typeof cr.changed === 'function') cr.changed('customFieldValues', true);
+        }
         await cr.save({ transaction: tx });
-        await addAuditLog({ actorId, action: 'CR Implemented', ref: id, detail: `Marked Change Request ${id} as Implemented and Closed.` }, tx);
+        await updateConfig('cr_approval_comments', (map) => ({
+          ...map,
+          [id]: {
+            ...(map[id] || {}),
+            implementedComment: actionComment,
+            implementedBy: actorName
+          }
+        }), tx);
+        await addAuditLog({ actorId, action: 'CR Implemented', ref: id, detail: `Marked Change Request ${id} as Implemented. Comment: ${actionComment || 'None'}` }, tx);
         await createWorklistActionNotifications(cr, 'implement', actorId, tx);
       }
     });
 
     const metrics = await getConfig('worklist_metrics');
-    return { id, action: 'implement', status: 'Implemented', closedAt: new Date(), worklistMetrics: metrics };
+    return { id, action: 'implement', status: 'Implemented', closedAt: new Date(), implementedComment: actionComment, worklistMetrics: metrics };
   }
 
   if (isChangeManager && !isAdminOrSuperAdmin) {
-    const assignedCategoryIds = (actor?.categoryAssignments || []).map((c) => c.categoryId);
     const assignedCategories = await CatalogCategory.findAll({
       where: { id: { [Op.in]: assignedCategoryIds } }
     });
@@ -922,7 +1270,7 @@ export const applyWorklistActionService = async ({ id, action, rejectionReason =
 
   await sequelize.transaction(async (t) => {
     const [updatedCount] = await ChangeRequestApproval.update(
-      { decision, rationale: rejectionReason, decidedAt: new Date() },
+      { decision, rationale: actionComment, decidedAt: new Date() },
       { where: { changeRequestId: id, approverId: actorId, decision: 'Pending' }, transaction: t }
     );
 
@@ -933,22 +1281,63 @@ export const applyWorklistActionService = async ({ id, action, rejectionReason =
       });
       if (!existing) {
         await ChangeRequestApproval.create(
-          { changeRequestId: id, approverId: actorId, decision, rationale: rejectionReason, decidedAt: new Date() },
+          { changeRequestId: id, approverId: actorId, decision, rationale: actionComment, decidedAt: new Date() },
           { transaction: t }
         );
       } else {
-        await existing.update({ decision, rationale: rejectionReason, decidedAt: new Date() }, { transaction: t });
+        await existing.update({ decision, rationale: actionComment, decidedAt: new Date() }, { transaction: t });
       }
     }
+
+    // Optionally mark rationale for other pending approval rows
+    await ChangeRequestApproval.update(
+      { rationale: 'Resolved by peer approver' },
+      { where: { changeRequestId: id, decision: 'Pending', approverId: { [Op.ne]: actorId } }, transaction: t }
+    );
 
     const changeRequest = await ChangeRequest.findByPk(id, { transaction: t });
     if (changeRequest) {
       changeRequest.status = finalStatus;
       if (finalStatus === 'Rejected') {
         changeRequest.closedAt = new Date();
-        changeRequest.rejectionReason = rejectionReason || 'This change request was rejected during CAB review.';
+        changeRequest.rejectionReason = actionComment || 'This change request was rejected during CAB review.';
+      }
+      const existingComments = Array.isArray(changeRequest.comments) ? [...changeRequest.comments] : [];
+      if (actionComment) {
+        existingComments.push({
+          id: `cmt-${Date.now()}`,
+          authorName: actorName,
+          authorRole: actorRoleName,
+          text: actionComment,
+          action: finalStatus,
+          createdAt: new Date().toISOString()
+        });
+        changeRequest.comments = existingComments;
+        const currentCustom = changeRequest.customFieldValues && typeof changeRequest.customFieldValues === 'object'
+          ? { ...changeRequest.customFieldValues }
+          : {};
+        currentCustom.comments = existingComments;
+        if (finalStatus === 'Approved') {
+          currentCustom.approvedComment = actionComment;
+          currentCustom.approvedBy = actorName;
+        } else if (finalStatus === 'Rejected') {
+          currentCustom.rejectionReason = actionComment;
+          currentCustom.rejectedComment = actionComment;
+          currentCustom.rejectedBy = actorName;
+        }
+        changeRequest.customFieldValues = currentCustom;
+        if (typeof changeRequest.changed === 'function') changeRequest.changed('customFieldValues', true);
       }
       await changeRequest.save({ transaction: t });
+
+      await updateConfig('cr_approval_comments', (map) => ({
+        ...map,
+        [id]: {
+          ...(map[id] || {}),
+          ...(decision === 'Approved' ? { approvedComment: actionComment, approvedBy: actorName, approvedDate: new Date().toISOString() } : {}),
+          ...(decision === 'Rejected' ? { rejectedComment: actionComment, rejectionReason: actionComment, rejectedBy: actorName, rejectedDate: new Date().toISOString() } : {})
+        }
+      }), t);
 
       await createWorklistActionNotifications(changeRequest, action, actorId, t);
     }
@@ -957,7 +1346,7 @@ export const applyWorklistActionService = async ({ id, action, rejectionReason =
       {
         action: `CR ${decision}`,
         ref: changeRequest ? changeRequest.id : id,
-        detail: `${decision} by first responder approver (${actorId})`,
+        detail: `${decision} by first responder approver (${actorId}). Comment: ${actionComment || 'None'}`,
         actorId
       },
       t
@@ -972,19 +1361,30 @@ export const applyWorklistActionService = async ({ id, action, rejectionReason =
 
   const pending = await ChangeRequest.count({ where: { status: 'Pending' } });
   const metrics = await getConfig('worklist_metrics');
-  return { id, action, status: finalStatus, worklistMetrics: { ...metrics, pending } };
+  return {
+    id,
+    action,
+    status: finalStatus,
+    approvedComment: decision === 'Approved' ? actionComment : undefined,
+    rejectedComment: decision === 'Rejected' ? actionComment : undefined,
+    rejectionReason: decision === 'Rejected' ? actionComment : undefined,
+    comment: actionComment,
+    decidedBy: actorName,
+    worklistMetrics: { ...metrics, pending }
+  };
 };
 
-export const addChangeRequestCommentService = async ({ id, commentText, actorId = 'usr-1' } = {}) => {
+export const addChangeRequestCommentService = async ({ id, commentText, actorId = null } = {}) => {
   if (!commentText || !commentText.trim()) {
     const err = new Error('Comment text cannot be empty.');
     err.statusCode = 400;
     throw err;
   }
-  const actor = await User.findByPk(actorId, { include: [{ model: Role, as: 'role' }] });
-  const roleName = (actor?.role?.name || '').toLowerCase();
-  const roleId = actor?.roleId || '';
-  const isAdminOrSuperAdmin = ['role-1', 'role-2'].includes(roleId) || roleName.includes('admin') || roleName.includes('super');
+  const identityRes = await IdentityResolver.resolveByKey(actorId);
+  const actorName = identityRes.status === 'SUCCESS' ? identityRes.identity.displayName : 'User';
+  const actorRoleName = identityRes.status === 'SUCCESS' ? identityRes.identity.role : 'User';
+  const roleId = identityRes.status === 'SUCCESS' ? identityRes.identity.roleId : null;
+  const isAdminOrSuperAdmin = roleId === 'role-1' || roleId === 'role-2';
   if (!isAdminOrSuperAdmin) {
     const err = new Error('Unauthorized: Only Admins and Super Admins can post comments.');
     err.statusCode = 403;
@@ -1004,8 +1404,8 @@ export const addChangeRequestCommentService = async ({ id, commentText, actorId 
   const newComment = {
     id: `cmt-${Date.now()}`,
     authorId: actorId,
-    authorName: actor?.name || 'Admin User',
-    authorRole: actor?.role?.name || 'Admin',
+    authorName: actorName,
+    authorRole: actorRoleName,
     text: commentText.trim(),
     createdAt: new Date().toISOString()
   };
@@ -1027,7 +1427,44 @@ export const addChangeRequestCommentService = async ({ id, commentText, actorId 
   return serializeChangeRequest(cr);
 };
 
+const SUBCATEGORY_ORDER_MAP = {
+  // 1. Server & Infra
+  'subcat-srv-lc': 1,
+  'subcat-srv-patch': 2,
+  'subcat-srv-oth': 3,
+
+  // 2. Network & Connectivity
+  'subcat-net-fw': 1,
+  'subcat-net-proxy': 2,
+  'subcat-net-vpn': 3,
+  'subcat-net-oth': 4,
+
+  // 3. Access & Security
+  'subcat-acc-app': 1,
+  'subcat-acc-phys': 2,
+  'subcat-acc-oth': 3,
+
+  // 4. IT Asset
+  'subcat-asset-dev': 1,
+  'subcat-asset-hw': 2,
+  'subcat-asset-sw': 3,
+  'subcat-asset-lic': 4,
+  'subcat-asset-oth': 5,
+
+  // 5. Office 365 & Collaboration
+  'subcat-o365-mb': 1,
+  'subcat-o365-lic': 2,
+  'subcat-o365-oth': 3,
+
+  // 6. Security Tools & Policies
+  'subcat-sec-ep': 1,
+  'subcat-sec-oth': 2
+};
+
 export const getCatalogCategoriesService = async () => {
+  // This endpoint is called while navigating and must remain read-only.
+  // Catalog normalisation belongs in a migration or an admin write action,
+  // never in every user-facing GET request.
   const rows = await CatalogCategory.findAll({
     include: [
       {
@@ -1040,15 +1477,35 @@ export const getCatalogCategoriesService = async () => {
     ],
     order: [['sortOrder', 'ASC']]
   });
+
+  const OTHER_NAME_MAP = {
+    'cat-srv': 'Other Server Changes',
+    'cat-net': 'Other Network Changes',
+    'cat-acc': 'Other Access Requests',
+    'cat-asset': 'Other IT Asset Requests',
+    'cat-o365': 'Other Email / M365 Requests',
+    'cat-sec': 'Other Security Changes',
+    'subcat-srv-oth': 'Other Server Changes',
+    'subcat-net-oth': 'Other Network Changes',
+    'subcat-acc-oth': 'Other Access Requests',
+    'subcat-asset-oth': 'Other IT Asset Requests',
+    'subcat-o365-oth': 'Other Email / M365 Requests',
+    'subcat-sec-oth': 'Other Security Changes'
+  };
+
   return rows.map((c) => {
     const plain = c.get({ plain: true });
     if (plain.subcategories && Array.isArray(plain.subcategories)) {
+      plain.subcategories.forEach((sub) => {
+        if ((sub.name || '').toLowerCase() === 'other' || sub.name === 'Other') {
+          sub.name = OTHER_NAME_MAP[sub.id] || OTHER_NAME_MAP[sub.categoryId] || OTHER_NAME_MAP[c.id] || 'Other Request';
+          sub.description = `Other ${c.name || ''} change request.`.replace('Other Other', 'Other');
+        }
+      });
       plain.subcategories.sort((a, b) => {
-        const aIsOther = (a.name || '').toLowerCase() === 'other' || (a.id || '').endsWith('-oth');
-        const bIsOther = (b.name || '').toLowerCase() === 'other' || (b.id || '').endsWith('-oth');
-        if (aIsOther && !bIsOther) return 1;
-        if (!aIsOther && bIsOther) return -1;
-        return 0;
+        const orderA = SUBCATEGORY_ORDER_MAP[a.id] ?? 99;
+        const orderB = SUBCATEGORY_ORDER_MAP[b.id] ?? 99;
+        return orderA - orderB;
       });
     }
     return plain;
@@ -1058,10 +1515,15 @@ export const getCatalogCategoriesService = async () => {
 export const getCatalogSubcategoriesService = async (categoryId) => {
   const rows = await CatalogSubcategory.findAll({
     where: { categoryId, status: 'Active' },
-    include: [{ model: Workflow, as: 'workflow', attributes: ['id', 'name', 'steps'] }],
-    order: [['name', 'ASC']]
+    include: [{ model: Workflow, as: 'workflow', attributes: ['id', 'name', 'steps'] }]
   });
-  return rows.map((s) => s.get({ plain: true }));
+  const list = rows.map((s) => s.get({ plain: true }));
+  list.sort((a, b) => {
+    const orderA = SUBCATEGORY_ORDER_MAP[a.id] ?? 99;
+    const orderB = SUBCATEGORY_ORDER_MAP[b.id] ?? 99;
+    return orderA - orderB;
+  });
+  return list;
 };
 
 export const getSubcategoryFieldsService = async (subcategoryId) => {
@@ -1074,18 +1536,7 @@ export const getSubcategoryFieldsService = async (subcategoryId) => {
 
 
 
-// ---------- Catalogue management (admin) ------------
 
-export const getCatalogueManagementService = async () => {
-  const [categories, wf] = await Promise.all([
-    getCatalogCategoriesService(),
-    Workflow.findAll({ order: [['id', 'ASC']] })
-  ]);
-  return {
-    data: categories,
-    workflows: wf.map(serializeWorkflow)
-  };
-};
 
 export const createCatalogSubcategoryService = async (payload = {}) => {
   const { categoryId, name, sla, risk, workflowId, description, actor } = payload;
@@ -1148,8 +1599,9 @@ export const createCatalogSubcategoryService = async (payload = {}) => {
     }
   ]);
 
+  const resolvedActorId = actor ? await resolveUserId(actor) : null;
   await addAuditLog({
-    actorId: await resolveUserId(actor || 'Gauri Shinde'),
+    actorId: resolvedActorId || 'SYSTEM',
     action: 'Subcategory Created',
     ref: subcatId,
     detail: `Added new sub-category ${name} under category ${categoryId}.`
@@ -1166,7 +1618,7 @@ const nextWorkflowId = async () => {
   return `wf-${maxId + 1}`;
 };
 
-export const createWorkflowService = async (payload = {}) => {
+export const createWorkflowService = async (payload = {}, actorId = null) => {
   const id = await nextWorkflowId();
   const name = payload.name || 'New Approval Workflow';
   const steps = payload.steps || 'Draft → Change Manager Review → Approved → Implemented';
@@ -1178,7 +1630,7 @@ export const createWorkflowService = async (payload = {}) => {
   });
 
   await addAuditLog({
-    actorId: 'usr-1',
+    actorId: actorId || payload.actorId || null,
     action: 'Workflow Created',
     ref: id,
     detail: `Added new approval workflow ${id} (${name}).`
@@ -1188,123 +1640,290 @@ export const createWorkflowService = async (payload = {}) => {
 };
 
 export const getSettingsUsersService = async () => {
-  const rows = await User.findAll({
-    include: [
-      { model: Role, as: 'role', attributes: ['id', 'name'] },
-      { model: ChangeManagerCategory, as: 'categoryAssignments', attributes: ['categoryId'] }
-    ],
-    order: [['id', 'ASC']]
+  const [s8Users, employees, appRoles, cmAssignments] = await Promise.all([
+    UserS8.findAll({ raw: true }),
+    Employee.findAll({ raw: true }),
+    UserAppRole.findAll({ raw: true }),
+    ChangeManagerCategory.findAll({ raw: true })
+  ]);
+
+  const roleMap = new Map();
+  appRoles.forEach((r) => roleMap.set(r.user_key || r.userKey, r.role_id || r.roleId));
+
+  const cmMap = new Map();
+  cmAssignments.forEach((c) => {
+    const key = c.userId || c.user_id;
+    if (!cmMap.has(key)) cmMap.set(key, []);
+    cmMap.get(key).push(c.categoryId || c.category_id);
   });
-  return rows.map((u) => {
-    const plain = serializeUser(u);
-    if (u.categoryAssignments) {
-      plain.categoryIds = u.categoryAssignments.map((c) => c.categoryId);
+
+  const ROLE_NAMES = {
+    'role-1': 'Super Admin',
+    'role-2': 'Admin',
+    'role-3': 'Change Manager',
+    'role-4': 'Requester'
+  };
+
+  const results = [];
+  const empByEmail = new Map();
+  for (const e of employees) {
+    if (e.email) {
+      empByEmail.set(e.email.trim().toLowerCase(), e);
     }
-    return plain;
-  });
+  }
+
+  // ONLY show users from the user table (UserS8)
+  for (const u of s8Users) {
+    const userKey = `S8-${u.id}`;
+    const roleId = roleMap.get(userKey);
+    const emailKey = (u.email || '').trim().toLowerCase();
+    const linkedEmp = emailKey ? empByEmail.get(emailKey) : null;
+    const empId = linkedEmp ? (linkedEmp.emp_id || linkedEmp.empId) : null;
+
+    results.push({
+      id: userKey,
+      userKey,
+      sourceId: u.id,
+      identityType: 'S8_USER',
+      name: u.display_name || u.displayName || u.email,
+      displayName: u.display_name || u.displayName || u.email,
+      email: u.email,
+      employeeId: empId,
+      employeeBusinessId: empId,
+      roleId: roleId || null,
+      role: roleId ? ROLE_NAMES[roleId] : 'Unassigned',
+      applicationRole: roleId === 'role-1' ? 'SUPER_ADMIN' : roleId === 'role-2' ? 'ADMIN' : roleId === 'role-3' ? 'CHANGE_MANAGER' : roleId === 'role-4' ? 'REQUESTER' : 'UNASSIGNED',
+      status: u.is_active || u.isActive ? 'Active' : 'Inactive',
+      categoryIds: cmMap.get(userKey) || cmMap.get(`S8-${u.id}`) || cmMap.get(String(u.id)) || [],
+      isInUserTable: true
+    });
+  }
+
+  return results;
 };
 
-export const updateSettingsUserService = async (userId, payload = {}, meta = {}) => {
-  const user = await User.findByPk(userId);
-  if (!user) {
-    const err = new Error(`User ${userId} not found`);
+export const updateSettingsUserService = async (userKey, payload = {}, meta = {}) => {
+  const { IdentityResolver } = await import('./IdentityResolver.js');
+  const res = await IdentityResolver.resolveByKey(userKey);
+  if (!res.identity) {
+    const err = new Error(`Identity ${userKey} not found`);
     err.statusCode = 404;
     throw err;
   }
 
-  if (payload.name) user.name = String(payload.name).trim();
-  if (payload.employeeId || payload.empId) user.employeeId = payload.employeeId || payload.empId;
-  if (payload.status) user.status = STATUS_ALIASES[String(payload.status).toLowerCase()] || payload.status;
+  const identity = res.identity;
+  let newRoleId = payload.roleId;
 
-  if (payload.role) {
-    const role = await Role.findOne({ where: { name: { [Op.iLike]: payload.role } } });
-    if (role) user.roleId = role.id;
+  if (!newRoleId && payload.role) {
+    const rMap = {
+      'super admin': 'role-1',
+      admin: 'role-2',
+      'change manager': 'role-3',
+      requester: 'role-4',
+      'role-1': 'role-1',
+      'role-2': 'role-2',
+      'role-3': 'role-3',
+      'role-4': 'role-4'
+    };
+    newRoleId = rMap[String(payload.role).toLowerCase()];
   }
 
-  await user.save();
+  if (newRoleId) {
+    const validRoleIds = ['role-1', 'role-2', 'role-3', 'role-4'];
+    if (!validRoleIds.includes(newRoleId)) {
+      const err = new Error('Valid ChangeDesk role is required (role-1, role-2, role-3, role-4)');
+      err.statusCode = 400;
+      throw err;
+    }
+
+    await UserAppRole.upsert({ userKey, roleId: newRoleId });
+  }
+
+  // Update employee record if name / empId changed
+  if (identity.identityType === 'EMPLOYEE') {
+    const emp = await Employee.findByPk(identity.sourceId);
+    if (emp) {
+      if (payload.name) emp.name = payload.name;
+      if (payload.empId || payload.employeeId) emp.empId = payload.empId || payload.employeeId;
+      await emp.save();
+    }
+  } else if (identity.identityType === 'S8_USER') {
+    const s8 = await UserS8.findByPk(identity.sourceId);
+    if (s8 && payload.name) {
+      s8.displayName = payload.name;
+      await s8.save();
+    }
+  }
+
+  if (payload.categoryIds && Array.isArray(payload.categoryIds) && (newRoleId === 'role-3' || identity.roleId === 'role-3')) {
+    await updateChangeManagerCategoriesService(userKey, payload.categoryIds);
+  }
 
   await addAuditLog({
-    actorId: meta.actorId || null,
-    action: 'User Updated',
-    ref: user.id,
-    detail: `Updated user details for ${user.name}.`
+    actorId: meta.actorId || 'SYSTEM',
+    action: 'User Role Updated',
+    ref: userKey,
+    detail: `Updated role and assignments for ${identity.displayName} (${userKey}).`
   });
 
-  const updated = await User.findByPk(user.id, {
-    include: [{ model: Role, as: 'role', attributes: ['id', 'name'] }]
-  });
-  return serializeUser(updated);
+  const updatedRes = await IdentityResolver.resolveByKey(userKey);
+  return updatedRes.identity;
 };
 
-const STATUS_ALIASES = { enabled: 'Active', disabled: 'Inactive', active: 'Active', inactive: 'Inactive' };
-
-/** Invite a new user: create the row, then email them a sign-in link. */
+/** Invites or assigns a ChangeDesk role to a user */
 export const createSettingsUserService = async (payload = {}, meta = {}) => {
-  const name = String(payload.name || '').trim();
-  const email = String(payload.email || '').trim().toLowerCase();
-  if (!name || !email) {
-    const e = new Error('Name and email are required');
+  const email = payload.email ? String(payload.email).trim().toLowerCase() : null;
+  if (!email) {
+    const e = new Error('Email is required to invite or add a user');
     e.statusCode = 400;
     throw e;
   }
 
-  const clash = await User.findOne({ where: { email: { [Op.iLike]: email } } });
-  if (clash) {
-    const e = new Error('A user with that email already exists');
-    e.statusCode = 409;
+  const rMap = {
+    'super admin': 'role-1',
+    admin: 'role-2',
+    'change manager': 'role-3',
+    requester: 'role-4',
+    'role-1': 'role-1',
+    'role-2': 'role-2',
+    'role-3': 'role-3',
+    'role-4': 'role-4'
+  };
+  const roleId = rMap[String(payload.roleId || payload.role || '').toLowerCase()];
+
+  const validRoleIds = ['role-1', 'role-2', 'role-3', 'role-4'];
+  if (!roleId || !validRoleIds.includes(roleId)) {
+    const e = new Error('Valid ChangeDesk role is required (role-1, role-2, role-3, role-4)');
+    e.statusCode = 400;
     throw e;
   }
 
-  const roleName = payload.role || payload.roleName || 'Requester';
-  const role = await Role.findOne({ where: { name: { [Op.iLike]: roleName } } });
-  const status = STATUS_ALIASES[String(payload.status || 'Active').toLowerCase()] || 'Active';
+  const rawName = (payload.name || '').trim();
+  const nameParts = rawName ? rawName.split(/\s+/) : [email.split('@')[0]];
+  const displayName = rawName || email.split('@')[0];
+  const givenName = nameParts[0] || displayName;
+  const familyName = nameParts.slice(1).join(' ') || '';
+  const empId = payload.empId || payload.employeeId || null;
 
-  const ids = (await User.findAll({ attributes: ['id'], raw: true })).map(
-    (r) => parseInt(String(r.id).replace(/\D/g, ''), 10) || 0
-  );
-  const seq = (ids.length ? Math.max(...ids) : 0) + 1;
+  // Check existing records in both directories
+  let [s8User, employee] = await Promise.all([
+    UserS8.findOne({
+      where: sequelize.where(sequelize.fn('LOWER', sequelize.col('email')), email)
+    }),
+    Employee.findOne({
+      where: sequelize.where(sequelize.fn('LOWER', sequelize.col('email')), email)
+    })
+  ]);
 
-  const tempPassword = generateTempPassword();
-  await User.create({
-    id: `usr-${seq}`,
-    name,
-    email,
-    employeeId: payload.employeeId || payload.empId || `EMP-${10500 + seq}`,
-    status,
-    authProvider: 'local',
-    passwordHash: await bcrypt.hash(tempPassword, 10),
-    roleId: role ? role.id : null
-  });
+  // 1. ALWAYS create/ensure in UserS8 (user table) so the user is saved in DB and shown on Settings Users page
+  if (!s8User) {
+    const [maxRes] = await sequelize.query('SELECT COALESCE(MAX(id), 0) AS max_id FROM "user"');
+    const nextId = parseInt(maxRes[0]?.max_id || 0, 10) + 1;
+
+    s8User = await UserS8.create({
+      id: nextId,
+      displayName,
+      givenName,
+      familyName,
+      email,
+      isActive: payload.status !== 'Inactive' && payload.status !== 'Disabled'
+    });
+  } else {
+    if (displayName && s8User.displayName !== displayName) {
+      s8User.displayName = displayName;
+      await s8User.save();
+    }
+  }
+
+  // 2. Also ensure employee record exists
+  if (!employee) {
+    const [empMaxRes] = await sequelize.query('SELECT COALESCE(MAX(id), 0) AS max_id FROM employees');
+    const nextEmpId = parseInt(empMaxRes[0]?.max_id || 0, 10) + 1;
+    const assignedEmpId = empId || `EMP-${10500 + nextEmpId}`;
+
+    employee = await Employee.create({
+      id: nextEmpId,
+      name: displayName,
+      email,
+      empId: assignedEmpId,
+      location: payload.location || null
+    });
+  } else {
+    if (displayName && employee.name !== displayName) {
+      employee.name = displayName;
+      await employee.save();
+    }
+    if (empId && !employee.empId) {
+      employee.empId = empId;
+      await employee.save();
+    }
+  }
+
+  const s8Key = `S8-${s8User.id}`;
+  const empKey = `EMP-${employee.id}`;
+  const primaryKey = s8Key;
+
+  await UserAppRole.upsert({ userKey: s8Key, roleId });
+  await UserAppRole.upsert({ userKey: empKey, roleId });
+
+  if (roleId === 'role-3' && Array.isArray(payload.categoryIds) && payload.categoryIds.length > 0) {
+    await updateChangeManagerCategoriesService(s8Key, payload.categoryIds);
+    await updateChangeManagerCategoriesService(empKey, payload.categoryIds);
+  }
+
+  const ROLE_NAMES = {
+    'role-1': 'Super Admin',
+    'role-2': 'Admin',
+    'role-3': 'Change Manager',
+    'role-4': 'Requester'
+  };
 
   await addAuditLog({
-    actorId: meta.actorId || null,
+    actorId: meta.actorId || 'SYSTEM',
     action: 'User Invited',
-    ref: `usr-${seq}`,
-    detail: `Invited ${name} (${email}) as ${role ? role.name : roleName}.`
+    ref: primaryKey,
+    detail: `Invited user ${displayName} (${email}) with role ${ROLE_NAMES[roleId] || roleId}.`
   });
 
-  const created = await User.findByPk(`usr-${seq}`, {
-    include: [{ model: Role, as: 'role', attributes: ['id', 'name'] }]
-  });
-  const serialized = serializeUser(created);
-
-  // Fire-and-forget welcome email with a sign-in link.
-  sendUserInviteEmail({ user: serialized, tempPassword, invitedByName: meta.invitedByName }).catch((err) =>
-    console.error('[mail] user-invite notification failed:', err.message)
-  );
-
-  return serialized;
+  const { IdentityResolver } = await import('./IdentityResolver.js');
+  const updatedRes = await IdentityResolver.resolveByKey(primaryKey);
+  return updatedRes.identity || {
+    id: primaryKey,
+    userKey: primaryKey,
+    name: displayName,
+    displayName,
+    email,
+    roleId,
+    role: ROLE_NAMES[roleId] || 'Requester',
+    status: 'Active'
+  };
 };
 
 export const getSettingsRolesService = async () => {
-  const rows = await Role.findAll({
-    include: [{ model: User, as: 'users', attributes: ['id'] }],
-    order: [['id', 'ASC']]
+  const [rows, userRoles] = await Promise.all([
+    Role.findAll({ order: [['id', 'ASC']] }),
+    UserAppRole.findAll({ attributes: ['roleId'], raw: true })
+  ]);
+
+  const counts = {};
+  userRoles.forEach((ur) => {
+    const rid = ur.roleId || ur.role_id;
+    counts[rid] = (counts[rid] || 0) + 1;
   });
-  return rows.map(serializeRole);
+
+  return rows.map((r) => {
+    const plainRole = r.get ? r.get({ plain: true }) : r;
+    return {
+      id: plainRole.id,
+      name: plainRole.name,
+      usersCount: counts[plainRole.id] || 0,
+      description: plainRole.description,
+      permissions: plainRole.permissions
+    };
+  });
 };
 
-export const updateRolePermissionsService = async (roleId, permissions = []) => {
+export const updateRolePermissionsService = async (roleId, permissions = [], actorId = null) => {
   const role = await Role.findByPk(roleId);
   if (!role) {
     const err = new Error(`Role ${roleId} not found`);
@@ -1316,16 +1935,21 @@ export const updateRolePermissionsService = async (roleId, permissions = []) => 
   await role.save();
 
   await addAuditLog({
-    actorId: 'usr-1',
+    actorId: actorId || 'SYSTEM',
     action: 'Role Permissions Updated',
     ref: roleId,
     detail: `Updated permissions for role ${role.name}.`
   });
 
-  const updated = await Role.findByPk(roleId, {
-    include: [{ model: User, as: 'users', attributes: ['id'] }]
-  });
-  return serializeRole(updated);
+  const usersCount = await UserAppRole.count({ where: { roleId } });
+  const plainRole = role.get ? role.get({ plain: true }) : role;
+  return {
+    id: plainRole.id,
+    name: plainRole.name,
+    usersCount,
+    description: plainRole.description,
+    permissions: plainRole.permissions
+  };
 };
 
 const AUDIT_FILTERS = {
@@ -1338,10 +1962,63 @@ const AUDIT_FILTERS = {
 
 export const getSettingsAuditLogsService = async (filter = 'All activity') => {
   const rows = await AuditLog.findAll({
-    include: [{ model: User, as: 'actor', attributes: ['id', 'name', 'email'] }],
     order: [['id', 'DESC']]
   });
-  const logs = rows.map(serializeAuditLog);
+
+  const actorKeys = [...new Set(rows.map((r) => r.actorId).filter(Boolean))];
+  const identityMap = new Map();
+  await Promise.all(
+    actorKeys.map(async (k) => {
+      // 1. Reuse existing IdentityResolver
+      const res = await IdentityResolver.resolveByKey(k);
+      if (res.status === 'SUCCESS' && res.identity) {
+        identityMap.set(k, res.identity);
+        return;
+      }
+
+      // 2. Direct directory table lookup if key has S8- or EMP- prefix without active role
+      if (k.startsWith('S8-')) {
+        const id = parseInt(k.replace('S8-', ''), 10);
+        if (!isNaN(id)) {
+          const s8User = await UserS8.findByPk(id);
+          if (s8User) {
+            identityMap.set(k, {
+              displayName: s8User.name || s8User.displayName,
+              name: s8User.name || s8User.displayName,
+              email: s8User.email,
+              employeeBusinessId: s8User.empId || null
+            });
+            return;
+          }
+        }
+      } else if (k.startsWith('EMP-')) {
+        const raw = k.replace('EMP-', '');
+        const id = parseInt(raw, 10);
+        let employee = null;
+        if (!isNaN(id)) {
+          employee = await Employee.findByPk(id);
+        }
+        if (!employee) {
+          employee = await Employee.findOne({ where: { empId: k } });
+        }
+        if (employee) {
+          identityMap.set(k, {
+            displayName: employee.name,
+            name: employee.name,
+            email: employee.email,
+            employeeBusinessId: employee.empId || null
+          });
+          return;
+        }
+      }
+    })
+  );
+
+  const logs = rows.map((r) => {
+    const actorIdentity = identityMap.get(r.actorId) || null;
+    return serializeAuditLog(r, actorIdentity);
+  });
+
   const key = String(filter).toLowerCase();
   return key === 'all activity' || !AUDIT_FILTERS[key] ? logs : logs.filter(AUDIT_FILTERS[key]);
 };
@@ -1431,7 +2108,7 @@ export const getReportsMetricsService = async (dateFilter = 'overall', startDate
   // Location breakdown query
   const locationBreakdown = await sequelize.query(`
     SELECT
-      COALESCE(NULLIF(location, ''), 'Ahmedabad HQ') AS location,
+      COALESCE(NULLIF(location, ''), 'Not specified') AS location,
       COUNT(*)::int AS count
     FROM change_requests
     ${dateWhere}
@@ -1475,25 +2152,25 @@ export const getReportsMetricsService = async (dateFilter = 'overall', startDate
 // ---------- Notifications -----------------------------
 
 const getApproverUsers = async (tx) => {
-  const users = await User.findAll({
-    where: { status: 'Active' },
-    include: [
-      {
-        model: Role,
-        as: 'role',
-        attributes: ['id', 'name'],
-        where: { name: { [Op.in]: ['Super Admin', 'Admin', 'Change Manager'] } }
-      }
-    ],
+  const appRoles = await UserAppRole.findAll({
+    where: { roleId: { [Op.in]: ['role-1', 'role-2', 'role-3'] } },
     transaction: tx
   });
+  const users = [];
+  for (const r of appRoles) {
+    const res = await IdentityResolver.resolveByKey(r.userKey);
+    if (res.status === 'SUCCESS') {
+      users.push(res.identity);
+    }
+  }
   return users;
 };
 
 export const createSubmissionNotifications = async (changeRequest, tx) => {
   try {
     const approvers = await getVotersForCategory(changeRequest.categoryId, tx);
-    const requesterName = changeRequest.employeeName || (await User.findByPk(changeRequest.requesterId, { transaction: tx }))?.name || 'an employee';
+    const reqRes = await IdentityResolver.resolveByKey(changeRequest.requesterId);
+    const requesterName = changeRequest.employeeName || reqRes?.identity?.displayName || reqRes?.identity?.name || 'an employee';
 
     const notifications = approvers
       .filter((a) => a.id !== changeRequest.requesterId)
@@ -1516,9 +2193,10 @@ export const createSubmissionNotifications = async (changeRequest, tx) => {
 
 export const createWorklistActionNotifications = async (changeRequest, action, actorId, tx) => {
   try {
-    const actor = await User.findByPk(actorId, { transaction: tx });
-    const actorName = actor?.name || 'an approver';
-    const requesterName = changeRequest.employeeName || (await User.findByPk(changeRequest.requesterId, { transaction: tx }))?.name || 'an employee';
+    const actorRes = await IdentityResolver.resolveByKey(actorId);
+    const actorName = actorRes?.identity?.displayName || actorRes?.identity?.name || 'an approver';
+    const reqRes = await IdentityResolver.resolveByKey(changeRequest.requesterId);
+    const requesterName = changeRequest.employeeName || reqRes?.identity?.displayName || reqRes?.identity?.name || 'an employee';
 
     const verb = action === 'approve' ? 'Approved' : action === 'reject' ? 'Rejected' : action === 'implement' ? 'Implemented' : 'Sent back';
     const type = action === 'approve' ? 'CR_APPROVED' : action === 'reject' ? 'CR_REJECTED' : action === 'implement' ? 'CR_IMPLEMENTED' : 'CR_SENT_BACK';
@@ -1573,19 +2251,14 @@ export const createWorklistActionNotifications = async (changeRequest, action, a
   }
 };
 
-export const getUserNotificationsService = async (userId = 'usr-1') => {
+export const getUserNotificationsService = async (userId = null) => {
   if (!userId) return { data: [], unreadCount: 0 };
-  const user = await User.findByPk(userId, {
-    include: [
-      { model: Role, as: 'role' },
-      { model: ChangeManagerCategory, as: 'categoryAssignments' }
-    ]
-  });
 
-  const roleName = (user?.role?.name || '').toLowerCase();
-  const roleId = user?.roleId || '';
-  const isSuperOrAdmin = ['role-1', 'role-2'].includes(roleId) || roleName.includes('admin') || roleName.includes('super');
-  const isChangeManager = roleId === 'role-3' || roleName.includes('manager') || (user?.categoryAssignments && user?.categoryAssignments.length > 0);
+  const identityRes = await IdentityResolver.resolveByKey(userId);
+  const roleId = identityRes.status === 'SUCCESS' ? identityRes.identity.roleId : null;
+  const isSuperOrAdmin = roleId === 'role-1' || roleId === 'role-2';
+  const isChangeManager = roleId === 'role-3';
+  const assignedCategoryIds = new Set(identityRes.status === 'SUCCESS' ? (identityRes.identity.cmCategories || []) : []);
 
   const rows = await Notification.findAll({
     where: { userId },
@@ -1597,7 +2270,6 @@ export const getUserNotificationsService = async (userId = 'usr-1') => {
   let filteredRows = rows;
 
   if (isChangeManager && !isSuperOrAdmin) {
-    const assignedCategoryIds = new Set((user?.categoryAssignments || []).map((c) => c.categoryId));
     const allCategories = await CatalogCategory.findAll({ attributes: ['id', 'name'] });
     const categoryNameToIdMap = new Map();
     for (const c of allCategories) {
@@ -1620,25 +2292,54 @@ export const getUserNotificationsService = async (userId = 'usr-1') => {
   return { data: filteredRows.map((n) => n.get({ plain: true })), unreadCount };
 };
 
-export const markNotificationAsReadService = async (id, userId = 'usr-1') => {
+export const markNotificationAsReadService = async (id, userId = null) => {
+  if (!userId) return { data: [], unreadCount: 0 };
   await Notification.update({ isRead: true, isStale: true }, { where: { id, userId } });
   return getUserNotificationsService(userId);
 };
 
-export const markAllNotificationsAsReadService = async (userId = 'usr-1') => {
+export const markAllNotificationsAsReadService = async (userId = null) => {
+  if (!userId) return { data: [], unreadCount: 0 };
   await Notification.update({ isRead: true, isStale: true }, { where: { userId, isRead: false } });
   return getUserNotificationsService(userId);
 };
 
 
 export const getChangeManagerCategoriesService = async (userId) => {
-  const where = userId ? { userId } : {};
-  const assignments = await ChangeManagerCategory.findAll({ where, raw: true });
+  if (!userId) {
+    const assignments = await ChangeManagerCategory.findAll({ raw: true });
+    return assignments.map((a) => ({ userId: a.userId, categoryId: a.categoryId }));
+  }
+  const normalizedKeys = [userId];
+  if (typeof userId === 'string' && userId.startsWith('EMP-')) {
+    normalizedKeys.push(userId.replace('EMP-', ''));
+  } else if (typeof userId === 'string' && userId.startsWith('S8-')) {
+    normalizedKeys.push(userId.replace('S8-', ''));
+  } else if (!isNaN(Number(userId))) {
+    normalizedKeys.push(`EMP-${userId}`);
+    normalizedKeys.push(`S8-${userId}`);
+  }
+  const assignments = await ChangeManagerCategory.findAll({
+    where: { userId: { [Op.in]: normalizedKeys } },
+    raw: true
+  });
   return assignments.map((a) => ({ userId: a.userId, categoryId: a.categoryId }));
 };
 
 export const updateChangeManagerCategoriesService = async (userId, categoryIds = []) => {
-  const current = await ChangeManagerCategory.findAll({ where: { userId } });
+  const normalizedKeys = [userId];
+  if (typeof userId === 'string' && userId.startsWith('EMP-')) {
+    normalizedKeys.push(userId.replace('EMP-', ''));
+  } else if (typeof userId === 'string' && userId.startsWith('S8-')) {
+    normalizedKeys.push(userId.replace('S8-', ''));
+  } else if (!isNaN(Number(userId))) {
+    normalizedKeys.push(`EMP-${userId}`);
+    normalizedKeys.push(`S8-${userId}`);
+  }
+
+  const current = await ChangeManagerCategory.findAll({
+    where: { userId: { [Op.in]: normalizedKeys } }
+  });
   const currentCatIds = current.map((c) => c.categoryId);
 
   const toAdd = categoryIds.filter((cid) => !currentCatIds.includes(cid));
@@ -1646,7 +2347,7 @@ export const updateChangeManagerCategoriesService = async (userId, categoryIds =
 
   if (toRemove.length > 0) {
     await ChangeManagerCategory.destroy({
-      where: { userId, categoryId: { [Op.in]: toRemove } }
+      where: { userId: { [Op.in]: normalizedKeys }, categoryId: { [Op.in]: toRemove } }
     });
   }
 

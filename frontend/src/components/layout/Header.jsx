@@ -35,6 +35,7 @@ function Header({
 
   const notifRef = useRef(null);
   const profileRef = useRef(null);
+  const notificationRequestInFlight = useRef(false);
 
   // Click outside to close dropdowns
   useEffect(() => {
@@ -53,6 +54,8 @@ function Header({
   // 10-Second Polling for Notifications
   useEffect(() => {
     const fetchNotifications = async () => {
+      if (document.hidden || notificationRequestInFlight.current) return;
+      notificationRequestInFlight.current = true;
       try {
         const res = await apiFetch('/notifications');
         if (res.ok) {
@@ -64,11 +67,13 @@ function Header({
         }
       } catch (err) {
         // Polling catch - silent
+      } finally {
+        notificationRequestInFlight.current = false;
       }
     };
 
     fetchNotifications();
-    const interval = setInterval(fetchNotifications, 10000);
+    const interval = setInterval(fetchNotifications, 30000);
     return () => clearInterval(interval);
   }, []);
 

@@ -1,19 +1,14 @@
 // ────────────────────────────────────────────────────────────────
-//  Auth service – email/password login that issues a session JWT.
-//
-//  When Microsoft Entra ID (Azure AD) SSO is added later, the OAuth
-//  callback just needs to resolve/create a `users` row and call
-//  `issueToken(user)` — the rest of the app is unchanged.
+//  Auth service – Email-only development authentication using IdentityResolver.
 // ────────────────────────────────────────────────────────────────
-import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
-import { Op } from 'sequelize';
-import { User, Role } from '../models/index.js';
+import { IdentityResolver } from './IdentityResolver.js';
 
-const SECRET = process.env.JWT_SECRET || 'dev-change-desk-secret';
+if (!process.env.JWT_SECRET) {
+  throw new Error('JWT_SECRET environment variable is required and not set.');
+}
+const SECRET = process.env.JWT_SECRET;
 const EXPIRES_IN = process.env.JWT_EXPIRES_IN || '7d';
-
-const withRole = { include: [{ model: Role, as: 'role', attributes: ['id', 'name'] }] };
 
 const initials = (name = '') =>
   name
@@ -23,26 +18,64 @@ const initials = (name = '') =>
     .map((w) => w[0]?.toUpperCase() || '')
     .join('') || 'U';
 
-/** Everything the frontend is allowed to see about a user. */
-export const publicUser = (row) => {
-  const u = row?.get ? row.get({ plain: true }) : row;
+import { UserS8 } from '../models/UserS8.js';
+import { sequelize } from '../config/database.js';
+
+/** Check if email exists in public.users (S8 table) */
+export const checkUserInUserTable = async (email) => {
+  if (!email) return false;
+  try {
+    const s8User = await UserS8.findOne({
+      where: sequelize.where(sequelize.fn('LOWER', sequelize.col('email')), email.trim().toLowerCase())
+    });
+    return Boolean(s8User);
+  } catch (err) {
+    return false;
+  }
+};
+
+/** Formats normalized identity for frontend consumption. */
+export const publicUser = (identity) => {
+  if (!identity) return null;
+  const u = identity.get ? identity.get({ plain: true }) : identity;
+  
   return {
-    id: u.id,
-    name: u.name,
+    id: u.userKey || u.id,
+    userKey: u.userKey || u.id,
+    sourceId: u.sourceId,
+    identityType: u.identityType,
+    name: u.displayName || u.name,
+    displayName: u.displayName || u.name,
     email: u.email,
-    role: u.role?.name ?? null,
-    roleId: u.roleId || u.role?.id || null,
-    status: u.status,
-    initials: initials(u.name)
+    employeeId: u.employeeBusinessId || u.employeeId || null,
+    employeeBusinessId: u.employeeBusinessId || null,
+    location: u.location || null,
+    employee: u.employee || null,
+    role: u.role || null,
+    roleId: u.roleId || null,
+    applicationRole: u.applicationRole || null,
+    status: 'Active',
+    cmCategories: u.cmCategories || [],
+    initials: initials(u.displayName || u.name || u.email),
+    isInUserTable: u.identityType === 'S8_USER'
   };
 };
 
-export const issueToken = (user) =>
-  jwt.sign({ sub: user.id, name: user.name }, SECRET, { expiresIn: EXPIRES_IN });
+export const publicUserAsync = async (identity) => {
+  return publicUser(identity);
+};
 
-export const verifyToken = (token) => jwt.verify(token, SECRET); // throws if invalid/expired
+export const issueToken = (identity) =>
+  jwt.sign(
+    {
+      sub: identity.userKey || identity.id,
+      identityType: identity.identityType,
+      email: identity.email
+    },
+    SECRET,
+    { expiresIn: EXPIRES_IN }
+  );
 
-/** Human-typeable temporary password for freshly invited users. */
 export const generateTempPassword = () => {
   const words = ['fox', 'change', 'desk', 'north', 'delta', 'quartz', 'ember', 'sable', 'orbit', 'ridge'];
   const w = words[Math.floor(Math.random() * words.length)];
@@ -50,32 +83,47 @@ export const generateTempPassword = () => {
   return `${w.charAt(0).toUpperCase()}${w.slice(1)}-${n}`;
 };
 
-export const findUserById = (id) => User.findByPk(id, withRole);
+export const verifyToken = (token) => jwt.verify(token, SECRET);
 
-export const authenticate = async (email, password) => {
-  if (!email || !password) {
-    const e = new Error('Email and password are required');
+/** Development Email-Only Authentication (No password, no OTP, no dummy lookup) */
+export const authenticate = async (email) => {
+  if (!email) {
+    const e = new Error('Email is required');
     e.statusCode = 400;
     throw e;
   }
 
-  const user = await User.findOne({
-    where: { email: { [Op.iLike]: String(email).trim() } },
-    ...withRole
-  });
+  const result = await IdentityResolver.resolveByEmail(email);
 
-  const ok = user && user.passwordHash && (await bcrypt.compare(password, user.passwordHash));
-  if (!ok) {
-    const e = new Error('Invalid email or password');
+  if (result.status === 'NOT_FOUND') {
+    const e = new Error('Unknown email address — user not found in directory');
     e.statusCode = 401;
     throw e;
   }
 
-  if (String(user.status).toLowerCase() === 'inactive') {
-    const e = new Error('This account is inactive — contact an administrator');
+  if (result.status === 'AMBIGUOUS') {
+    const e = new Error('Ambiguous email match across directories. Contact support.');
     e.statusCode = 403;
     throw e;
   }
 
-  return user;
+  if (result.status === 'NO_ROLE') {
+    const e = new Error('Account has no assigned ChangeDesk application role');
+    e.statusCode = 403;
+    throw e;
+  }
+
+  if (result.status === 'INVALID_ROLE_COMBINATION') {
+    const e = new Error('Account has invalid identity and role configuration');
+    e.statusCode = 403;
+    throw e;
+  }
+
+  if (result.status !== 'SUCCESS' || !result.identity) {
+    const e = new Error('Authentication failed');
+    e.statusCode = 401;
+    throw e;
+  }
+
+  return result.identity;
 };

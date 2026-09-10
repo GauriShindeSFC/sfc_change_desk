@@ -1,14 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, X, ArrowRight } from 'lucide-react';
+import { Plus } from 'lucide-react';
 import FilterBar from '../components/ui/FilterBar';
 import { apiFetch } from '../lib/apiFetch';
 
-function ChangeCatalogPage({ onNavigate, searchQuery = '', user, initialData }) {
-  const roleName = (user?.role || '').toLowerCase();
-  const roleId = user?.roleId || '';
-  const canManageCatalog =
-    roleId === 'role-1' || roleName === 'super admin' || roleName.includes('super admin');
-
+function ChangeCatalogPage({ onNavigate, searchQuery = '', initialData }) {
   const defaultItems = [
     // 1. Server & Infra
     { id: 'subcat-srv-lc', title: 'Server Lifecycle', category: 'Server & Infra', description: 'Create, modify, migrate, or decommission server instances.', sla: '3 business days', risk: 'Medium', riskColor: '#D97706', riskBars: 2, iconBg: '#EBF5FF', iconColor: '#2563EB' },
@@ -45,8 +40,8 @@ function ChangeCatalogPage({ onNavigate, searchQuery = '', user, initialData }) 
 
   const [items, setItems] = useState(defaultItems);
   const [activeCategory, setActiveCategory] = useState(initialData?.activeCategory || initialData?.category || 'Server & Infra');
-  const [isModalOpen, setIsModalOpen] = useState(false);
   const [loadFailed, setLoadFailed] = useState(false);
+  const [hoveredCardId, setHoveredCardId] = useState(null);
 
   useEffect(() => {
     if (initialData?.activeCategory) {
@@ -55,16 +50,6 @@ function ChangeCatalogPage({ onNavigate, searchQuery = '', user, initialData }) 
       setActiveCategory(initialData.category);
     }
   }, [initialData]);
-
-  // New Catalog Item Modal Form State
-  const [newItem, setNewItem] = useState({
-    title: '',
-    category: 'Server & Infra',
-    sla: '',
-    description: '',
-    risk: 'Low',
-    workflow: 'Standard Change Workflow'
-  });
 
   useEffect(() => {
     const fetchCatalog = async () => {
@@ -79,11 +64,37 @@ function ChangeCatalogPage({ onNavigate, searchQuery = '', user, initialData }) 
                 cat.subcategories.forEach(sub => {
                   const riskColorMap = { Low: '#059669', Medium: '#D97706', High: '#DC2626' };
                   const riskBarsMap = { Low: 1, Medium: 2, High: 3 };
+
+                  const OTHER_NAME_MAP = {
+                    'cat-srv': 'Other Server Changes',
+                    'cat-net': 'Other Network Changes',
+                    'cat-acc': 'Other Access Requests',
+                    'cat-asset': 'Other IT Asset Requests',
+                    'cat-o365': 'Other Email / M365 Requests',
+                    'cat-sec': 'Other Security Changes',
+                    'subcat-srv-oth': 'Other Server Changes',
+                    'subcat-net-oth': 'Other Network Changes',
+                    'subcat-acc-oth': 'Other Access Requests',
+                    'subcat-asset-oth': 'Other IT Asset Requests',
+                    'subcat-o365-oth': 'Other Email / M365 Requests',
+                    'subcat-sec-oth': 'Other Security Changes'
+                  };
+
+                  let subTitle = sub.name;
+                  if (!subTitle || subTitle.trim().toLowerCase() === 'other') {
+                    subTitle = OTHER_NAME_MAP[sub.id] || OTHER_NAME_MAP[sub.categoryId] || OTHER_NAME_MAP[cat.id] || `Other ${cat.name} Changes`;
+                  }
+
+                  let subDesc = sub.description;
+                  if (!subDesc || subDesc.trim().toLowerCase() === 'other change request.') {
+                    subDesc = `Other ${cat.name} change request.`;
+                  }
+
                   flattened.push({
                     id: sub.id,
-                    title: sub.name,
+                    title: subTitle,
                     category: cat.name,
-                    description: sub.description || `${sub.name} change request.`,
+                    description: subDesc,
                     sla: sub.sla || '3 business days',
                     risk: sub.risk || 'Medium',
                     riskColor: riskColorMap[sub.risk] || '#D97706',
@@ -97,6 +108,11 @@ function ChangeCatalogPage({ onNavigate, searchQuery = '', user, initialData }) 
             if (flattened.length > 0) {
               setItems(flattened);
               setLoadFailed(false);
+            }
+            const catList = body.data.map(cat => ({ id: cat.id, name: cat.name }));
+            setCategories(catList);
+            if (!initialData?.activeCategory && !initialData?.category && catList.length > 0) {
+              setActiveCategory(catList[0].name);
             }
           } else {
             setLoadFailed(true);
@@ -112,20 +128,7 @@ function ChangeCatalogPage({ onNavigate, searchQuery = '', user, initialData }) 
     fetchCatalog();
   }, []);
 
-  const categories = [
-    'Server & Infra',
-    'Network & Connectivity',
-    'Access & Security',
-    'IT Asset',
-    'Office 365 & Collaboration',
-    'Security Tools & Policies'
-  ];
-
-  const isOtherItem = (item) => {
-    const titleLower = (item.title || '').toLowerCase();
-    const idLower = (item.id || '').toLowerCase();
-    return titleLower === 'other' || titleLower.startsWith('other ') || titleLower.startsWith('other') || idLower.endsWith('-oth');
-  };
+  const [categories, setCategories] = useState([]);
 
   const filteredItems = items.filter(item => {
     const matchesCat = !activeCategory || activeCategory === 'All items' || (item.category && item.category.toLowerCase() === activeCategory.toLowerCase());
@@ -135,71 +138,7 @@ function ChangeCatalogPage({ onNavigate, searchQuery = '', user, initialData }) 
       (item.category || '').toLowerCase().includes(q) ||
       (item.description || '').toLowerCase().includes(q);
     return matchesCat && matchesQuery;
-  }).sort((a, b) => {
-    const aIsOther = isOtherItem(a);
-    const bIsOther = isOtherItem(b);
-    if (aIsOther && !bIsOther) return 1;
-    if (!aIsOther && bIsOther) return -1;
-    return 0;
   });
-
-  const handleSaveCatalogItem = async (e) => {
-    e.preventDefault();
-    if (!newItem.title) return;
-
-    const catMap = {
-      'Server & Infra': 'cat-srv',
-      'Network & Connectivity': 'cat-net',
-      'Access & Security': 'cat-acc',
-      'IT Asset': 'cat-asset',
-      'Office 365 & Collaboration': 'cat-o365',
-      'Security Tools & Policies': 'cat-sec'
-    };
-
-    const categoryId = catMap[newItem.category] || 'cat-srv';
-    const riskColorMap = { Low: '#059669', Medium: '#D97706', High: '#DC2626' };
-    const riskBarsMap = { Low: 1, Medium: 2, High: 3 };
-
-    const createdItem = {
-      id: `subcat-custom-${Date.now()}`,
-      title: newItem.title,
-      category: newItem.category,
-      description: newItem.description || `${newItem.title} change request.`,
-      sla: newItem.sla || '3 business days',
-      risk: newItem.risk,
-      riskColor: riskColorMap[newItem.risk] || '#059669',
-      riskBars: riskBarsMap[newItem.risk] || 1,
-      iconBg: newItem.category.includes('Server') ? '#EBF5FF' : newItem.category.includes('Network') ? '#F3E8FF' : newItem.category.includes('Security') ? '#FEE2E2' : '#D1FAE5',
-      iconColor: newItem.category.includes('Server') ? '#2563EB' : newItem.category.includes('Network') ? '#7C3AED' : newItem.category.includes('Security') ? '#DC2626' : '#059669'
-    };
-
-    setItems((prev) => [createdItem, ...prev]);
-    setIsModalOpen(false);
-    const saveTitle = newItem.title;
-    const saveSla = newItem.sla;
-    const saveRisk = newItem.risk;
-    const saveWorkflow = newItem.workflow;
-    const saveDesc = newItem.description;
-
-    setNewItem({ title: '', category: 'Server & Infra', sla: '', description: '', risk: 'Low', workflow: 'Standard Change Workflow' });
-
-    try {
-      await apiFetch('/catalog/subcategories', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          categoryId,
-          name: saveTitle,
-          sla: saveSla || '3 business days',
-          risk: saveRisk,
-          workflow: saveWorkflow,
-          description: saveDesc
-        })
-      });
-    } catch (err) {
-      console.warn('Failed to post catalog item to backend:', err);
-    }
-  };
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
@@ -257,101 +196,128 @@ function ChangeCatalogPage({ onNavigate, searchQuery = '', user, initialData }) 
       {/* Filter Category Pills */}
       <FilterBar
         variant="inline"
-        tabs={categories.map((cat) => ({ id: cat, label: cat }))}
+        tabs={categories.map((cat) => ({ id: cat.name, label: cat.name }))}
         activeTab={activeCategory}
         onTabChange={setActiveCategory}
       />
 
       {/* Catalog Cards 3-Col Grid */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: '1.25rem' }}>
-        {filteredItems.map(item => (
-          <div
-            key={item.id}
-            style={{
-              backgroundColor: 'var(--card-bg)',
-              border: '1px solid var(--border-color)',
-              borderRadius: '12px',
-              padding: '1.35rem 1.25rem',
-              display: 'flex',
-              flexDirection: 'column',
-              justifyContent: 'space-between',
-              boxShadow: '0 1px 3px rgba(16, 21, 30, 0.04)',
-              minHeight: '220px'
-            }}
-          >
-            <div>
-              {/* Light Blue Icon Square Box with Plus Sign */}
-              <div style={{
-                width: '44px',
-                height: '44px',
+        {filteredItems.map(item => {
+          const handleCardClick = () => {
+            if (onNavigate) {
+              onNavigate('Change Request', {
+                category: item.category,
+                subCategory: item.title,
+                subcategoryId: item.id,
+                fromCategory: activeCategory,
+                activeCategory
+              });
+            }
+          };
+
+          const isHovered = hoveredCardId === item.id;
+
+          return (
+            <div
+              key={item.id}
+              onClick={handleCardClick}
+              onMouseEnter={() => setHoveredCardId(item.id)}
+              onMouseLeave={() => setHoveredCardId(null)}
+              style={{
+                backgroundColor: 'var(--card-bg)',
+                border: isHovered ? '1.5px solid #2563EB' : '1px solid var(--border-color)',
                 borderRadius: '12px',
-                backgroundColor: item.iconBg || '#EBF5FF',
+                padding: '1.35rem 1.25rem',
                 display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                marginBottom: '1rem'
-              }}>
-                <Plus size={22} color={item.iconColor || '#2563EB'} strokeWidth={2.2} />
+                flexDirection: 'column',
+                justifyContent: 'space-between',
+                boxShadow: isHovered
+                  ? '0 12px 24px -4px rgba(37, 99, 235, 0.16), 0 4px 12px -2px rgba(0, 0, 0, 0.08)'
+                  : '0 1px 3px rgba(16, 21, 30, 0.04)',
+                minHeight: '200px',
+                cursor: 'pointer',
+                transform: isHovered ? 'translateY(-5px)' : 'translateY(0)',
+                transition: 'transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease'
+              }}
+            >
+              <div>
+                {/* Light Blue Icon Square Box with Plus Sign (Clickable Button) */}
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleCardClick();
+                  }}
+                  title={`Start request for ${item.title}`}
+                  style={{
+                    width: '44px',
+                    height: '44px',
+                    borderRadius: '12px',
+                    backgroundColor: item.iconBg || '#EBF5FF',
+                    border: 'none',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    marginBottom: '1rem',
+                    cursor: 'pointer',
+                    transition: 'transform 0.15s ease, opacity 0.15s ease, box-shadow 0.15s ease',
+                    outline: 'none',
+                    boxShadow: '0 2px 5px rgba(0, 0, 0, 0.08)'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.transform = 'scale(1.1)';
+                    e.currentTarget.style.boxShadow = '0 4px 10px rgba(0, 0, 0, 0.15)';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.transform = 'scale(1)';
+                    e.currentTarget.style.boxShadow = '0 2px 5px rgba(0, 0, 0, 0.08)';
+                  }}
+                >
+                  <Plus size={22} color={item.iconColor || '#2563EB'} strokeWidth={2.5} />
+                </button>
+
+                <h3 style={{ fontSize: '1.05rem', fontWeight: 800, color: 'var(--text-primary)', marginBottom: '0.45rem', lineHeight: 1.3 }}>
+                  {item.title}
+                </h3>
+                <p style={{ fontSize: '0.825rem', color: 'var(--text-secondary)', lineHeight: 1.45, marginBottom: '1.25rem' }}>
+                  {item.description}
+                </p>
               </div>
 
-              <h3 style={{ fontSize: '1.05rem', fontWeight: 500, color: 'var(--text-primary)', marginBottom: '0.45rem', lineHeight: 1.3 }}>
-                {item.title}
-              </h3>
-              <p style={{ fontSize: '0.825rem', color: 'var(--text-secondary)', lineHeight: 1.45, marginBottom: '1.25rem' }}>
-                {item.description}
-              </p>
-            </div>
-
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingTop: '0.75rem', borderTop: '1px solid var(--border-color)' }}>
-                <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', fontWeight: 500 }}>
-                  SLA <strong style={{ color: 'var(--text-primary)', fontWeight: 500, marginLeft: '0.2rem' }}>{item.sla}</strong>
-                </span>
-
-                <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}>
-                  <div style={{ display: 'flex', gap: '2px', alignItems: 'center' }}>
-                    {[1, 2, 3].map(bar => (
-                      <div
-                        key={bar}
-                        style={{
-                          width: '3.5px',
-                          height: '12px',
-                          borderRadius: '1.5px',
-                          backgroundColor: bar <= (item.riskBars || 2) ? (item.riskColor || '#D97706') : 'var(--border-color)'
-                        }}
-                      />
-                    ))}
-                  </div>
-                  <span style={{ fontSize: '0.775rem', fontWeight: 500, color: item.riskColor || '#D97706' }}>
-                    {item.risk || 'Medium'}
-                  </span>
-                </div>
+              {/* Bottom Action: Visible only on hover */}
+              <div style={{ minHeight: '26px', display: 'flex', alignItems: 'center' }}>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleCardClick();
+                  }}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    color: '#2563EB',
+                    fontSize: '0.85rem',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '0.35rem',
+                    padding: 0,
+                    textAlign: 'left',
+                    opacity: isHovered ? 1 : 0,
+                    transform: isHovered ? 'translateX(0)' : 'translateX(-4px)',
+                    pointerEvents: isHovered ? 'auto' : 'none',
+                    transition: 'opacity 0.2s ease, transform 0.2s ease, color 0.15s ease'
+                  }}
+                >
+                  <span>Start request →</span>
+                </button>
               </div>
 
-              {/* Bottom Teal Start Request Link */}
-              <button
-                type="button"
-                onClick={() => onNavigate && onNavigate('Change Request', { category: item.category, subCategory: item.title, subcategoryId: item.id, fromCategory: activeCategory, activeCategory })}
-                style={{
-                  background: 'none',
-                  border: 'none',
-                  color: 'var(--brand-primary)',
-                  fontSize: '0.85rem',
-                  fontWeight: 500,
-                  cursor: 'pointer',
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '0.3rem',
-                  padding: 0,
-                  textAlign: 'left'
-                }}
-              >
-                <span>Start request →</span>
-              </button>
             </div>
-
-          </div>
-        ))}
+          );
+        })}
       </div>
 
     </div>

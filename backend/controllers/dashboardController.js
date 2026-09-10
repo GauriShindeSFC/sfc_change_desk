@@ -20,9 +20,7 @@ import {
   getCatalogCategoriesService,
   getCatalogSubcategoriesService,
   getSubcategoryFieldsService,
-  getCatalogueManagementService,
   createCatalogSubcategoryService,
-  createWorkflowService,
   getSettingsUsersService,
   createSettingsUserService,
   updateSettingsUserService,
@@ -41,26 +39,26 @@ import {
 
 export const getMetrics = asyncHandler(async (req, res) => {
   const isOrgScope = req.query.scope === 'organization' || req.query.scope === 'org';
-  const userId = isOrgScope ? null : (req.user?.id || req.query.userId || null);
+  const userId = isOrgScope ? null : (req.user?.userKey || req.user?.id || req.query.userId || null);
   res.json({ success: true, data: await getMetricsService(userId) });
 });
 
 export const getCategories = asyncHandler(async (req, res) => {
   const isOrgScope = req.query.scope === 'organization' || req.query.scope === 'org';
-  const userId = isOrgScope ? null : (req.user?.id || req.query.userId || null);
+  const userId = isOrgScope ? null : (req.user?.userKey || req.user?.id || req.query.userId || null);
   res.json({ success: true, data: await getCategoryMetricsService(userId) });
 });
 
 export const getStatusBreakdown = asyncHandler(async (req, res) => {
   const isOrgScope = req.query.scope === 'organization' || req.query.scope === 'org';
-  const userId = isOrgScope ? null : (req.user?.id || req.query.userId || null);
+  const userId = isOrgScope ? null : (req.user?.userKey || req.user?.id || req.query.userId || null);
   res.json({ success: true, data: await getStatusBreakdownService(userId) });
 });
 
 // ---------- Change requests -------------------------------
 
 export const getMyRequests = asyncHandler(async (req, res) => {
-  const userId = req.headers['x-user-id'] || req.user?.id || 'usr-1';
+  const userId = req.user?.userKey || req.user?.id || req.headers['x-user-id'];
   const page = req.query.page || 1;
   const limit = req.query.limit || 10;
   const status = req.query.status || null;
@@ -68,6 +66,7 @@ export const getMyRequests = asyncHandler(async (req, res) => {
   const startDate = req.query.startDate || null;
   const endDate = req.query.endDate || null;
   const searchQuery = req.query.search || req.query.searchQuery || null;
+  const organizationScope = ['organization', 'org'].includes(String(req.query.scope || '').toLowerCase());
 
   const result = await getFilteredChangeRequests({
     userId,
@@ -77,6 +76,7 @@ export const getMyRequests = asyncHandler(async (req, res) => {
     startDate,
     endDate,
     searchQuery,
+    organizationScope,
     page,
     limit
   });
@@ -86,7 +86,9 @@ export const getMyRequests = asyncHandler(async (req, res) => {
 export const createChangeRequest = asyncHandler(async (req, res) => {
   const cr = await createChangeRequestService({
     ...(req.body || {}),
-    requesterId: req.user?.id || req.body?.requesterId
+    userKey: req.user?.userKey || req.user?.id,
+    requesterId: req.user?.userKey || req.user?.id || req.body?.requesterId,
+    currentUser: req.user
   });
   res.status(201).json({
     success: true,
@@ -98,13 +100,13 @@ export const createChangeRequest = asyncHandler(async (req, res) => {
 
 export const updateDraftChangeRequest = asyncHandler(async (req, res) => {
   const { id } = req.params;
-  const updated = await updateDraftChangeRequestService(id, req.user?.id, req.body || {});
+  const updated = await updateDraftChangeRequestService(id, req.user?.userKey || req.user?.id, req.body || {});
   res.json({ success: true, message: 'Draft updated successfully', data: updated });
 });
 
 export const submitDraftChangeRequest = asyncHandler(async (req, res) => {
   const { id } = req.params;
-  const cr = await submitDraftChangeRequestService(id, req.user?.id);
+  const cr = await submitDraftChangeRequestService(id, req.user?.userKey || req.user?.id);
   res.json({
     success: true,
     message: `Change Request ${id} submitted for approval`,
@@ -115,7 +117,7 @@ export const submitDraftChangeRequest = asyncHandler(async (req, res) => {
 // ---------- CAB worklist --------------------------------
 
 export const getWorklist = asyncHandler(async (req, res) => {
-  const userId = req.headers['x-user-id'] || req.user?.id || 'usr-1';
+  const userId = req.user?.userKey || req.user?.id || req.headers['x-user-id'];
   const page = req.query.page || 1;
   const limit = req.query.limit || 10;
   const status = req.query.status || null;
@@ -140,11 +142,12 @@ export const getWorklist = asyncHandler(async (req, res) => {
 });
 
 export const handleWorklistAction = asyncHandler(async (req, res) => {
-  const { id, action, rejectionReason } = req.body || {};
+  const { id, action, rejectionReason, comment, rationale } = req.body || {};
   if (!id || !action) {
     return res.status(400).json({ success: false, message: 'Both "id" and "action" are required' });
   }
-  const result = await applyWorklistActionService({ id, action, rejectionReason, actorId: req.user?.id });
+  const actionComment = comment || rationale || rejectionReason || '';
+  const result = await applyWorklistActionService({ id, action, rejectionReason: actionComment, comment: actionComment, actorId: req.user?.id });
   res.json({ success: true, message: `Action "${action}" processed for ${id}`, data: result });
 });
 
@@ -178,11 +181,7 @@ export const getSubcategoryFields = asyncHandler(async (req, res) => {
   res.json({ success: true, data: await getSubcategoryFieldsService(id) });
 });
 
-// ---------- Catalogue management (admin) ---------------
 
-export const getCatalogueManagement = asyncHandler(async (req, res) => {
-  res.json({ success: true, ...(await getCatalogueManagementService()) });
-});
 
 
 
@@ -511,20 +510,20 @@ export const exportReport = asyncHandler(async (req, res) => {
 // ---------- Notifications -----------------------------
 
 export const getUserNotifications = asyncHandler(async (req, res) => {
-  const userId = req.user?.id || req.headers['x-user-id'] || 'usr-1';
+  const userId = req.user?.userKey || req.user?.id || req.headers['x-user-id'];
   const result = await getUserNotificationsService(userId);
   res.json({ success: true, ...result });
 });
 
 export const markNotificationAsRead = asyncHandler(async (req, res) => {
-  const userId = req.user?.id || req.headers['x-user-id'] || 'usr-1';
+  const userId = req.user?.userKey || req.user?.id || req.headers['x-user-id'];
   const { id } = req.params;
   const result = await markNotificationAsReadService(id, userId);
   res.json({ success: true, ...result });
 });
 
 export const markAllNotificationsAsRead = asyncHandler(async (req, res) => {
-  const userId = req.user?.id || req.headers['x-user-id'] || 'usr-1';
+  const userId = req.user?.userKey || req.user?.id || req.headers['x-user-id'];
   const result = await markAllNotificationsAsReadService(userId);
   res.json({ success: true, ...result });
 });
