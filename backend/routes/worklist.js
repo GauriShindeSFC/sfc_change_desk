@@ -8,9 +8,9 @@ import { requireRole, requireOrganizationScopeRole } from '../middlewares/authMi
 
 const router = express.Router();
 
-router.get('/worklist', requireRole(['Change Manager', 'Admin', 'Super Admin']), requireOrganizationScopeRole, getWorklist);
-router.get('/my-worklist', requireRole(['Change Manager', 'Admin', 'Super Admin']), requireOrganizationScopeRole, getWorklist);
-router.post('/worklist/action', requireRole(['Change Manager', 'Admin', 'Super Admin']), handleWorklistAction);
-router.post('/worklist/comment', requireRole(['Admin', 'Super Admin']), addChangeRequestComment);
+router.get('/worklist', requireRole(['Change Manager', 'Change Implementer', 'Admin', 'Super Admin', 'role-5']), requireOrganizationScopeRole, getWorklist);
+router.get('/my-worklist', requireRole(['Change Manager', 'Change Implementer', 'Admin', 'Super Admin', 'role-5']), requireOrganizationScopeRole, getWorklist);
+router.post('/worklist/action', requireRole(['Change Manager', 'Change Implementer', 'Admin', 'Super Admin', 'role-5']), handleWorklistAction);
+router.post('/worklist/comment', requireRole(['Change Manager', 'Change Implementer', 'Admin', 'Super Admin', 'role-5']), addChangeRequestComment);
 
 export default router;

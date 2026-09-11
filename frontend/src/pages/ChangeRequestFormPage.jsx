@@ -130,6 +130,8 @@ function ChangeRequestFormPage({ onNavigate, initialData, user }) {
   const [fieldsLoading, setFieldsLoading] = useState(false);
   const [customFieldValues, setCustomFieldValues] = useState({});
 
+  const isEditingDraft = Boolean(initialData?.id && initialData?.isDraft);
+
   const [currentSessionUser, setCurrentSessionUser] = useState(() => user || getSession()?.user);
   const activeSessionUser = currentSessionUser || user || getSession()?.user;
 
@@ -192,6 +194,7 @@ function ChangeRequestFormPage({ onNavigate, initialData, user }) {
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitSuccess, setSubmitSuccess] = useState(false);
+  const [isDraftSubmission, setIsDraftSubmission] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
 
   // 1. Load Categories on mount
@@ -358,13 +361,13 @@ function ChangeRequestFormPage({ onNavigate, initialData, user }) {
     setFormData((prev) => ({ ...prev, [field]: value }));
   };
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = async (e, isDraft = false) => {
     if (e) e.preventDefault();
-    if (isSubmitting) return;
     setIsSubmitting(true);
+    setIsDraftSubmission(isDraft);
     setErrorMessage('');
 
-    if (customFieldValues.actionRequired === 'Other' && !customFieldValues.otherAction?.trim()) {
+    if (!isDraft && customFieldValues.actionRequired === 'Other' && !customFieldValues.otherAction?.trim()) {
       setErrorMessage('Please specify the details for the Other action option.');
       setIsSubmitting(false);
       return;
@@ -382,6 +385,24 @@ function ChangeRequestFormPage({ onNavigate, initialData, user }) {
       }
     });
 
+    // Whitelist only valid fields belonging to the current subcategory & action
+    const allowedFieldKeys = new Set(
+      fields
+        .filter((f) => !f.appliesToActions || !Array.isArray(f.appliesToActions) || f.appliesToActions.includes(currentAction))
+        .map((f) => f.fieldKey)
+    );
+    allowedFieldKeys.add('actionRequired');
+    allowedFieldKeys.add('otherAction');
+
+    const sanitizedCustomValues = {};
+    for (const [k, v] of Object.entries(finalCustomValues)) {
+      if (allowedFieldKeys.has(k)) {
+        if (v !== '' && v !== null && v !== undefined) {
+          sanitizedCustomValues[k] = v;
+        }
+      }
+    }
+
     const selectedCat = categories.find((c) => c.id === selectedCategoryId);
     const todayStr = new Date().toISOString().split('T')[0];
 
@@ -392,14 +413,14 @@ function ChangeRequestFormPage({ onNavigate, initialData, user }) {
       subCategory: selectedSubcategory?.name || formData.subCategory || '',
       subcategoryId: selectedSubcategoryId,
       actionRequired: finalCustomValues.actionRequired || '',
-      customFieldValues: finalCustomValues,
-      isDraft: false,
+      customFieldValues: sanitizedCustomValues,
+      isDraft,
       risk: selectedSubcategory?.risk || formData.risk
     };
 
     try {
-      const endpoint = '/change-requests';
-      const method = 'POST';
+      const endpoint = isEditingDraft ? `/change-requests/${initialData.id}` : '/change-requests';
+      const method = isEditingDraft ? 'PATCH' : 'POST';
 
       const res = await apiFetch(endpoint, {
         method,
@@ -407,6 +428,9 @@ function ChangeRequestFormPage({ onNavigate, initialData, user }) {
         body: JSON.stringify(payload)
       });
       if (res.ok) {
+        if (isEditingDraft && !isDraft) {
+          await apiFetch(`/change-requests/${initialData.id}/submit`, { method: 'PATCH' });
+        }
         setSubmitSuccess(true);
       } else {
         const errBody = await res.json();
@@ -446,16 +470,18 @@ function ChangeRequestFormPage({ onNavigate, initialData, user }) {
           <Check size={28} />
         </div>
         <h2 style={{ fontSize: '1.4rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '0.5rem' }}>
-          Change Request Submitted Successfully!
+          {isDraftSubmission ? 'Change Request Saved as Draft!' : 'Change Request Submitted Successfully!'}
         </h2>
         <p style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', maxWidth: '460px', margin: '0 auto 1.75rem auto' }}>
-          Your change request has been routed to Change Managers for review.
+          {isDraftSubmission
+            ? 'Your request has been saved in your drafts. You can review and submit it anytime from My Requests.'
+            : 'Your change request has been routed to Change Managers for review.'}
         </p>
 
         <div style={{ display: 'flex', justifyContent: 'center', gap: '0.75rem' }}>
           <button
             type="button"
-            onClick={() => onNavigate('My Requests', { filter: 'Pending' })}
+            onClick={() => onNavigate('My Requests', { filter: isDraftSubmission ? 'Draft' : 'Pending' })}
             style={{
               padding: '0.65rem 1.35rem',
               backgroundColor: 'var(--brand-primary)',
@@ -467,7 +493,7 @@ function ChangeRequestFormPage({ onNavigate, initialData, user }) {
               cursor: 'pointer'
             }}
           >
-            View My Requests
+            {isDraftSubmission ? 'Go to My Drafts' : 'View My Requests'}
           </button>
         </div>
       </div>
@@ -488,13 +514,13 @@ function ChangeRequestFormPage({ onNavigate, initialData, user }) {
   };
 
   return (
-    <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+    <form onSubmit={(e) => handleSubmit(e, false)} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
       
       {/* Top Header with Change Category Button on the Top Right */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '1rem' }}>
         <div>
           <h1 style={{ fontSize: '1.45rem', fontWeight: 800, color: 'var(--text-primary)', lineHeight: 1.2, margin: 0 }}>
-            Create Change Request
+            {isEditingDraft ? 'Edit Draft Change Request' : 'Create Change Request'}
           </h1>
           <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginTop: '0.2rem', margin: 0 }}>
             Fill in employee and change details, then submit for Change Manager approval
@@ -504,7 +530,6 @@ function ChangeRequestFormPage({ onNavigate, initialData, user }) {
         <button
           type="button"
           onClick={handleGoBack}
-          disabled={isSubmitting}
           style={{
             display: 'inline-flex',
             alignItems: 'center',
@@ -516,13 +541,12 @@ function ChangeRequestFormPage({ onNavigate, initialData, user }) {
             borderRadius: '8px',
             fontSize: '0.825rem',
             fontWeight: 600,
-            cursor: isSubmitting ? 'not-allowed' : 'pointer',
-            opacity: isSubmitting ? 0.6 : 1,
+            cursor: 'pointer',
             boxShadow: '0 1px 3px rgba(0, 0, 0, 0.05)',
             transition: 'background-color 0.15s ease'
           }}
-          onMouseEnter={(e) => !isSubmitting && (e.currentTarget.style.backgroundColor = 'var(--input-bg)')}
-          onMouseLeave={(e) => !isSubmitting && (e.currentTarget.style.backgroundColor = 'var(--card-bg)')}
+          onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--input-bg)'}
+          onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'var(--card-bg)'}
         >
           <span>Change Category</span>
         </button>

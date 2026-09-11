@@ -15,7 +15,7 @@ export const serializeChangeRequest = (row) => {
     ...rest
   } = cr;
 
-  const rejApproval = Array.isArray(approvals) ? approvals.find(a => (a.decision === 'Rejected' || a.action === 'Rejected') && (a.rationale || a.comments)) : null;
+  const rejApproval = Array.isArray(approvals) ? approvals.find(a => a.decision === 'Rejected' || a.action === 'Rejected') : null;
   const rationale = cr.rejectionReason || cr.rejection_reason || rejApproval?.rationale || rejApproval?.comments || cr.customFieldValues?.rejectionReason || (cr.status === 'Rejected' ? 'This change request was rejected during Change Manager review.' : null);
 
   const decidedApproval = Array.isArray(approvals) ? approvals.find(a => (a.decision === 'Approved' || a.decision === 'Rejected' || a.action === 'Approved' || a.action === 'Rejected')) : null;
@@ -33,27 +33,36 @@ export const serializeChangeRequest = (row) => {
     return act === 'approved' || act === 'approve';
   })?.text;
 
-  const foundRejComment = [...allComments].reverse().find(c => {
+  const foundRejCommentObj = [...allComments].reverse().find(c => {
     const act = (c.action || c.type || c.decision || '').toLowerCase();
     return act === 'rejected' || act === 'reject';
-  })?.text;
+  });
+  const foundRejComment = foundRejCommentObj?.text;
+  const foundRejAuthor = foundRejCommentObj?.authorName;
 
   const foundImpComment = [...allComments].reverse().find(c => {
     const act = (c.action || c.type || c.decision || '').toLowerCase();
     return act === 'implemented' || act === 'implement';
   })?.text;
 
+  const rejApproverName = rejApproval?.approver?.name || (rejApproval?.approverId ? String(rejApproval.approverId) : null);
+  const rejectedBy = cr.rejectedBy || cr.customFieldValues?.rejectedBy || rejApproverName || foundRejAuthor || decidedBy || null;
+
   const appApproval = Array.isArray(approvals) ? approvals.find(a => a.decision === 'Approved' || a.action === 'Approved') : null;
-  const approvedBy = cr.approvedBy || appApproval?.approver?.name || decidedBy || null;
+  const approvedBy = cr.approvedBy || appApproval?.approver?.name || (cr.status === 'Rejected' ? rejectedBy : decidedBy) || null;
   const approvedDate = appApproval ? formatDate(new Date(appApproval.decidedAt || appApproval.updatedAt)) : (cr.status === 'Approved' || cr.status === 'Implemented' ? formatDate(new Date(decidedAt || cr.updatedAt)) : null);
   const approvedComment = cr.approvedComment || cr.approved_comment || cr.approvalRationale || cr.approval_rationale || appApproval?.rationale || appApproval?.comments || appApproval?.comment || foundAppComment || null;
 
-  const rejectedBy = cr.rejectedBy || rejApproval?.approver?.name || decidedBy || null;
   const rejectedDate = rejApproval ? formatDate(new Date(rejApproval.decidedAt || rejApproval.updatedAt)) : (cr.status === 'Rejected' ? formatDate(new Date(decidedAt || closedAt || cr.updatedAt)) : null);
   const rejectedComment = cr.rejectedComment || cr.rejected_comment || cr.rejectionReason || cr.rejection_reason || rejApproval?.rationale || rejApproval?.comments || rejApproval?.comment || foundRejComment || rationale;
 
   const implementedDate = cr.status === 'Implemented' ? formatDate(new Date(closedAt || cr.updatedAt)) : null;
   const implementedComment = cr.implementedComment || cr.implemented_comment || foundImpComment || (Array.isArray(cr.comments) ? cr.comments.find(c => c.action === 'Implemented')?.text || null : null);
+
+  const isClosedStatus = cr.status === 'Implemented' || cr.status === 'Rejected';
+  const closedDate = isClosedStatus
+    ? (closedAt ? formatDate(new Date(closedAt)) : (cr.updatedAt ? formatDate(new Date(cr.updatedAt)) : null))
+    : null;
 
   return {
     ...rest,
@@ -71,6 +80,7 @@ export const serializeChangeRequest = (row) => {
     rejectedComment,
     implementedDate,
     implementedComment,
+    closedDate,
     requester: requester?.name ?? cr.employeeName ?? null,
     employeeName: cr.employeeName || cr.customFieldValues?.employeeName || requester?.name || null,
     employeeEmail: cr.employeeEmail || cr.customFieldValues?.employeeEmail || requester?.email || null,
@@ -138,6 +148,11 @@ export const serializeWorklistEntry = (row) => {
   const implementedDate = cr.status === 'Implemented' ? formatDate(new Date(cr.closedAt || cr.updatedAt)) : null;
   const implementedComment = cr.implementedComment || cr.implemented_comment || foundImpComment || (Array.isArray(cr.comments) ? cr.comments.find(c => c.action === 'Implemented')?.text || null : null);
 
+  const isClosedStatus = cr.status === 'Implemented' || cr.status === 'Rejected';
+  const closedDate = isClosedStatus
+    ? (cr.closedAt ? formatDate(new Date(cr.closedAt)) : (cr.updatedAt ? formatDate(new Date(cr.updatedAt)) : null))
+    : null;
+
   return {
     id: cr.id,
     title: cr.title,
@@ -159,6 +174,7 @@ export const serializeWorklistEntry = (row) => {
     createdAt: cr.createdAt || null,
     updatedAt: cr.updatedAt || null,
     closedAt: cr.closedAt || null,
+    closedDate,
     comments: cr.comments || cr.customFieldValues?.comments || [],
     startDate: cr.startDate ? formatDate(new Date(cr.startDate)) : '',
     endDate: cr.endDate ? formatDate(new Date(cr.endDate)) : '',

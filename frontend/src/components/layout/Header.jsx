@@ -113,7 +113,7 @@ function Header({
 
       {/* Right controls */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-        {!isMobile && activeRoute !== 'Dashboard' && !activeRoute?.includes('Change Request') && (
+        {!isMobile && activeRoute !== 'Dashboard' && !activeRoute?.includes('Change Request') && !['Pre-Spend Request', 'Travel Desk', 'Tribe CRM'].includes(activeRoute) && (
           <div style={{ width: '280px', position: 'relative' }}>
             <div
               style={{

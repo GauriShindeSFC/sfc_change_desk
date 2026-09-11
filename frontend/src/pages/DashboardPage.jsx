@@ -1,18 +1,19 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   FileText, Clock, RotateCw, XCircle, Layers, PieChart,
-  TrendingUp, TrendingDown, Minus, Sunrise, Sun, Moon, Plus
+  TrendingUp, TrendingDown, Minus, Sunrise, Sun, Moon, Plus,
+  Download, FileSpreadsheet
 } from 'lucide-react';
 import FilterBar, { initCustomDateRange } from '../components/ui/FilterBar';
 import ChangeRequestModal from '../components/ui/ChangeRequestModal';
 import { apiFetch } from '../lib/apiFetch';
-import { fetchMe } from '../lib/auth';
 
 const METRIC_STYLES = [
-  { match: (m) => m.isTotal || m.title.includes('Total'), icon: FileText, color: '#2563EB', tint: '#EFF6FF', filterKey: 'All' },
-  { match: (m) => m.isPending || m.title.includes('Pending'), icon: Clock, color: '#D97706', tint: '#FFFBEB', filterKey: 'Pending' },
-  { match: (m) => m.isInProgress || m.isImplemented || m.title.includes('Progress') || m.title.includes('Implemented'), icon: RotateCw, color: '#7C3AED', tint: '#F5F3FF', filterKey: 'Implemented' },
-  { match: () => true, icon: XCircle, color: '#DC2626', tint: '#FEF2F2', filterKey: 'Rejected' }
+  { id: 'total', match: (m) => m.isTotal || m.title.includes('Total'), icon: FileText, color: '#2563EB', tint: '#EFF6FF', filterKey: 'All' },
+  { id: 'pending', match: (m) => m.isPending || m.title.includes('Pending'), icon: Clock, color: '#D97706', tint: '#FFFBEB', filterKey: 'Pending' },
+  { id: 'in-process', match: (m) => m.id === 'in-process' || m.isInProcess || m.title === 'In Process', icon: Clock, color: '#059669', tint: '#ECFDF5', filterKey: 'Approved' },
+  { id: 'implemented', match: (m) => m.isInProgress || m.isImplemented || m.title.includes('Progress') || m.title.includes('Implemented'), icon: RotateCw, color: '#7C3AED', tint: '#F5F3FF', filterKey: 'Implemented' },
+  { id: 'rejected', match: () => true, icon: XCircle, color: '#DC2626', tint: '#FEF2F2', filterKey: 'Rejected' }
 ];
 const getMetricStyle = (m) => METRIC_STYLES.find((s) => s.match(m)) || METRIC_STYLES[METRIC_STYLES.length - 1];
 
@@ -55,11 +56,13 @@ function DashboardPage({ onNavigate, user, isOrgDashboard = false, searchQuery =
   const [statusCounts, setStatusCounts] = useState({
     All: 0,
     Pending: 0,
+    InProcess: 0,
     Implemented: 0,
     Rejected: 0
   });
   const [isLoadingRequests, setIsLoadingRequests] = useState(false);
   const [selectedRequest, setSelectedRequest] = useState(null);
+  const [isExporting, setIsExporting] = useState(false);
 
   const requestInFlight = useRef(false);
   const fetchSeqRef = useRef(0);
@@ -77,9 +80,17 @@ function DashboardPage({ onNavigate, user, isOrgDashboard = false, searchQuery =
     setIsLoadingRequests(true);
 
     try {
-      const analyticsParams = new URLSearchParams({
+      const metricsParams = new URLSearchParams({
         ...(isOrgDashboard && { scope: 'organization' }),
         ...(activeFilter !== 'All' && { status: activeFilter }),
+        ...(dateFilter !== 'overall' && { dateFilter }),
+        ...(dateFilter === 'custom' && startDate && { startDate }),
+        ...(dateFilter === 'custom' && endDate && { endDate }),
+        ...(searchQuery && { search: searchQuery })
+      });
+
+      const commonParams = new URLSearchParams({
+        ...(isOrgDashboard && { scope: 'organization' }),
         ...(dateFilter !== 'overall' && { dateFilter }),
         ...(dateFilter === 'custom' && startDate && { startDate }),
         ...(dateFilter === 'custom' && endDate && { endDate }),
@@ -95,38 +106,13 @@ function DashboardPage({ onNavigate, user, isOrgDashboard = false, searchQuery =
         ...(searchQuery && { search: searchQuery })
       });
 
-      // 1. First fetch /me and /my-requests
-      let effectiveUserId = user?.id;
-      try {
-        const activeUser = await fetchMe();
-        if (activeUser?.id) effectiveUserId = activeUser.id;
-      } catch {
-        /* fallback to user.id */
-      }
+      const headers = user?.id ? { 'x-user-id': user.id } : {};
 
-      const headers = effectiveUserId ? { 'x-user-id': effectiveUserId } : {};
-
-      const rRes = await apiFetch(`/my-requests?${requestParams}`, { headers });
-      if (currentSeq !== fetchSeqRef.current) return;
-
-      if (rRes.ok) {
-        const rData = await rRes.json();
-        if (rData.data && Array.isArray(rData.data)) setRequests(rData.data);
-        if (rData.statusCounts) {
-          setStatusCounts({
-            All: rData.statusCounts.All || 0,
-            Pending: rData.statusCounts.Pending || 0,
-            Implemented: rData.statusCounts.Implemented || 0,
-            Rejected: rData.statusCounts.Rejected || 0
-          });
-        }
-      }
-
-      // 2. Then load the rest of the analytics APIs
-      const [mRes, cRes, sRes] = await Promise.all([
-        apiFetch(`/metrics?${analyticsParams}`, { headers }),
-        apiFetch(`/categories?${analyticsParams}`, { headers }),
-        apiFetch(`/status-breakdown?${analyticsParams}`, { headers })
+      const [mRes, cRes, sRes, rRes] = await Promise.all([
+        apiFetch(`/metrics?${metricsParams}`, { headers }),
+        apiFetch(`/categories?${commonParams}`, { headers }),
+        apiFetch(`/status-breakdown?${commonParams}`, { headers }),
+        apiFetch(`/my-requests?${requestParams}`, { headers })
       ]);
 
       if (currentSeq !== fetchSeqRef.current) return;
@@ -142,6 +128,19 @@ function DashboardPage({ onNavigate, user, isOrgDashboard = false, searchQuery =
       if (sRes.ok) {
         const sData = await sRes.json();
         if (sData.data && Array.isArray(sData.data)) setStatusBreakdown(sData.data);
+      }
+      if (rRes.ok) {
+        const rData = await rRes.json();
+        if (rData.data && Array.isArray(rData.data)) setRequests(rData.data);
+        if (rData.statusCounts) {
+          setStatusCounts({
+            All: rData.statusCounts.All || 0,
+            Pending: rData.statusCounts.Pending || 0,
+            InProcess: rData.statusCounts.InProcess ?? rData.statusCounts.Approved ?? rData.metrics?.inProcess ?? 0,
+            Implemented: rData.statusCounts.Implemented || 0,
+            Rejected: rData.statusCounts.Rejected || 0
+          });
+        }
       }
     } catch (err) {
       console.warn('Dashboard API error:', err);
@@ -181,13 +180,65 @@ function DashboardPage({ onNavigate, user, isOrgDashboard = false, searchQuery =
   });
   const totalCRs = displayStatuses.reduce((sum, item) => sum + (item.count || 0), 0);
 
-  // Filter Tabs (Only 3 statuses + All)
+  // Filter Tabs (Including In Process)
   const filterTabs = [
     { id: 'All', label: 'All', count: statusCounts.All || totalCRs },
     { id: 'Pending', label: 'Pending Approvals', count: statusCounts.Pending },
+    { id: 'Approved', label: 'In Process', count: statusCounts.InProcess },
     { id: 'Implemented', label: 'Implemented', count: statusCounts.Implemented },
     { id: 'Rejected', label: 'Rejected', count: statusCounts.Rejected }
   ];
+
+  const handleSubmitDraft = async (crId) => {
+    try {
+      const res = await apiFetch(`/change-requests/${crId}/submit`, { method: 'PATCH' });
+      if (res.ok) {
+        setSelectedRequest(null);
+        setActiveFilter('Pending');
+        fetchData();
+      }
+    } catch (err) {
+      console.warn('Failed to submit draft:', err);
+    }
+  };
+
+  const handleExport = async (format) => {
+    if (isExporting) return;
+    setIsExporting(true);
+    try {
+      const exportParams = new URLSearchParams({
+        scope: 'organization',
+        format,
+        ...(activeFilter !== 'All' && { status: activeFilter }),
+        ...(dateFilter !== 'overall' && { dateFilter }),
+        ...(dateFilter === 'custom' && startDate && { startDate }),
+        ...(dateFilter === 'custom' && endDate && { endDate }),
+        ...(searchQuery && { search: searchQuery })
+      });
+
+      const headers = user?.id ? { 'x-user-id': user.id } : {};
+      const res = await apiFetch(`/export?${exportParams}`, { headers });
+      if (!res.ok) {
+        throw new Error(`Export failed with status ${res.status}`);
+      }
+
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      const dateStr = new Date().toISOString().slice(0, 10);
+      link.download = `organization_dashboard_${dateStr}.${format}`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error('Export failed:', err);
+      alert('Failed to export dashboard data. Please check network and permissions.');
+    } finally {
+      setIsExporting(false);
+    }
+  };
 
   const { text: greetingText } = getGreeting();
   const firstName = (user?.name || '').split(' ')[0] || '';
@@ -201,34 +252,74 @@ function DashboardPage({ onNavigate, user, isOrgDashboard = false, searchQuery =
           <h1 style={{ fontSize: '1.45rem', fontWeight: 700, color: 'var(--text-primary)', lineHeight: 1.2, margin: 0 }}>
             {isOrgDashboard ? 'Organization Dashboard' : `${greetingText}${firstName ? `, ${firstName}` : ''}`}
           </h1>
-          <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginTop: '0.3rem' }}>
-            {isOrgDashboard
-              ? 'Overall company-wide change request metrics and analytics · updated just now'
-              : 'Snapshot across your submitted change requests · updated just now'}
-          </p>
+          {isOrgDashboard && (
+            <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginTop: '0.3rem' }}>
+              Overall company-wide change request metrics and analytics · updated just now
+            </p>
+          )}
         </div>
-      </div>
 
-      {/* Single Unified Filter Bar */}
-      <FilterBar
-        tabs={filterTabs}
-        activeTab={activeFilter}
-        onTabChange={setActiveFilter}
-        dateValue={dateFilter}
-        onDateChange={(val) => {
-          setDateFilter(val);
-          if (val === 'custom') {
-            initCustomDateRange({ startDate, endDate, setStartDate, setEndDate });
-          } else {
-            setStartDate('');
-            setEndDate('');
-          }
-        }}
-        startDate={startDate}
-        endDate={endDate}
-        onStartDateChange={setStartDate}
-        onEndDateChange={setEndDate}
-      />
+        {/* Organization Dashboard Export Action Buttons (Strictly isolated to Org Dashboard) */}
+        {isOrgDashboard && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
+            <button
+              id="org-export-csv-btn"
+              type="button"
+              onClick={() => handleExport('csv')}
+              disabled={isExporting}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '0.45rem',
+                padding: '0.45rem 0.85rem',
+                fontSize: '0.825rem',
+                fontWeight: 600,
+                color: 'var(--text-primary)',
+                backgroundColor: 'var(--card-bg)',
+                border: '1px solid var(--border-color)',
+                borderRadius: 'var(--radius-md)',
+                cursor: isExporting ? 'not-allowed' : 'pointer',
+                opacity: isExporting ? 0.7 : 1,
+                boxShadow: 'var(--shadow-sm)',
+                transition: 'all 0.15s ease'
+              }}
+              className="cd-btn-hover"
+              title="Export page data as CSV spreadsheet"
+            >
+              <FileSpreadsheet size={15} color="#059669" />
+              <span>{isExporting ? 'Exporting...' : 'Export CSV'}</span>
+            </button>
+
+            <button
+              id="org-export-pdf-btn"
+              type="button"
+              onClick={() => handleExport('pdf')}
+              disabled={isExporting}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '0.45rem',
+                padding: '0.45rem 0.85rem',
+                fontSize: '0.825rem',
+                fontWeight: 600,
+                color: 'var(--text-primary)',
+                backgroundColor: 'var(--card-bg)',
+                border: '1px solid var(--border-color)',
+                borderRadius: 'var(--radius-md)',
+                cursor: isExporting ? 'not-allowed' : 'pointer',
+                opacity: isExporting ? 0.7 : 1,
+                boxShadow: 'var(--shadow-sm)',
+                transition: 'all 0.15s ease'
+              }}
+              className="cd-btn-hover"
+              title="Export page data as PDF document"
+            >
+              <FileText size={15} color="#DC2626" />
+              <span>{isExporting ? 'Exporting...' : 'Export PDF'}</span>
+            </button>
+          </div>
+        )}
+      </div>
 
       {/* KPI Metric Cards Grid */}
       <div style={{
@@ -245,13 +336,14 @@ function DashboardPage({ onNavigate, user, isOrgDashboard = false, searchQuery =
           const TrendIcon = isUp ? TrendingUp : isDown ? TrendingDown : Minus;
           const trendColor = isUp ? '#059669' : isDown ? '#DC2626' : 'var(--text-secondary)';
           const trendText = changeStr.replace('▲', '').replace('▼', '').trim();
-          const isSelected = activeFilter === style.filterKey;
+          const isInformational = Boolean(style.isInformational);
+          const isSelected = !isInformational && activeFilter === style.filterKey;
 
           return (
             <div
               key={idx}
-              className="cd-card-hover"
-              onClick={() => setActiveFilter(style.filterKey)}
+              className={isInformational ? '' : 'cd-card-hover'}
+              onClick={isInformational ? undefined : () => setActiveFilter(style.filterKey)}
               style={{
                 backgroundColor: 'var(--card-bg)',
                 border: isSelected ? `1.5px solid ${style.color}` : '1px solid var(--border-color)',
@@ -262,7 +354,7 @@ function DashboardPage({ onNavigate, user, isOrgDashboard = false, searchQuery =
                 justifyContent: 'space-between',
                 boxShadow: isSelected ? '0 2px 8px rgba(0, 0, 0, 0.08)' : 'var(--shadow-card)',
                 minHeight: '125px',
-                cursor: 'pointer',
+                cursor: isInformational ? 'default' : 'pointer',
                 transition: 'all 0.15s ease',
                 position: 'relative',
                 overflow: 'hidden'
@@ -518,6 +610,27 @@ function DashboardPage({ onNavigate, user, isOrgDashboard = false, searchQuery =
         </div>
       </div>
 
+      {/* Single Unified Filter Bar */}
+      <FilterBar
+        tabs={filterTabs}
+        activeTab={activeFilter}
+        onTabChange={setActiveFilter}
+        dateValue={dateFilter}
+        onDateChange={(val) => {
+          setDateFilter(val);
+          if (val === 'custom') {
+            initCustomDateRange({ startDate, endDate, setStartDate, setEndDate });
+          } else {
+            setStartDate('');
+            setEndDate('');
+          }
+        }}
+        startDate={startDate}
+        endDate={endDate}
+        onStartDateChange={setStartDate}
+        onEndDateChange={setEndDate}
+      />
+
       {/* Bottom Section: Change Requests Table */}
       <div style={{
         backgroundColor: 'var(--card-bg)',
@@ -550,63 +663,114 @@ function DashboardPage({ onNavigate, user, isOrgDashboard = false, searchQuery =
                 <th style={{ padding: '0.75rem 1rem', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', fontSize: '0.725rem', letterSpacing: '0.05em', whiteSpace: 'nowrap' }}>CR ID</th>
                 <th style={{ padding: '0.75rem 1rem', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', fontSize: '0.725rem', letterSpacing: '0.05em' }}>Title</th>
                 <th style={{ padding: '0.75rem 1rem', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', fontSize: '0.725rem', letterSpacing: '0.05em' }}>Category</th>
+                {isOrgDashboard && (
+                  <th style={{ padding: '0.75rem 1rem', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', fontSize: '0.725rem', letterSpacing: '0.05em', whiteSpace: 'nowrap' }}>Requester Details</th>
+                )}
                 <th style={{ padding: '0.75rem 1rem', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', fontSize: '0.725rem', letterSpacing: '0.05em', whiteSpace: 'nowrap' }}>Raised Date</th>
                 <th style={{ padding: '0.75rem 1rem', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', fontSize: '0.725rem', letterSpacing: '0.05em', whiteSpace: 'nowrap' }}>Closed Date</th>
-                <th style={{ padding: '0.75rem 1rem', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', fontSize: '0.725rem', letterSpacing: '0.05em', whiteSpace: 'nowrap' }}>Status</th>
+                {isOrgDashboard ? (
+                  <th style={{ padding: '0.75rem 1rem', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', fontSize: '0.725rem', letterSpacing: '0.05em', whiteSpace: 'nowrap' }}>Approved By</th>
+                ) : (
+                  <th style={{ padding: '0.75rem 1rem', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', fontSize: '0.725rem', letterSpacing: '0.05em', whiteSpace: 'nowrap' }}>Status</th>
+                )}
                 <th style={{ padding: '0.75rem 1rem', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', fontSize: '0.725rem', letterSpacing: '0.05em', textAlign: 'right', whiteSpace: 'nowrap' }}>Actions</th>
               </tr>
             </thead>
             <tbody>
               {requests.length > 0 ? (
-                requests.map(cr => (
-                  <tr key={cr.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
-                    <td style={{ padding: '0.85rem 1rem', fontWeight: 500, color: 'var(--text-primary)', fontFamily: 'var(--font-mono)', whiteSpace: 'nowrap' }}>{cr.id}</td>
-                    <td style={{ padding: '0.85rem 1rem', fontWeight: 500, color: 'var(--text-primary)', maxWidth: '280px', wordBreak: 'break-word' }}>{cr.title}</td>
-                    <td style={{ padding: '0.85rem 1rem', color: 'var(--text-secondary)', wordBreak: 'break-word' }}>{cr.category}</td>
-                    <td style={{ padding: '0.85rem 1rem', color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)', fontSize: '0.8rem', whiteSpace: 'nowrap' }}>{cr.raisedDate}</td>
-                    <td style={{ padding: '0.85rem 1rem', color: 'var(--text-secondary)', fontSize: '0.8rem', whiteSpace: 'nowrap' }}>{cr.closedDate || '—'}</td>
-                    <td style={{ padding: '0.85rem 1rem', whiteSpace: 'nowrap' }}>
-                      <div style={{
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: '0.35rem',
-                        padding: '0.2rem 0.65rem',
-                        borderRadius: 'var(--radius-lg)',
-                        backgroundColor: cr.statusBg || '#FEF3C7',
-                        color: cr.statusColor || '#D97706',
-                        fontSize: '0.775rem',
-                        fontWeight: 500,
-                        whiteSpace: 'nowrap'
-                      }}>
-                        <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: cr.statusDot || '#D97706' }} />
-                        <span style={{ whiteSpace: 'nowrap' }}>
-                          {(cr.status || '').toLowerCase() === 'pending' ? 'Pending Approvals' : cr.status}
-                        </span>
-                      </div>
-                    </td>
-                    <td style={{ padding: '0.85rem 1rem', textAlign: 'right', whiteSpace: 'nowrap' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '0.6rem' }}>
-                        <button
-                          type="button"
-                          onClick={() => setSelectedRequest(cr)}
-                          style={{
-                            background: 'none',
-                            border: 'none',
-                            color: 'var(--brand-primary)',
+                requests.map(cr => {
+                  const requesterEmail = cr.employeeEmail || cr.requesterEmail || cr.managerEmail || '';
+                  const requesterName = cr.employeeName || cr.requester || cr.requesterName || (requesterEmail ? requesterEmail.split('@')[0].replace(/[\._]/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) : '—');
+                  const approverDisplayName = cr.status === 'Rejected'
+                    ? (cr.rejectedBy || cr.decidedBy || cr.approvedBy || '—')
+                    : (cr.approvedBy || cr.decidedBy || (['Approved', 'Implemented'].includes(cr.status) ? 'Approver' : '—'));
+
+                  return (
+                    <tr key={cr.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
+                      <td style={{ padding: '0.85rem 1rem', fontWeight: 500, color: 'var(--text-primary)', fontFamily: 'var(--font-mono)', whiteSpace: 'nowrap' }}>{cr.id}</td>
+                      <td style={{ padding: '0.85rem 1rem', fontWeight: 500, color: 'var(--text-primary)', maxWidth: '280px', wordBreak: 'break-word' }}>{cr.title}</td>
+                      <td style={{ padding: '0.85rem 1rem', color: 'var(--text-secondary)', wordBreak: 'break-word' }}>{cr.category}</td>
+                      {isOrgDashboard && (
+                        <td style={{ padding: '0.85rem 1rem', color: 'var(--text-primary)', whiteSpace: 'nowrap' }}>
+                          <div style={{ fontWeight: 500, fontSize: '0.85rem', color: 'var(--text-primary)' }}>
+                            {requesterName}
+                          </div>
+                          {requesterEmail && (
+                            <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)', marginTop: '0.15rem' }}>
+                              {requesterEmail}
+                            </div>
+                          )}
+                        </td>
+                      )}
+                      <td style={{ padding: '0.85rem 1rem', color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)', fontSize: '0.8rem', whiteSpace: 'nowrap' }}>{cr.raisedDate}</td>
+                      <td style={{ padding: '0.85rem 1rem', color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)', fontSize: '0.8rem', whiteSpace: 'nowrap' }}>{cr.closedDate || '—'}</td>
+                      {isOrgDashboard ? (
+                        <td style={{ padding: '0.85rem 1rem', color: 'var(--text-primary)', fontWeight: 500, whiteSpace: 'nowrap' }}>
+                          {approverDisplayName}
+                        </td>
+                      ) : (
+                        <td style={{ padding: '0.85rem 1rem', whiteSpace: 'nowrap' }}>
+                          <div style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '0.35rem',
+                            padding: '0.2rem 0.65rem',
+                            borderRadius: 'var(--radius-lg)',
+                            backgroundColor: cr.statusBg || ((cr.status || '').toLowerCase() === 'draft' ? 'var(--input-bg)' : '#FEF3C7'),
+                            color: cr.statusColor || ((cr.status || '').toLowerCase() === 'draft' ? 'var(--text-secondary)' : '#D97706'),
+                            fontSize: '0.775rem',
                             fontWeight: 500,
-                            cursor: 'pointer',
-                            fontSize: '0.825rem'
-                          }}
-                        >
-                          Details
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))
+                            whiteSpace: 'nowrap'
+                          }}>
+                            <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: cr.statusDot || ((cr.status || '').toLowerCase() === 'draft' ? '#94A0B0' : '#D97706') }} />
+                            <span style={{ whiteSpace: 'nowrap' }}>
+                              {(cr.status || '').toLowerCase() === 'pending' ? 'Pending Approvals' : cr.status}
+                            </span>
+                          </div>
+                        </td>
+                      )}
+                      <td style={{ padding: '0.85rem 1rem', textAlign: 'right', whiteSpace: 'nowrap' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '0.6rem' }}>
+                          {(cr.status || '').toLowerCase() === 'draft' && (
+                            <button
+                              type="button"
+                              onClick={() => onNavigate && onNavigate('Change Request', cr)}
+                              style={{
+                                padding: '0.3rem 0.65rem',
+                                backgroundColor: '#E6F4F1',
+                                color: 'var(--brand-primary)',
+                                border: '1px solid #A7F3D0',
+                                borderRadius: '6px',
+                                fontWeight: 500,
+                                cursor: 'pointer',
+                                fontSize: '0.775rem'
+                              }}
+                            >
+                              Edit Draft
+                            </button>
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => setSelectedRequest(cr)}
+                            style={{
+                              background: 'none',
+                              border: 'none',
+                              color: 'var(--brand-primary)',
+                              fontWeight: 500,
+                              cursor: 'pointer',
+                              fontSize: '0.825rem'
+                            }}
+                          >
+                            Details
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })
               ) : isLoadingRequests ? (
                 <tr>
-                  <td colSpan={7} style={{ padding: '2.5rem', textAlign: 'center', color: 'var(--text-secondary)' }}>
+                  <td colSpan={isOrgDashboard ? 8 : 7} style={{ padding: '2.5rem', textAlign: 'center', color: 'var(--text-secondary)' }}>
                     <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', fontWeight: 600, fontSize: '0.875rem' }}>
                       <span style={{ display: 'inline-block', width: '16px', height: '16px', border: '2px solid var(--border-color)', borderTopColor: 'var(--brand-primary)', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
                       <span>Loading change requests...</span>
@@ -615,8 +779,8 @@ function DashboardPage({ onNavigate, user, isOrgDashboard = false, searchQuery =
                 </tr>
               ) : (
                 <tr>
-                  <td colSpan={7} style={{ padding: '2.5rem', textAlign: 'center', color: 'var(--text-secondary)' }}>
-                    No change requests found for status "{activeFilter}".
+                  <td colSpan={isOrgDashboard ? 8 : 7} style={{ padding: '2.5rem', textAlign: 'center', color: 'var(--text-secondary)' }}>
+                    <span style={{ fontSize: '0.875rem' }}>No change requests found.</span>
                   </td>
                 </tr>
               )}
@@ -634,6 +798,7 @@ function DashboardPage({ onNavigate, user, isOrgDashboard = false, searchQuery =
           onApprove={null}
           onReject={null}
           onSendBack={null}
+          onSubmitForApproval={handleSubmitDraft}
           onImplement={null}
         />
       )}

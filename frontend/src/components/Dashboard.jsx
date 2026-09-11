@@ -7,6 +7,7 @@ import ChangeCatalogPage from '../pages/ChangeCatalogPage';
 import ChangeRequestFormPage from '../pages/ChangeRequestFormPage';
 import MyWorklistPage from '../pages/MyWorklistPage';
 import SettingsPage from '../pages/SettingsPage';
+import ComingSoonPage from '../pages/ComingSoonPage';
 import { useIsMobile } from '../lib/useIsMobile';
 
 import { apiFetch } from '../lib/apiFetch';
@@ -52,17 +53,25 @@ export default function Dashboard({ user, onLogout }) {
     setMobileOpen(false);
   }, [activeItem, isMobile]);
 
-  // Live polling for Sidebar badge counters (excluding worklist)
+  // Live polling for Sidebar badge counters
   useEffect(() => {
     const fetchBadgeCounts = async () => {
       if (document.hidden || badgeRequestInFlight.current) return;
       badgeRequestInFlight.current = true;
       try {
-        const reqRes = await apiFetch('/my-requests');
+        const requests = [apiFetch('/my-requests')];
+        if (canSeeWorklist) requests.push(apiFetch('/worklist'));
+        const [reqRes, workRes] = await Promise.all(requests);
         if (reqRes.ok) {
           const reqBody = await reqRes.json();
           if (reqBody.data && Array.isArray(reqBody.data)) {
             setMyRequestsCount(reqBody.total ?? reqBody.data.length);
+          }
+        }
+        if (workRes?.ok) {
+          const workBody = await workRes.json();
+          if (workBody.data && Array.isArray(workBody.data)) {
+            setWorklistCount(workBody.total ?? workBody.data.length);
           }
         }
       } catch (err) {
@@ -75,7 +84,7 @@ export default function Dashboard({ user, onLogout }) {
     fetchBadgeCounts();
     const interval = setInterval(fetchBadgeCounts, 30000);
     return () => clearInterval(interval);
-  }, [user?.id, activeItem]);
+  }, [user?.id, activeItem, canSeeWorklist]);
 
   const [visitedSections, setVisitedSections] = useState(() => {
     try {
@@ -130,13 +139,16 @@ export default function Dashboard({ user, onLogout }) {
   const pages = {
     Dashboard: DashboardPage,
     'Organization Dashboard': DashboardPage,
-    'My Requests': MyRequestsPage,
+    'My Requests': DashboardPage,
     'Change Catalog': ChangeCatalogPage,
     'Change Request': ChangeRequestFormPage,
     'My Worklist': MyWorklistPage,
     'Org Worklist': DashboardPage,
     'Organization worklist': DashboardPage,
-    Settings: SettingsPage
+    Settings: SettingsPage,
+    'Pre-Spend Request': ComingSoonPage,
+    'Travel Desk': ComingSoonPage,
+    'Tribe CRM': ComingSoonPage
   };
   const ActivePage = pages[currentItem];
 

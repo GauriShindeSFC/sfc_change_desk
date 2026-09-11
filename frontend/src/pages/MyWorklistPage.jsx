@@ -23,6 +23,7 @@ function MyWorklistPage({ onNavigate, searchQuery = '', user, isOrgWorklist = fa
   const [metrics, setMetrics] = useState({
     pending: 0,
     approved: 0,
+    inProcess: 0,
     rejected: 0,
     implemented: 0
   });
@@ -123,6 +124,7 @@ function MyWorklistPage({ onNavigate, searchQuery = '', user, isOrgWorklist = fa
     All: 0,
     Pending: 0,
     Approved: 0,
+    InProcess: 0,
     Implemented: 0,
     'In progress': 0,
     Rejected: 0
@@ -175,9 +177,12 @@ function MyWorklistPage({ onNavigate, searchQuery = '', user, isOrgWorklist = fa
 
   const getStatus = (r) => (r.status || 'Pending').toLowerCase();
 
+  const inProcessCount = statusCounts.InProcess ?? metrics?.inProcess ?? statusCounts.Approved ?? 0;
+
   const filterTabs = [
     { id: 'All', label: `All (${statusCounts.All || 0})` },
     { id: 'Pending', label: `Pending (${statusCounts.Pending || 0})` },
+    { id: 'In Process', label: `In Process (${inProcessCount})` },
     { id: 'Approved', label: `Approved (${statusCounts.Approved || 0})` },
     { id: 'Implemented', label: `Implemented (${statusCounts.Implemented || 0})` },
     { id: 'Rejected', label: `Rejected (${statusCounts.Rejected || 0})` }
@@ -185,6 +190,7 @@ function MyWorklistPage({ onNavigate, searchQuery = '', user, isOrgWorklist = fa
 
   const metricCards = [
     { id: 'pending', title: 'Pending Review', count: metrics?.pending ?? statusCounts.Pending ?? 0, subtext: 'In Queue Right Now', subtextColor: 'var(--text-secondary)', icon: Clock, iconBg: '#FEF3C7', iconColor: '#D97706' },
+    { id: 'in-process', title: 'In Process', count: inProcessCount, subtext: 'Awaiting Implementation', subtextColor: '#059669', icon: Clock, iconBg: '#ECFDF5', iconColor: '#059669' },
     { id: 'approved', title: 'Approved', count: metrics?.approved ?? statusCounts.Approved ?? 0, subtext: 'Last 30 Days', subtextColor: '#059669', icon: Check, iconBg: '#D1FAE5', iconColor: '#059669' },
     { id: 'rejected', title: 'Rejected', count: metrics?.rejected ?? statusCounts.Rejected ?? 0, subtext: 'Last 30 Days', subtextColor: 'var(--text-secondary)', icon: X, iconBg: '#FEE2E2', iconColor: '#DC2626' },
     { id: 'implemented', title: 'Implemented', count: metrics?.implemented ?? statusCounts.Implemented ?? 0, subtext: 'Last 30 Days', subtextColor: 'var(--text-secondary)', icon: RotateCw, iconBg: '#F3E8FF', iconColor: '#7C3AED' }
@@ -202,7 +208,7 @@ function MyWorklistPage({ onNavigate, searchQuery = '', user, isOrgWorklist = fa
           <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginTop: '0.2rem' }}>
             {isOrgWorklist
               ? 'All change requests requiring Change Manager oversight across the organization'
-              : (isApprover ? 'Change requests awaiting your review and Change Manager sign-off' : 'Change requests in your worklist')}
+              : 'Change requests awaiting your review'}
           </p>
         </div>
 
@@ -445,9 +451,23 @@ function MyWorklistPage({ onNavigate, searchQuery = '', user, isOrgWorklist = fa
             gap: '1rem'
           }}>
             <div>
-              <h3 style={{ fontSize: '1.1rem', fontWeight: 800, color: rowActionPrompt.color, margin: 0 }}>
-                {rowActionPrompt.title}
-              </h3>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem' }}>
+                <h3 style={{ fontSize: '1.1rem', fontWeight: 800, color: rowActionPrompt.color, margin: 0 }}>
+                  {rowActionPrompt.title}
+                </h3>
+                <span style={{
+                  fontSize: '0.725rem',
+                  fontWeight: 600,
+                  color: '#64748B',
+                  backgroundColor: '#F1F5F9',
+                  border: '1px solid #CBD5E1',
+                  padding: '0.15rem 0.5rem',
+                  borderRadius: '5px',
+                  whiteSpace: 'nowrap'
+                }}>
+                  Visible to all
+                </span>
+              </div>
               <p style={{ fontSize: '0.825rem', color: 'var(--text-secondary)', marginTop: '0.35rem', margin: 0 }}>
                 {rowActionPrompt.action === 'implement'
                   ? 'A comment explaining what has been done'

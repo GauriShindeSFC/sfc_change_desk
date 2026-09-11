@@ -31,7 +31,6 @@ export default function ChangeRequestModal({ cr, onClose, onApprove, onReject, o
   const [actionPrompt, setActionPrompt] = useState(null); // { action: 'approve'|'reject'|'implement', title: string, color: string }
   const [actionCommentInput, setActionCommentInput] = useState('');
   const [actionCommentError, setActionCommentError] = useState('');
-  const [isSubmittingAction, setIsSubmittingAction] = useState(false);
   const [hoveredStepIdx, setHoveredStepIdx] = useState(null);
 
   const initialComments = Array.isArray(cr.comments)
@@ -133,7 +132,43 @@ export default function ChangeRequestModal({ cr, onClose, onApprove, onReject, o
     'subCategory',
     'startDate',
     'justification',
-    'workflow'
+    'workflow',
+    'approvedBy',
+    'approvedComment',
+    'implementedComment',
+    'rejectedComment',
+    'rejectionReason'
+  ];
+
+  const categoryLower = (cr.category || '').toLowerCase();
+  const isITAsset = categoryLower.includes('asset');
+  const isServer = categoryLower.includes('server');
+  const isNetwork = categoryLower.includes('network');
+
+  const serverNetworkKeys = [
+    'hostingType',
+    'vlanRequirement',
+    'backupRequired',
+    'rebootRequired',
+    'operatingSystem',
+    'currentOsVersion',
+    'targetVersionPatch',
+    'kbCve',
+    'serverName',
+    'ipAddress',
+    'cpu',
+    'ram',
+    'storage'
+  ];
+
+  const itAssetKeys = [
+    'assetType',
+    'assetId',
+    'dateOfPurchase',
+    'disposalReason',
+    'currentQtyInStock',
+    'qtyRequired',
+    'returnAssetConfiguration'
   ];
 
   const customFields = cr.customFieldValues && typeof cr.customFieldValues === 'object'
@@ -141,9 +176,18 @@ export default function ChangeRequestModal({ cr, onClose, onApprove, onReject, o
         if (ignoredKeys.includes(key)) return false;
         if (val === undefined || val === null) return false;
         if (typeof val === 'string' && val.trim() === '') return false;
+        if (isITAsset && serverNetworkKeys.includes(key)) return false;
+        if ((isServer || isNetwork) && itAssetKeys.includes(key)) return false;
         return true;
       })
     : [];
+
+  // Ensure Action Required is always displayed if available on cr
+  const hasActionInFields = customFields.some(([k]) => k === 'actionRequired' || k === 'action');
+  const requestAction = cr.action || cr.actionRequired || cr.customFieldValues?.actionRequired;
+  if (!hasActionInFields && requestAction && typeof requestAction === 'string' && requestAction.trim()) {
+    customFields.unshift(['actionRequired', requestAction.trim()]);
+  }
 
   const statusLower = (cr.status || '').toLowerCase();
   const decisionLower = (cr.myDecision || '').toLowerCase();
@@ -151,11 +195,12 @@ export default function ChangeRequestModal({ cr, onClose, onApprove, onReject, o
   const isImplemented = statusLower === 'implemented';
   const isRejected = statusLower === 'rejected' || decisionLower === 'rejected';
   const isApproved = (statusLower === 'approved' || decisionLower === 'approved') && !isImplemented;
+  const isDraft = statusLower === 'draft';
 
-  const statusLabel = isImplemented ? 'Implemented' : isRejected ? 'Rejected' : isApproved ? 'Approved' : (cr.status || 'Pending');
-  const statusBg = isImplemented ? '#F3E8FF' : isRejected ? '#FEE2E2' : isApproved ? '#FEF3C7' : '#FEF3C7';
-  const statusColor = isImplemented ? '#7C3AED' : isRejected ? '#DC2626' : isApproved ? '#D97706' : '#D97706';
-  const statusDot = isImplemented ? '#7C3AED' : isRejected ? '#DC2626' : isApproved ? '#D97706' : '#D97706';
+  const statusLabel = isImplemented ? 'Implemented' : isRejected ? 'Rejected' : isApproved ? 'Approved' : isDraft ? 'Draft' : (cr.status || 'Pending');
+  const statusBg = isImplemented ? '#F3E8FF' : isRejected ? '#FEE2E2' : isApproved ? '#FEF3C7' : isDraft ? 'var(--input-bg)' : '#FEF3C7';
+  const statusColor = isImplemented ? '#7C3AED' : isRejected ? '#DC2626' : isApproved ? '#D97706' : isDraft ? 'var(--text-secondary)' : '#D97706';
+  const statusDot = isImplemented ? '#7C3AED' : isRejected ? '#DC2626' : isApproved ? '#D97706' : isDraft ? '#94A0B0' : '#D97706';
 
   const steps = isRejected
     ? ['Requested', 'Rejected']
@@ -168,16 +213,16 @@ export default function ChangeRequestModal({ cr, onClose, onApprove, onReject, o
 
   const progressPercent = Math.min(100, Math.max(0, (currentStepIdx / (steps.length - 1)) * 100));
 
-  const activeColor = isRejected ? '#DC2626' : isImplemented ? '#7C3AED' : isApproved ? '#D97706' : 'var(--brand-primary)';
+  const activeColor = isRejected ? '#DC2626' : isImplemented ? '#7C3AED' : isApproved ? '#D97706' : isDraft ? '#7C3AED' : 'var(--brand-primary)';
 
-  const canAct = cr.canAct !== false && !isApproved && !isRejected && !isImplemented && !isSelfRequest;
+  const canAct = cr.canAct !== false && !isApproved && !isRejected && !isDraft && !isImplemented && !isSelfRequest;
 
   const getStepDate = (stepName) => {
     const todayFormatted = new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
     if (stepName === 'Requested') return cr.raisedDate || (cr.submittedAt ? new Date(cr.submittedAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : todayFormatted);
     if (stepName === 'Approved') return (isApproved || isImplemented) ? (cr.approvedDate || (cr.decidedAt ? new Date(cr.decidedAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : (cr.updatedAt ? new Date(cr.updatedAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : cr.raisedDate || todayFormatted))) : '';
-    if (stepName === 'Rejected') return isRejected ? (cr.rejectedDate || (cr.closedAt ? new Date(cr.closedAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : (cr.updatedAt ? new Date(cr.updatedAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : cr.raisedDate || todayFormatted))) : '';
-    if (stepName === 'Implemented') return isImplemented ? (cr.implementedDate || (cr.closedAt ? new Date(cr.closedAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : (cr.updatedAt ? new Date(cr.updatedAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : cr.raisedDate || todayFormatted))) : '';
+    if (stepName === 'Rejected') return isRejected ? (cr.closedDate || cr.rejectedDate || (cr.closedAt ? new Date(cr.closedAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : (cr.updatedAt ? new Date(cr.updatedAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : cr.raisedDate || todayFormatted))) : '';
+    if (stepName === 'Implemented') return isImplemented ? (cr.closedDate || cr.implementedDate || (cr.closedAt ? new Date(cr.closedAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : (cr.updatedAt ? new Date(cr.updatedAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : cr.raisedDate || todayFormatted))) : '';
     return '';
   };
 
@@ -655,9 +700,23 @@ export default function ChangeRequestModal({ cr, onClose, onApprove, onReject, o
               gap: '1rem'
             }}>
               <div>
-                <h3 style={{ fontSize: '1.05rem', fontWeight: 800, color: actionPrompt.color, margin: 0 }}>
-                  {actionPrompt.title}
-                </h3>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem' }}>
+                  <h3 style={{ fontSize: '1.05rem', fontWeight: 800, color: actionPrompt.color, margin: 0 }}>
+                    {actionPrompt.title}
+                  </h3>
+                  <span style={{
+                    fontSize: '0.725rem',
+                    fontWeight: 600,
+                    color: '#64748B',
+                    backgroundColor: '#F1F5F9',
+                    border: '1px solid #CBD5E1',
+                    padding: '0.15rem 0.5rem',
+                    borderRadius: '5px',
+                    whiteSpace: 'nowrap'
+                  }}>
+                    Visible to all
+                  </span>
+                </div>
                 <p style={{ fontSize: '0.825rem', color: 'var(--text-secondary)', marginTop: '0.35rem', margin: 0, lineHeight: 1.4 }}>
                   {actionPrompt.action === 'implement'
                     ? 'A comment explaining what has been done'
@@ -697,74 +756,43 @@ export default function ChangeRequestModal({ cr, onClose, onApprove, onReject, o
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '0.25rem' }}>
                 <button
                   type="button"
-                  disabled={isSubmittingAction}
                   onClick={() => {
                     setActionPrompt(null);
                     setActionCommentInput('');
                     setActionCommentError('');
                   }}
-                  style={{
-                    padding: '0.55rem 1.1rem',
-                    backgroundColor: 'var(--card-bg)',
-                    border: '1px solid var(--border-color)',
-                    borderRadius: '8px',
-                    fontSize: '0.825rem',
-                    fontWeight: 600,
-                    color: 'var(--text-primary)',
-                    cursor: isSubmittingAction ? 'not-allowed' : 'pointer',
-                    opacity: isSubmittingAction ? 0.6 : 1
-                  }}
+                  style={{ padding: '0.55rem 1.1rem', backgroundColor: 'var(--card-bg)', border: '1px solid var(--border-color)', borderRadius: '8px', fontSize: '0.825rem', fontWeight: 600, color: 'var(--text-primary)', cursor: 'pointer' }}
                 >
                   Cancel
                 </button>
                 <button
                   type="button"
-                  disabled={isSubmittingAction}
-                  onClick={async () => {
-                    if (isSubmittingAction) return;
+                  onClick={() => {
                     if (!actionCommentInput.trim()) {
                       setActionCommentError('Please enter a comment.');
                       return;
                     }
-                    setIsSubmittingAction(true);
                     const commentText = actionCommentInput.trim();
-                    try {
-                      if (actionPrompt.action === 'approve' && onApprove) {
-                        cr.approvedComment = commentText;
-                        cr.approvedBy = currentUser.name || 'Approver';
-                        await onApprove(cr.id, commentText);
-                      } else if (actionPrompt.action === 'reject' && onReject) {
-                        cr.rejectedComment = commentText;
-                        cr.rejectionReason = commentText;
-                        cr.rejectedBy = currentUser.name || 'Approver';
-                        await onReject(cr.id, commentText);
-                      } else if (actionPrompt.action === 'implement' && onImplement) {
-                        cr.implementedComment = commentText;
-                        await onImplement(cr.id, commentText);
-                      }
-                      setActionPrompt(null);
-                      setActionCommentInput('');
-                      onClose();
-                    } catch (err) {
-                      setActionCommentError(err.message || 'Action failed');
-                    } finally {
-                      setIsSubmittingAction(false);
+                    if (actionPrompt.action === 'approve' && onApprove) {
+                      cr.approvedComment = commentText;
+                      cr.approvedBy = currentUser.name || 'Approver';
+                      onApprove(cr.id, commentText);
+                    } else if (actionPrompt.action === 'reject' && onReject) {
+                      cr.rejectedComment = commentText;
+                      cr.rejectionReason = commentText;
+                      cr.rejectedBy = currentUser.name || 'Approver';
+                      onReject(cr.id, commentText);
+                    } else if (actionPrompt.action === 'implement' && onImplement) {
+                      cr.implementedComment = commentText;
+                      onImplement(cr.id, commentText);
                     }
+                    setActionPrompt(null);
+                    setActionCommentInput('');
+                    onClose();
                   }}
-                  style={{
-                    padding: '0.55rem 1.25rem',
-                    backgroundColor: isSubmittingAction ? 'var(--border-color)' : actionPrompt.color,
-                    color: '#FFFFFF',
-                    border: 'none',
-                    borderRadius: '8px',
-                    fontSize: '0.825rem',
-                    fontWeight: 700,
-                    cursor: isSubmittingAction ? 'not-allowed' : 'pointer',
-                    opacity: isSubmittingAction ? 0.7 : 1,
-                    boxShadow: '0 2px 6px rgba(0,0,0,0.2)'
-                  }}
+                  style={{ padding: '0.55rem 1.25rem', backgroundColor: actionPrompt.color, color: '#FFFFFF', border: 'none', borderRadius: '8px', fontSize: '0.825rem', fontWeight: 700, cursor: 'pointer', boxShadow: '0 2px 6px rgba(0,0,0,0.2)' }}
                 >
-                  {isSubmittingAction ? 'Processing...' : actionPrompt.action === 'implement' ? 'Submit for Implement' : 'Submit'}
+                  {actionPrompt.action === 'implement' ? 'Submit for Implement' : 'Submit'}
                 </button>
               </div>
             </div>
@@ -773,69 +801,39 @@ export default function ChangeRequestModal({ cr, onClose, onApprove, onReject, o
 
         {/* Footer Actions */}
         <div style={{ padding: '1rem 1.75rem 1.5rem 1.75rem', borderTop: '1px solid var(--border-color)', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '0.75rem', backgroundColor: 'var(--card-bg)', position: 'sticky', bottom: 0 }}>
-            <button
-              onClick={onClose}
-              disabled={isSubmittingAction}
-              style={{
-                padding: '0.55rem 1.1rem',
-                backgroundColor: 'var(--card-bg)',
-                border: '1px solid var(--border-color)',
-                borderRadius: '8px',
-                fontSize: '0.825rem',
-                fontWeight: 600,
-                color: 'var(--text-primary)',
-                cursor: isSubmittingAction ? 'not-allowed' : 'pointer',
-                opacity: isSubmittingAction ? 0.6 : 1
-              }}
-            >
-              Close
-            </button>
+            <button onClick={onClose} style={{ padding: '0.55rem 1.1rem', backgroundColor: 'var(--card-bg)', border: '1px solid var(--border-color)', borderRadius: '8px', fontSize: '0.825rem', fontWeight: 600, color: 'var(--text-primary)', cursor: 'pointer' }}>Close</button>
             
-            {canAct ? (
+            {isDraft ? (
+              <button
+                onClick={() => {
+                  if (onSubmitForApproval) onSubmitForApproval(cr.id);
+                  onClose();
+                }}
+                style={{
+                  padding: '0.55rem 1.25rem',
+                  backgroundColor: 'var(--brand-primary)',
+                  color: '#FFFFFF',
+                  border: 'none',
+                  borderRadius: '8px',
+                  fontSize: '0.825rem',
+                  fontWeight: 500,
+                  cursor: 'pointer',
+                  boxShadow: '0 1px 3px rgba(0, 0, 0, 0.2)'
+                }}
+              >
+                Submit for Approval
+              </button>
+            ) : canAct ? (
               <>
                 {onReject && (
-                  <button
-                    disabled={isSubmittingAction}
-                    onClick={() => { setActionPrompt({ action: 'reject', title: 'Reject Change Request', color: '#DC2626' }); setActionCommentInput(''); }}
-                    style={{
-                      padding: '0.55rem 1.1rem',
-                      backgroundColor: '#FEF2F2',
-                      color: '#DC2626',
-                      border: '1px solid #FCA5A5',
-                      borderRadius: '8px',
-                      fontSize: '0.825rem',
-                      fontWeight: 700,
-                      cursor: isSubmittingAction ? 'not-allowed' : 'pointer',
-                      opacity: isSubmittingAction ? 0.6 : 1
-                    }}
-                  >
-                    Reject
-                  </button>
+                  <button onClick={() => { setActionPrompt({ action: 'reject', title: 'Reject Change Request', color: '#DC2626' }); setActionCommentInput(''); }} style={{ padding: '0.55rem 1.1rem', backgroundColor: '#FEF2F2', color: '#DC2626', border: '1px solid #FCA5A5', borderRadius: '8px', fontSize: '0.825rem', fontWeight: 700, cursor: 'pointer' }}>Reject</button>
                 )}
                 {onApprove && (
-                  <button
-                    disabled={isSubmittingAction}
-                    onClick={() => { setActionPrompt({ action: 'approve', title: 'Approve Change Request', color: '#0D9488' }); setActionCommentInput(''); }}
-                    style={{
-                      padding: '0.55rem 1.25rem',
-                      backgroundColor: '#0D9488',
-                      color: '#FFFFFF',
-                      border: 'none',
-                      borderRadius: '8px',
-                      fontSize: '0.825rem',
-                      fontWeight: 700,
-                      cursor: isSubmittingAction ? 'not-allowed' : 'pointer',
-                      opacity: isSubmittingAction ? 0.6 : 1,
-                      boxShadow: '0 1px 3px rgba(13, 148, 136, 0.2)'
-                    }}
-                  >
-                    Approve
-                  </button>
+                  <button onClick={() => { setActionPrompt({ action: 'approve', title: 'Approve Change Request', color: '#0D9488' }); setActionCommentInput(''); }} style={{ padding: '0.55rem 1.25rem', backgroundColor: '#0D9488', color: '#FFFFFF', border: 'none', borderRadius: '8px', fontSize: '0.825rem', fontWeight: 700, cursor: 'pointer', boxShadow: '0 1px 3px rgba(13, 148, 136, 0.2)' }}>Approve</button>
                 )}
               </>
             ) : isApproved && canMarkImplemented && !isSelfRequest ? (
               <button
-                disabled={isSubmittingAction}
                 onClick={() => {
                   setActionPrompt({ action: 'implement', title: 'Mark as Implemented', color: '#0D9488' });
                   setActionCommentInput('');
@@ -848,8 +846,7 @@ export default function ChangeRequestModal({ cr, onClose, onApprove, onReject, o
                   borderRadius: '8px',
                   fontSize: '0.825rem',
                   fontWeight: 500,
-                  cursor: isSubmittingAction ? 'not-allowed' : 'pointer',
-                  opacity: isSubmittingAction ? 0.6 : 1,
+                  cursor: 'pointer',
                   boxShadow: '0 1px 3px rgba(0, 0, 0, 0.2)'
                 }}
               >

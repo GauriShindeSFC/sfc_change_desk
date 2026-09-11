@@ -5,7 +5,10 @@ import {
   FileText,
   CheckCircle2,
   Settings,
-  X
+  X,
+  CreditCard,
+  Plane,
+  Users
 } from 'lucide-react';
 
 function Sidebar({
@@ -30,7 +33,10 @@ function Sidebar({
 
   const topNavItems = [
     { id: 'Dashboard', label: 'My Dashboard', icon: LayoutGrid },
-    { id: 'Change Catalog', label: 'Change Request', icon: FileText }
+    { id: 'Change Catalog', label: 'Change Request', icon: FileText },
+    { id: 'Pre-Spend Request', label: 'Pre-Spend Request', icon: CreditCard},
+    { id: 'Travel Desk', label: 'Travel Desk', icon: Plane},
+    { id: 'Tribe CRM', label: 'Tribe CRM', icon: Users}
   ];
 
   // On desktop: compact rail by default, expands to full width on hover.
@@ -74,6 +80,24 @@ function Sidebar({
         {!mini && (
           <span style={{ flex: 1, textAlign: 'left', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
             {item.label}
+          </span>
+        )}
+        {!mini && item.comingSoon && (
+          <span
+            style={{
+              padding: '0.15rem 0.45rem',
+              borderRadius: '4px',
+              fontSize: '0.625rem',
+              fontWeight: 600,
+              backgroundColor: '#1E293B',
+              color: '#94A3B8',
+              border: '1px solid #334155',
+              whiteSpace: 'nowrap',
+              letterSpacing: '0.02em',
+              lineHeight: 1.2
+            }}
+          >
+            Coming Soon
           </span>
         )}
         {!mini && !isActive && Boolean(item.badge) && item.badge > 0 && (

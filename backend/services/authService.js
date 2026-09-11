@@ -56,6 +56,8 @@ export const publicUser = (identity) => {
     applicationRole: u.applicationRole || null,
     status: 'Active',
     cmCategories: u.cmCategories || [],
+    ciCategories: u.ciCategories || [],
+    categoryIds: u.categoryIds || u.ciCategories || u.cmCategories || [],
     initials: initials(u.displayName || u.name || u.email),
     isInUserTable: u.identityType === 'S8_USER'
   };

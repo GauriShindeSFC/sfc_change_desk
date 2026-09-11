@@ -28,6 +28,14 @@ export class IdentityResolver {
   static keyCache = new Map();
   static CACHE_TTL_MS = 30_000;
 
+  static clearCache(key = null) {
+    if (key) {
+      this.keyCache.delete(String(key));
+    } else {
+      this.keyCache.clear();
+    }
+  }
+
   /**
    * Resolves identity by email address.
    * Checks both public.users (UserS8) and employees (Employee).
@@ -223,7 +231,7 @@ export class IdentityResolver {
     });
 
     // Role hierarchy rank (lower number = higher administrative privilege)
-    const ROLE_RANK = { 'role-1': 1, 'role-2': 2, 'role-3': 3, 'role-4': 4 };
+    const ROLE_RANK = { 'role-1': 1, 'role-2': 2, 'role-3': 3, 'role-5': 4, 'role-4': 5 };
 
     // 1. Check if the exact userKey being resolved has a mapping
     const exactMapping = allRoleMappings.find(m => m.userKey === userKey);
@@ -237,7 +245,7 @@ export class IdentityResolver {
     const highestPrivilegeMapping = sortedByPrivilege[0] || null;
 
     // Prefer exact mapping if it's an elevated role; otherwise pick the highest privilege mapping
-    const roleMapping = (exactMapping && (ROLE_RANK[exactMapping.roleId] || 99) < 4)
+    const roleMapping = (exactMapping && (ROLE_RANK[exactMapping.roleId] || 99) < ROLE_RANK['role-4'])
       ? exactMapping
       : (highestPrivilegeMapping || exactMapping || allRoleMappings[0] || null);
 
@@ -265,21 +273,36 @@ export class IdentityResolver {
     let cmCategories = [];
     let ciCategories = [];
 
-    // Fetch CM category assignments if role-3 (Change Manager)
-    if (roleId === 'role-3') {
-      const assignments = await ChangeManagerCategory.findAll({
-        where: {
-          userId: { [Op.in]: Array.from(roleKeys) }
-        }
-      });
-      cmCategories = assignments.map(a => a.categoryId);
-    } else if (roleId === 'role-5') {
-      const assignments = await ChangeImplementerCategory.findAll({
-        where: {
-          userId: { [Op.in]: Array.from(roleKeys) }
-        }
-      });
-      ciCategories = assignments.map(a => a.categoryId);
+    // Fetch CM category assignments
+    const cmAssignments = await ChangeManagerCategory.findAll({
+      where: {
+        userId: { [Op.in]: Array.from(roleKeys) }
+      }
+    });
+    cmCategories = cmAssignments.map(a => a.categoryId);
+
+    // Fetch CI category assignments
+    const ciAssignments = await ChangeImplementerCategory.findAll({
+      where: {
+        userId: { [Op.in]: Array.from(roleKeys) }
+      }
+    });
+    ciCategories = ciAssignments.map(a => a.categoryId);
+
+    // Automatically recognize role if categories are assigned
+    let resolvedRoleId = roleId;
+    let resolvedRoleName = roleName;
+    let resolvedAppRole = applicationRole;
+    if (resolvedRoleId === 'role-4') {
+      if (ciCategories.length > 0) {
+        resolvedRoleId = 'role-5';
+        resolvedRoleName = 'Change Implementer';
+        resolvedAppRole = 'CHANGE_IMPLEMENTER';
+      } else if (cmCategories.length > 0) {
+        resolvedRoleId = 'role-3';
+        resolvedRoleName = 'Change Manager';
+        resolvedAppRole = 'CHANGE_MANAGER';
+      }
     }
 
     const dto = {
@@ -290,9 +313,9 @@ export class IdentityResolver {
       email: record.email,
       displayName,
       name: displayName,
-      applicationRole,
-      roleId,
-      role: roleName,
+      applicationRole: resolvedAppRole,
+      roleId: resolvedRoleId,
+      role: resolvedRoleName,
       isExplicitRole,
       employeeBusinessId,
       employeeId: employeeBusinessId,
