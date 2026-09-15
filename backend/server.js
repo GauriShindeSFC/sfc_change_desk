@@ -9,6 +9,8 @@ import { sequelize, Role } from './models/index.js';
 import { roles } from './data/seed.js';
 import { verifyMailTransport } from './services/mailService.js';
 
+import publicActionRoutes from './routes/publicActions.js';
+
 const app = express();
 const PORT = process.env.PORT || 5001;
 const NODE_ENV = process.env.NODE_ENV || 'development';
@@ -24,6 +26,7 @@ app.get('/api/health', (req, res) => {
 
 // Mount modular routes
 app.use('/api/auth', authRoutes);
+app.use('/api/public', publicActionRoutes);
 app.use('/api/dashboard', dashboardRoutes); // Authenticated via authenticateUser inside dashboard.js
 
 // 404 + centralized error handling (order matters — these come last)

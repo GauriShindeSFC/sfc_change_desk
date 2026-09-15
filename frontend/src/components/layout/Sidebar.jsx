@@ -6,9 +6,10 @@ import {
   CheckCircle2,
   Settings,
   X,
-  CreditCard,
+  IndianRupee,
   Plane,
-  Users
+  Users,
+  ExternalLink
 } from 'lucide-react';
 
 function Sidebar({
@@ -19,9 +20,24 @@ function Sidebar({
   mobileOpen = false,
   onCloseMobile,
   myRequestsCount = 6,
-  worklistCount = 4
+  worklistCount = 4,
+  onHoverChange
 }) {
   const [isHovered, setIsHovered] = useState(false);
+
+  const handleMouseEnter = () => {
+    if (!isMobile) {
+      setIsHovered(true);
+      onHoverChange?.(true);
+    }
+  };
+
+  const handleMouseLeave = () => {
+    if (!isMobile) {
+      setIsHovered(false);
+      onHoverChange?.(false);
+    }
+  };
 
   const roleName = (user?.role || '').toLowerCase();
   const roleId = user?.roleId || '';
@@ -34,9 +50,9 @@ function Sidebar({
   const topNavItems = [
     { id: 'Dashboard', label: 'My Dashboard', icon: LayoutGrid },
     { id: 'Change Catalog', label: 'Change Request', icon: FileText },
-    { id: 'Pre-Spend Request', label: 'Pre-Spend Request', icon: CreditCard},
+    { id: 'Pre-Spend Request', label: 'Pre-Spend Request', icon: IndianRupee },
     { id: 'Travel Desk', label: 'Travel Desk', icon: Plane},
-    { id: 'Tribe CRM', label: 'Tribe CRM', icon: Users}
+    { id: 'Tribe CRM', label: 'Tribe CRM', icon: Users, externalUrl: 'https://tribe.stfox.com/jsp/iamlogin.jsp' }
   ];
 
   // On desktop: compact rail by default, expands to full width on hover.
@@ -45,8 +61,13 @@ function Sidebar({
   const mini = !isExpanded;
   const width = isMobile ? 250 : isHovered ? 250 : 68;
 
-  const handleSelect = (id) => {
-    onItemSelect?.(id);
+  const handleSelect = (item) => {
+    if (item?.externalUrl) {
+      window.open(item.externalUrl, '_blank', 'noopener,noreferrer');
+      if (isMobile) onCloseMobile?.();
+      return;
+    }
+    onItemSelect?.(item.id || item);
     if (isMobile) onCloseMobile?.();
   };
 
@@ -56,7 +77,7 @@ function Sidebar({
     return (
       <button
         key={item.id}
-        onClick={() => handleSelect(item.id)}
+        onClick={() => handleSelect(item)}
         title={mini ? item.label : undefined}
         style={{
           display: 'flex',
@@ -81,6 +102,9 @@ function Sidebar({
           <span style={{ flex: 1, textAlign: 'left', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
             {item.label}
           </span>
+        )}
+        {!mini && item.externalUrl && (
+          <ExternalLink size={13} style={{ color: '#64748B', flexShrink: 0, marginLeft: 'auto' }} />
         )}
         {!mini && item.comingSoon && (
           <span
@@ -120,8 +144,8 @@ function Sidebar({
 
   const aside = (
     <aside
-      onMouseEnter={() => !isMobile && setIsHovered(true)}
-      onMouseLeave={() => !isMobile && setIsHovered(false)}
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}
       style={{
         width: `${width}px`,
         backgroundColor: '#0B1018',
@@ -224,7 +248,7 @@ function Sidebar({
         const visibleMgmtItems = [];
 
         if (isChangeManager || isChangeImplementer || isAdmin) {
-          visibleMgmtItems.push({ id: 'My Worklist', label: 'My Worklist', icon: CheckCircle2, badge: worklistCount });
+          visibleMgmtItems.push({ id: 'My Worklist', label: 'My Worklist', icon: CheckCircle2 });
         }
 
         if (isAdmin) {

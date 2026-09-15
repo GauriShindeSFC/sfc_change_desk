@@ -115,7 +115,7 @@ function ChangeRequestFormPage({ onNavigate, initialData, user }) {
       name: 'Security Tools & Policies',
       description: 'Endpoint security agents, policies, and exemption requests',
       subcategories: [
-        { id: 'subcat-sec-ep', name: 'End Point Agent', sla: '2 business days', risk: 'High' },
+        { id: 'subcat-sec-ep', name: 'Endpoint Agent', sla: '2 business days', risk: 'High' },
         { id: 'subcat-sec-oth', name: 'Other Security Changes', sla: '3 business days', risk: 'High' }
       ]
     }
@@ -205,6 +205,15 @@ function ChangeRequestFormPage({ onNavigate, initialData, user }) {
         if (res.ok) {
           const body = await res.json();
           if (body.data && Array.isArray(body.data)) {
+            body.data.forEach(c => {
+              if (c.subcategories && Array.isArray(c.subcategories)) {
+                c.subcategories.forEach(s => {
+                  if (s.id === 'subcat-sec-ep' || s.name === 'End Point Agent') {
+                    s.name = 'Endpoint Agent';
+                  }
+                });
+              }
+            });
             setCategories(body.data);
             
             // Match category from initialData
@@ -266,7 +275,21 @@ function ChangeRequestFormPage({ onNavigate, initialData, user }) {
         if (res.ok) {
           const body = await res.json();
           if (body.data && Array.isArray(body.data)) {
-            setFields(body.data);
+            const sanitizedFields = body.data.map(f => ({
+              ...f,
+              fieldLabel: f.fieldLabel && f.fieldLabel.toLowerCase() === 'current configuration'
+                ? 'Current Configuration'
+                : f.fieldLabel
+                  ? f.fieldLabel.replace(/congfig/gi, 'Config').replace(/figuraiton/gi, 'figuration').replace('Proess', 'Process')
+                  : f.fieldLabel,
+              options: Array.isArray(f.options)
+                ? f.options.map(opt => (typeof opt === 'string' ? opt.replace(/Exisitng/g, 'Existing') : opt))
+                : f.options,
+              appliesToActions: Array.isArray(f.appliesToActions)
+                ? f.appliesToActions.map(act => (typeof act === 'string' ? act.replace(/Exisitng/g, 'Existing') : act))
+                : f.appliesToActions
+            }));
+            setFields(sanitizedFields);
             const initialVals = { ...(initialData?.customFieldValues || {}) };
             const isOtherSubcat = selectedSubcategory?.name?.toLowerCase() === 'other' || selectedSubcategoryId?.endsWith('-oth');
             
@@ -274,7 +297,7 @@ function ChangeRequestFormPage({ onNavigate, initialData, user }) {
               const newCustomVals = { ...prev };
               const currentAction = prev.actionRequired || initialVals.actionRequired || (isOtherSubcat ? 'Other' : '');
 
-              body.data.forEach((f) => {
+              sanitizedFields.forEach((f) => {
                 let defaultVal = '';
                 if (f.fieldType === 'dropdown') {
                   const opts = getFieldOptions(f, activeSessionUser);
@@ -338,7 +361,10 @@ function ChangeRequestFormPage({ onNavigate, initialData, user }) {
       ? (customFieldValues.otherAction?.trim() || 'Other Action')
       : actionRequiredVal;
 
-    const subName = selectedSubcategory?.name || '';
+    let subName = selectedSubcategory?.name || '';
+    if (subName === 'End Point Agent' || selectedSubcategory?.id === 'subcat-sec-ep') {
+      subName = 'Endpoint Agent';
+    }
 
     if (actionText && subName) {
       setFormData((prev) => ({
@@ -375,8 +401,12 @@ function ChangeRequestFormPage({ onNavigate, initialData, user }) {
 
     const finalCustomValues = { ...customFieldValues };
     const currentAction = finalCustomValues.actionRequired || '';
+    const otherAllowedKeys = ['actionRequired', 'description', 'purposeReason', 'purpose'];
+
     fields.forEach((f) => {
-      const applies = !f.appliesToActions || !Array.isArray(f.appliesToActions) || f.appliesToActions.includes(currentAction);
+      const applies = currentAction === 'Other'
+        ? otherAllowedKeys.includes(f.fieldKey)
+        : (!f.appliesToActions || !Array.isArray(f.appliesToActions) || f.appliesToActions.includes(currentAction));
       if (applies && f.fieldType === 'dropdown') {
         const opts = getFieldOptions(f, activeSessionUser);
         if (!finalCustomValues[f.fieldKey] || !opts.includes(finalCustomValues[f.fieldKey])) {
@@ -388,7 +418,12 @@ function ChangeRequestFormPage({ onNavigate, initialData, user }) {
     // Whitelist only valid fields belonging to the current subcategory & action
     const allowedFieldKeys = new Set(
       fields
-        .filter((f) => !f.appliesToActions || !Array.isArray(f.appliesToActions) || f.appliesToActions.includes(currentAction))
+        .filter((f) => {
+          if (currentAction === 'Other') {
+            return otherAllowedKeys.includes(f.fieldKey);
+          }
+          return !f.appliesToActions || !Array.isArray(f.appliesToActions) || f.appliesToActions.includes(currentAction);
+        })
         .map((f) => f.fieldKey)
     );
     allowedFieldKeys.add('actionRequired');
@@ -501,7 +536,11 @@ function ChangeRequestFormPage({ onNavigate, initialData, user }) {
   }
 
   const actionRequiredValue = customFieldValues.actionRequired || '';
+  const OTHER_ACTION_ALLOWED_KEYS = ['actionRequired', 'description', 'purposeReason', 'purpose'];
   const visibleFields = fields.filter((f) => {
+    if (actionRequiredValue === 'Other') {
+      return OTHER_ACTION_ALLOWED_KEYS.includes(f.fieldKey);
+    }
     if (!f.appliesToActions || !Array.isArray(f.appliesToActions)) return true;
     return f.appliesToActions.includes(actionRequiredValue);
   });
@@ -589,7 +628,7 @@ function ChangeRequestFormPage({ onNavigate, initialData, user }) {
             </span>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1.25rem' }}>
+          <div className="cd-responsive-form-grid">
             <div>
               <label style={{ display: 'block', fontSize: '0.825rem', fontWeight: 500, color: 'var(--text-primary)', marginBottom: '0.4rem' }}>
                 Requester Name
@@ -671,7 +710,7 @@ function ChangeRequestFormPage({ onNavigate, initialData, user }) {
             </span>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1.25rem' }}>
+          <div className="cd-responsive-form-grid">
             {/* Change Title */}
             <div>
               <label style={{ display: 'block', fontSize: '0.825rem', fontWeight: 500, color: 'var(--text-primary)', marginBottom: '0.4rem' }}>
@@ -731,14 +770,14 @@ function ChangeRequestFormPage({ onNavigate, initialData, user }) {
             {/* Dynamic Fields Renderer */}
             {visibleFields.length > 0 && (
               <div style={{ gridColumn: '1 / -1', display: 'flex', flexDirection: 'column', gap: '1rem', padding: '1rem', backgroundColor: 'var(--card-bg, #FFFFFF)', borderRadius: '10px', border: '1px solid var(--border-color)' }}>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1rem' }}>
+                <div className="cd-responsive-form-grid" style={{ gap: '1rem' }}>
                   {visibleFields.map((field) => {
                     const isActionRequiredOther = field.fieldKey === 'actionRequired' && customFieldValues.actionRequired === 'Other';
                     const isOtherSubcat = selectedSubcategory?.name?.toLowerCase() === 'other' || selectedSubcategoryId?.endsWith('-oth');
 
                     if (isOtherSubcat && field.fieldKey === 'actionRequired') {
                       return (
-                        <div key={field.id || field.fieldKey} style={{ gridColumn: 'span 2', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                        <div key={field.id || field.fieldKey} className="cd-form-span-2 cd-responsive-inner-grid">
                           <div>
                             <label style={{ display: 'block', fontSize: '0.825rem', fontWeight: 500, color: 'var(--text-primary)', marginBottom: '0.35rem' }}>
                               Action Required *
@@ -770,7 +809,7 @@ function ChangeRequestFormPage({ onNavigate, initialData, user }) {
                     if (field.fieldType === 'dropdown' && isActionRequiredOther) {
                       const isDisabled = fieldsLoading && field.fieldKey === 'actionRequired';
                       return (
-                        <div key={field.id || field.fieldKey} style={{ gridColumn: 'span 2', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                        <div key={field.id || field.fieldKey} className="cd-form-span-2 cd-responsive-inner-grid">
                           <div>
                             <label style={{ display: 'block', fontSize: '0.825rem', fontWeight: 500, color: 'var(--text-primary)', marginBottom: '0.35rem' }}>
                               {field.fieldLabel} {field.isRequired ? '*' : ''}

@@ -30,6 +30,7 @@ export default function Dashboard({ user, onLogout }) {
   const [searchQuery, setSearchQuery] = useState('');
   const [myRequestsCount, setMyRequestsCount] = useState(0);
   const [worklistCount, setWorklistCount] = useState(0);
+  const [isSidebarHovered, setIsSidebarHovered] = useState(false);
   const badgeRequestInFlight = useRef(false);
 
   const roleName = (user?.role || '').toLowerCase();
@@ -110,6 +111,10 @@ export default function Dashboard({ user, onLogout }) {
   }, [activeItem, user?.id]);
 
   const handleNavigate = useCallback((page, payload = null) => {
+    if (page === 'Tribe CRM') {
+      window.open('https://tribe.stfox.com/jsp/iamlogin.jsp', '_blank', 'noopener,noreferrer');
+      return;
+    }
     setActiveItem(page);
     setNavigationPayload(payload);
   }, []);
@@ -148,7 +153,40 @@ export default function Dashboard({ user, onLogout }) {
     Settings: SettingsPage,
     'Pre-Spend Request': ComingSoonPage,
     'Travel Desk': ComingSoonPage,
-    'Tribe CRM': ComingSoonPage
+    'Tribe CRM': function TribeCrmRedirectPage() {
+      useEffect(() => {
+        window.open('https://tribe.stfox.com/jsp/iamlogin.jsp', '_blank', 'noopener,noreferrer');
+      }, []);
+      return (
+        <div style={{ padding: '3rem', textAlign: 'center', color: 'var(--text-secondary)' }}>
+          <p style={{ fontSize: '1rem', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '0.5rem' }}>
+            Opening Tribe CRM in a new tab...
+          </p>
+          <p style={{ fontSize: '0.85rem', marginBottom: '1.5rem' }}>
+            If the tab did not open automatically, click below:
+          </p>
+          <a
+            href="https://tribe.stfox.com/jsp/iamlogin.jsp"
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '0.5rem',
+              padding: '0.65rem 1.25rem',
+              backgroundColor: '#2563EB',
+              color: '#FFFFFF',
+              borderRadius: '8px',
+              textDecoration: 'none',
+              fontWeight: 600,
+              fontSize: '0.875rem'
+            }}
+          >
+            Go to Tribe CRM &rarr;
+          </a>
+        </div>
+      );
+    }
   };
   const ActivePage = pages[currentItem];
 
@@ -163,6 +201,7 @@ export default function Dashboard({ user, onLogout }) {
         onCloseMobile={handleCloseMobile}
         myRequestsCount={visitedSections['My Requests'] ? 0 : myRequestsCount}
         worklistCount={worklistCount}
+        onHoverChange={setIsSidebarHovered}
       />
 
       <div style={{
@@ -170,8 +209,8 @@ export default function Dashboard({ user, onLogout }) {
         display: 'flex',
         flexDirection: 'column',
         minWidth: 0,
-        marginLeft: isMobile ? 0 : '68px',
-        transition: 'margin-left 0.16s ease'
+        marginLeft: isMobile ? 0 : isSidebarHovered ? '250px' : '68px',
+        transition: 'margin-left 0.2s cubic-bezier(0.4, 0, 0.2, 1)'
       }}>
         <Header
           activeRoute={activeItem}

@@ -419,12 +419,7 @@ function DashboardPage({ onNavigate, user, isOrgDashboard = false, searchQuery =
       </div>
 
       {/* Middle Row: Tickets by Category & Status Breakdown Side-by-Side */}
-      <div style={{
-        display: 'grid',
-        gridTemplateColumns: '1fr 1fr',
-        gap: '1.25rem',
-        alignItems: 'stretch'
-      }}>
+      <div className="cd-responsive-2col" style={{ alignItems: 'stretch' }}>
 
         {/* Card 1: Tickets by Category */}
         <div className="cd-card-hover" style={{
@@ -523,13 +518,7 @@ function DashboardPage({ onNavigate, user, isOrgDashboard = false, searchQuery =
             </div>
 
             {/* Donut Chart on Left, Legend Content on Right */}
-            <div style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              gap: '1.5rem',
-              marginTop: '0.85rem'
-            }}>
+            <div className="cd-responsive-breakdown" style={{ marginTop: '0.85rem' }}>
               {/* Left: SVG Donut Ring Chart with Center Text */}
               <div style={{ position: 'relative', width: '140px', height: '140px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                 <svg width="140" height="140" viewBox="0 0 42 42">
@@ -657,7 +646,7 @@ function DashboardPage({ onNavigate, user, isOrgDashboard = false, searchQuery =
         </div>
 
         <div style={{ overflowX: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.85rem' }}>
+          <table style={{ width: '100%', minWidth: '780px', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.85rem' }}>
             <thead>
               <tr style={{ backgroundColor: 'var(--input-bg)', borderBottom: '1px solid var(--border-color)' }}>
                 <th style={{ padding: '0.75rem 1rem', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', fontSize: '0.725rem', letterSpacing: '0.05em', whiteSpace: 'nowrap' }}>CR ID</th>

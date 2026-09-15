@@ -296,7 +296,7 @@ export const catalogSubcategories = [
   { id: 'subcat-o365-oth', categoryId: 'cat-o365', name: 'Other Email / M365 Requests', sla: '2 business days', risk: 'Low', workflowId: 'wf-3', status: 'Active' },
 
   // 6. Security Tools & Policies
-  { id: 'subcat-sec-ep', categoryId: 'cat-sec', name: 'End Point Agent', sla: '2 business days', risk: 'High', workflowId: 'wf-2', status: 'Active' },
+  { id: 'subcat-sec-ep', categoryId: 'cat-sec', name: 'Endpoint Agent', sla: '2 business days', risk: 'High', workflowId: 'wf-2', status: 'Active' },
   { id: 'subcat-sec-oth', categoryId: 'cat-sec', name: 'Other Security Changes', sla: '3 business days', risk: 'High', workflowId: 'wf-2', status: 'Active' }
 ];
 
@@ -445,14 +445,14 @@ export const catalogSubcategoryFields = [
   { id: 'f-o365oth-act', subcategoryId: 'subcat-o365-oth', fieldKey: 'actionRequired', fieldLabel: 'Action Required', fieldType: 'dropdown', isRequired: true, sortOrder: 0, appliesToActions: null, options: ['Other Email/M365 related request', 'Other'] },
   { id: 'f-o365oth-desc', subcategoryId: 'subcat-o365-oth', fieldKey: 'description', fieldLabel: 'Description', fieldType: 'textarea', isRequired: true, sortOrder: 1, appliesToActions: ['Other Email/M365 related request'], options: null },
 
-  // ── 19. End Point Agent ──
+  // ── 19. Endpoint Agent ──
   { id: 'f-ep-act', subcategoryId: 'subcat-sec-ep', fieldKey: 'actionRequired', fieldLabel: 'Action Required', fieldType: 'dropdown', isRequired: true, sortOrder: 0, appliesToActions: null, options: ['Remove Security / Endpoint Agent', 'Modify Endpoint Security Policy', 'Request Exception in Security Policy', 'Other'] },
   { id: 'f-ep-tool', subcategoryId: 'subcat-sec-ep', fieldKey: 'toolName', fieldLabel: 'Tool Name', fieldType: 'text', isRequired: true, sortOrder: 1, appliesToActions: ['Remove Security / Endpoint Agent', 'Modify Endpoint Security Policy', 'Request Exception in Security Policy'], options: null },
   { id: 'f-ep-devid', subcategoryId: 'subcat-sec-ep', fieldKey: 'deviceId', fieldLabel: 'Device ID', fieldType: 'text', isRequired: true, sortOrder: 2, appliesToActions: ['Remove Security / Endpoint Agent', 'Modify Endpoint Security Policy', 'Request Exception in Security Policy'], options: null },
   { id: 'f-ep-hostid', subcategoryId: 'subcat-sec-ep', fieldKey: 'hostId', fieldLabel: 'Host ID', fieldType: 'text', isRequired: true, sortOrder: 3, appliesToActions: ['Remove Security / Endpoint Agent', 'Modify Endpoint Security Policy', 'Request Exception in Security Policy'], options: null },
   { id: 'f-ep-curgrp', subcategoryId: 'subcat-sec-ep', fieldKey: 'currentGroup', fieldLabel: 'Current Group', fieldType: 'text', isRequired: true, sortOrder: 4, appliesToActions: ['Modify Endpoint Security Policy'], options: null },
   { id: 'f-ep-reqgrp', subcategoryId: 'subcat-sec-ep', fieldKey: 'requestedGroup', fieldLabel: 'Requested Group', fieldType: 'text', isRequired: true, sortOrder: 5, appliesToActions: ['Modify Endpoint Security Policy'], options: null },
-  { id: 'f-ep-hash', subcategoryId: 'subcat-sec-ep', fieldKey: 'fileProcessPathHash', fieldLabel: 'File/Proess/Path/Hash', fieldType: 'text', isRequired: true, sortOrder: 6, appliesToActions: ['Request Exception in Security Policy'], options: null },
+  { id: 'f-ep-hash', subcategoryId: 'subcat-sec-ep', fieldKey: 'fileProcessPathHash', fieldLabel: 'File/Process/Path/Hash', fieldType: 'text', isRequired: true, sortOrder: 6, appliesToActions: ['Request Exception in Security Policy'], options: null },
   { id: 'f-ep-reason', subcategoryId: 'subcat-sec-ep', fieldKey: 'purposeReason', fieldLabel: 'Purpose / Reason', fieldType: 'text', isRequired: true, sortOrder: 7, appliesToActions: ['Remove Security / Endpoint Agent', 'Modify Endpoint Security Policy', 'Request Exception in Security Policy'], options: null },
 
   // ── 20. Security Other ──

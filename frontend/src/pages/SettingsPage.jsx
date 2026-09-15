@@ -490,43 +490,46 @@ function SettingsPage({ user }) {
       {/* TAB 1: USERS DIRECTORY */}
       {activeTab === 'users' && (
         <div style={{ backgroundColor: 'var(--card-bg)', border: '1px solid var(--border-color)', borderRadius: '12px', overflow: 'hidden', boxShadow: '0 1px 3px rgba(16, 21, 30, 0.04)' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
-            <thead>
-              <tr style={{ backgroundColor: 'var(--input-bg)', color: 'var(--text-secondary)', fontSize: '0.6875rem', fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', borderBottom: '1px solid var(--border-color)' }}>
-                <th style={{ padding: '0.75rem 0.85rem' }}>USER</th>
-                <th style={{ padding: '0.75rem 0.85rem' }}>EMAIL ID</th>
-                <th style={{ padding: '0.75rem 0.85rem' }}>ROLE</th>
-                <th style={{ padding: '0.75rem 0.85rem', textAlign: 'right' }}>ACTIONS</th>
-              </tr>
-            </thead>
-            <tbody>
-              {users.map((u, idx) => (
-                <tr key={u.id} style={{ borderBottom: idx === users.length - 1 ? 'none' : '1px solid var(--border-color)' }}>
-                  <td style={{ padding: '0.75rem 0.85rem', fontSize: '0.875rem', fontWeight: 500, color: 'var(--text-primary)' }}>{u.name}</td>
-                  <td style={{ padding: '0.75rem 0.85rem', fontSize: '0.825rem', color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)' }}>{u.email}</td>
-                  <td style={{ padding: '0.75rem 0.85rem', fontSize: '0.825rem', color: 'var(--text-primary)', fontWeight: 600 }}>{u.role}</td>
-                  <td style={{ padding: '0.75rem 0.85rem', textAlign: 'right' }}>
-                    <button
-                      type="button"
-                      onClick={() => handleOpenManageUser(u)}
-                      disabled={isRequester}
-                      style={{
-                        background: 'none',
-                        border: 'none',
-                        color: isRequester ? 'var(--text-secondary)' : 'var(--brand-primary)',
-                        fontSize: '0.8rem',
-                        fontWeight: 600,
-                        cursor: isRequester ? 'not-allowed' : 'pointer',
-                        opacity: isRequester ? 0.4 : 1
-                      }}
-                    >
-                      Manage user
-                    </button>
-                  </td>
+          <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
+            <table style={{ width: '100%', minWidth: '650px', borderCollapse: 'collapse', textAlign: 'left' }}>
+              <thead>
+                <tr style={{ backgroundColor: 'var(--input-bg)', color: 'var(--text-secondary)', fontSize: '0.6875rem', fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', borderBottom: '1px solid var(--border-color)' }}>
+                  <th style={{ padding: '0.75rem 0.85rem', whiteSpace: 'nowrap' }}>USER</th>
+                  <th style={{ padding: '0.75rem 0.85rem', whiteSpace: 'nowrap' }}>EMAIL ID</th>
+                  <th style={{ padding: '0.75rem 0.85rem', whiteSpace: 'nowrap' }}>ROLE</th>
+                  <th style={{ padding: '0.75rem 0.85rem', textAlign: 'right', whiteSpace: 'nowrap' }}>ACTIONS</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {users.map((u, idx) => (
+                  <tr key={u.id} style={{ borderBottom: idx === users.length - 1 ? 'none' : '1px solid var(--border-color)' }}>
+                    <td style={{ padding: '0.75rem 0.85rem', fontSize: '0.875rem', fontWeight: 500, color: 'var(--text-primary)', whiteSpace: 'nowrap' }}>{u.name}</td>
+                    <td style={{ padding: '0.75rem 0.85rem', fontSize: '0.825rem', color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)', whiteSpace: 'nowrap' }}>{u.email}</td>
+                    <td style={{ padding: '0.75rem 0.85rem', fontSize: '0.825rem', color: 'var(--text-primary)', fontWeight: 600, whiteSpace: 'nowrap' }}>{u.role}</td>
+                    <td style={{ padding: '0.75rem 0.85rem', textAlign: 'right', whiteSpace: 'nowrap' }}>
+                      <button
+                        type="button"
+                        onClick={() => handleOpenManageUser(u)}
+                        disabled={isRequester}
+                        style={{
+                          background: 'none',
+                          border: 'none',
+                          color: isRequester ? 'var(--text-secondary)' : 'var(--brand-primary)',
+                          fontSize: '0.8rem',
+                          fontWeight: 600,
+                          cursor: isRequester ? 'not-allowed' : 'pointer',
+                          opacity: isRequester ? 0.4 : 1,
+                          whiteSpace: 'nowrap'
+                        }}
+                      >
+                        Manage user
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
 
@@ -544,38 +547,40 @@ function SettingsPage({ user }) {
 
           {/* Audit Logs Table */}
           <div style={{ backgroundColor: 'var(--card-bg)', border: '1px solid var(--border-color)', borderRadius: '12px', overflow: 'hidden', boxShadow: '0 1px 3px rgba(16, 21, 30, 0.04)' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
-              <thead>
-                <tr style={{ backgroundColor: 'var(--input-bg)', color: 'var(--text-secondary)', fontSize: '0.6875rem', fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', borderBottom: '1px solid var(--border-color)' }}>
-                  <th style={{ padding: '0.75rem 1rem' }}>TIMESTAMP</th>
-                  <th style={{ padding: '0.75rem 1rem' }}>ACTOR</th>
-                  <th style={{ padding: '0.75rem 1rem' }}>ACTION</th>
-                  <th style={{ padding: '0.75rem 1rem' }}>REFERENCE</th>
-                  <th style={{ padding: '0.75rem 1rem' }}>EMPLOYEE EMAIL</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredLogs.map((log, idx) => (
-                  <tr key={log.id} style={{ borderBottom: idx === filteredLogs.length - 1 ? 'none' : '1px solid var(--border-color)' }}>
-                    <td style={{ padding: '0.85rem 1rem', fontSize: '0.825rem', color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)' }}>
-                      {log.timestamp}
-                    </td>
-                    <td style={{ padding: '0.85rem 1rem', fontSize: '0.875rem', fontWeight: 500, color: 'var(--text-primary)' }}>
-                      {log.actor}
-                    </td>
-                    <td style={{ padding: '0.85rem 1rem', fontSize: '0.835rem', color: 'var(--text-primary)', fontWeight: 600 }}>
-                      {log.action}
-                    </td>
-                    <td style={{ padding: '0.85rem 1rem', fontSize: '0.825rem', color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)' }}>
-                      {log.reference}
-                    </td>
-                    <td style={{ padding: '0.85rem 1rem', fontSize: '0.825rem', color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)' }}>
-                      {log.employeeEmail || '—'}
-                    </td>
+            <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
+              <table style={{ width: '100%', minWidth: '780px', borderCollapse: 'collapse', textAlign: 'left' }}>
+                <thead>
+                  <tr style={{ backgroundColor: 'var(--input-bg)', color: 'var(--text-secondary)', fontSize: '0.6875rem', fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', borderBottom: '1px solid var(--border-color)' }}>
+                    <th style={{ padding: '0.75rem 1rem' }}>TIMESTAMP</th>
+                    <th style={{ padding: '0.75rem 1rem' }}>ACTOR</th>
+                    <th style={{ padding: '0.75rem 1rem' }}>ACTION</th>
+                    <th style={{ padding: '0.75rem 1rem' }}>REFERENCE</th>
+                    <th style={{ padding: '0.75rem 1rem' }}>EMPLOYEE EMAIL</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {filteredLogs.map((log, idx) => (
+                    <tr key={log.id} style={{ borderBottom: idx === filteredLogs.length - 1 ? 'none' : '1px solid var(--border-color)' }}>
+                      <td style={{ padding: '0.85rem 1rem', fontSize: '0.825rem', color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)' }}>
+                        {log.timestamp}
+                      </td>
+                      <td style={{ padding: '0.85rem 1rem', fontSize: '0.875rem', fontWeight: 500, color: 'var(--text-primary)' }}>
+                        {log.actor}
+                      </td>
+                      <td style={{ padding: '0.85rem 1rem', fontSize: '0.835rem', color: 'var(--text-primary)', fontWeight: 600 }}>
+                        {log.action}
+                      </td>
+                      <td style={{ padding: '0.85rem 1rem', fontSize: '0.825rem', color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)' }}>
+                        {log.reference}
+                      </td>
+                      <td style={{ padding: '0.85rem 1rem', fontSize: '0.825rem', color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)' }}>
+                        {log.employeeEmail || '—'}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
 
         </div>
@@ -850,7 +855,7 @@ function SettingsPage({ user }) {
 
             <form onSubmit={handleSaveManageUser} style={{ display: 'flex', flexDirection: 'column', gap: '1rem', padding: '1.25rem 1.75rem', overflowY: 'auto', flex: 1 }}>
               {/* Row 1: Full name & Employee ID */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+              <div className="cd-responsive-inner-grid">
                 <div>
                   <label style={{ display: 'block', fontSize: '0.825rem', fontWeight: 500, color: 'var(--text-primary)', marginBottom: '0.4rem' }}>
                     Full name

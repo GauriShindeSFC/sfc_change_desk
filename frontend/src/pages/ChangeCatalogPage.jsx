@@ -34,7 +34,7 @@ function ChangeCatalogPage({ onNavigate, searchQuery = '', initialData }) {
     { id: 'subcat-o365-oth', title: 'Other Email / M365 Requests', category: 'Office 365 & Collaboration', description: 'Other email, Teams, & Microsoft 365 related change requests.', sla: '2 business days', risk: 'Low', riskColor: '#059669', riskBars: 1, iconBg: '#FEF3C7', iconColor: '#D97706' },
 
     // 6. Security Tools & Policies
-    { id: 'subcat-sec-ep', title: 'End Point Agent', category: 'Security Tools & Policies', description: 'Remove security agent, modify EDR policy, or request exceptions.', sla: '2 business days', risk: 'High', riskColor: '#DC2626', riskBars: 3, iconBg: '#FEE2E2', iconColor: '#DC2626' },
+    { id: 'subcat-sec-ep', title: 'Endpoint Agent', category: 'Security Tools & Policies', description: 'Remove security agent, modify EDR policy, or request exceptions.', sla: '2 business days', risk: 'High', riskColor: '#DC2626', riskBars: 3, iconBg: '#FEE2E2', iconColor: '#DC2626' },
     { id: 'subcat-sec-oth', title: 'Other Security Changes', category: 'Security Tools & Policies', description: 'Other security policy, DLP, & SIEM rule change requests.', sla: '3 business days', risk: 'High', riskColor: '#DC2626', riskBars: 3, iconBg: '#FEE2E2', iconColor: '#DC2626' }
   ];
 
@@ -91,6 +91,9 @@ function ChangeCatalogPage({ onNavigate, searchQuery = '', initialData }) {
                   };
 
                   let subTitle = sub.name;
+                  if (sub.id === 'subcat-sec-ep' || subTitle === 'End Point Agent') {
+                    subTitle = 'Endpoint Agent';
+                  }
                   if (!subTitle || subTitle.trim().toLowerCase() === 'other') {
                     subTitle = OTHER_NAME_MAP[sub.id] || OTHER_NAME_MAP[sub.categoryId] || OTHER_NAME_MAP[cat.id] || `Other ${cat.name} Changes`;
                   }
@@ -155,7 +158,7 @@ function ChangeCatalogPage({ onNavigate, searchQuery = '', initialData }) {
             Change Request
           </h1>
           <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginTop: '0.2rem' }}>
-            Pre-approved templates for standardized changes · select a category to start your request
+            Select a category to start your request
           </p>
         </div>
       </div>
@@ -206,8 +209,8 @@ function ChangeCatalogPage({ onNavigate, searchQuery = '', initialData }) {
         onTabChange={setActiveCategory}
       />
 
-      {/* Catalog Cards 3-Col Grid */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: '1.25rem' }}>
+      {/* Catalog Cards Responsive Grid */}
+      <div className="cd-responsive-3col">
         {filteredItems.map(item => {
           const handleCardClick = () => {
             if (onNavigate) {

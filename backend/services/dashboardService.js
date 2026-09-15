@@ -834,21 +834,67 @@ export const submitDraftChangeRequestService = async (id, actorId = null) => {
   return serializeChangeRequest(updated);
 };
 
-// Emails of active Change Managers, Admins & Super Admins.
-const getApproverEmails = async () => {
-  const roles = await UserAppRole.findAll({
-    where: { roleId: { [Op.in]: ['role-1', 'role-2', 'role-3'] } },
+// Emails of assigned Change Managers for the category.
+// If no Change Manager is assigned to the category, falls back ONLY to ChangeDesk Super Admin (role-1) & Admin (role-2).
+const getApproverEmails = async (categoryNameOrId = null) => {
+  const emails = [];
+
+  let targetCategoryId = null;
+  if (categoryNameOrId) {
+    const cat = await CatalogCategory.findOne({
+      where: {
+        [Op.or]: [
+          { id: categoryNameOrId },
+          sequelize.where(sequelize.fn('LOWER', sequelize.col('name')), String(categoryNameOrId).toLowerCase().trim())
+        ]
+      }
+    });
+    if (cat) {
+      targetCategoryId = cat.id;
+    } else {
+      targetCategoryId = categoryNameOrId;
+    }
+  }
+
+  // 1. Check specific Change Managers assigned to this category
+  if (targetCategoryId) {
+    const cmAssignments = await ChangeManagerCategory.findAll({
+      where: { categoryId: targetCategoryId },
+      raw: true
+    });
+
+    for (const cm of cmAssignments) {
+      const key = cm.userId;
+      const res = await IdentityResolver.resolveByKey(key);
+      if (res.status === 'SUCCESS' && res.identity.email) {
+        emails.push(res.identity.email.trim());
+      }
+    }
+  }
+
+  // 2. If one or more assigned Change Managers were found, return only them!
+  const uniqueEmails = Array.from(new Set(emails.filter(Boolean)));
+  if (uniqueEmails.length > 0) {
+    return uniqueEmails;
+  }
+
+  // 3. Fallback: If no Change Manager is assigned to this category, send only to Super Admin (role-1) and Admin (role-2)
+  console.log(`[mail] No Change Manager assigned to category "${categoryNameOrId || 'General'}" — routing to Super Admin & Admin`);
+  const adminRoles = await UserAppRole.findAll({
+    where: { roleId: { [Op.in]: ['role-1', 'role-2'] } },
     raw: true
   });
-  const emails = [];
-  for (const r of roles) {
+
+  const adminEmails = [];
+  for (const r of adminRoles) {
     const key = r.userKey || r.user_key;
     const res = await IdentityResolver.resolveByKey(key);
     if (res.status === 'SUCCESS' && res.identity.email) {
-      emails.push(res.identity.email);
+      adminEmails.push(res.identity.email.trim());
     }
   }
-  return Array.from(new Set(emails));
+
+  return Array.from(new Set(adminEmails.filter(Boolean)));
 };
 
 const resolveUserId = async (idOrName, fallback = null) => {
@@ -904,6 +950,7 @@ export const createChangeRequestService = async (payload = {}) => {
   let workflowId = payload.workflowId;
   let categoryName = payload.category || 'Software Deployment';
   let subCategoryName = payload.subCategory || '';
+  let targetCategoryId = payload.categoryId || null;
 
   if (payload.subcategoryId) {
     const subcat = await CatalogSubcategory.findByPk(payload.subcategoryId, {
@@ -915,6 +962,7 @@ export const createChangeRequestService = async (payload = {}) => {
     if (subcat) {
       workflowId = subcat.workflowId || workflowId;
       categoryName = subcat.category?.name || categoryName;
+      targetCategoryId = subcat.categoryId || subcat.category?.id || targetCategoryId;
       subCategoryName = subcat.name;
 
       const customValues = payload.customFieldValues || {};
@@ -1047,8 +1095,9 @@ export const createChangeRequestService = async (payload = {}) => {
   const serialized = serializeChangeRequest(created);
 
   if (!isDraft) {
+    const categoryTarget = targetCategoryId || categoryName || serialized.category;
     Promise.all([
-      getApproverEmails(),
+      getApproverEmails(categoryTarget),
       IdentityResolver.resolveByKey(requesterId)
     ])
       .then(([approverEmails, requesterRes]) =>
@@ -1477,6 +1526,9 @@ export const getCatalogCategoriesService = async () => {
     const plain = c.get({ plain: true });
     if (plain.subcategories && Array.isArray(plain.subcategories)) {
       plain.subcategories.forEach((sub) => {
+        if (sub.id === 'subcat-sec-ep' || sub.name === 'End Point Agent') {
+          sub.name = 'Endpoint Agent';
+        }
         if ((sub.name || '').toLowerCase() === 'other' || sub.name === 'Other') {
           sub.name = OTHER_NAME_MAP[sub.id] || OTHER_NAME_MAP[sub.categoryId] || OTHER_NAME_MAP[c.id] || 'Other Request';
           sub.description = `Other ${c.name || ''} change request.`.replace('Other Other', 'Other');
@@ -1497,7 +1549,13 @@ export const getCatalogSubcategoriesService = async (categoryId) => {
     where: { categoryId, status: 'Active' },
     include: [{ model: Workflow, as: 'workflow', attributes: ['id', 'name', 'steps'] }]
   });
-  const list = rows.map((s) => s.get({ plain: true }));
+  const list = rows.map((s) => {
+    const plain = s.get({ plain: true });
+    if (plain.id === 'subcat-sec-ep' || plain.name === 'End Point Agent') {
+      plain.name = 'Endpoint Agent';
+    }
+    return plain;
+  });
   list.sort((a, b) => {
     const orderA = SUBCATEGORY_ORDER_MAP[a.id] ?? 99;
     const orderB = SUBCATEGORY_ORDER_MAP[b.id] ?? 99;
@@ -1511,7 +1569,40 @@ export const getSubcategoryFieldsService = async (subcategoryId) => {
     where: { subcategoryId },
     order: [['sortOrder', 'ASC']]
   });
-  return rows.map((f) => f.get({ plain: true }));
+  return rows.map((f) => {
+    const plain = f.get({ plain: true });
+    let dbNeedsUpdate = false;
+    if (plain.fieldLabel && (plain.fieldLabel.toLowerCase() === 'current configuration' || plain.fieldLabel.includes('Congfig') || plain.fieldLabel.includes('figuraiton') || plain.fieldLabel.toLowerCase().includes('congfig'))) {
+      plain.fieldLabel = 'Current Configuration';
+      dbNeedsUpdate = true;
+    }
+    if (plain.fieldLabel && plain.fieldLabel.includes('Proess')) {
+      plain.fieldLabel = plain.fieldLabel.replace('Proess', 'Process');
+      dbNeedsUpdate = true;
+    }
+    if (plain.options && Array.isArray(plain.options)) {
+      const fixedOpts = plain.options.map(opt => (typeof opt === 'string' ? opt.replace(/Exisitng/g, 'Existing') : opt));
+      if (JSON.stringify(fixedOpts) !== JSON.stringify(plain.options)) {
+        plain.options = fixedOpts;
+        dbNeedsUpdate = true;
+      }
+    }
+    if (plain.appliesToActions && Array.isArray(plain.appliesToActions)) {
+      const fixedActs = plain.appliesToActions.map(act => (typeof act === 'string' ? act.replace(/Exisitng/g, 'Existing') : act));
+      if (JSON.stringify(fixedActs) !== JSON.stringify(plain.appliesToActions)) {
+        plain.appliesToActions = fixedActs;
+        dbNeedsUpdate = true;
+      }
+    }
+    if (dbNeedsUpdate) {
+      f.update({
+        fieldLabel: plain.fieldLabel,
+        options: plain.options,
+        appliesToActions: plain.appliesToActions
+      }).catch(() => {});
+    }
+    return plain;
+  });
 };
 
 
@@ -1890,6 +1981,16 @@ export const createSettingsUserService = async (payload = {}, meta = {}) => {
     ref: primaryKey,
     detail: `Invited user ${displayName} (${email}) with role ${ROLE_NAMES[roleId] || roleId}.`
   });
+
+  sendUserInviteEmail({
+    user: {
+      name: displayName,
+      email,
+      role: ROLE_NAMES[roleId] || 'Requester'
+    },
+    tempPassword: payload.tempPassword || payload.password || null,
+    invitedByName: meta.invitedByName || 'An Administrator'
+  }).catch((err) => console.error('[mail] User invite email failed:', err.message));
 
   const { IdentityResolver } = await import('./IdentityResolver.js');
   const updatedRes = await IdentityResolver.resolveByKey(primaryKey);
