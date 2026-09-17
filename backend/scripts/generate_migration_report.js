@@ -6,7 +6,7 @@ async function generateMigrationReport() {
   const { User } = await import('../models/index.js');
   const { UserS8 } = await import('../models/UserS8.js');
   const { Employee } = await import('../models/Employee.js');
-  const { UserAppRole } = await import('../models/userAppRole.js');
+  const { UserAppRole } = await import('../models/UserAppRole.js');
 
   console.log('====================================================');
   console.log('  DETERMINISTIC LEGACY identity MIGRATION REPORT');

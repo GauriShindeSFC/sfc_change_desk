@@ -1,18 +1,116 @@
 import React, { useState, useEffect } from 'react';
-import LoginPage from './pages/LoginPage';
-import Dashboard from './components/Dashboard';
-import ApprovalActionPage from './pages/ApprovalActionPage';
-import { getSession, saveSession, clearSession, fetchMe } from './lib/auth';
+import { BrowserRouter, Routes, Route, Navigate, useOutletContext, useLocation, useParams } from 'react-router-dom';
+import LoginPage from './pages/login.page';
+import AppLayout from './components/layout/app.layout';
+import DashboardPage from './pages/dashboard.page';
+import ChangeCatalogPage from './pages/catalog.page';
+import ChangeRequestFormPage from './pages/changeRequestForm.page';
+import MyWorklistPage from './pages/worklist.page';
+import SettingsPage from './pages/settings.page';
+import ComingSoonPage from './pages/comingSoon.page';
+import ApprovalActionPage from './pages/approvalAction.page';
+import { getSession, saveSession, clearSession, fetchMe } from './lib/auth.lib';
 
+/* ── Route Wrapper Helpers ───────────────────────────────────── */
+function DashboardRoute({ isOrg = false }) {
+  const { user, searchQuery, onNavigate } = useOutletContext();
+  const location = useLocation();
+
+  const roleName = (user?.role || '').toLowerCase();
+  const isSuperAdmin = user?.roleId === 'role-1' || roleName.includes('super');
+
+  if (isOrg && !isSuperAdmin) {
+    return <Navigate to="/dashboard" replace />;
+  }
+
+  return (
+    <DashboardPage
+      user={user}
+      searchQuery={searchQuery}
+      onNavigate={onNavigate}
+      initialData={location.state}
+      isOrgDashboard={isOrg}
+    />
+  );
+}
+
+function CatalogRoute() {
+  const { user, searchQuery, onNavigate } = useOutletContext();
+  return (
+    <ChangeCatalogPage
+      user={user}
+      searchQuery={searchQuery}
+      onNavigate={onNavigate}
+    />
+  );
+}
+
+function ChangeRequestRoute() {
+  const { user, searchQuery, onNavigate } = useOutletContext();
+  const location = useLocation();
+  const params = useParams();
+  const initialData = location.state || (params.id ? { id: params.id } : null);
+
+  return (
+    <ChangeRequestFormPage
+      user={user}
+      searchQuery={searchQuery}
+      onNavigate={onNavigate}
+      initialData={initialData}
+    />
+  );
+}
+
+function WorklistRoute() {
+  const { user, searchQuery, onNavigate } = useOutletContext();
+  const location = useLocation();
+  return (
+    <MyWorklistPage
+      user={user}
+      searchQuery={searchQuery}
+      onNavigate={onNavigate}
+      initialData={location.state}
+    />
+  );
+}
+
+function SettingsRoute() {
+  const { user, searchQuery, onNavigate } = useOutletContext();
+  const roleName = (user?.role || '').toLowerCase();
+  const isSuperAdmin = user?.roleId === 'role-1' || roleName.includes('super');
+  const isAdmin = isSuperAdmin || user?.roleId === 'role-2' || user?.roleId === 'role-2-change' || roleName.includes('admin');
+
+  if (!isAdmin) {
+    return <Navigate to="/dashboard" replace />;
+  }
+
+  return (
+    <SettingsPage
+      user={user}
+      searchQuery={searchQuery}
+      onNavigate={onNavigate}
+    />
+  );
+}
+
+function PreSpendRoute() {
+  return <ComingSoonPage />;
+}
+
+function TravelDeskRoute() {
+  return <ComingSoonPage />;
+}
+
+/* ── Main App Router ─────────────────────────────────────────── */
 export default function App() {
   const [session, setSession] = useState(() => getSession());
 
+  // Check for external approval token in URL
   const isApprovalAction =
     typeof window !== 'undefined' &&
     (window.location.pathname.includes('approval-action') ||
-     new URLSearchParams(window.location.search).has('token'));
+      new URLSearchParams(window.location.search).has('token'));
 
-  // On load, re-validate the stored token and refresh the user record.
   useEffect(() => {
     if (!session || isApprovalAction) return;
     fetchMe().then((user) => {
@@ -22,8 +120,6 @@ export default function App() {
         setSession(next);
       }
     });
-    // run once on mount
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isApprovalAction]);
 
   const handleLogin = (nextSession) => {
@@ -41,13 +137,35 @@ export default function App() {
   }
 
   return (
-    <div className="app-container">
-      {session ? (
-        <Dashboard user={session.user} onLogout={handleLogout} />
-      ) : (
-        <LoginPage onLogin={handleLogin} />
-      )}
-    </div>
+    <BrowserRouter>
+      <Routes>
+        {/* Unauthenticated Login Route */}
+        <Route
+          path="/login"
+          element={session ? <Navigate to="/dashboard" replace /> : <LoginPage onLogin={handleLogin} />}
+        />
+
+        {/* Authenticated Layout Shell */}
+        <Route
+          element={session ? <AppLayout user={session.user} onLogout={handleLogout} /> : <Navigate to="/login" replace />}
+        >
+          <Route path="/" element={<Navigate to="/dashboard" replace />} />
+          <Route path="/dashboard" element={<DashboardRoute />} />
+          <Route path="/my-requests" element={<DashboardRoute />} />
+          <Route path="/org-dashboard" element={<DashboardRoute isOrg={true} />} />
+          <Route path="/catalog" element={<CatalogRoute />} />
+          <Route path="/change-requests/new" element={<ChangeRequestRoute />} />
+          <Route path="/change-requests/:id" element={<ChangeRequestRoute />} />
+          <Route path="/worklist" element={<WorklistRoute />} />
+          <Route path="/settings" element={<SettingsRoute />} />
+          <Route path="/pre-spend" element={<PreSpendRoute />} />
+          <Route path="/travel-desk" element={<TravelDeskRoute />} />
+        </Route>
+
+        {/* Catch-All Fallback */}
+        <Route path="*" element={<Navigate to="/dashboard" replace />} />
+      </Routes>
+    </BrowserRouter>
   );
 }
 

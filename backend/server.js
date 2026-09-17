@@ -1,15 +1,15 @@
 import './config/env.js';
 import express from 'express';
 import cors from 'cors';
-import dashboardRoutes from './routes/dashboard.js';
-import authRoutes from './routes/auth.js';
-import { errorHandler, notFoundHandler } from './middlewares/errorHandler.js';
+import dashboardRoutes from './routes/dashboard.routes.js';
+import authRoutes from './routes/auth.routes.js';
+import { errorHandler, notFoundHandler } from './middlewares/error.middleware.js';
 import { Op } from 'sequelize';
 import { sequelize, Role } from './models/index.js';
 import { roles } from './data/seed.js';
-import { verifyMailTransport } from './services/mailService.js';
+import { verifyMailTransport } from './services/mail.service.js';
 
-import publicActionRoutes from './routes/publicActions.js';
+import publicActionRoutes from './routes/publicAction.routes.js';
 
 const app = express();
 const PORT = process.env.PORT || 5001;

@@ -20,21 +20,18 @@ const hoursAgo = (n) => new Date(NOW - n * 3_600_000);
 // ---------- roles ------------------------------------------
 export const roles = [
   { id: 'role-1', name: 'Super Admin', description: 'Ultimate system control across all modules, role & permission management, system audit, database & user management.', permissions: ['Full System Control', 'Manage Roles & Permissions', 'Manage Users', 'View System Audit Logs', 'Override Approvals'] },
+  { id: 'role-2-change', name: 'Change Desk Admin', description: 'Change Desk system administration, category oversight, and change management workflows.', permissions: ['Manage Change Desk Users', 'Manage Change Categories', 'Export Reports', 'Change Desk Settings'] },
+  { id: 'role-2-prespend', name: 'Pre-Spend Admin', description: 'Pre-Spend system administration, budget approvals, and financial spend policies.', permissions: ['Manage Pre-Spend Users', 'Manage Budgets & Thresholds', 'Export Pre-Spend Reports'] },
+  { id: 'role-2-travel', name: 'Travel Desk Admin', description: 'Travel Desk system administration, booking rules, vendor policies, and travel reports.', permissions: ['Manage Travel Users', 'Manage Travel Policies', 'Export Travel Reports'] },
   { id: 'role-2', name: 'Admin', description: 'System administration, user onboarding, and system reporting.', permissions: ['Manage Users', 'Export Reports', 'System Settings'] },
   { id: 'role-3', name: 'Change Manager', description: 'Full lifecycle oversight: review, approve, reject, or request information on change requests.', permissions: ['Approve / Reject CRs', 'Lifecycle Oversight', 'Request Info (Send Back)', 'View Worklist & Metrics'] },
   { id: 'role-4', name: 'Requester', description: 'Standard employee permission to raise change requests, track progress, and update own draft submissions.', permissions: ['Create change requests', 'View own requests', 'Save draft CRs'] },
-  { id: 'role-5', name: 'Change Implementer', description: 'Implementation oversight: mark approved change requests as implemented within assigned categories.', permissions: ['Implement Approved CRs', 'View Worklist & Metrics'] }
+  { id: 'role-5', name: 'Change Implementer', description: 'Implementation oversight: mark approved change requests as implemented within assigned categories.', permissions: ['Implement Approved CRs', 'View Worklist & Metrics'] },
+  { id: 'role-6', name: 'Board', description: 'Board member governance, expedited approval authority, and executive oversight.', permissions: ['Board Approvals', 'View System Reports', 'View Organization Dashboard'] }
 ];
 
-// ---------- users (roleId -> roles.id) --------------------
-export const users = [
-  { id: 'usr-0', name: 'Ashish', employeeId: 'EMP-10001', email: 'ashish.sfc@company.com', status: 'Active', roleId: 'role-1' },
-  { id: 'usr-1', name: 'Gauri Shinde', employeeId: 'EMP-10432', email: 'gauri.shinde@company.com', status: 'Active', roleId: 'role-3' },
-  { id: 'usr-2', name: 'Priya Nair', employeeId: 'EMP-10433', email: 'priya.nair@company.com', status: 'Active', roleId: 'role-4' },
-  { id: 'usr-3', name: 'Arjun Mehta', employeeId: 'EMP-10434', email: 'arjun.mehta@company.com', status: 'Active', roleId: 'role-2' },
-  { id: 'usr-4', name: 'Sana Iqbal', employeeId: 'EMP-10435', email: 'sana.iqbal@company.com', status: 'Active', roleId: 'role-1' },
-  { id: 'usr-5', name: 'Rahul Verma', employeeId: 'EMP-10436', email: 'rahul.verma@company.com', status: 'Active', roleId: 'role-3' }
-].map((u) => ({ ...u, authProvider: 'local', passwordHash: DEV_PASSWORD_HASH }));
+// ---------- users (Empty for production) --------------------
+export const users = [];
 
 // ---------- workflows ------------------------------------
 export const workflows = [
@@ -43,214 +40,20 @@ export const workflows = [
   { id: 'wf-3', name: 'Lightweight Access Workflow', steps: 'Draft → Change Manager Review → Approved → Implemented' }
 ];
 
-// ---------- catalog items (workflowId -> workflows.id) --
-export const catalogItems = [
-  { id: 'CAT-01', title: 'Software Deployment', category: 'Software', description: 'Deploy new releases, hotfixes, or config updates to an existing application or service.', sla: '3 business days', risk: 'Medium', iconBg: '#EBF5FF', iconColor: '#2563EB', status: 'Active', workflowId: 'wf-1' },
-  { id: 'CAT-02', title: 'Server Patching', category: 'Infrastructure', description: 'Apply OS-level or security patches to production, staging, or DR servers.', sla: '5 business days', risk: 'High', iconBg: '#D1FAE5', iconColor: '#059669', status: 'Active', workflowId: 'wf-2' },
-  { id: 'CAT-03', title: 'Network Change', category: 'Network', description: 'Firewall rules, VLAN, routing, or load-balancer configuration changes.', sla: '5 business days', risk: 'Medium', iconBg: '#F3E8FF', iconColor: '#7C3AED', status: 'Active', workflowId: 'wf-1' },
-  { id: 'CAT-04', title: 'Access & Permissions', category: 'Access', description: 'Grant, modify, or revoke system, application, or data access for a user or team.', sla: '1 business day', risk: 'Low', iconBg: '#FEF3C7', iconColor: '#D97706', status: 'Active', workflowId: 'wf-3' },
-  { id: 'CAT-05', title: 'Hardware Change', category: 'Infrastructure', description: 'Physical hardware install, replacement, or decommission in a managed data center.', sla: '7 business days', risk: 'Low', iconBg: '#F1F5F9', iconColor: '#475569', status: 'Active', workflowId: 'wf-1' },
-  { id: 'CAT-06', title: 'Emergency Change', category: 'Emergency', description: 'Urgent, unplanned change to restore service or prevent imminent outage. Expedited CAB review.', sla: '4 hours', risk: 'High', iconBg: '#FEE2E2', iconColor: '#DC2626', status: 'Active', workflowId: 'wf-2' },
-  { id: 'CAT-07', title: 'Database Schema Change', category: 'Software', description: 'Execute DDL migrations, index rebuilds, or column additions against a managed database.', sla: '5 business days', risk: 'High', iconBg: '#EBF5FF', iconColor: '#2563EB', status: 'Active', workflowId: 'wf-1' },
-  { id: 'CAT-08', title: 'SSL Certificate Renewal', category: 'Infrastructure', description: 'Renew or rotate production SSL/TLS certificates before expiry.', sla: '2 business days', risk: 'Low', iconBg: '#D1FAE5', iconColor: '#059669', status: 'Active', workflowId: 'wf-1' },
-  { id: 'CAT-09', title: 'New Vendor Integration', category: 'Software', description: 'Onboard new third-party webhooks or API connections into the platform.', sla: '10 business days', risk: 'Medium', iconBg: '#EBF5FF', iconColor: '#2563EB', status: 'Active', workflowId: 'wf-1' }
-];
+// ---------- catalog items (Empty for production) ----------
+export const catalogItems = [];
 
-// ---------- change requests -----------------------------
-export const changeRequests = [
-  {
-    id: 'CR-2051',
-    title: '[Create a New Server] - Server Lifecycle',
-    category: 'Server & Infra',
-    subCategory: 'Server Lifecycle',
-    location: 'Ahmedabad HQ',
-    justification: 'Provision new database server for core trading microservices.',
-    managerEmail: 'rahul.verma@company.com',
-    startDate: hoursAgo(48),
-    endDate: hoursAgo(24),
-    risk: 'High',
-    status: 'Approved',
-    isDraft: false,
-    submittedAt: daysAgo(2),
-    closedAt: daysAgo(1),
-    requesterId: 'usr-2',
-    approverId: 'usr-1',
-    workflowId: 'wf-1',
-    customFieldValues: {
-      actionRequired: 'Create a New Server',
-      purpose: 'Provision new database server',
-      hostingType: 'On-Premise DC',
-      operatingSystem: 'Ubuntu 22.04 LTS',
-      cpu: '16 Cores',
-      ram: '64 GB',
-      storage: '1 TB NVMe',
-      vlanRequirement: 'Yes',
-      backupRequired: 'Yes',
-      employeeEmail: 'priya.nair@company.com'
-    }
-  },
-  {
-    id: 'CR-2052',
-    title: '[Open a Firewall Port] - Firewall / Port',
-    category: 'Network & Connectivity',
-    subCategory: 'Firewall / Port',
-    location: 'Mumbai DC',
-    justification: 'Open port 8443 for partner API gateway communication.',
-    managerEmail: 'rahul.verma@company.com',
-    startDate: hoursAgo(12),
-    endDate: hoursAgo(2),
-    risk: 'Medium',
-    status: 'Approved',
-    isDraft: false,
-    submittedAt: daysAgo(1),
-    closedAt: hoursAgo(2),
-    requesterId: 'usr-2',
-    approverId: 'usr-1',
-    workflowId: 'wf-1',
-    customFieldValues: {
-      actionRequired: 'Open a Firewall Port / Allow Traffic',
-      sourceIpSubnet: '10.200.1.0/24',
-      destinationIpSubnet: '10.200.5.10/32',
-      protocol: 'TCP',
-      port: '8443',
-      direction: 'Inbound',
-      applicationService: 'Partner API Gateway',
-      internetFacing: 'Yes',
-      purposeReason: 'Partner API Integration',
-      employeeEmail: 'priya.nair@company.com'
-    }
-  },
-  {
-    id: 'CR-2053',
-    title: '[Request Application Access] - Application Access',
-    category: 'Access & Security',
-    subCategory: 'Application Access',
-    location: 'Ahmedabad HQ',
-    justification: 'Grant senior engineer access to staging deployment dashboard.',
-    managerEmail: 'rahul.verma@company.com',
-    startDate: hoursAgo(6),
-    endDate: hoursAgo(1),
-    risk: 'Low',
-    status: 'Approved',
-    isDraft: false,
-    submittedAt: hoursAgo(8),
-    closedAt: hoursAgo(1),
-    requesterId: 'usr-0',
-    approverId: 'usr-1',
-    workflowId: 'wf-3',
-    customFieldValues: {
-      actionRequired: 'Request Application Access',
-      application: 'Deployment Portal',
-      requestedRole: 'Lead Engineer',
-      purposeReason: 'Project Onboarding',
-      employeeEmail: 'ashish.sfc@company.com'
-    }
-  },
-  {
-    id: 'CR-2054',
-    title: '[Upgrade / Patch Server OS] - OS / Patching',
-    category: 'Server & Infra',
-    subCategory: 'OS / Patching',
-    location: 'Ahmedabad HQ',
-    justification: 'Apply Q3 OS kernel security patches.',
-    managerEmail: 'rahul.verma@company.com',
-    startDate: hoursAgo(3),
-    endDate: hoursAgo(1),
-    risk: 'High',
-    status: 'Rejected',
-    isDraft: false,
-    rejectionReason: 'Maintenance window conflicts with month-end financial processing.',
-    submittedAt: hoursAgo(5),
-    closedAt: hoursAgo(1),
-    requesterId: 'usr-0',
-    approverId: 'usr-1',
-    workflowId: 'wf-2',
-    customFieldValues: {
-      actionRequired: 'Upgrade / Patch Server OS',
-      serverName: 'srv-app-prod-03',
-      ipAddress: '10.100.2.15',
-      currentOsVersion: 'RHEL 8.4',
-      targetVersionPatch: 'RHEL 8.8 (KB-2026-99)',
-      rebootRequired: 'Yes',
-      purposeReason: 'Quarterly OS Patching',
-      employeeEmail: 'ashish.sfc@company.com'
-    }
-  },
-  {
-    id: 'CR-2055',
-    title: '[Request VPN Access] - VPN',
-    category: 'Network & Connectivity',
-    subCategory: 'VPN',
-    location: 'Remote',
-    justification: 'Provision remote SSL VPN access for on-call engineer.',
-    managerEmail: 'rahul.verma@company.com',
-    startDate: hoursAgo(2),
-    endDate: hoursAgo(1),
-    risk: 'Medium',
-    status: 'Pending',
-    isDraft: false,
-    submittedAt: hoursAgo(2),
-    requesterId: 'usr-2',
-    workflowId: 'wf-1',
-    customFieldValues: {
-      actionRequired: 'Request VPN Access',
-      vpnType: 'User VPN (SSL)',
-      sourceNetwork: '192.168.1.0/24',
-      destinationNetworkApp: '10.100.0.0/16 Internal Subnet',
-      employeeEmail: 'priya.nair@company.com'
-    }
-  }
-];
+// ---------- change requests (Empty for production) -------
+export const changeRequests = [];
 
-// ---------- audit logs (actorId -> users.id) ------------
-// Oldest -> newest so autoincrement id ascends with time.
-export const auditLogs = [
-  { timestamp: '21 Aug 2026 18:10:05', actorId: 'usr-5', action: 'CR Sent Back', ref: 'CR-2042', detail: 'Requested additional information on network change justification.' },
-  { timestamp: '22 Aug 2026 09:20:14', actorId: 'usr-1', action: 'Catalog Template Created', ref: 'CAT-09', detail: 'Added new template CAT-09 New Vendor Integration to Change Catalog.' },
-  { timestamp: '23 Aug 2026 16:45:22', actorId: 'usr-3', action: 'CR Approved', ref: 'CR-2048', detail: 'Approved CR-2048 Apply Q3 security patch for prod DB cluster.' },
-  { timestamp: '24 Aug 2026 09:15:00', actorId: 'usr-4', action: 'CR Approved', ref: 'CR-2052', detail: 'Approved CR-2052 Rotate SSH keys all bastion hosts.' },
-  { timestamp: '24 Aug 2026 11:15:00', actorId: 'usr-4', action: 'User Permission Updated', ref: 'EMP-10435', detail: 'Assigned Admin role permissions to Sana Iqbal.' },
-  { timestamp: '24 Aug 2026 14:32:10', actorId: 'usr-2', action: 'Created Change Request', ref: 'CR-2049', detail: 'Submitted CR-2049 Upgrade payment-gateway API to v4 for CAB review.' },
-  { timestamp: '25 Aug 2026 14:47:00', actorId: 'usr-3', action: 'CR Rejected', ref: 'CR-2035', detail: 'Rejected CR-2035 Emergency rollback checkout service v2.3 due to incomplete test plan.' },
-  { timestamp: '26 Aug 2026 10:20:00', actorId: 'usr-4', action: 'CR Rejected', ref: 'CR-2039', detail: 'Rejected CR-2039 Firewall port unblock request due to security policy.' }
-];
+// ---------- audit logs (Empty for production) ------------
+export const auditLogs = [];
 
 // ---------- standalone analytics data ------------------
-export const categoryBreakdown = [
-  { label: 'Software Deployment', count: 34, max: 40, color: '#2563EB' },
-  { label: 'Server / Patching', count: 28, max: 40, color: '#0D9488' },
-  { label: 'Network Change', count: 21, max: 40, color: '#7C3AED' },
-  { label: 'Access & Permissions', count: 18, max: 40, color: '#B45309' },
-  { label: 'Hardware Change', count: 13, max: 40, color: '#475569' },
-  { label: 'Emergency Change', count: 7, max: 40, color: '#DC2626' }
-];
-
-export const statusBreakdown = [
-  { label: 'Approved', count: 76, color: '#0D9488' },
-  { label: 'Pending', count: 17, color: '#D97706' },
-  { label: 'In Progress', count: 21, color: '#7C3AED' },
-  { label: 'Rejected', count: 14, color: '#DC2626' }
-];
-
-export const monthlyVolume = [
-  { month: 'Jan', count: 42, barHeight: '55%' },
-  { month: 'Feb', count: 58, barHeight: '72%' },
-  { month: 'Mar', count: 64, barHeight: '80%' },
-  { month: 'Apr', count: 51, barHeight: '65%' },
-  { month: 'May', count: 72, barHeight: '90%' },
-  { month: 'Jun', count: 68, barHeight: '85%' },
-  { month: 'Jul', count: 80, barHeight: '100%' },
-  { month: 'Aug', count: 76, barHeight: '95%' }
-].map((row, i) => ({ ...row, sortIndex: i }));
-
-export const appConfig = [
-  { key: 'dashboard_stats', value: { total: 128, pending: 17, approved: 76, inProgress: 21, rejected: 14 } },
-  { key: 'worklist_metrics', value: { pending: 4, approved: 32, rejected: 6, implemented: 3 } },
-  {
-    key: 'report_metrics',
-    value: { approvalRate: '94.2%', avgLeadTime: '2.4 days', emergencyCount: 4, complianceScore: '99.1%' }
-  }
-];
+export const categoryBreakdown = [];
+export const statusBreakdown = [];
+export const monthlyVolume = [];
+export const appConfig = [];
 
 /**
  * Populate every table, parent-first. Safe to re-run: with `force` the
@@ -502,26 +305,10 @@ export async function seedDatabase({ force = false } = {}) {
   results.push(await fill(CatalogSubcategoryField, catalogSubcategoryFields));
   results.push(await fill(ChangeRequest, changeRequests));
 
-  const sampleApprovals = [
-    { id: 'appr-2051', changeRequestId: 'CR-2051', approverId: 'usr-1', decision: 'Approved', decidedAt: daysAgo(1) },
-    { id: 'appr-2052', changeRequestId: 'CR-2052', approverId: 'usr-1', decision: 'Approved', decidedAt: hoursAgo(2) },
-    { id: 'appr-2053', changeRequestId: 'CR-2053', approverId: 'usr-1', decision: 'Approved', decidedAt: hoursAgo(1) },
-    { id: 'appr-2054', changeRequestId: 'CR-2054', approverId: 'usr-1', decision: 'Rejected', decidedAt: hoursAgo(1) },
-    { id: 'appr-2055', changeRequestId: 'CR-2055', approverId: 'usr-1', decision: 'Pending' }
-  ];
+  const sampleApprovals = [];
   results.push(await fill(ChangeRequestApproval, sampleApprovals));
 
-  const sampleCmCategories = [
-    { id: 'cmc-usr-1-cat-srv', userId: 'usr-1', categoryId: 'cat-srv' },
-    { id: 'cmc-usr-1-cat-net', userId: 'usr-1', categoryId: 'cat-net' },
-    { id: 'cmc-usr-1-cat-acc', userId: 'usr-1', categoryId: 'cat-acc' },
-    { id: 'cmc-usr-1-cat-asset', userId: 'usr-1', categoryId: 'cat-asset' },
-    { id: 'cmc-usr-5-cat-srv', userId: 'usr-5', categoryId: 'cat-srv' },
-    { id: 'cmc-usr-5-cat-net', userId: 'usr-5', categoryId: 'cat-net' },
-    { id: 'cmc-usr-5-cat-acc', userId: 'usr-5', categoryId: 'cat-acc' },
-    { id: 'cmc-usr-5-cat-sec', userId: 'usr-5', categoryId: 'cat-sec' },
-    { id: 'cmc-usr-5-cat-asset', userId: 'usr-5', categoryId: 'cat-asset' }
-  ];
+  const sampleCmCategories = [];
   results.push(await fill(ChangeManagerCategory, sampleCmCategories));
 
   results.push(await fill(AuditLog, auditLogs));

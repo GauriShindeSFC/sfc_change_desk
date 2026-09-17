@@ -106,7 +106,7 @@ import { CatalogSubcategory } from './CatalogSubcategory.js';
 import { CatalogSubcategoryField } from './CatalogSubcategoryField.js';
 import { Employee } from './Employee.js';
 import { UserS8 } from './UserS8.js';
-import { UserAppRole } from './userAppRole.js';
+import { UserAppRole } from './UserAppRole.js';
 
 export { ChangeRequestApproval, CatalogCategory, CatalogSubcategory, CatalogSubcategoryField, Employee, UserS8, UserAppRole };
 
