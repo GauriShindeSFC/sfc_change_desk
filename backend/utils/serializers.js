@@ -25,8 +25,8 @@ export const serializeChangeRequest = (row) => {
   const allComments = Array.isArray(cr.comments)
     ? cr.comments
     : Array.isArray(cr.customFieldValues?.comments)
-    ? cr.customFieldValues.comments
-    : [];
+      ? cr.customFieldValues.comments
+      : [];
 
   const foundAppComment = [...allComments].reverse().find(c => {
     const act = (c.action || c.type || c.decision || '').toLowerCase();
@@ -118,8 +118,8 @@ export const serializeWorklistEntry = (row) => {
   const allComments = Array.isArray(cr.comments)
     ? cr.comments
     : Array.isArray(cr.customFieldValues?.comments)
-    ? cr.customFieldValues.comments
-    : [];
+      ? cr.customFieldValues.comments
+      : [];
 
   const foundAppComment = [...allComments].reverse().find(c => {
     const act = (c.action || c.type || c.decision || '').toLowerCase();

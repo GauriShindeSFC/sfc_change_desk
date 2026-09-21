@@ -97,11 +97,11 @@ export default function LoginPage({ onLogin, onLoginSuccess }) {
         {/* Company logo */}
         <div style={{ marginBottom: '0.75rem', display: 'flex', justifyContent: 'center' }}>
           <img
-            src={isDarkMode ? '/images/white-stfox-logo.png' : '/images/black-stfox-logo.png'}
+            src="/images/black-stfox-logo.png"
             alt="ST FOX"
             onError={(e) => {
               e.target.onerror = null;
-              e.target.src = isDarkMode ? '/images/white-favicon.png' : '/images/black-favicon.png';
+              e.target.src = '/images/black-favicon.png';
             }}
             style={{ height: '52px', width: 'auto', maxWidth: '100%', objectFit: 'contain', display: 'block' }}
           />
