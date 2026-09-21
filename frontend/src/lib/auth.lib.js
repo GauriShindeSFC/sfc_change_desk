@@ -45,9 +45,11 @@ export const login = async (email) => {
   return { token: body.token, user: body.user };
 };
 
+export const MICROSOFT_LOGIN_URL = `${AUTH_BASE_URL}/microsoft`;
+
 // Re-validate the token and refresh the user record on app load.
-export const fetchMe = async () => {
-  const token = getToken();
+export const fetchMe = async (overrideToken = null) => {
+  const token = overrideToken || getToken();
   if (!token) return null;
   try {
     const res = await fetch(`${AUTH_BASE_URL}/me`, {
@@ -60,3 +62,4 @@ export const fetchMe = async () => {
     return null;
   }
 };
+

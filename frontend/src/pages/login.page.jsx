@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Sun, Moon } from 'lucide-react';
-import { login } from '../lib/auth.lib';
+import { login, MICROSOFT_LOGIN_URL, fetchMe, saveSession } from '../lib/auth.lib';
 
 export default function LoginPage({ onLogin, onLoginSuccess }) {
   const [isDarkMode, setIsDarkMode] = useState(() => {
@@ -11,9 +11,43 @@ export default function LoginPage({ onLogin, onLoginSuccess }) {
     }
   });
   const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+
+  // Capture Microsoft SSO callback token or error from URL
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const ssoToken = params.get('token');
+    const ssoError = params.get('error');
+
+    if (ssoError) {
+      setError(decodeURIComponent(ssoError));
+      window.history.replaceState({}, document.title, window.location.pathname);
+      return;
+    }
+
+    if (ssoToken) {
+      setIsLoading(true);
+      fetchMe(ssoToken)
+        .then((user) => {
+          if (user) {
+            const session = { token: ssoToken, user };
+            saveSession(session);
+            window.history.replaceState({}, document.title, window.location.pathname);
+            if (onLogin) onLogin(session);
+            else if (onLoginSuccess) onLoginSuccess(session);
+          } else {
+            setError('Failed to retrieve user profile after Microsoft authentication.');
+          }
+        })
+        .catch((err) => {
+          setError(err.message || 'SSO authentication failed.');
+        })
+        .finally(() => {
+          setIsLoading(false);
+        });
+    }
+  }, [onLogin, onLoginSuccess]);
 
   useEffect(() => {
     document.documentElement.classList.toggle('dark', isDarkMode);
@@ -37,6 +71,11 @@ export default function LoginPage({ onLogin, onLoginSuccess }) {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handleMicrosoftSignIn = () => {
+    setError('');
+    window.location.href = MICROSOFT_LOGIN_URL;
   };
 
   return (
@@ -101,11 +140,11 @@ export default function LoginPage({ onLogin, onLoginSuccess }) {
           />
         </div>
 
-        {/* Continue with Microsoft OAuth Button (placeholder — SSO wiring pending) */}
+        {/* Continue with Microsoft OAuth Button */}
         <button
           type="button"
-          disabled
-          title="Microsoft sign-in will be enabled soon"
+          onClick={handleMicrosoftSignIn}
+          disabled={isLoading}
           style={{
             width: '100%',
             padding: '0.85rem 1rem',
@@ -115,13 +154,13 @@ export default function LoginPage({ onLogin, onLoginSuccess }) {
             color: 'var(--text-primary)',
             fontSize: '0.925rem',
             fontWeight: 600,
-            cursor: 'not-allowed',
-            opacity: 0.6,
+            cursor: isLoading ? 'not-allowed' : 'pointer',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
             gap: '0.75rem',
-            boxShadow: 'var(--shadow-soft)'
+            boxShadow: 'var(--shadow-soft)',
+            transition: 'all 0.15s ease'
           }}
         >
           {/* 4-Color Microsoft Square Icon */}
@@ -131,7 +170,7 @@ export default function LoginPage({ onLogin, onLoginSuccess }) {
             <div style={{ backgroundColor: '#00A4EF', width: '7px', height: '7px' }} />
             <div style={{ backgroundColor: '#FFB900', width: '7px', height: '7px' }} />
           </div>
-          <span>Continue with Microsoft (coming soon)</span>
+          <span>Sign in with Microsoft</span>
         </button>
 
         {/* Divider Line */}
@@ -203,33 +242,16 @@ export default function LoginPage({ onLogin, onLoginSuccess }) {
               border: 'none',
               borderRadius: 'var(--radius-md)',
               fontSize: '0.95rem',
-              fontFamily: 'var(--font-family)',
-              fontWeight: 700,
+              fontWeight: 600,
               cursor: isLoading ? 'not-allowed' : 'pointer',
               opacity: isLoading ? 0.7 : 1,
-              boxShadow: 'var(--shadow-card)'
+              boxShadow: 'var(--shadow-soft)',
+              transition: 'opacity 0.15s ease'
             }}
           >
-            {isLoading ? 'Signing in…' : 'Sign in'}
+            {isLoading ? 'Signing in...' : 'Sign In'}
           </button>
         </form>
-
-        {/* Footer Disclaimer */}
-        <p style={{
-          fontSize: '0.775rem',
-          color: 'var(--text-secondary)',
-          textAlign: 'center',
-          lineHeight: 1.45,
-          margin: 0,
-          marginTop: '0.25rem',
-          maxWidth: '340px'
-        }}>
-          By continuing you agree to the terms of internal use. For access issues, contact your IT administrator.
-        </p>
-
-        <p style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', textAlign: 'center', margin: 0 }}>
-          Development login: Enter any registered directory email
-        </p>
 
       </div>
     </div>

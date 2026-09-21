@@ -11,10 +11,10 @@ import { Pagination, ExportButtonGroup } from '../components/ui/primitives.compo
 import { apiFetch } from '../lib/apiFetch.lib';
 
 const METRIC_STYLES = [
-  { id: 'total', match: (m) => m.isTotal || m.title.includes('Total'), icon: FileText, color: '#2563EB', tint: '#EFF6FF', filterKey: 'All' },
-  { id: 'pending', match: (m) => m.isPending || m.title.includes('Pending'), icon: Clock, color: '#D97706', tint: '#FFFBEB', filterKey: 'Pending' },
-  { id: 'approved', match: (m) => m.id === 'approved' || m.isApproved || m.title === 'Approved' || m.title === 'In Process', icon: Check, color: '#059669', tint: '#ECFDF5', filterKey: 'Approved' },
-  { id: 'implemented', match: (m) => m.isInProgress || m.isImplemented || m.title.includes('Progress') || m.title.includes('Implemented'), icon: RotateCw, color: '#7C3AED', tint: '#F5F3FF', filterKey: 'Implemented' },
+  { id: 'total', match: (m) => m?.isTotal || m?.title?.includes('Total'), icon: FileText, color: '#2563EB', tint: '#EFF6FF', filterKey: 'All' },
+  { id: 'pending', match: (m) => m?.isPending || m?.title?.includes('Pending'), icon: Clock, color: '#D97706', tint: '#FFFBEB', filterKey: 'Pending' },
+  { id: 'approved', match: (m) => m?.id === 'approved' || m?.isApproved || m?.title === 'Approved' || m?.title === 'In Process', icon: Check, color: '#059669', tint: '#ECFDF5', filterKey: 'Approved' },
+  { id: 'implemented', match: (m) => m?.isInProgress || m?.isImplemented || m?.title?.includes('Progress') || m?.title?.includes('Implemented'), icon: RotateCw, color: '#7C3AED', tint: '#F5F3FF', filterKey: 'Implemented' },
   { id: 'rejected', match: () => true, icon: XCircle, color: '#DC2626', tint: '#FEF2F2', filterKey: 'Rejected' }
 ];
 const getMetricStyle = (m) => METRIC_STYLES.find((s) => s.match(m)) || METRIC_STYLES[METRIC_STYLES.length - 1];
@@ -25,6 +25,14 @@ const getGreeting = () => {
   if (h < 17) return { text: 'Good Afternoon', Icon: Sun };
   return { text: 'Good Evening', Icon: Moon };
 };
+
+const CANONICAL_METRICS = [
+  { id: 'total', title: 'Total Change Requests', value: 0, count: 0, change: 'Total Requests', isTotal: true },
+  { id: 'pending', title: 'Pending Approvals', value: 0, count: 0, change: 'Awaiting review', isPending: true },
+  { id: 'approved', title: 'Approved', value: 0, count: 0, change: 'Approved', isApproved: true },
+  { id: 'implemented', title: 'Implemented', value: 0, count: 0, change: 'Implemented', isImplemented: true, isInProgress: true },
+  { id: 'rejected', title: 'Rejected', value: 0, count: 0, change: 'Rejected', isRejected: true }
+];
 
 const CANONICAL_CATEGORIES = [
   { category: 'IT Asset', label: 'IT Asset', count: 0, color: '#D97706', percentage: 0 },
@@ -125,11 +133,21 @@ function DashboardPage({ onNavigate, user, isOrgDashboard = false, searchQuery =
     refetchInterval: 30000,
   });
 
-  const metrics = dashboardResult?.metrics || [];
+  const rawMetrics = dashboardResult?.metrics;
   const categoryData = dashboardResult?.categories || [];
   const statusBreakdown = dashboardResult?.statusBreakdown || [];
   const requests = dashboardResult?.requests || [];
   const statusCounts = dashboardResult?.statusCounts || { All: 0, Pending: 0, InProcess: 0, Implemented: 0, Rejected: 0 };
+
+  const metrics = (Array.isArray(rawMetrics) && rawMetrics.length > 0)
+    ? rawMetrics
+    : [
+        { id: 'total', title: 'Total Change Requests', value: statusCounts.All || 0, count: statusCounts.All || 0, change: 'Total Requests', isTotal: true },
+        { id: 'pending', title: 'Pending Approvals', value: statusCounts.Pending || 0, count: statusCounts.Pending || 0, change: 'Awaiting review', isPending: true },
+        { id: 'approved', title: 'Approved', value: statusCounts.Approved ?? statusCounts.InProcess ?? 0, count: statusCounts.Approved ?? statusCounts.InProcess ?? 0, change: 'Approved', isApproved: true },
+        { id: 'implemented', title: 'Implemented', value: statusCounts.Implemented || 0, count: statusCounts.Implemented || 0, change: 'Implemented', isImplemented: true, isInProgress: true },
+        { id: 'rejected', title: 'Rejected', value: statusCounts.Rejected || 0, count: statusCounts.Rejected || 0, change: 'Rejected', isRejected: true }
+      ];
 
   // Aligned Categories
   const displayCategories = CANONICAL_CATEGORIES.map((def) => {

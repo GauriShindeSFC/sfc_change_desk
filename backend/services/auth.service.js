@@ -135,3 +135,119 @@ export const authenticate = async (email) => {
 
   return result.identity;
 };
+
+/**
+ * Generates Microsoft OAuth2 Authorization URL
+ */
+export const getMicrosoftAuthUrl = (state = 'changedesk-auth') => {
+  const clientId = process.env.MICROSOFT_CLIENT_ID || process.env.AZURE_CLIENT_ID;
+  const tenantId = process.env.MICROSOFT_TENANT_ID || process.env.AZURE_TENANT_ID || 'common';
+  const redirectUri = process.env.MICROSOFT_REDIRECT_URI || 'http://localhost:5001/api/auth/microsoft/callback';
+
+  if (!clientId || clientId === 'your-azure-client-id-here') {
+    const err = new Error('Microsoft Client ID is not configured in backend/.env (MICROSOFT_CLIENT_ID).');
+    err.statusCode = 500;
+    throw err;
+  }
+
+  const scope = encodeURIComponent('openid profile email User.Read');
+  const encodedRedirect = encodeURIComponent(redirectUri);
+
+  return `https://login.microsoftonline.com/${tenantId}/oauth2/v2.0/authorize?client_id=${clientId}&response_type=code&redirect_uri=${encodedRedirect}&response_mode=query&scope=${scope}&state=${encodeURIComponent(state)}`;
+};
+
+/**
+ * Handles Microsoft OAuth2 callback: exchanges code for token, fetches Microsoft profile,
+ * resolves ChangeDesk identity, updates UserS8, and issues JWT session token.
+ */
+export const handleMicrosoftCallbackService = async (code) => {
+  if (!code) {
+    const err = new Error('Authorization code missing from Microsoft callback.');
+    err.statusCode = 400;
+    throw err;
+  }
+
+  const clientId = process.env.MICROSOFT_CLIENT_ID || process.env.AZURE_CLIENT_ID;
+  const clientSecret = process.env.MICROSOFT_CLIENT_SECRET || process.env.AZURE_CLIENT_SECRET;
+  const tenantId = process.env.MICROSOFT_TENANT_ID || process.env.AZURE_TENANT_ID || 'common';
+  const redirectUri = process.env.MICROSOFT_REDIRECT_URI || 'http://localhost:5001/api/auth/microsoft/callback';
+
+  if (!clientId || !clientSecret) {
+    const err = new Error('Microsoft OAuth credentials missing in backend/.env (MICROSOFT_CLIENT_ID / MICROSOFT_CLIENT_SECRET).');
+    err.statusCode = 500;
+    throw err;
+  }
+
+  // 1. Exchange Authorization Code for Access Token
+  const tokenUrl = `https://login.microsoftonline.com/${tenantId}/oauth2/v2.0/token`;
+  const tokenParams = new URLSearchParams({
+    client_id: clientId,
+    client_secret: clientSecret,
+    code,
+    redirect_uri: redirectUri,
+    grant_type: 'authorization_code',
+    scope: 'openid profile email User.Read'
+  });
+
+  const tokenRes = await fetch(tokenUrl, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: tokenParams.toString()
+  });
+
+  const tokenData = await tokenRes.json().catch(() => ({}));
+  if (!tokenRes.ok || !tokenData.access_token) {
+    const err = new Error(tokenData.error_description || tokenData.error || 'Failed to exchange Microsoft authorization code for tokens.');
+    err.statusCode = 401;
+    throw err;
+  }
+
+  // 2. Fetch User Profile from Microsoft Graph
+  const graphRes = await fetch('https://graph.microsoft.com/v1.0/me', {
+    headers: { Authorization: `Bearer ${tokenData.access_token}` }
+  });
+
+  const graphData = await graphRes.json().catch(() => ({}));
+  if (!graphRes.ok) {
+    const err = new Error(graphData.error?.message || 'Failed to fetch user profile from Microsoft Graph API.');
+    err.statusCode = 401;
+    throw err;
+  }
+
+  const rawEmail = graphData.mail || graphData.userPrincipalName;
+  if (!rawEmail) {
+    const err = new Error('No email found associated with this Microsoft account.');
+    err.statusCode = 400;
+    throw err;
+  }
+
+  const email = rawEmail.trim().toLowerCase();
+  const microsoftId = graphData.id || null;
+
+  // 3. Resolve ChangeDesk Identity
+  const identity = await authenticate(email);
+
+  // 4. Update Microsoft ID and last login timestamp if user exists in UserS8 table
+  try {
+    const s8User = await UserS8.findOne({
+      where: sequelize.where(sequelize.fn('LOWER', sequelize.col('email')), email)
+    });
+
+    if (s8User) {
+      await s8User.update({
+        microsoftId: microsoftId || s8User.microsoftId,
+        loginType: 1, // 1 = Microsoft SSO
+        lastLogin: new Date()
+      });
+    }
+  } catch (dbErr) {
+    console.warn('[Microsoft SSO] Could not update UserS8 metadata:', dbErr.message);
+  }
+
+  // 5. Issue ChangeDesk JWT session token
+  const token = issueToken(identity);
+  const user = publicUser(identity);
+
+  return { token, user };
+};
+
