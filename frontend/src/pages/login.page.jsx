@@ -1,18 +1,20 @@
 import React, { useState, useEffect } from 'react';
-import { Sun, Moon } from 'lucide-react';
 import { login, MICROSOFT_LOGIN_URL, fetchMe, saveSession } from '../lib/auth.lib';
 
 export default function LoginPage({ onLogin, onLoginSuccess }) {
-  const [isDarkMode, setIsDarkMode] = useState(() => {
-    try {
-      return localStorage.getItem('changedesk.theme') !== 'light';
-    } catch {
-      return true;
-    }
-  });
   const [email, setEmail] = useState('');
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+
+  // Enforce light mode across the entire application
+  useEffect(() => {
+    document.documentElement.classList.remove('dark');
+    try {
+      localStorage.setItem('changedesk.theme', 'light');
+    } catch {
+      /* ignore */
+    }
+  }, []);
 
   // Capture Microsoft SSO callback token or error from URL
   useEffect(() => {
@@ -49,15 +51,6 @@ export default function LoginPage({ onLogin, onLoginSuccess }) {
     }
   }, [onLogin, onLoginSuccess]);
 
-  useEffect(() => {
-    document.documentElement.classList.toggle('dark', isDarkMode);
-    try {
-      localStorage.setItem('changedesk.theme', isDarkMode ? 'dark' : 'light');
-    } catch {
-      /* ignore */
-    }
-  }, [isDarkMode]);
-
   const handleLogin = async (e) => {
     if (e) e.preventDefault();
     setError('');
@@ -91,32 +84,6 @@ export default function LoginPage({ onLogin, onLoginSuccess }) {
       padding: '1.5rem',
       position: 'relative'
     }}>
-
-      {/* Top-Right Corner Theme Toggle Icon Button */}
-      <button
-        type="button"
-        onClick={() => setIsDarkMode(prev => !prev)}
-        title={isDarkMode ? "Switch to Light Mode" : "Switch to Dark Mode"}
-        style={{
-          position: 'absolute',
-          top: '1.5rem',
-          right: '1.5rem',
-          width: '44px',
-          height: '44px',
-          borderRadius: 'var(--radius-md)',
-          backgroundColor: 'var(--card-bg)',
-          border: '1px solid var(--border-color)',
-          color: 'var(--text-primary)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          cursor: 'pointer',
-          boxShadow: 'var(--shadow-soft)',
-          outline: 'none'
-        }}
-      >
-        {isDarkMode ? <Sun size={20} strokeWidth={2} /> : <Moon size={20} strokeWidth={2} />}
-      </button>
 
       <div style={{
         width: '100%',
