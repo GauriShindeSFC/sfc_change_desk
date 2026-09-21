@@ -1,13 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Clock, Check, X, RotateCw } from 'lucide-react';
+import { Clock, Check, X, RotateCw, FileText, IndianRupee, Plane } from 'lucide-react';
 import ChangeRequestModal from '../components/ui/changeRequestModal.component';
 import FilterBar, { initCustomDateRange } from '../components/ui/filterBar.component';
+import ModuleSwitcher from '../components/ui/moduleSwitcher.component';
 import { Pagination } from '../components/ui/primitives.component';
 import { apiFetch } from '../lib/apiFetch.lib';
 
 function MyWorklistPage({ onNavigate, searchQuery = '', user, isOrgWorklist = false }) {
   const queryClient = useQueryClient();
+  const [activeModule, setActiveModule] = useState('change_request');
   const roleName = (user?.role || '').toLowerCase();
   const roleId = user?.roleId || '';
   const isSuperAdmin = roleId === 'role-1' || roleName.includes('super');
@@ -32,10 +34,10 @@ function MyWorklistPage({ onNavigate, searchQuery = '', user, isOrgWorklist = fa
   // Initial Filter State
   const [activeFilter, setActiveFilter] = useState(isImplementer ? 'Approved' : 'Pending');
 
-  // Reset pagination when filter/date/search changes
+  // Reset pagination when filter/date/search/module changes
   useEffect(() => {
     setCurrentPage(1);
-  }, [activeFilter, dateFilter, startDate, endDate, searchQuery]);
+  }, [activeModule, activeFilter, dateFilter, startDate, endDate, searchQuery]);
 
   const isCustomDateIncomplete = dateFilter === 'custom' && (!startDate || !endDate);
 
@@ -166,40 +168,78 @@ function MyWorklistPage({ onNavigate, searchQuery = '', user, isOrgWorklist = fa
 
   const approvedCount = statusCounts.Approved ?? statusCounts.InProcess ?? metrics?.approved ?? 0;
 
+  // Domain-specific worklist items
+  const displayItems = activeModule === 'change_request' ? items : [];
+
   const filterTabs = [
-    { id: 'All', label: `All (${statusCounts.All || 0})` },
-    { id: 'Pending', label: `Pending (${statusCounts.Pending || 0})` },
-    { id: 'Approved', label: `Approved (${approvedCount})` },
-    { id: 'Implemented', label: `Implemented (${statusCounts.Implemented || 0})` },
-    { id: 'Rejected', label: `Rejected (${statusCounts.Rejected || 0})` }
+    { id: 'All', label: `All (${activeModule === 'change_request' ? (statusCounts.All || 0) : 0})` },
+    { id: 'Pending', label: `Pending (${activeModule === 'change_request' ? (statusCounts.Pending || 0) : 0})` },
+    { id: 'Approved', label: `Approved (${activeModule === 'change_request' ? approvedCount : 0})` },
+    { id: 'Implemented', label: `${activeModule === 'travel' ? 'Completed' : activeModule === 'prespend' ? 'Processed' : 'Implemented'} (${activeModule === 'change_request' ? (statusCounts.Implemented || 0) : 0})` },
+    { id: 'Rejected', label: `Rejected (${activeModule === 'change_request' ? (statusCounts.Rejected || 0) : 0})` }
   ];
 
-  const metricCards = [
+  // 1. Change Request Worklist Cards
+  const crMetricCards = [
     { id: 'pending', title: 'Pending Review', count: metrics?.pending ?? statusCounts.Pending ?? 0, subtext: 'In Queue Right Now', subtextColor: 'var(--text-secondary)', icon: Clock, iconBg: '#FEF3C7', iconColor: '#D97706' },
     { id: 'approved', title: 'Approved', count: approvedCount, subtext: 'Approved Requests', subtextColor: '#059669', icon: Check, iconBg: '#ECFDF5', iconColor: '#059669' },
     { id: 'implemented', title: 'Implemented', count: metrics?.implemented ?? statusCounts.Implemented ?? 0, subtext: 'Last 30 Days', subtextColor: 'var(--text-secondary)', icon: RotateCw, iconBg: '#F3E8FF', iconColor: '#7C3AED' },
     { id: 'rejected', title: 'Rejected', count: metrics?.rejected ?? statusCounts.Rejected ?? 0, subtext: 'Last 30 Days', subtextColor: 'var(--text-secondary)', icon: X, iconBg: '#FEE2E2', iconColor: '#DC2626' }
   ];
 
+  // 2. Pre-Spend Worklist Cards
+  const prespendMetricCards = [
+    { id: 'pending', title: 'Pending Budget Review', count: 0, subtext: 'Awaiting Manager Sign-off', subtextColor: 'var(--text-secondary)', icon: Clock, iconBg: '#FEF3C7', iconColor: '#D97706' },
+    { id: 'approved', title: 'Approved Spend', count: 0, subtext: 'Approved Budgets', subtextColor: '#059669', icon: Check, iconBg: '#ECFDF5', iconColor: '#059669' },
+    { id: 'implemented', title: 'Processed / Paid', count: 0, subtext: 'Disbursed', subtextColor: 'var(--text-secondary)', icon: RotateCw, iconBg: '#F3E8FF', iconColor: '#7C3AED' },
+    { id: 'rejected', title: 'Rejected', count: 0, subtext: 'Declined Requests', subtextColor: 'var(--text-secondary)', icon: X, iconBg: '#FEE2E2', iconColor: '#DC2626' }
+  ];
+
+  // 3. Travel Desk Worklist Cards
+  const travelMetricCards = [
+    { id: 'pending', title: 'Pending Approval', count: 0, subtext: 'Awaiting Travel Sign-off', subtextColor: 'var(--text-secondary)', icon: Clock, iconBg: '#FEF3C7', iconColor: '#D97706' },
+    { id: 'approved', title: 'Ticketed & Confirmed', count: 0, subtext: 'Confirmed Itineraries', subtextColor: '#059669', icon: Check, iconBg: '#ECFDF5', iconColor: '#059669' },
+    { id: 'implemented', title: 'Completed', count: 0, subtext: 'Completed Journeys', subtextColor: 'var(--text-secondary)', icon: RotateCw, iconBg: '#F3E8FF', iconColor: '#7C3AED' },
+    { id: 'rejected', title: 'Rejected', count: 0, subtext: 'Declined Bookings', subtextColor: 'var(--text-secondary)', icon: X, iconBg: '#FEE2E2', iconColor: '#DC2626' }
+  ];
+
+  const metricCards = activeModule === 'prespend'
+    ? prespendMetricCards
+    : activeModule === 'travel'
+    ? travelMetricCards
+    : crMetricCards;
+
+  const moduleSubtitles = {
+    change_request: isOrgWorklist ? 'All change requests requiring Change Manager oversight across the organization' : 'Change requests awaiting your review',
+    prespend: isOrgWorklist ? 'All departmental pre-spend and capital budget authorization requests' : 'Pre-spend and budget purchase requests awaiting your sign-off',
+    travel: isOrgWorklist ? 'All corporate flight, train, and hotel reservations requiring travel desk approval' : 'Travel and accommodation requests awaiting your approval'
+  };
+
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', width: '100%' }}>
 
-      {/* Header Row */}
-      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: '1rem' }}>
-        <div>
-          <h1 style={{ fontSize: '1.45rem', fontWeight: 700, color: 'var(--text-primary)', lineHeight: 1.2, margin: 0 }}>
-            {isOrgWorklist ? 'Organization worklist' : 'My Worklist'}
-          </h1>
-          <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginTop: '0.2rem' }}>
-            {isOrgWorklist
-              ? 'All change requests requiring Change Manager oversight across the organization'
-              : 'Change requests awaiting your review'}
-          </p>
+      {/* Header Row: Title on Top */}
+      <div style={{ width: '100%' }}>
+        <h1 style={{ fontSize: '1.45rem', fontWeight: 700, color: 'var(--text-primary)', lineHeight: 1.2, margin: 0 }}>
+          {isOrgWorklist ? 'Organization Worklist' : 'My Worklist'}
+        </h1>
+        <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginTop: '0.2rem' }}>
+          {moduleSubtitles[activeModule]}
+        </p>
+      </div>
+
+      {/* Module Switcher Row: 3 Options on Left, Total Count at Extreme Right */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '1rem', width: '100%' }}>
+        <ModuleSwitcher
+          activeModule={activeModule}
+          onModuleChange={setActiveModule}
+        />
+
+        <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+          <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-secondary)' }}>
+            {displayItems.length} total request{displayItems.length !== 1 ? 's' : ''}
+          </span>
         </div>
-
-        <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-secondary)' }}>
-          {items.length} total request{items.length !== 1 ? 's' : ''}
-        </span>
       </div>
 
       {/* Metric Cards Grid */}
@@ -270,8 +310,8 @@ function MyWorklistPage({ onNavigate, searchQuery = '', user, isOrgWorklist = fa
               </tr>
             </thead>
             <tbody>
-              {items.length > 0 ? (
-                items.slice((currentPage - 1) * pageSize, currentPage * pageSize).map(item => {
+              {displayItems.length > 0 ? (
+                displayItems.slice((currentPage - 1) * pageSize, currentPage * pageSize).map(item => {
                   const status = getStatus(item);
                   const isItemApproved = status === 'approved' || item.myDecision === 'Approved';
                   const isItemRejected = status === 'rejected' || item.myDecision === 'Rejected';
@@ -464,7 +504,11 @@ function MyWorklistPage({ onNavigate, searchQuery = '', user, isOrgWorklist = fa
               ) : (
                 <tr>
                   <td colSpan={9} style={{ padding: '2.5rem', textAlign: 'center', color: 'var(--text-secondary)' }}>
-                    No change requests found matching the selected filter.
+                    {activeModule === 'prespend'
+                      ? 'No pre-spend requests found.'
+                      : activeModule === 'travel'
+                      ? 'No travel bookings found.'
+                      : 'No change requests found matching the selected filter.'}
                   </td>
                 </tr>
               )}
@@ -476,7 +520,7 @@ function MyWorklistPage({ onNavigate, searchQuery = '', user, isOrgWorklist = fa
         <Pagination
           currentPage={currentPage}
           pageSize={pageSize}
-          totalItems={items.length}
+          totalItems={displayItems.length}
           onPageChange={setCurrentPage}
           onPageSizeChange={(size) => {
             setPageSize(size);

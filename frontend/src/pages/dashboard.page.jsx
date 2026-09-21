@@ -3,18 +3,19 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   FileText, Clock, RotateCw, XCircle, Layers, PieChart,
   TrendingUp, TrendingDown, Minus, Sunrise, Sun, Moon, Plus,
-  Download, FileSpreadsheet, Check
+  Download, FileSpreadsheet, Check, IndianRupee, Plane, Car, Building2, Train, Bus
 } from 'lucide-react';
 import FilterBar, { initCustomDateRange } from '../components/ui/filterBar.component';
 import ChangeRequestModal from '../components/ui/changeRequestModal.component';
+import ModuleSwitcher from '../components/ui/moduleSwitcher.component';
 import { Pagination, ExportButtonGroup } from '../components/ui/primitives.component';
 import { apiFetch } from '../lib/apiFetch.lib';
 
 const METRIC_STYLES = [
   { id: 'total', match: (m) => m?.isTotal || m?.title?.includes('Total'), icon: FileText, color: '#2563EB', tint: '#EFF6FF', filterKey: 'All' },
   { id: 'pending', match: (m) => m?.isPending || m?.title?.includes('Pending'), icon: Clock, color: '#D97706', tint: '#FFFBEB', filterKey: 'Pending' },
-  { id: 'approved', match: (m) => m?.id === 'approved' || m?.isApproved || m?.title === 'Approved' || m?.title === 'In Process', icon: Check, color: '#059669', tint: '#ECFDF5', filterKey: 'Approved' },
-  { id: 'implemented', match: (m) => m?.isInProgress || m?.isImplemented || m?.title?.includes('Progress') || m?.title?.includes('Implemented'), icon: RotateCw, color: '#7C3AED', tint: '#F5F3FF', filterKey: 'Implemented' },
+  { id: 'approved', match: (m) => m?.id === 'approved' || m?.isApproved || m?.title === 'Approved' || m?.title === 'In Process' || m?.title?.includes('Ticketed'), icon: Check, color: '#059669', tint: '#ECFDF5', filterKey: 'Approved' },
+  { id: 'implemented', match: (m) => m?.isInProgress || m?.isImplemented || m?.title?.includes('Progress') || m?.title?.includes('Implemented') || m?.title?.includes('Processed') || m?.title?.includes('Board'), icon: RotateCw, color: '#7C3AED', tint: '#F5F3FF', filterKey: 'Implemented' },
   { id: 'rejected', match: () => true, icon: XCircle, color: '#DC2626', tint: '#FEF2F2', filterKey: 'Rejected' }
 ];
 const getMetricStyle = (m) => METRIC_STYLES.find((s) => s.match(m)) || METRIC_STYLES[METRIC_STYLES.length - 1];
@@ -25,6 +26,22 @@ const getGreeting = () => {
   if (h < 17) return { text: 'Good Afternoon', Icon: Sun };
   return { text: 'Good Evening', Icon: Moon };
 };
+
+const PRESPEND_CANONICAL_CATEGORIES = [
+  { category: 'Hardware & Devices', label: 'Hardware & Devices', count: 0, color: '#2563EB', percentage: 0 },
+  { category: 'Software & SaaS', label: 'Software & SaaS', count: 0, color: '#7C3AED', percentage: 0 },
+  { category: 'Cloud Infrastructure', label: 'Cloud Infrastructure', count: 0, color: '#0D9488', percentage: 0 },
+  { category: 'Consulting & Services', label: 'Consulting & Services', count: 0, color: '#D97706', percentage: 0 },
+  { category: 'Office Assets', label: 'Office Assets', count: 0, color: '#475569', percentage: 0 }
+];
+
+const TRAVEL_CANONICAL_CATEGORIES = [
+  { category: 'Flight', label: 'Flights', count: 0, color: '#2563EB', percentage: 0 },
+  { category: 'Hotel', label: 'Hotel Rooms', count: 0, color: '#7C3AED', percentage: 0 },
+  { category: 'Cab', label: 'Cabs & Transfers', count: 0, color: '#D97706', percentage: 0 },
+  { category: 'Train', label: 'Train Bookings', count: 0, color: '#0D9488', percentage: 0 },
+  { category: 'Bus', label: 'Bus Reservations', count: 0, color: '#475569', percentage: 0 }
+];
 
 const CANONICAL_METRICS = [
   { id: 'total', title: 'Total Change Requests', value: 0, count: 0, change: 'Total Requests', isTotal: true },
@@ -52,6 +69,7 @@ const CANONICAL_STATUSES = [
 
 function DashboardPage({ onNavigate, user, isOrgDashboard = false, searchQuery = '' }) {
   const queryClient = useQueryClient();
+  const [activeModule, setActiveModule] = useState('change_request');
   const [hoveredStatus, setHoveredStatus] = useState(null);
 
   // Unified Filter State
@@ -64,10 +82,10 @@ function DashboardPage({ onNavigate, user, isOrgDashboard = false, searchQuery =
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
 
-  // Reset pagination when filters or search change
+  // Reset pagination when filters, module or search change
   useEffect(() => {
     setCurrentPage(1);
-  }, [activeFilter, dateFilter, startDate, endDate, searchQuery]);
+  }, [activeModule, activeFilter, dateFilter, startDate, endDate, searchQuery]);
 
   const [selectedRequest, setSelectedRequest] = useState(null);
   const [isExporting, setIsExporting] = useState(false);
@@ -136,10 +154,11 @@ function DashboardPage({ onNavigate, user, isOrgDashboard = false, searchQuery =
   const rawMetrics = dashboardResult?.metrics;
   const categoryData = dashboardResult?.categories || [];
   const statusBreakdown = dashboardResult?.statusBreakdown || [];
-  const requests = dashboardResult?.requests || [];
+  const crRequests = dashboardResult?.requests || [];
   const statusCounts = dashboardResult?.statusCounts || { All: 0, Pending: 0, InProcess: 0, Implemented: 0, Rejected: 0 };
 
-  const metrics = (Array.isArray(rawMetrics) && rawMetrics.length > 0)
+  // 1. Change Request Domain Metrics
+  const crMetrics = (Array.isArray(rawMetrics) && rawMetrics.length > 0)
     ? rawMetrics
     : [
         { id: 'total', title: 'Total Change Requests', value: statusCounts.All || 0, count: statusCounts.All || 0, change: 'Total Requests', isTotal: true },
@@ -149,31 +168,65 @@ function DashboardPage({ onNavigate, user, isOrgDashboard = false, searchQuery =
         { id: 'rejected', title: 'Rejected', value: statusCounts.Rejected || 0, count: statusCounts.Rejected || 0, change: 'Rejected', isRejected: true }
       ];
 
-  // Aligned Categories
-  const displayCategories = CANONICAL_CATEGORIES.map((def) => {
-    const found = categoryData.find(
-      (c) => (c.name || c.category || c.label || '').trim().toLowerCase() === def.category.toLowerCase()
-    );
-    return found ? { ...def, ...found } : def;
-  });
+  // 2. Pre-Spend Domain Metrics
+  const prespendMetrics = [
+    { id: 'total', title: 'Total Pre-Spend Requests', value: 0, count: 0, change: 'All Spend Requests', isTotal: true },
+    { id: 'pending', title: 'Pending Budget Review', value: 0, count: 0, change: 'Manager Review', isPending: true },
+    { id: 'approved', title: 'Approved Spend', value: 0, count: 0, change: 'Approved by Manager', isApproved: true },
+    { id: 'implemented', title: 'Processed / Paid', value: 0, count: 0, change: 'Finance Processed', isImplemented: true },
+    { id: 'rejected', title: 'Rejected', value: 0, count: 0, change: 'Rejected', isRejected: true }
+  ];
+
+  // 3. Travel Desk Domain Metrics
+  const travelMetrics = [
+    { id: 'total', title: 'Total Travel Bookings', value: 0, count: 0, change: 'All Bookings', isTotal: true },
+    { id: 'pending', title: 'Pending Approvals', value: 0, count: 0, change: 'Awaiting approval', isPending: true },
+    { id: 'approved', title: 'Ticketed & Confirmed', value: 0, count: 0, change: 'Confirmed Bookings', isApproved: true },
+    { id: 'implemented', title: 'Completed', value: 0, count: 0, change: 'Completed Journeys', isInProgress: true },
+    { id: 'rejected', title: 'Rejected', value: 0, count: 0, change: 'Rejected', isRejected: true }
+  ];
+
+  // Resolve Active Metrics
+  const metrics = activeModule === 'prespend'
+    ? prespendMetrics
+    : activeModule === 'travel'
+    ? travelMetrics
+    : crMetrics;
+
+  // Resolve Active Categories
+  const displayCategories = activeModule === 'prespend'
+    ? PRESPEND_CANONICAL_CATEGORIES
+    : activeModule === 'travel'
+    ? TRAVEL_CANONICAL_CATEGORIES
+    : CANONICAL_CATEGORIES.map((def) => {
+        const found = categoryData.find(
+          (c) => (c.name || c.category || c.label || '').trim().toLowerCase() === def.category.toLowerCase()
+        );
+        return found ? { ...def, ...found } : def;
+      });
+
   const totalCategoryCount = displayCategories.reduce((sum, c) => sum + (c.count || 0), 0);
 
-  // Aligned Statuses
-  const displayStatuses = CANONICAL_STATUSES.map((def) => {
-    const found = statusBreakdown.find(
-      (s) => (s.status || s.label || '').trim().toLowerCase() === def.status.toLowerCase()
-    );
-    return found ? { ...def, count: found.count || 0 } : def;
-  });
+  // Resolve Active Status Breakdown
+  const displayStatuses = activeModule === 'prespend' || activeModule === 'travel'
+    ? CANONICAL_STATUSES.map(def => ({ ...def, count: 0 }))
+    : CANONICAL_STATUSES.map((def) => {
+        const found = statusBreakdown.find(
+          (s) => (s.status || s.label || '').trim().toLowerCase() === def.status.toLowerCase()
+        );
+        return found ? { ...def, count: found.count || 0 } : def;
+      });
+
   const totalCRs = displayStatuses.reduce((sum, item) => sum + (item.count || 0), 0);
+  const requests = activeModule === 'change_request' ? crRequests : [];
 
   // Filter Tabs
   const filterTabs = [
-    { id: 'All', label: 'All', count: statusCounts.All || totalCRs },
-    { id: 'Pending', label: 'Pending Approvals', count: statusCounts.Pending },
-    { id: 'Approved', label: 'Approved', count: statusCounts.Approved ?? statusCounts.InProcess },
-    { id: 'Implemented', label: 'Implemented', count: statusCounts.Implemented },
-    { id: 'Rejected', label: 'Rejected', count: statusCounts.Rejected }
+    { id: 'All', label: 'All', count: activeModule === 'change_request' ? (statusCounts.All || totalCRs) : 0 },
+    { id: 'Pending', label: 'Pending Approvals', count: activeModule === 'change_request' ? statusCounts.Pending : 0 },
+    { id: 'Approved', label: 'Approved', count: activeModule === 'change_request' ? (statusCounts.Approved ?? statusCounts.InProcess) : 0 },
+    { id: 'Implemented', label: activeModule === 'travel' ? 'Completed' : activeModule === 'prespend' ? 'Processed' : 'Implemented', count: activeModule === 'change_request' ? statusCounts.Implemented : 0 },
+    { id: 'Rejected', label: 'Rejected', count: activeModule === 'change_request' ? statusCounts.Rejected : 0 }
   ];
 
   const handleExport = async (format) => {
@@ -217,32 +270,115 @@ function DashboardPage({ onNavigate, user, isOrgDashboard = false, searchQuery =
   const { text: greetingText } = getGreeting();
   const firstName = (user?.name || '').split(' ')[0] || '';
 
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+  const moduleSubtitles = {
+    change_request: isOrgDashboard ? 'Overall company-wide change request metrics and analytics' : 'Your submitted and active change requests',
+    prespend: isOrgDashboard ? 'Company-wide departmental pre-spend and capital budget overview' : 'Your submitted pre-spend and purchase authorization requests',
+    travel: isOrgDashboard ? 'Company-wide flight, hotel, and travel reservations' : 'Your business travel, flights, and hotel bookings'
+  };
 
-      {/* Top Header Row */}
-      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: '1rem' }}>
-        <div>
-          <h1 style={{ fontSize: '1.45rem', fontWeight: 700, color: 'var(--text-primary)', lineHeight: 1.2, margin: 0 }}>
-            {isOrgDashboard ? 'Organization Dashboard' : `${greetingText}${firstName ? `, ${firstName}` : ''}`}
-          </h1>
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', width: '100%' }}>
+
+      {/* Top Title Row */}
+      <div style={{ width: '100%' }}>
+        <h1 style={{ fontSize: '1.45rem', fontWeight: 700, color: 'var(--text-primary)', lineHeight: 1.2, margin: 0 }}>
+          {isOrgDashboard ? 'Organization Dashboard' : `${greetingText}${firstName ? `, ${firstName}` : ''}`}
+        </h1>
+        <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginTop: '0.3rem' }}>
+          {moduleSubtitles[activeModule]} · updated just now
+        </p>
+      </div>
+
+      {/* Module Switcher Row: 3 Options on Left, Export / Action Buttons on Extreme Right */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '1rem', width: '100%' }}>
+        {/* 3-Way Domain Switcher */}
+        <ModuleSwitcher
+          activeModule={activeModule}
+          onModuleChange={setActiveModule}
+        />
+
+        {/* Extreme Right Action Buttons */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginLeft: 'auto' }}>
+          {activeModule === 'change_request' && !isOrgDashboard && (
+            <button
+              type="button"
+              onClick={() => onNavigate?.('Change Catalog')}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '0.4rem',
+                padding: '0.5rem 0.9rem',
+                backgroundColor: 'var(--brand-primary)',
+                color: '#FFFFFF',
+                borderRadius: '8px',
+                fontSize: '0.825rem',
+                fontWeight: 600,
+                border: 'none',
+                cursor: 'pointer'
+              }}
+            >
+              <Plus size={15} />
+              <span>New Change Request</span>
+            </button>
+          )}
+
+          {activeModule === 'prespend' && !isOrgDashboard && (
+            <button
+              type="button"
+              onClick={() => onNavigate?.('Pre-Spend Request')}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '0.4rem',
+                padding: '0.5rem 0.9rem',
+                backgroundColor: 'var(--brand-primary)',
+                color: '#FFFFFF',
+                borderRadius: '8px',
+                fontSize: '0.825rem',
+                fontWeight: 600,
+                border: 'none',
+                cursor: 'pointer'
+              }}
+            >
+              <Plus size={15} />
+              <span>New Pre-Spend Request</span>
+            </button>
+          )}
+
+          {activeModule === 'travel' && !isOrgDashboard && (
+            <button
+              type="button"
+              onClick={() => onNavigate?.('Travel Desk')}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '0.4rem',
+                padding: '0.5rem 0.9rem',
+                backgroundColor: 'var(--brand-primary)',
+                color: '#FFFFFF',
+                borderRadius: '8px',
+                fontSize: '0.825rem',
+                fontWeight: 600,
+                border: 'none',
+                cursor: 'pointer'
+              }}
+            >
+              <Plus size={15} />
+              <span>Book Travel / Stay</span>
+            </button>
+          )}
+
+          {/* Organization Dashboard Export Action Buttons */}
           {isOrgDashboard && (
-            <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginTop: '0.3rem' }}>
-              Overall company-wide change request metrics and analytics · updated just now
-            </p>
+            <ExportButtonGroup
+              onExportCsv={() => handleExport('csv')}
+              onExportPdf={() => handleExport('pdf')}
+              isExporting={isExporting}
+              csvLabel={isExporting ? 'Exporting...' : 'Export CSV'}
+              pdfLabel={isExporting ? 'Exporting...' : 'Export PDF'}
+            />
           )}
         </div>
-
-        {/* Organization Dashboard Export Action Buttons (Strictly isolated to Org Dashboard) */}
-        {isOrgDashboard && (
-          <ExportButtonGroup
-            onExportCsv={() => handleExport('csv')}
-            onExportPdf={() => handleExport('pdf')}
-            isExporting={isExporting}
-            csvLabel={isExporting ? 'Exporting...' : 'Export CSV'}
-            pdfLabel={isExporting ? 'Exporting...' : 'Export PDF'}
-          />
-        )}
       </div>
 
       {/* KPI Metric Cards Grid */}
@@ -364,7 +500,7 @@ function DashboardPage({ onNavigate, user, isOrgDashboard = false, searchQuery =
                   <Layers size={15} style={{ color: 'var(--text-primary)' }} />
                 </div>
                 <h3 style={{ fontSize: '1.05rem', fontWeight: 500, color: 'var(--text-primary)', margin: 0 }}>
-                  Tickets by Category
+                  {activeModule === 'prespend' ? 'Spend by Category' : activeModule === 'travel' ? 'Travel by Mode' : 'Tickets by Category'}
                 </h3>
               </div>
               <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', fontWeight: 600 }}>
@@ -562,10 +698,14 @@ function DashboardPage({ onNavigate, user, isOrgDashboard = false, searchQuery =
         }}>
           <div>
             <h3 style={{ fontSize: '1rem', fontWeight: 600, color: 'var(--text-primary)', margin: 0 }}>
-              {isOrgDashboard ? 'Organization Change Requests' : 'My Change Requests'}
+              {activeModule === 'prespend'
+                ? (isOrgDashboard ? 'Organization Pre-Spend Requests' : 'My Pre-Spend Requests')
+                : activeModule === 'travel'
+                ? (isOrgDashboard ? 'Organization Travel Bookings' : 'My Travel Bookings')
+                : (isOrgDashboard ? 'Organization Change Requests' : 'My Change Requests')}
             </h3>
             <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', margin: '0.2rem 0 0 0' }}>
-              Showing {requests.length} ticket{requests.length === 1 ? '' : 's'} matching current filters
+              Showing {requests.length} {activeModule === 'travel' ? 'booking' : 'request'}{requests.length === 1 ? '' : 's'} matching current filters
             </p>
           </div>
         </div>
@@ -574,13 +714,21 @@ function DashboardPage({ onNavigate, user, isOrgDashboard = false, searchQuery =
           <table style={{ width: '100%', minWidth: isOrgDashboard ? '1060px' : '920px', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.85rem' }}>
             <thead>
               <tr style={{ backgroundColor: 'var(--input-bg)', borderBottom: '1px solid var(--border-color)' }}>
-                <th style={{ padding: '0.85rem 1rem', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', fontSize: '0.725rem', letterSpacing: '0.05em', width: '90px', minWidth: '90px', whiteSpace: 'nowrap' }}>CR ID</th>
-                <th style={{ padding: '0.85rem 1rem', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', fontSize: '0.725rem', letterSpacing: '0.05em', minWidth: '220px' }}>Title</th>
-                <th style={{ padding: '0.85rem 1rem', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', fontSize: '0.725rem', letterSpacing: '0.05em', minWidth: '140px', width: '160px' }}>Category</th>
+                <th style={{ padding: '0.85rem 1rem', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', fontSize: '0.725rem', letterSpacing: '0.05em', width: '90px', minWidth: '90px', whiteSpace: 'nowrap' }}>
+                  {activeModule === 'travel' ? 'BOOKING ID' : activeModule === 'prespend' ? 'REQ ID' : 'CR ID'}
+                </th>
+                <th style={{ padding: '0.85rem 1rem', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', fontSize: '0.725rem', letterSpacing: '0.05em', minWidth: '220px' }}>
+                  {activeModule === 'travel' ? 'Route / Location' : activeModule === 'prespend' ? 'Item / Description' : 'Title'}
+                </th>
+                <th style={{ padding: '0.85rem 1rem', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', fontSize: '0.725rem', letterSpacing: '0.05em', minWidth: '140px', width: '160px' }}>
+                  {activeModule === 'travel' ? 'Mode' : 'Category'}
+                </th>
                 {isOrgDashboard && (
                   <th style={{ padding: '0.85rem 1rem', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', fontSize: '0.725rem', letterSpacing: '0.05em', minWidth: '160px', width: '180px' }}>Requester Details</th>
                 )}
-                <th style={{ padding: '0.85rem 1rem', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', fontSize: '0.725rem', letterSpacing: '0.05em', width: '110px', minWidth: '110px', whiteSpace: 'nowrap' }}>Raised Date</th>
+                <th style={{ padding: '0.85rem 1rem', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', fontSize: '0.725rem', letterSpacing: '0.05em', width: '110px', minWidth: '110px', whiteSpace: 'nowrap' }}>
+                  {activeModule === 'travel' ? 'Travel Date' : 'Raised Date'}
+                </th>
                 <th style={{ padding: '0.85rem 1rem', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', fontSize: '0.725rem', letterSpacing: '0.05em', width: '110px', minWidth: '110px', whiteSpace: 'nowrap' }}>Closed Date</th>
                 {isOrgDashboard && (
                   <th style={{ padding: '0.85rem 1rem', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', fontSize: '0.725rem', letterSpacing: '0.05em', minWidth: '140px', width: '150px' }}>Approved By</th>
@@ -685,14 +833,20 @@ function DashboardPage({ onNavigate, user, isOrgDashboard = false, searchQuery =
                   <td colSpan={isOrgDashboard ? 8 : 7} style={{ padding: '2.5rem', textAlign: 'center', color: 'var(--text-secondary)' }}>
                     <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', fontWeight: 600, fontSize: '0.875rem' }}>
                       <span style={{ display: 'inline-block', width: '16px', height: '16px', border: '2px solid var(--border-color)', borderTopColor: 'var(--brand-primary)', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
-                      <span>Loading change requests...</span>
+                      <span>Loading...</span>
                     </div>
                   </td>
                 </tr>
               ) : (
                 <tr>
                   <td colSpan={isOrgDashboard ? 8 : 7} style={{ padding: '2.5rem', textAlign: 'center', color: 'var(--text-secondary)' }}>
-                    <span style={{ fontSize: '0.875rem' }}>No change requests found.</span>
+                    <span style={{ fontSize: '0.875rem' }}>
+                      {activeModule === 'prespend'
+                        ? 'No pre-spend requests found.'
+                        : activeModule === 'travel'
+                        ? 'No travel bookings found.'
+                        : 'No change requests found.'}
+                    </span>
                   </td>
                 </tr>
               )}

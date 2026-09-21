@@ -8,6 +8,8 @@ import ChangeRequestFormPage from './pages/changeRequestForm.page';
 import MyWorklistPage from './pages/worklist.page';
 import SettingsPage from './pages/settings.page';
 import ComingSoonPage from './pages/comingSoon.page';
+import PreSpendPage from './pages/preSpend.page';
+import TravelDeskPage from './pages/travelDesk.page';
 import ApprovalActionPage from './pages/approvalAction.page';
 import { getSession, saveSession, clearSession, fetchMe } from './lib/auth.lib';
 
@@ -94,11 +96,13 @@ function SettingsRoute() {
 }
 
 function PreSpendRoute() {
-  return <ComingSoonPage />;
+  const { user, searchQuery, onNavigate } = useOutletContext();
+  return <PreSpendPage user={user} searchQuery={searchQuery} onNavigate={onNavigate} />;
 }
 
 function TravelDeskRoute() {
-  return <ComingSoonPage />;
+  const { user, searchQuery, onNavigate } = useOutletContext();
+  return <TravelDeskPage user={user} searchQuery={searchQuery} onNavigate={onNavigate} />;
 }
 
 /* ── Main App Router ─────────────────────────────────────────── */
