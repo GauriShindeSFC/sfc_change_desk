@@ -156,7 +156,8 @@ export const getMicrosoftAuthUrl = (state = 'changedesk-auth') => {
     redirect_uri: redirectUri,
     response_mode: 'query',
     scope: 'openid profile email User.Read',
-    state: state
+    state: state,
+    prompt: 'select_account'
   });
 
   return `https://login.microsoftonline.com/${tenantId}/oauth2/v2.0/authorize?${params.toString()}`;
