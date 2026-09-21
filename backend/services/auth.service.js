@@ -140,9 +140,9 @@ export const authenticate = async (email) => {
  * Generates Microsoft OAuth2 Authorization URL
  */
 export const getMicrosoftAuthUrl = (state = 'changedesk-auth') => {
-  const clientId = process.env.MICROSOFT_CLIENT_ID || process.env.AZURE_CLIENT_ID;
-  const tenantId = process.env.MICROSOFT_TENANT_ID || process.env.AZURE_TENANT_ID || 'common';
-  const redirectUri = process.env.MICROSOFT_REDIRECT_URI || 'http://localhost:5001/api/auth/microsoft/callback';
+  const clientId = (process.env.MICROSOFT_CLIENT_ID || process.env.AZURE_CLIENT_ID || '').trim();
+  const tenantId = (process.env.MICROSOFT_TENANT_ID || process.env.AZURE_TENANT_ID || 'common').trim();
+  const redirectUri = (process.env.MICROSOFT_REDIRECT_URI || 'http://localhost:5001/api/auth/microsoft/callback').trim();
 
   if (!clientId || clientId === 'your-azure-client-id-here') {
     const err = new Error('Microsoft Client ID is not configured in backend/.env (MICROSOFT_CLIENT_ID).');
@@ -150,10 +150,16 @@ export const getMicrosoftAuthUrl = (state = 'changedesk-auth') => {
     throw err;
   }
 
-  const scope = encodeURIComponent('openid profile email User.Read');
-  const encodedRedirect = encodeURIComponent(redirectUri);
+  const params = new URLSearchParams({
+    client_id: clientId,
+    response_type: 'code',
+    redirect_uri: redirectUri,
+    response_mode: 'query',
+    scope: 'openid profile email User.Read',
+    state: state
+  });
 
-  return `https://login.microsoftonline.com/${tenantId}/oauth2/v2.0/authorize?client_id=${clientId}&response_type=code&redirect_uri=${encodedRedirect}&response_mode=query&scope=${scope}&state=${encodeURIComponent(state)}`;
+  return `https://login.microsoftonline.com/${tenantId}/oauth2/v2.0/authorize?${params.toString()}`;
 };
 
 /**
@@ -167,10 +173,10 @@ export const handleMicrosoftCallbackService = async (code) => {
     throw err;
   }
 
-  const clientId = process.env.MICROSOFT_CLIENT_ID || process.env.AZURE_CLIENT_ID;
-  const clientSecret = process.env.MICROSOFT_CLIENT_SECRET || process.env.AZURE_CLIENT_SECRET;
-  const tenantId = process.env.MICROSOFT_TENANT_ID || process.env.AZURE_TENANT_ID || 'common';
-  const redirectUri = process.env.MICROSOFT_REDIRECT_URI || 'http://localhost:5001/api/auth/microsoft/callback';
+  const clientId = (process.env.MICROSOFT_CLIENT_ID || process.env.AZURE_CLIENT_ID || '').trim();
+  const clientSecret = (process.env.MICROSOFT_CLIENT_SECRET || process.env.AZURE_CLIENT_SECRET || '').trim();
+  const tenantId = (process.env.MICROSOFT_TENANT_ID || process.env.AZURE_TENANT_ID || 'common').trim();
+  const redirectUri = (process.env.MICROSOFT_REDIRECT_URI || 'http://localhost:5001/api/auth/microsoft/callback').trim();
 
   if (!clientId || !clientSecret) {
     const err = new Error('Microsoft OAuth credentials missing in backend/.env (MICROSOFT_CLIENT_ID / MICROSOFT_CLIENT_SECRET).');
