@@ -105,11 +105,11 @@ function TravelDeskRoute() {
 export default function App() {
   const [session, setSession] = useState(() => getSession());
 
-  // Check for external approval token in URL
+  // Check for external approval token in URL (strictly on approval-action routes)
   const isApprovalAction =
     typeof window !== 'undefined' &&
     (window.location.pathname.includes('approval-action') ||
-      new URLSearchParams(window.location.search).has('token'));
+      (window.location.pathname.includes('approval') && new URLSearchParams(window.location.search).has('token')));
 
   useEffect(() => {
     if (!session || isApprovalAction) return;
