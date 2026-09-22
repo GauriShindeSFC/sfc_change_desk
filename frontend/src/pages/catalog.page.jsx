@@ -123,13 +123,22 @@ function ChangeCatalogPage({ onNavigate, searchQuery = '', initialData }) {
   const items = catalogResult?.items || defaultItems;
   const categories = catalogResult?.categories || DEFAULT_CATEGORIES;
 
+  const isSearching = Boolean((searchQuery || '').trim());
+  const q = (searchQuery || '').trim().toLowerCase();
+
   const filteredItems = items.filter(item => {
-    const matchesCat = !activeCategory || activeCategory === 'All items' || (item.category && item.category.trim().toLowerCase() === (activeCategory || '').trim().toLowerCase());
-    const q = (searchQuery || '').trim().toLowerCase();
     const matchesQuery = !q ||
       (item.title || '').toLowerCase().includes(q) ||
       (item.category || '').toLowerCase().includes(q) ||
       (item.description || '').toLowerCase().includes(q);
+
+    // If actively searching, match globally across all categories
+    if (isSearching) {
+      return matchesQuery;
+    }
+
+    // When not searching, filter by active tab
+    const matchesCat = !activeCategory || activeCategory === 'All items' || (item.category && item.category.trim().toLowerCase() === (activeCategory || '').trim().toLowerCase());
     return matchesCat && matchesQuery;
   });
 
@@ -143,7 +152,7 @@ function ChangeCatalogPage({ onNavigate, searchQuery = '', initialData }) {
             Change Request
           </h1>
           <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginTop: '0.2rem' }}>
-            Select a category to start your request
+            {isSearching ? `Showing search results for "${searchQuery}" across all categories` : 'Select a category to start your request'}
           </p>
         </div>
       </div>
@@ -187,12 +196,33 @@ function ChangeCatalogPage({ onNavigate, searchQuery = '', initialData }) {
       )}
 
       {/* Filter Category Pills */}
-      <FilterBar
-        variant="inline"
-        tabs={categories.map((cat) => ({ id: cat.name, label: cat.name }))}
-        activeTab={activeCategory}
-        onTabChange={setActiveCategory}
-      />
+      {!isSearching && (
+        <FilterBar
+          variant="inline"
+          tabs={categories.map((cat) => ({ id: cat.name, label: cat.name }))}
+          activeTab={activeCategory}
+          onTabChange={setActiveCategory}
+        />
+      )}
+
+      {/* Empty State when Search has no results */}
+      {filteredItems.length === 0 && (
+        <div style={{
+          backgroundColor: 'var(--card-bg)',
+          border: '1px solid var(--border-color)',
+          borderRadius: '12px',
+          padding: '3rem 1.5rem',
+          textAlign: 'center',
+          color: 'var(--text-secondary)'
+        }}>
+          <p style={{ fontSize: '1rem', fontWeight: 600, color: 'var(--text-primary)', margin: '0 0 0.5rem' }}>
+            No subcategories found matching "{searchQuery}"
+          </p>
+          <p style={{ fontSize: '0.85rem', margin: 0 }}>
+            Try searching with a different keyword or browse by category.
+          </p>
+        </div>
+      )}
 
       {/* Catalog Cards Responsive Grid */}
       <div className="cd-responsive-3col">
@@ -203,8 +233,8 @@ function ChangeCatalogPage({ onNavigate, searchQuery = '', initialData }) {
                 category: item.category,
                 subCategory: item.title,
                 subcategoryId: item.id,
-                fromCategory: activeCategory,
-                activeCategory
+                fromCategory: item.category || activeCategory,
+                activeCategory: item.category || activeCategory
               });
             }
           };

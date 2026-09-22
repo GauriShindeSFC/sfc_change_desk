@@ -125,7 +125,6 @@ export default function ChangeRequestModal({ cr, onClose, onApprove, onReject, o
     'employeeEmail',
     'employeeId',
     'employeeName',
-    'location',
     'managerEmail',
     'title',
     'category',
@@ -550,6 +549,12 @@ export default function ChangeRequestModal({ cr, onClose, onApprove, onReject, o
               <div style={{ fontSize: '0.8rem', fontWeight: 500, color: 'var(--text-primary)', marginBottom: '0.25rem' }}>Location</div>
               <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>{cr.location || 'Not specified'}</div>
             </div>
+            {cr.customFieldValues?.managerName && (
+              <div>
+                <div style={{ fontSize: '0.8rem', fontWeight: 500, color: 'var(--text-primary)', marginBottom: '0.25rem' }}>Manager Name</div>
+                <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>{cr.customFieldValues.managerName}</div>
+              </div>
+            )}
             <div>
               <div style={{ fontSize: '0.8rem', fontWeight: 500, color: 'var(--text-primary)', marginBottom: '0.25rem' }}>Manager Email</div>
               <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>{cr.managerEmail || 'N/A'}</div>

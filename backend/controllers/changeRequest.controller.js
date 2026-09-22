@@ -3,8 +3,14 @@ import {
   getFilteredChangeRequests,
   createChangeRequestService,
   updateDraftChangeRequestService,
-  submitDraftChangeRequestService
+  submitDraftChangeRequestService,
+  getAllUsersListService
 } from '../services/dashboard.service.js';
+
+export const getAllUsers = asyncHandler(async (req, res) => {
+  const users = await getAllUsersListService();
+  res.json({ success: true, count: users.length, data: users });
+});
 
 export const getMyRequests = asyncHandler(async (req, res) => {
   const organizationScope = ['organization', 'org'].includes(String(req.query.scope || '').toLowerCase());

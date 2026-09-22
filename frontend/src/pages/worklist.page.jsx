@@ -144,13 +144,10 @@ function MyWorklistPage({ onNavigate, searchQuery = '', user, isOrgWorklist = fa
           return prev;
         });
 
-        setMetrics(prev => ({
-          ...prev,
-          pending: Math.max(0, prev.pending - 1),
-          approved: action === 'approve' ? prev.approved + 1 : prev.approved,
-          rejected: action === 'reject' ? prev.rejected + 1 : prev.rejected,
-          implemented: action === 'implement' ? (prev.implemented || 0) + 1 : prev.implemented
-        }));
+        // Invalidate react-query cache so fresh metrics & lists update cleanly
+        queryClient.invalidateQueries({ queryKey: ['worklist'] });
+        queryClient.invalidateQueries({ queryKey: ['change-requests'] });
+        queryClient.invalidateQueries({ queryKey: ['dashboard_metrics'] });
       } else {
         const errData = await res.json().catch(() => ({}));
         console.warn('Backend action request failed:', errData.message || res.statusText);

@@ -64,8 +64,7 @@ const IGNORED_KEYS = [
   'employeeName',
   'employeeEmail',
   'managerEmail',
-  'employeeId',
-  'location'
+  'employeeId'
 ];
 
 const getCustomFields = (cr) => {

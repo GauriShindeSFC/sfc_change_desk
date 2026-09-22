@@ -98,8 +98,34 @@ function ChangeRequestFormPage({ onNavigate, user, initialData, searchQuery = ''
     employeeEmail: initialData?.employeeEmail || activeSessionUser?.employee?.email || activeSessionUser?.email || '',
     employeeId: resolveEmpBusinessId(activeSessionUser, initialData?.employeeId),
     location: resolveEmpLocation(activeSessionUser, initialData?.location),
+    managerName: initialData?.managerName || initialData?.customFieldValues?.managerName || '',
     managerEmail: initialData?.managerEmail || ''
   }));
+
+  const [availableUsers, setAvailableUsers] = useState([]);
+  const [loadingUsers, setLoadingUsers] = useState(false);
+
+  // Fetch active employees for Manager dropdown
+  useEffect(() => {
+    const fetchUsers = async () => {
+      setLoadingUsers(true);
+      try {
+        const res = await apiFetch('/users');
+        if (res.ok) {
+          const body = await res.json();
+          const list = body.data || body.users || [];
+          if (Array.isArray(list)) {
+            setAvailableUsers(list);
+          }
+        }
+      } catch (err) {
+        console.warn('Failed to load active employees for manager dropdown:', err);
+      } finally {
+        setLoadingUsers(false);
+      }
+    };
+    fetchUsers();
+  }, []);
 
   // Sync logged in user details if loaded async or refetched
   useEffect(() => {
@@ -359,6 +385,10 @@ function ChangeRequestFormPage({ onNavigate, user, initialData, searchQuery = ''
       }
     }
 
+    if (formData.managerName) {
+      sanitizedCustomValues.managerName = formData.managerName;
+    }
+
     const selectedCat = categories.find((c) => c.id === selectedCategoryId);
     const todayStr = new Date().toISOString().split('T')[0];
 
@@ -586,15 +616,42 @@ function ChangeRequestFormPage({ onNavigate, user, initialData, searchQuery = ''
                 style={READONLY_FIELD_STYLE}
               />
             </div>
+            {/* Manager Name Dropdown */}
             <div>
-              <FormLabel required>Manager Email</FormLabel>
+              <FormLabel required>Manager Name</FormLabel>
+              <select
+                required
+                value={formData.managerName || ''}
+                onChange={(e) => {
+                  const selectedName = e.target.value;
+                  const matched = availableUsers.find(u => u.name === selectedName);
+                  setFormData(prev => ({
+                    ...prev,
+                    managerName: selectedName,
+                    managerEmail: matched ? matched.email : ''
+                  }));
+                }}
+                style={ACTIVE_FIELD_STYLE}
+              >
+                <option value="">{loadingUsers ? 'Loading users...' : 'Select Reporting Manager...'}</option>
+                {availableUsers.map((u) => (
+                  <option key={u.id || u.email} value={u.name}>
+                    {u.name} {u.department ? `(${u.department})` : ''}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Manager Email (Auto-filled & Greyed Out) */}
+            <div>
+              <FormLabel>Manager Email</FormLabel>
               <input
                 type="email"
-                required
-                placeholder="e.g. manager@company.com"
+                readOnly
+                disabled
+                placeholder="Auto-populated from manager selection"
                 value={formData.managerEmail}
-                onChange={(e) => handleInputChange('managerEmail', e.target.value)}
-                style={ACTIVE_FIELD_STYLE}
+                style={READONLY_FIELD_STYLE}
               />
             </div>
           </div>
@@ -657,6 +714,7 @@ function ChangeRequestFormPage({ onNavigate, user, initialData, searchQuery = ''
               <FormLabel>Start Date</FormLabel>
               <input
                 type="date"
+                min={new Date().toISOString().split('T')[0]}
                 value={formData.startDate}
                 onChange={(e) => handleInputChange('startDate', e.target.value)}
                 style={ACTIVE_FIELD_STYLE}
