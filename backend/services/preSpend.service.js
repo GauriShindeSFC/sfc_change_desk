@@ -1,5 +1,28 @@
-import { Op } from 'sequelize';
+import { Op, fn, col } from 'sequelize';
 import { PreSpendRequest } from '../models/PreSpendRequest.js';
+import { UserAppRole } from '../models/UserAppRole.js';
+import { IdentityResolver } from './identityResolver.service.js';
+import { sendPreSpendCreatedEmail, sendPreSpendDecisionEmail } from './mail.service.js';
+
+const getPreSpendApproverEmails = async () => {
+  const emails = [];
+  // Find Pre-Spend Admins (role-2-prespend, role-1) and Board members (role-6, role-board)
+  const approverRoles = await UserAppRole.findAll({
+    where: { roleId: { [Op.in]: ['role-1', 'role-2-prespend', 'role-6', 'role-board'] } },
+    raw: true
+  });
+
+  for (const r of approverRoles) {
+    const key = r.userKey || r.user_key;
+    if (key) {
+      const res = await IdentityResolver.resolveByKey(key);
+      if (res?.status === 'SUCCESS' && res?.identity?.email) {
+        emails.push(res.identity.email.trim());
+      }
+    }
+  }
+  return Array.from(new Set(emails.filter(Boolean)));
+};
 
 const generatePreSpendCode = async () => {
   const count = await PreSpendRequest.count();
@@ -38,14 +61,50 @@ export const createPreSpendService = async (data, user) => {
     status: 'Pending Approval'
   });
 
+  // Asynchronously notify Pre-Spend Admin & Board with attached quotation files
+  getPreSpendApproverEmails()
+    .then((approverEmails) =>
+      sendPreSpendCreatedEmail({
+        preSpend: created.toJSON ? created.toJSON() : created,
+        requesterName,
+        requesterEmail,
+        approverEmails
+      })
+    )
+    .catch((err) => console.error('[mail] pre-spend notification failed:', err.message));
+
   return created;
 };
 
-export const getPreSpendRequestsService = async ({ userId, isWorklist = false, status, searchQuery, page = 1, limit = 10 }) => {
+export const getPreSpendRequestsService = async ({ user, userId, isWorklist = false, isOrgWorklist = false, status, searchQuery, page = 1, limit = 10 }) => {
   const where = {};
+  const currentUserId = user?.userKey || user?.id || userId || '';
+  const currentUserEmail = (user?.email || '').toLowerCase().trim();
 
-  if (!isWorklist && userId) {
-    where.requesterId = userId;
+  // 1. My Dashboard View (not worklist): Only requests raised by the logged-in user
+  if (!isWorklist && currentUserId) {
+    if (currentUserEmail) {
+      where[Op.or] = [
+        { requesterId: currentUserId },
+        { requesterEmail: { [Op.iLike]: currentUserEmail } }
+      ];
+    } else {
+      where.requesterId = currentUserId;
+    }
+  }
+
+  // 2. My Worklist View (personal approver inbox): Exclude requests raised by the logged-in user
+  if (isWorklist && !isOrgWorklist && (currentUserId || currentUserEmail)) {
+    const andConditions = [];
+    if (currentUserId) {
+      andConditions.push({ requesterId: { [Op.ne]: currentUserId } });
+    }
+    if (currentUserEmail) {
+      andConditions.push({ requesterEmail: { [Op.notILike]: currentUserEmail } });
+    }
+    if (andConditions.length > 0) {
+      where[Op.and] = andConditions;
+    }
   }
 
   if (status && status !== 'All') {
@@ -69,27 +128,58 @@ export const getPreSpendRequestsService = async ({ userId, isWorklist = false, s
     offset
   });
 
-  // Calculate high-level summary counts
-  const allWhere = isWorklist || !userId ? {} : { requesterId: userId };
-  const allItems = await PreSpendRequest.findAll({ where: allWhere, attributes: ['status', 'estimatedAmount', 'category'] });
+  // Calculate summary metrics & category distributions using direct SQL aggregations (GROUP BY)
+  const scopedWhere = {};
+  if (where[Op.and]) scopedWhere[Op.and] = where[Op.and];
+  if (where[Op.or] && !searchQuery) scopedWhere[Op.or] = where[Op.or];
+  if (where.requesterId) scopedWhere.requesterId = where.requesterId;
+
+  const [statusAggregates, categoryAggregates] = await Promise.all([
+    PreSpendRequest.findAll({
+      where: scopedWhere,
+      attributes: [
+        'status',
+        [fn('COUNT', col('id')), 'count'],
+        [fn('SUM', col('estimated_amount')), 'totalAmount']
+      ],
+      group: ['status'],
+      raw: true
+    }),
+    PreSpendRequest.findAll({
+      where: scopedWhere,
+      attributes: [
+        'category',
+        [fn('COUNT', col('id')), 'count']
+      ],
+      group: ['category'],
+      raw: true
+    })
+  ]);
 
   let pending = 0;
   let approved = 0;
   let rejected = 0;
   let totalAmount = 0;
-  const categoryCounts = {};
 
-  allItems.forEach(item => {
-    const s = (item.status || '').toLowerCase();
-    const amt = Number(item.estimatedAmount || 0);
+  statusAggregates.forEach((row) => {
+    const s = (row.status || '').toLowerCase();
+    const cnt = parseInt(row.count, 10) || 0;
+    const amt = parseFloat(row.totalAmount) || 0;
     totalAmount += amt;
 
-    if (s.includes('pending')) pending++;
-    else if (s.includes('approved') || s.includes('procured')) approved++;
-    else if (s.includes('rejected')) rejected++;
+    if (s.includes('pending')) {
+      pending += cnt;
+    } else if (s.includes('approved') || s.includes('procured')) {
+      approved += cnt;
+    } else if (s.includes('rejected')) {
+      rejected += cnt;
+    }
+  });
 
-    const cat = item.category || 'Other';
-    categoryCounts[cat] = (categoryCounts[cat] || 0) + 1;
+  const categoryCounts = {};
+  categoryAggregates.forEach((row) => {
+    const cat = row.category || 'Other';
+    categoryCounts[cat] = parseInt(row.count, 10) || 0;
   });
 
   const formattedItems = rows.map(r => ({
@@ -150,9 +240,13 @@ export const getPreSpendRequestsService = async ({ userId, isWorklist = false, s
       : null,
     requesterName: r.requesterName,
     requesterEmail: r.requesterEmail,
+    raisedDate: r.createdAt ? new Date(r.createdAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '—',
+    raisedAt: r.createdAt,
     createdAt: r.createdAt,
     submittedAt: r.createdAt
   }));
+
+  const totalCount = count || (pending + approved + rejected);
 
   return {
     data: formattedItems,
@@ -161,7 +255,7 @@ export const getPreSpendRequestsService = async ({ userId, isWorklist = false, s
     totalPages: Math.ceil(count / limit) || 1,
     currentPage: Number(page),
     metrics: {
-      total: allItems.length,
+      total: totalCount,
       pending,
       approved,
       rejected,
@@ -171,7 +265,7 @@ export const getPreSpendRequestsService = async ({ userId, isWorklist = false, s
       category: cat,
       label: cat,
       count: cnt,
-      percentage: allItems.length > 0 ? Math.round((cnt / allItems.length) * 100) : 0
+      percentage: totalCount > 0 ? Math.round((cnt / totalCount) * 100) : 0
     })),
     statusBreakdown: [
       { status: 'Pending', label: 'Pending Approvals', count: pending },
@@ -179,7 +273,7 @@ export const getPreSpendRequestsService = async ({ userId, isWorklist = false, s
       { status: 'Rejected', label: 'Rejected', count: rejected }
     ],
     statusCounts: {
-      All: allItems.length,
+      All: totalCount,
       Pending: pending,
       Approved: approved,
       Rejected: rejected
@@ -202,6 +296,21 @@ export const handlePreSpendActionService = async ({ id, action, comment, actor }
   const isSuperAdmin = actorRoleId === 'role-1' || actorRole.includes('super');
   const isPreSpendAdmin = actorRoleId === 'role-2-prespend' || (actorRole.includes('admin') && (actorRole.includes('spend') || actorRole.includes('prespend')));
 
+  // Integrity Rule: Users cannot approve/reject their own requests
+  const actorId = actor?.userKey || actor?.id || actor?.email || '';
+  const actorEmail = (actor?.email || '').toLowerCase().trim();
+  const reqEmail = (req.requesterEmail || '').toLowerCase().trim();
+  const reqId = String(req.requesterId || '');
+
+  if (
+    (actorId && reqId && (reqId === String(actorId) || reqId === String(actor?.id) || reqId === String(actor?.userKey))) ||
+    (actorEmail && reqEmail && actorEmail === reqEmail)
+  ) {
+    const err = new Error('Separation of duties violation: You cannot approve or reject your own pre-spend request.');
+    err.statusCode = 403;
+    throw err;
+  }
+
   if (!isPreSpendAdmin && !isBoardUser && !isSuperAdmin) {
     const err = new Error('Unauthorized to perform action on this pre-spend request.');
     err.statusCode = 403;
@@ -223,6 +332,15 @@ export const handlePreSpendActionService = async ({ id, action, comment, actor }
   req.status = newStatus;
   req.approvalHistory = history;
   await req.save();
+
+  // Asynchronously notify Requester of the decision
+  sendPreSpendDecisionEmail({
+    preSpend: req.toJSON ? req.toJSON() : req,
+    action,
+    comment,
+    deciderName: actor?.displayName || actor?.name || actor?.email || 'Approver',
+    deciderRole: isBoardUser ? 'Board Member' : isPreSpendAdmin ? 'Pre-Spend Admin' : 'Super Admin'
+  }).catch((err) => console.error('[mail] pre-spend decision email failed:', err.message));
 
   return req;
 };

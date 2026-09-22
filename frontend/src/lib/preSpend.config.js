@@ -114,9 +114,13 @@ export const PRE_SPEND_CATEGORIES = [
 ];
 
 export const SAMPLE_BUDGET_LINES = [
-  { value: 'demo-operating', label: 'Operating expenses (sample)' },
-  { value: 'demo-capital', label: 'Capital expenditure (sample)' },
-  { value: 'demo-project', label: 'Project expenses (sample)' }
+  { value: 'plant-capex-manufacturing', label: 'Plant Capex — Manufacturing (₹2Cr free)' },
+  { value: 'consumables-spares-manufacturing', label: 'Consumables & Spares — Manufacturing (₹54L free)' },
+  { value: 'it-hardware-refresh', label: 'IT Hardware Refresh — IT (₹9L free)' },
+  { value: 'saas-licences-it', label: 'SaaS & Licences — IT (₹32L free)' },
+  { value: 'brand-events-marketing', label: 'Brand & Events — Marketing (₹29L free)' },
+  { value: 'facilities-opex-admin', label: 'Facilities Opex — Admin (₹22L free)' },
+  { value: 'professional-fees-finance', label: 'Professional Fees — Finance (₹17L free)' }
 ];
 
 export const COMMERCIAL_REASONS = [
@@ -130,6 +134,7 @@ export const COMMERCIAL_REASONS = [
 ];
 
 export const EXCEPTION_OPTIONS = [
+  'Not applicable',
   'Sole-source / OEM vendor',
   'Existing renewal',
   'Emergency spend',

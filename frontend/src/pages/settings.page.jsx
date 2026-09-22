@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Plus, X, Download } from 'lucide-react';
 import FilterBar from '../components/ui/filterBar.component';
-import { ExportButtonGroup, LoadingSpinner } from '../components/ui/primitives.component';
+import { ExportButtonGroup, LoadingSpinner, Pagination } from '../components/ui/primitives.component';
 import { apiFetch } from '../lib/apiFetch.lib';
 import { useToast } from '../context/ToastContext';
 
@@ -57,6 +57,20 @@ function SettingsPage({ user }) {
   const [auditFilter, setAuditFilter] = useState('All activity');
   const [isInviteModalOpen, setIsInviteModalOpen] = useState(false);
   const [editingUser, setEditingUser] = useState(null);
+
+  // Pagination states
+  const [usersPage, setUsersPage] = useState(1);
+  const [usersPageSize, setUsersPageSize] = useState(10);
+  const [auditPage, setAuditPage] = useState(1);
+  const [auditPageSize, setAuditPageSize] = useState(10);
+
+  useEffect(() => {
+    setUsersPage(1);
+  }, [activeTab]);
+
+  useEffect(() => {
+    setAuditPage(1);
+  }, [auditFilter, activeTab]);
 
   const defaultCategoriesList = [
     { id: 'cat-srv', name: 'Server & Infra' },
@@ -401,61 +415,77 @@ function SettingsPage({ user }) {
 
       {/* TAB 1: USERS DIRECTORY */}
       {activeTab === 'users' && (
-        <div style={{ backgroundColor: 'var(--card-bg)', border: '1px solid var(--border-color)', borderRadius: '12px', overflow: 'hidden', boxShadow: '0 1px 3px rgba(16, 21, 30, 0.04)' }}>
-          <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
-            <table style={{ width: '100%', minWidth: '650px', borderCollapse: 'collapse', textAlign: 'left' }}>
-              <thead>
-                <tr style={{ backgroundColor: 'var(--input-bg)', color: 'var(--text-secondary)', fontSize: '0.6875rem', fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', borderBottom: '1px solid var(--border-color)' }}>
-                  <th style={{ padding: '0.75rem 0.85rem', whiteSpace: 'nowrap' }}>USER</th>
-                  <th style={{ padding: '0.75rem 0.85rem', whiteSpace: 'nowrap' }}>EMAIL ID</th>
-                  <th style={{ padding: '0.75rem 0.85rem', whiteSpace: 'nowrap' }}>ROLE</th>
-                  <th style={{ padding: '0.75rem 0.85rem', textAlign: 'right', whiteSpace: 'nowrap' }}>ACTIONS</th>
-                </tr>
-              </thead>
-              <tbody>
-                {isLoadingUsers ? (
-                  <tr>
-                    <td colSpan={4} style={{ padding: '3rem 1rem', textAlign: 'center' }}>
-                      <LoadingSpinner size="md" message="Loading users..." />
-                    </td>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+          <div style={{ backgroundColor: 'var(--card-bg)', border: '1px solid var(--border-color)', borderRadius: '12px', overflow: 'hidden', boxShadow: '0 1px 3px rgba(16, 21, 30, 0.04)' }}>
+            <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
+              <table style={{ width: '100%', minWidth: '650px', borderCollapse: 'collapse', textAlign: 'left' }}>
+                <thead>
+                  <tr style={{ backgroundColor: 'var(--input-bg)', color: 'var(--text-secondary)', fontSize: '0.6875rem', fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', borderBottom: '1px solid var(--border-color)' }}>
+                    <th style={{ padding: '0.75rem 0.85rem', whiteSpace: 'nowrap' }}>USER</th>
+                    <th style={{ padding: '0.75rem 0.85rem', whiteSpace: 'nowrap' }}>EMAIL ID</th>
+                    <th style={{ padding: '0.75rem 0.85rem', whiteSpace: 'nowrap' }}>ROLE</th>
+                    <th style={{ padding: '0.75rem 0.85rem', textAlign: 'right', whiteSpace: 'nowrap' }}>ACTIONS</th>
                   </tr>
-                ) : users.length === 0 ? (
-                  <tr>
-                    <td colSpan={4} style={{ padding: '2.5rem 1rem', textAlign: 'center', color: 'var(--text-secondary)', fontSize: '0.875rem' }}>
-                      No users found.
-                    </td>
-                  </tr>
-                ) : (
-                  users.map((u, idx) => (
-                    <tr key={u.id} style={{ borderBottom: idx === users.length - 1 ? 'none' : '1px solid var(--border-color)' }}>
-                      <td style={{ padding: '0.75rem 0.85rem', fontSize: '0.875rem', fontWeight: 500, color: 'var(--text-primary)', whiteSpace: 'nowrap' }}>{u.name}</td>
-                      <td style={{ padding: '0.75rem 0.85rem', fontSize: '0.825rem', color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)', whiteSpace: 'nowrap' }}>{u.email}</td>
-                      <td style={{ padding: '0.75rem 0.85rem', fontSize: '0.825rem', color: 'var(--text-primary)', fontWeight: 600, whiteSpace: 'nowrap' }}>{u.role}</td>
-                      <td style={{ padding: '0.75rem 0.85rem', textAlign: 'right', whiteSpace: 'nowrap' }}>
-                        <button
-                          type="button"
-                          onClick={() => handleOpenManageUser(u)}
-                          disabled={isRequester}
-                          style={{
-                            background: 'none',
-                            border: 'none',
-                            color: isRequester ? 'var(--text-secondary)' : 'var(--brand-primary)',
-                            fontSize: '0.8rem',
-                            fontWeight: 600,
-                            cursor: isRequester ? 'not-allowed' : 'pointer',
-                            opacity: isRequester ? 0.4 : 1,
-                            whiteSpace: 'nowrap'
-                          }}
-                        >
-                          Manage user
-                        </button>
+                </thead>
+                <tbody>
+                  {isLoadingUsers ? (
+                    <tr>
+                      <td colSpan={4} style={{ padding: '3rem 1rem', textAlign: 'center' }}>
+                        <LoadingSpinner size="md" message="Loading users..." />
                       </td>
                     </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
+                  ) : users.length === 0 ? (
+                    <tr>
+                      <td colSpan={4} style={{ padding: '2.5rem 1rem', textAlign: 'center', color: 'var(--text-secondary)', fontSize: '0.875rem' }}>
+                        No users found.
+                      </td>
+                    </tr>
+                  ) : (
+                    users.slice((usersPage - 1) * usersPageSize, usersPage * usersPageSize).map((u, idx, arr) => (
+                      <tr key={u.id} style={{ borderBottom: idx === arr.length - 1 ? 'none' : '1px solid var(--border-color)' }}>
+                        <td style={{ padding: '0.75rem 0.85rem', fontSize: '0.875rem', fontWeight: 500, color: 'var(--text-primary)', whiteSpace: 'nowrap' }}>{u.name}</td>
+                        <td style={{ padding: '0.75rem 0.85rem', fontSize: '0.825rem', color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)', whiteSpace: 'nowrap' }}>{u.email}</td>
+                        <td style={{ padding: '0.75rem 0.85rem', fontSize: '0.825rem', color: 'var(--text-primary)', fontWeight: 600, whiteSpace: 'nowrap' }}>{u.role}</td>
+                        <td style={{ padding: '0.75rem 0.85rem', textAlign: 'right', whiteSpace: 'nowrap' }}>
+                          <button
+                            type="button"
+                            onClick={() => handleOpenManageUser(u)}
+                            disabled={isRequester}
+                            style={{
+                              background: 'none',
+                              border: 'none',
+                              color: isRequester ? 'var(--text-secondary)' : 'var(--brand-primary)',
+                              fontSize: '0.8rem',
+                              fontWeight: 600,
+                              cursor: isRequester ? 'not-allowed' : 'pointer',
+                              opacity: isRequester ? 0.4 : 1,
+                              whiteSpace: 'nowrap'
+                            }}
+                          >
+                            Manage user
+                          </button>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
           </div>
+
+          {/* Users Pagination */}
+          {!isLoadingUsers && users.length > 0 && (
+            <Pagination
+              currentPage={usersPage}
+              pageSize={usersPageSize}
+              totalItems={users.length}
+              onPageChange={setUsersPage}
+              onPageSizeChange={(size) => {
+                setUsersPageSize(size);
+                setUsersPage(1);
+              }}
+            />
+          )}
         </div>
       )}
 
@@ -498,8 +528,8 @@ function SettingsPage({ user }) {
                       </td>
                     </tr>
                   ) : (
-                    auditLogs.map((log, idx) => (
-                      <tr key={log.id} style={{ borderBottom: idx === auditLogs.length - 1 ? 'none' : '1px solid var(--border-color)' }}>
+                    auditLogs.slice((auditPage - 1) * auditPageSize, auditPage * auditPageSize).map((log, idx, arr) => (
+                      <tr key={log.id} style={{ borderBottom: idx === arr.length - 1 ? 'none' : '1px solid var(--border-color)' }}>
                         <td style={{ padding: '0.85rem 1rem', fontSize: '0.825rem', color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)' }}>
                           {formatAuditTimestamp(log.timestamp)}
                         </td>
@@ -522,6 +552,20 @@ function SettingsPage({ user }) {
               </table>
             </div>
           </div>
+
+          {/* Audit Logs Pagination */}
+          {!isLoadingAuditLogs && auditLogs.length > 0 && (
+            <Pagination
+              currentPage={auditPage}
+              pageSize={auditPageSize}
+              totalItems={auditLogs.length}
+              onPageChange={setAuditPage}
+              onPageSizeChange={(size) => {
+                setAuditPageSize(size);
+                setAuditPage(1);
+              }}
+            />
+          )}
 
         </div>
       )}

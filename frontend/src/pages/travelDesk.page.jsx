@@ -86,7 +86,10 @@ export default function TravelDeskPage({ onNavigate, user, travellerName = '', d
     return `${year}-${month}-${day}`;
   })();
 
+  const isFlight = category?.toLowerCase() === 'flight' || category?.toLowerCase() === 'flights';
+
   const requiresBoardApproval = () => {
+    if (!isFlight) return false;
     const travelDateStr = values['Date of travel'] || values['Date of journey'] || values['Check-in date'];
     if (!travelDateStr) return false;
 

@@ -1,5 +1,28 @@
 import { Op } from 'sequelize';
 import { TravelRequest } from '../models/TravelRequest.js';
+import { UserAppRole } from '../models/UserAppRole.js';
+import { IdentityResolver } from './identityResolver.service.js';
+import { sendTravelCreatedEmail, sendTravelDecisionEmail } from './mail.service.js';
+
+const getTravelApproverEmails = async () => {
+  const emails = [];
+  // Find Travel Desk Admins (role-2-travel, role-1) and Board members (role-6, role-board)
+  const approverRoles = await UserAppRole.findAll({
+    where: { roleId: { [Op.in]: ['role-1', 'role-2-travel', 'role-6', 'role-board'] } },
+    raw: true
+  });
+
+  for (const r of approverRoles) {
+    const key = r.userKey || r.user_key;
+    if (key) {
+      const res = await IdentityResolver.resolveByKey(key);
+      if (res?.status === 'SUCCESS' && res?.identity?.email) {
+        emails.push(res.identity.email.trim());
+      }
+    }
+  }
+  return Array.from(new Set(emails.filter(Boolean)));
+};
 
 const generateTravelCode = async () => {
   const count = await TravelRequest.count();
@@ -13,12 +36,13 @@ export const createTravelService = async (data, user) => {
   const requesterId = user?.userKey || user?.id || user?.email || 'unknown';
   const travellerName = data.travellerName || data.Traveller || user?.displayName || user?.name || 'Traveller';
   const travellerEmail = data.travellerEmail || user?.email || '';
-
   const departureDate = data.departureDate || data['Date of travel'] || data['Date of journey'] || data['Check-in date'] || null;
-  
-  // Calculate short notice (< 7 days)
-  let isShortNotice = Boolean(data.isShortNotice);
-  if (departureDate && !isShortNotice) {
+  const travelMode = data.travelMode || data.category || 'Flight';
+  const isFlight = travelMode.toLowerCase() === 'flight' || travelMode.toLowerCase() === 'flights';
+
+  // Calculate short notice (< 7 days) ONLY for flights
+  let isShortNotice = isFlight && Boolean(data.isShortNotice);
+  if (isFlight && departureDate && !isShortNotice) {
     const depTime = new Date(departureDate).getTime();
     const nowTime = new Date().getTime();
     const diffDays = (depTime - nowTime) / (1000 * 60 * 60 * 24);
@@ -33,7 +57,7 @@ export const createTravelService = async (data, user) => {
     travellerName,
     travellerEmail,
     department: data.department || data['Department / Cost Centre'] || user?.department || 'Leadership / Corporate',
-    travelMode: data.travelMode || data.category || 'Flight',
+    travelMode,
     purpose: data.purpose || data['Purpose of visit'] || '',
     tripType: data.tripType || data['Trip type'] || data['Journey type'] || '',
     travelClass: data.travelClass || data['Travel class'] || data['Bus type'] || data['Room type'] || '',
@@ -48,14 +72,51 @@ export const createTravelService = async (data, user) => {
     status: 'Pending Approval'
   });
 
+  // Asynchronously notify Travel Admin & Board (with special notice if short-notice booking)
+  getTravelApproverEmails()
+    .then((approverEmails) =>
+      sendTravelCreatedEmail({
+        travelReq: created.toJSON ? created.toJSON() : created,
+        requesterName: travellerName,
+        requesterEmail: travellerEmail,
+        approverEmails,
+        isShortNotice
+      })
+    )
+    .catch((err) => console.error('[mail] travel notification failed:', err.message));
+
   return created;
 };
 
-export const getTravelRequestsService = async ({ userId, isWorklist = false, status, searchQuery, page = 1, limit = 10 }) => {
+export const getTravelRequestsService = async ({ user, userId, isWorklist = false, isOrgWorklist = false, status, searchQuery, page = 1, limit = 10 }) => {
   const where = {};
+  const currentUserId = user?.userKey || user?.id || userId || '';
+  const currentUserEmail = (user?.email || '').toLowerCase().trim();
 
-  if (!isWorklist && userId) {
-    where.requesterId = userId;
+  // 1. My Dashboard View (not worklist): Only requests raised by the logged-in user
+  if (!isWorklist && currentUserId) {
+    if (currentUserEmail) {
+      where[Op.or] = [
+        { requesterId: currentUserId },
+        { travellerEmail: { [Op.iLike]: currentUserEmail } }
+      ];
+    } else {
+      where.requesterId = currentUserId;
+    }
+  }
+
+  // 2. My Worklist View (personal approver inbox): Exclude requests raised by the logged-in user
+  if (isWorklist && !isOrgWorklist && (currentUserId || currentUserEmail)) {
+    const andConditions = [];
+    if (currentUserId) {
+      andConditions.push({ requesterId: { [Op.ne]: currentUserId } });
+    }
+    if (currentUserEmail) {
+      andConditions.push({ travellerEmail: { [Op.notILike]: currentUserEmail } });
+    }
+    if (andConditions.length > 0) {
+      where[Op.and] = andConditions;
+    }
   }
 
   if (status && status !== 'All') {
@@ -81,8 +142,13 @@ export const getTravelRequestsService = async ({ userId, isWorklist = false, sta
     offset
   });
 
-  const allWhere = isWorklist || !userId ? {} : { requesterId: userId };
-  const allItems = await TravelRequest.findAll({ where: allWhere, attributes: ['status', 'travelMode'] });
+  // Calculate high-level summary counts strictly within the scoped where (excluding self requests in personal worklist)
+  const scopedWhere = {};
+  if (where[Op.and]) scopedWhere[Op.and] = where[Op.and];
+  if (where[Op.or] && !searchQuery) scopedWhere[Op.or] = where[Op.or];
+  if (where.requesterId) scopedWhere.requesterId = where.requesterId;
+
+  const allItems = await TravelRequest.findAll({ where: scopedWhere, attributes: ['status', 'travelMode'] });
 
   let pending = 0;
   let approved = 0;
@@ -201,6 +267,21 @@ export const handleTravelActionService = async ({ id, action, comment, actor }) 
   const isSuperAdmin = actorRoleId === 'role-1' || actorRole.includes('super');
   const isTravelAdmin = actorRoleId === 'role-2-travel' || (actorRole.includes('admin') && actorRole.includes('travel'));
 
+  // Integrity Rule: Users cannot approve/reject their own requests
+  const actorId = actor?.userKey || actor?.id || actor?.email || '';
+  const actorEmail = (actor?.email || '').toLowerCase().trim();
+  const reqEmail = (req.travellerEmail || '').toLowerCase().trim();
+  const reqId = String(req.requesterId || '');
+
+  if (
+    (actorId && reqId && (reqId === String(actorId) || reqId === String(actor?.id) || reqId === String(actor?.userKey))) ||
+    (actorEmail && reqEmail && actorEmail === reqEmail)
+  ) {
+    const err = new Error('Separation of duties violation: You cannot approve or reject your own travel request.');
+    err.statusCode = 403;
+    throw err;
+  }
+
   // Rule: If short-notice flight (< 7 days), ONLY Board Member has authorization
   if (req.isShortNotice) {
     if (!isBoardUser) {
@@ -231,6 +312,15 @@ export const handleTravelActionService = async ({ id, action, comment, actor }) 
   req.status = newStatus;
   req.approvalHistory = history;
   await req.save();
+
+  // Asynchronously notify Traveller of the decision
+  sendTravelDecisionEmail({
+    travelReq: req.toJSON ? req.toJSON() : req,
+    action,
+    comment,
+    deciderName: actor?.displayName || actor?.name || actor?.email || 'Approver',
+    deciderRole: isBoardUser ? 'Board Member' : isTravelAdmin ? 'Travel Admin' : 'Super Admin'
+  }).catch((err) => console.error('[mail] travel decision email failed:', err.message));
 
   return req;
 };

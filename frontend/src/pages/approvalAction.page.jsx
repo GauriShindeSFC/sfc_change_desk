@@ -91,6 +91,7 @@ const getCustomFields = (cr) => {
 export default function ApprovalActionPage() {
   const [token, setToken] = useState('');
   const [action, setAction] = useState('approve'); // 'approve' | 'reject' | 'implement'
+  const [reqModule, setReqModule] = useState('cr'); // 'cr' | 'prespend' | 'travel'
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [crData, setCrData] = useState(null);
@@ -105,6 +106,9 @@ export default function ApprovalActionPage() {
     const params = new URLSearchParams(window.location.search);
     const urlToken = params.get('token');
     const urlAction = params.get('action');
+    const urlModule = params.get('module') || 'cr';
+
+    setReqModule(urlModule);
 
     if (urlAction && ['approve', 'reject', 'implement'].includes(urlAction.toLowerCase())) {
       setAction(urlAction.toLowerCase());
@@ -117,32 +121,35 @@ export default function ApprovalActionPage() {
 
     setToken(urlToken);
 
-    // Fetch Change Request details for confirmation
-    const fetchCrDetails = async () => {
+    // Fetch Request details for confirmation
+    const fetchDetails = async () => {
       try {
-        const res = await fetch(`/api/public/change-request-action?token=${encodeURIComponent(urlToken)}`);
+        const res = await fetch(`/api/public/change-request-action?token=${encodeURIComponent(urlToken)}&module=${encodeURIComponent(urlModule)}`);
         const body = await res.json();
         if (!res.ok || !body.success) {
           throw new Error(body.message || 'Failed to verify action token.');
         }
-        setCrData(body.data?.cr || null);
+        setCrData(body.data?.request || body.data?.cr || null);
+        if (body.data?.module) {
+          setReqModule(body.data.module);
+        }
         if (body.data?.action && !urlAction) {
           setAction(body.data.action);
         }
       } catch (err) {
-        setError(err.message || 'Unable to load change request details.');
+        setError(err.message || 'Unable to load request details.');
       } finally {
         setLoading(false);
       }
     };
 
-    fetchCrDetails();
+    fetchDetails();
   }, []);
 
   const handleSubmitDecision = async (e) => {
     e?.preventDefault();
     if (action === 'reject' && !comment.trim()) {
-      setFormError('Please provide a reason for rejecting this change request.');
+      setFormError('Please provide a reason for rejecting this request.');
       return;
     }
     setFormError('');
@@ -154,6 +161,7 @@ export default function ApprovalActionPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           token,
+          module: reqModule,
           action,
           comment: comment.trim()
         })
@@ -167,7 +175,7 @@ export default function ApprovalActionPage() {
       setSuccessResult({
         action,
         message: body.message,
-        crId: crData?.id
+        crId: crData?.requestCode || crData?.id
       });
     } catch (err) {
       setFormError(err.message || 'Something went wrong while submitting.');
@@ -179,6 +187,16 @@ export default function ApprovalActionPage() {
   const isApprove = action === 'approve';
   const isImplement = action === 'implement';
   const isReject = action === 'reject';
+  const isPreSpend = reqModule === 'prespend';
+  const isTravel = reqModule === 'travel';
+
+  const portalTitle = isPreSpend
+    ? 'Pre-Spend Authorization Portal'
+    : isTravel
+      ? 'Travel Desk Authorization Portal'
+      : isImplement
+        ? 'Change Implementation Portal'
+        : 'Change Manager Authorization Portal';
 
   return (
     <div style={{
@@ -202,7 +220,7 @@ export default function ApprovalActionPage() {
           </span>
         </div>
         <div style={{ fontSize: '0.75rem', fontWeight: 600, color: '#64748B', letterSpacing: '0.06em', textTransform: 'uppercase', marginTop: '0.25rem' }}>
-          {isImplement ? 'Change Implementation Portal' : 'Change Manager Authorization Portal'}
+          {portalTitle}
         </div>
       </div>
 
@@ -273,13 +291,13 @@ export default function ApprovalActionPage() {
             </div>
             <h2 style={{ fontSize: '1.35rem', fontWeight: 800, color: '#0F172A', margin: '0 0 0.5rem' }}>
               {successResult.action === 'implement'
-                ? 'Change Request Implemented & Closed'
+                ? 'Request Implemented & Closed'
                 : successResult.action === 'approve'
-                  ? 'Change Request Approved'
-                  : 'Change Request Rejected'}
+                  ? 'Request Approved'
+                  : 'Request Rejected'}
             </h2>
             <p style={{ fontSize: '0.9rem', color: '#475569', maxWidth: '440px', margin: '0 auto 1.75rem', lineHeight: 1.55 }}>
-              Change Request <strong>{successResult.crId}</strong> has been marked as <strong>{successResult.action === 'implement' ? 'Implemented' : successResult.action === 'approve' ? 'Approved' : 'Rejected'}</strong>. The database, audit logs, and ChangeDesk dashboards have been updated.
+              Request <strong>{successResult.crId}</strong> has been marked as <strong>{successResult.action === 'implement' ? 'Implemented' : successResult.action === 'approve' ? 'Approved' : 'Rejected'}</strong>. The database, audit records, and notification emails have been dispatched.
             </p>
             <a
               href="/"
@@ -332,10 +350,10 @@ export default function ApprovalActionPage() {
                 </div>
                 <div>
                   <h3 style={{ fontSize: '1rem', fontWeight: 700, color: isImplement ? '#115E59' : isApprove ? '#166534' : '#991B1B', margin: 0 }}>
-                    {isImplement ? 'Mark Change Request as Implemented' : isApprove ? 'Approve Change Request' : 'Reject Change Request'}
+                    {isImplement ? 'Mark Request as Implemented' : isApprove ? 'Approve Request' : 'Reject Request'}
                   </h3>
                   <span style={{ fontSize: '0.775rem', color: isImplement ? '#0F766E' : isApprove ? '#15803D' : '#B91C1C' }}>
-                    {isImplement ? `Confirm completion and execution notes for ${crData.id}` : `Confirm your decision for ${crData.id}`}
+                    Confirm your decision for {crData.requestCode || crData.id}
                   </span>
                 </div>
               </div>
@@ -368,13 +386,17 @@ export default function ApprovalActionPage() {
               <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '1rem', marginBottom: '1.25rem' }}>
                 <div>
                   <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#2563EB', fontFamily: 'monospace', letterSpacing: '0.05em' }}>
-                    {crData.id}
+                    {crData.requestCode || crData.id}
                   </span>
                   <h2 style={{ fontSize: '1.2rem', fontWeight: 700, color: '#0F172A', margin: '0.2rem 0 0.3rem', lineHeight: 1.3 }}>
-                    {crData.title}
+                    {isPreSpend ? (crData.itemDescription || crData.category) : isTravel ? `${crData.travelMode}: ${crData.fromLocation} → ${crData.toLocation}` : crData.title}
                   </h2>
                   <span style={{ fontSize: '0.825rem', color: '#64748B' }}>
-                    {crData.category} {crData.subCategory ? `· ${crData.subCategory}` : ''}
+                    {isPreSpend
+                      ? `${crData.category} ${crData.subcategory ? `· ${crData.subcategory}` : ''}`
+                      : isTravel
+                        ? `${crData.tripType || 'One-Way'} · ${crData.travelClass || 'Standard'}`
+                        : `${crData.category} ${crData.subCategory ? `· ${crData.subCategory}` : ''}`}
                   </span>
                 </div>
                 <div style={{
@@ -390,109 +412,154 @@ export default function ApprovalActionPage() {
                   gap: '0.35rem'
                 }}>
                   {crData.status === 'Approved' ? <CheckCircle2 size={13} /> : <Clock size={13} />}
-                  <span>{crData.status === 'Approved' ? 'Approved (Ready to Implement)' : crData.status === 'Implemented' ? 'Implemented' : 'Pending Approval'}</span>
+                  <span>{crData.status}</span>
                 </div>
               </div>
 
-              {/* Section 1: Requester Details */}
-              <div style={{ borderTop: '1px solid #E2E8F0', paddingTop: '1rem', marginTop: '0.75rem' }}>
-                <div style={{ fontSize: '0.825rem', fontWeight: 700, color: '#0F172A', marginBottom: '0.65rem' }}>
-                  Section 1: Requester Details
-                </div>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '0.75rem', marginBottom: '1rem' }}>
-                  <div>
-                    <div style={{ fontSize: '0.7rem', fontWeight: 600, color: '#64748B' }}>Requester / Employee</div>
-                    <div style={{ fontSize: '0.85rem', fontWeight: 600, color: '#0F172A', marginTop: '0.15rem' }}>{crData.employeeName || crData.requester || 'Requester'}</div>
+              {/* Dynamic Overview Section depending on Module */}
+              {isPreSpend && (
+                <div style={{ borderTop: '1px solid #E2E8F0', paddingTop: '1rem', marginTop: '0.75rem' }}>
+                  <div style={{ fontSize: '0.825rem', fontWeight: 700, color: '#0F172A', marginBottom: '0.65rem' }}>
+                    Requisition &amp; Financial Overview
                   </div>
-                  <div>
-                    <div style={{ fontSize: '0.7rem', fontWeight: 600, color: '#64748B' }}>Approver</div>
-                    <div style={{ fontSize: '0.85rem', fontWeight: 600, color: '#0F172A', marginTop: '0.15rem' }}>{crData.decidedBy || crData.approver || '—'}</div>
-                  </div>
-                  <div>
-                    <div style={{ fontSize: '0.7rem', fontWeight: 600, color: '#64748B' }}>Employee ID</div>
-                    <div style={{ fontSize: '0.85rem', fontWeight: 600, color: '#0F172A', fontFamily: 'monospace', marginTop: '0.15rem' }}>{crData.employeeId || crData.empId || 'N/A'}</div>
-                  </div>
-                  <div>
-                    <div style={{ fontSize: '0.7rem', fontWeight: 600, color: '#64748B' }}>Employee Email</div>
-                    <div style={{ fontSize: '0.85rem', fontWeight: 600, color: '#0F172A', marginTop: '0.15rem' }}>{crData.employeeEmail || crData.requesterEmail || '—'}</div>
-                  </div>
-                  <div>
-                    <div style={{ fontSize: '0.7rem', fontWeight: 600, color: '#64748B' }}>Location</div>
-                    <div style={{ fontSize: '0.85rem', fontWeight: 600, color: '#0F172A', marginTop: '0.15rem' }}>{crData.location || 'Not specified'}</div>
-                  </div>
-                  <div>
-                    <div style={{ fontSize: '0.7rem', fontWeight: 600, color: '#64748B' }}>Manager Email</div>
-                    <div style={{ fontSize: '0.85rem', fontWeight: 600, color: '#0F172A', marginTop: '0.15rem' }}>{crData.managerEmail || '—'}</div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Section 2: Change Details */}
-              <div style={{ borderTop: '1px solid #E2E8F0', paddingTop: '1rem', marginTop: '0.5rem' }}>
-                <div style={{ fontSize: '0.825rem', fontWeight: 700, color: '#0F172A', marginBottom: '0.65rem' }}>
-                  Section 2: Change Details
-                </div>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '0.75rem', marginBottom: '1rem' }}>
-                  <div style={{ gridColumn: '1 / -1' }}>
-                    <div style={{ fontSize: '0.7rem', fontWeight: 600, color: '#64748B' }}>Change Title</div>
-                    <div style={{ fontSize: '0.875rem', fontWeight: 700, color: '#0F172A', marginTop: '0.15rem' }}>{crData.title}</div>
-                  </div>
-                  <div>
-                    <div style={{ fontSize: '0.7rem', fontWeight: 600, color: '#64748B' }}>Category</div>
-                    <div style={{ fontSize: '0.85rem', fontWeight: 600, color: '#0F172A', marginTop: '0.15rem' }}>{crData.category}</div>
-                  </div>
-                  <div>
-                    <div style={{ fontSize: '0.7rem', fontWeight: 600, color: '#64748B' }}>Sub-category</div>
-                    <div style={{ fontSize: '0.85rem', fontWeight: 600, color: '#0F172A', marginTop: '0.15rem' }}>{crData.subCategory || 'Standard'}</div>
-                  </div>
-                  <div>
-                    <div style={{ fontSize: '0.7rem', fontWeight: 600, color: '#64748B' }}>Start Date</div>
-                    <div style={{ fontSize: '0.85rem', fontWeight: 600, color: '#0F172A', fontFamily: 'monospace', marginTop: '0.15rem' }}>{formatCleanDate(crData.startDate)}</div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Dynamic Action & Specification Details Box */}
-              {(() => {
-                const customFields = getCustomFields(crData);
-                if (!customFields.length) return null;
-                return (
-                  <div style={{
-                    backgroundColor: '#F8FAFC',
-                    border: '1px solid #E2E8F0',
-                    borderRadius: '10px',
-                    padding: '1rem 1.25rem',
-                    margin: '1rem 0'
-                  }}>
-                    <div style={{ fontSize: '0.75rem', fontWeight: 800, color: '#0F172A', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '0.75rem' }}>
-                      Action &amp; Specification Details
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '0.75rem', marginBottom: '1rem' }}>
+                    <div>
+                      <div style={{ fontSize: '0.7rem', fontWeight: 600, color: '#64748B' }}>Requester</div>
+                      <div style={{ fontSize: '0.85rem', fontWeight: 600, color: '#0F172A', marginTop: '0.15rem' }}>{crData.requesterName}</div>
                     </div>
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '0.85rem' }}>
-                      {customFields.map(([k, v]) => (
-                        <div key={k}>
-                          <div style={{ fontSize: '0.7rem', fontWeight: 600, color: '#64748B' }}>{formatFieldLabel(k)}</div>
-                          <div style={{ fontSize: '0.85rem', fontWeight: 700, color: '#0F172A', marginTop: '0.15rem', wordBreak: 'break-word' }}>{v}</div>
+                    <div>
+                      <div style={{ fontSize: '0.7rem', fontWeight: 600, color: '#64748B' }}>Estimated Amount</div>
+                      <div style={{ fontSize: '0.9rem', fontWeight: 700, color: '#059669', marginTop: '0.15rem' }}>
+                        {Number(crData.estimatedAmount || 0).toLocaleString('en-IN', { style: 'currency', currency: 'INR' })}
+                      </div>
+                    </div>
+                    <div>
+                      <div style={{ fontSize: '0.7rem', fontWeight: 600, color: '#64748B' }}>Cost Centre</div>
+                      <div style={{ fontSize: '0.85rem', fontWeight: 600, color: '#0F172A', marginTop: '0.15rem' }}>{crData.costCentre || 'Corporate'}</div>
+                    </div>
+                    <div>
+                      <div style={{ fontSize: '0.7rem', fontWeight: 600, color: '#64748B' }}>Budget Line</div>
+                      <div style={{ fontSize: '0.85rem', fontWeight: 600, color: '#0F172A', marginTop: '0.15rem' }}>{crData.budgetLine || '—'}</div>
+                    </div>
+                    <div>
+                      <div style={{ fontSize: '0.7rem', fontWeight: 600, color: '#64748B' }}>Needed By</div>
+                      <div style={{ fontSize: '0.85rem', fontWeight: 600, color: '#0F172A', marginTop: '0.15rem' }}>{formatCleanDate(crData.neededByDate)}</div>
+                    </div>
+                    <div>
+                      <div style={{ fontSize: '0.7rem', fontWeight: 600, color: '#64748B' }}>Selected Vendor</div>
+                      <div style={{ fontSize: '0.85rem', fontWeight: 700, color: '#2563EB', marginTop: '0.15rem' }}>{crData.selectedVendor || 'Primary Quote'}</div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {isTravel && (
+                <div style={{ borderTop: '1px solid #E2E8F0', paddingTop: '1rem', marginTop: '0.75rem' }}>
+                  <div style={{ fontSize: '0.825rem', fontWeight: 700, color: '#0F172A', marginBottom: '0.65rem' }}>
+                    Traveller &amp; Journey Overview
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '0.75rem', marginBottom: '1rem' }}>
+                    <div>
+                      <div style={{ fontSize: '0.7rem', fontWeight: 600, color: '#64748B' }}>Traveller Name</div>
+                      <div style={{ fontSize: '0.85rem', fontWeight: 600, color: '#0F172A', marginTop: '0.15rem' }}>{crData.travellerName}</div>
+                    </div>
+                    <div>
+                      <div style={{ fontSize: '0.7rem', fontWeight: 600, color: '#64748B' }}>Departure Date</div>
+                      <div style={{ fontSize: '0.85rem', fontWeight: 700, color: '#2563EB', marginTop: '0.15rem' }}>{formatCleanDate(crData.departureDate)}</div>
+                    </div>
+                    <div>
+                      <div style={{ fontSize: '0.7rem', fontWeight: 600, color: '#64748B' }}>Return Date</div>
+                      <div style={{ fontSize: '0.85rem', fontWeight: 600, color: '#0F172A', marginTop: '0.15rem' }}>{formatCleanDate(crData.returnDate)}</div>
+                    </div>
+                    <div>
+                      <div style={{ fontSize: '0.7rem', fontWeight: 600, color: '#64748B' }}>Department</div>
+                      <div style={{ fontSize: '0.85rem', fontWeight: 600, color: '#0F172A', marginTop: '0.15rem' }}>{crData.department || 'Corporate'}</div>
+                    </div>
+                    <div>
+                      <div style={{ fontSize: '0.7rem', fontWeight: 600, color: '#64748B' }}>Time Slot</div>
+                      <div style={{ fontSize: '0.85rem', fontWeight: 600, color: '#0F172A', marginTop: '0.15rem' }}>{crData.preferredTimeSlot || 'Anytime'}</div>
+                    </div>
+                    {crData.isShortNotice && (
+                      <div>
+                        <div style={{ fontSize: '0.7rem', fontWeight: 600, color: '#DC2626' }}>Notice Status</div>
+                        <div style={{ fontSize: '0.8rem', fontWeight: 700, color: '#DC2626', marginTop: '0.15rem' }}>Short Notice (&lt; 7 Days)</div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {!isPreSpend && !isTravel && (
+                <>
+                  {/* Change Desk Section 1 */}
+                  <div style={{ borderTop: '1px solid #E2E8F0', paddingTop: '1rem', marginTop: '0.75rem' }}>
+                    <div style={{ fontSize: '0.825rem', fontWeight: 700, color: '#0F172A', marginBottom: '0.65rem' }}>
+                      Section 1: Requester Details
+                    </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '0.75rem', marginBottom: '1rem' }}>
+                      <div>
+                        <div style={{ fontSize: '0.7rem', fontWeight: 600, color: '#64748B' }}>Requester / Employee</div>
+                        <div style={{ fontSize: '0.85rem', fontWeight: 600, color: '#0F172A', marginTop: '0.15rem' }}>{crData.employeeName || crData.requester || 'Requester'}</div>
+                      </div>
+                      <div>
+                        <div style={{ fontSize: '0.7rem', fontWeight: 600, color: '#64748B' }}>Approver</div>
+                        <div style={{ fontSize: '0.85rem', fontWeight: 600, color: '#0F172A', marginTop: '0.15rem' }}>{crData.decidedBy || crData.approver || '—'}</div>
+                      </div>
+                      <div>
+                        <div style={{ fontSize: '0.7rem', fontWeight: 600, color: '#64748B' }}>Employee ID</div>
+                        <div style={{ fontSize: '0.85rem', fontWeight: 600, color: '#0F172A', fontFamily: 'monospace', marginTop: '0.15rem' }}>{crData.employeeId || crData.empId || 'N/A'}</div>
+                      </div>
+                      <div>
+                        <div style={{ fontSize: '0.7rem', fontWeight: 600, color: '#64748B' }}>Employee Email</div>
+                        <div style={{ fontSize: '0.85rem', fontWeight: 600, color: '#0F172A', marginTop: '0.15rem' }}>{crData.employeeEmail || crData.requesterEmail || '—'}</div>
+                      </div>
+                      <div>
+                        <div style={{ fontSize: '0.7rem', fontWeight: 600, color: '#64748B' }}>Location</div>
+                        <div style={{ fontSize: '0.85rem', fontWeight: 600, color: '#0F172A', marginTop: '0.15rem' }}>{crData.location || 'Not specified'}</div>
+                      </div>
+                      <div>
+                        <div style={{ fontSize: '0.7rem', fontWeight: 600, color: '#64748B' }}>Manager Email</div>
+                        <div style={{ fontSize: '0.85rem', fontWeight: 600, color: '#0F172A', marginTop: '0.15rem' }}>{crData.managerEmail || '—'}</div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Dynamic Action & Specification Details Box */}
+                  {(() => {
+                    const customFields = getCustomFields(crData);
+                    if (!customFields.length) return null;
+                    return (
+                      <div style={{
+                        backgroundColor: '#F8FAFC',
+                        border: '1px solid #E2E8F0',
+                        borderRadius: '10px',
+                        padding: '1rem 1.25rem',
+                        margin: '1rem 0'
+                      }}>
+                        <div style={{ fontSize: '0.75rem', fontWeight: 800, color: '#0F172A', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '0.75rem' }}>
+                          Action &amp; Specification Details
                         </div>
-                      ))}
-                    </div>
-                  </div>
-                );
-              })()}
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '0.85rem' }}>
+                          {customFields.map(([k, v]) => (
+                            <div key={k}>
+                              <div style={{ fontSize: '0.7rem', fontWeight: 600, color: '#64748B' }}>{formatFieldLabel(k)}</div>
+                              <div style={{ fontSize: '0.85rem', fontWeight: 700, color: '#0F172A', marginTop: '0.15rem', wordBreak: 'break-word' }}>{v}</div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  })()}
+                </>
+              )}
 
-              {/* Raised Date & Justification */}
+              {/* Justification Section */}
               <div style={{ marginTop: '0.75rem' }}>
-                <div style={{ marginBottom: '0.75rem' }}>
-                  <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#0F172A', marginBottom: '0.2rem' }}>Raised Date</div>
-                  <div style={{ fontSize: '0.85rem', color: '#64748B' }}>{formatLongDate(crData.submittedAt || crData.createdAt) || crData.raisedDate || 'Today'}</div>
+                <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#0F172A', marginBottom: '0.35rem' }}>
+                  {isPreSpend ? 'Business & Selection Justification' : isTravel ? 'Purpose of Visit' : 'Business Justification'}
                 </div>
-
-                <div>
-                  <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#0F172A', marginBottom: '0.35rem' }}>
-                    Business Justification
-                  </div>
-                  <div style={{ fontSize: '0.85rem', color: '#1E293B', backgroundColor: '#F8FAFC', border: '1px solid #E2E8F0', padding: '0.75rem 1rem', borderRadius: '8px', lineHeight: 1.55 }}>
-                    {crData.justification || 'No justification entered.'}
-                  </div>
+                <div style={{ fontSize: '0.85rem', color: '#1E293B', backgroundColor: '#F8FAFC', border: '1px solid #E2E8F0', padding: '0.75rem 1rem', borderRadius: '8px', lineHeight: 1.55 }}>
+                  {crData.businessJustification || crData.purpose || crData.justification || 'No justification entered.'}
                 </div>
               </div>
             </div>
@@ -504,7 +571,7 @@ export default function ApprovalActionPage() {
                   {isImplement
                     ? 'Implementation Remarks / Execution Notes (Optional)'
                     : isApprove
-                      ? 'Approval Comments / Rationale (Optional)'
+                      ? 'Approval Comments / Instructions (Optional)'
                       : 'Rejection Reason (Required) *'}
                 </label>
                 <textarea
@@ -516,8 +583,8 @@ export default function ApprovalActionPage() {
                     isImplement
                       ? 'Add any execution notes, deployment logs, or verification comments...'
                       : isApprove
-                        ? 'Add any comments, conditions, or instructions for implementation...'
-                        : 'Please explain why this change request cannot be approved...'
+                        ? 'Add any comments, conditions, or instructions for the requester...'
+                        : 'Please explain why this request cannot be approved...'
                   }
                   style={{
                     width: '100%',

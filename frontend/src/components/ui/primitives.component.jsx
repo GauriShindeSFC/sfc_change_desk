@@ -653,6 +653,100 @@ export const LoadingSpinner = ({
   );
 };
 
+/* ── Centered Loading Popup Modal ────────────────────────────── */
+export const LoadingPopupModal = ({
+  isOpen = false,
+  title = 'Processing Request...',
+  subtitle = 'Please wait while records are updated and notifications are dispatched.'
+}) => {
+  if (!isOpen) return null;
+
+  return (
+    <div
+      style={{
+        position: 'fixed',
+        inset: 0,
+        backgroundColor: 'rgba(15, 23, 42, 0.65)',
+        backdropFilter: 'blur(5px)',
+        WebkitBackdropFilter: 'blur(5px)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        zIndex: 99999,
+        padding: '1rem',
+        animation: 'fadeIn 0.15s ease'
+      }}
+    >
+      <div
+        style={{
+          backgroundColor: '#FFFFFF',
+          borderRadius: '16px',
+          padding: '2rem 2.25rem',
+          maxWidth: '420px',
+          width: '100%',
+          textAlign: 'center',
+          boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+          border: '1px solid #E2E8F0',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          gap: '1rem'
+        }}
+      >
+        <div
+          style={{
+            width: '52px',
+            height: '52px',
+            borderRadius: '50%',
+            backgroundColor: '#F0FDFA',
+            border: '2px solid #CCFBF1',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            position: 'relative'
+          }}
+        >
+          <div
+            className="animate-spin"
+            style={{
+              width: '32px',
+              height: '32px',
+              borderRadius: '50%',
+              border: '3px solid #CCFBF1',
+              borderTopColor: '#0D9488',
+              borderRightColor: '#0D9488'
+            }}
+          />
+        </div>
+
+        <div>
+          <h3
+            style={{
+              fontSize: '1.1rem',
+              fontWeight: 700,
+              color: '#0F172A',
+              margin: '0 0 0.4rem 0',
+              lineHeight: 1.3
+            }}
+          >
+            {title}
+          </h3>
+          <p
+            style={{
+              fontSize: '0.85rem',
+              color: '#64748B',
+              margin: 0,
+              lineHeight: 1.5
+            }}
+          >
+            {subtitle}
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 /* ── Decision Comment / Note Popup Modal ────────────────────── */
 export const CommentPopupModal = ({ isOpen, onClose, data }) => {
   if (!isOpen || !data) return null;

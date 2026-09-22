@@ -10,10 +10,12 @@ const router = express.Router();
 
 router.get('/', asyncHandler(async (req, res) => {
   const isWorklist = req.query.view === 'worklist';
-  const userId = isWorklist ? null : (req.user?.userKey || req.user?.id || req.headers['x-user-id']);
+  const isOrgWorklist = req.query.scope === 'organization';
+  const currentUser = req.user || (req.headers['x-user-id'] ? { id: req.headers['x-user-id'] } : null);
   const result = await getTravelRequestsService({
-    userId,
+    user: currentUser,
     isWorklist,
+    isOrgWorklist,
     status: req.query.status,
     searchQuery: req.query.search,
     page: req.query.page || 1,

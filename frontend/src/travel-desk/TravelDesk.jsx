@@ -58,7 +58,10 @@ export default function TravelDesk({ onNavigate, user, travellerName = '', depar
         : <input {...props} type={field.type === 'input' ? 'text' : field.type} min={minVal} placeholder={field.placeholder} />}
     </div>;
   };
+  const isFlight = category?.toLowerCase() === 'flight' || category?.toLowerCase() === 'flights';
+
   const requiresBoardApproval = () => {
+    if (!isFlight) return false;
     // Only departure / start dates trigger short-notice board approval (return date is excluded)
     const travelDateStr = values['Date of travel'] || values['Date of journey'] || values['Check-in date'];
     if (!travelDateStr) return false;

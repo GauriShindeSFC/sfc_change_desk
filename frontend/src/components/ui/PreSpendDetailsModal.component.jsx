@@ -297,16 +297,82 @@ export default function PreSpendDetailsModal({ item, onClose, onApprove, onRejec
                       <th style={{ padding: '0.65rem 0.85rem', fontWeight: 600, color: 'var(--text-secondary)' }}>Vendor</th>
                       <th style={{ padding: '0.65rem 0.85rem', fontWeight: 600, color: 'var(--text-secondary)' }}>Quoted Amount</th>
                       <th style={{ padding: '0.65rem 0.85rem', fontWeight: 600, color: 'var(--text-secondary)' }}>Quote Date</th>
+                      <th style={{ padding: '0.65rem 0.85rem', fontWeight: 600, color: 'var(--text-secondary)' }}>Quotation Document</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {vendors.map((v, i) => (
-                      <tr key={i} style={{ borderBottom: i < vendors.length - 1 ? '1px solid var(--border-color)' : 'none' }}>
-                        <td style={{ padding: '0.65rem 0.85rem', fontWeight: 600, color: 'var(--text-primary)' }}>{v.name || `Vendor ${i + 1}`}</td>
-                        <td style={{ padding: '0.65rem 0.85rem', color: '#059669', fontWeight: 600 }}>{v.amount ? money(v.amount) : '—'}</td>
-                        <td style={{ padding: '0.65rem 0.85rem', color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)' }}>{formatCleanDate(v.date)}</td>
-                      </tr>
-                    ))}
+                    {vendors.map((v, i) => {
+                      const docSrc = v.fileData || v.fileUrl || (typeof v.file === 'string' ? v.file : null);
+                      const hasDoc = Boolean(docSrc || v.fileName);
+                      return (
+                        <tr key={i} style={{ borderBottom: i < vendors.length - 1 ? '1px solid var(--border-color)' : 'none' }}>
+                          <td style={{ padding: '0.65rem 0.85rem', fontWeight: 600, color: 'var(--text-primary)' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                              <span>{v.name || `Vendor ${i + 1}`}</span>
+                              {i === 0 && (
+                                <span style={{ fontSize: '0.65rem', backgroundColor: '#E6F4EA', color: '#137333', fontWeight: 700, padding: '0.1rem 0.4rem', borderRadius: '4px' }}>
+                                  Primary
+                                </span>
+                              )}
+                            </div>
+                          </td>
+                          <td style={{ padding: '0.65rem 0.85rem', color: '#059669', fontWeight: 600 }}>{v.amount ? money(v.amount) : '—'}</td>
+                          <td style={{ padding: '0.65rem 0.85rem', color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)' }}>{formatCleanDate(v.date)}</td>
+                          <td style={{ padding: '0.65rem 0.85rem' }}>
+                            {hasDoc ? (
+                              <button
+                                type="button"
+                                title="View attached quotation"
+                                onClick={() => {
+                                  if (docSrc) {
+                                    if (docSrc.startsWith('data:')) {
+                                      try {
+                                        const parts = docSrc.split(';base64,');
+                                        const contentType = parts[0].replace('data:', '') || 'application/pdf';
+                                        const raw = window.atob(parts[1]);
+                                        const uInt8Array = new Uint8Array(raw.length);
+                                        for (let j = 0; j < raw.length; ++j) {
+                                          uInt8Array[j] = raw.charCodeAt(j);
+                                        }
+                                        const blob = new Blob([uInt8Array], { type: contentType });
+                                        const blobUrl = URL.createObjectURL(blob);
+                                        window.open(blobUrl, '_blank');
+                                      } catch {
+                                        window.open(docSrc, '_blank');
+                                      }
+                                    } else {
+                                      window.open(docSrc, '_blank');
+                                    }
+                                  } else {
+                                    alert(`Quotation document: ${v.fileName}`);
+                                  }
+                                }}
+                                style={{
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '0.35rem',
+                                  padding: '0.25rem 0.6rem',
+                                  backgroundColor: '#EFF6FF',
+                                  color: '#1D4ED8',
+                                  border: '1px solid #BFDBFE',
+                                  borderRadius: '6px',
+                                  fontSize: '0.75rem',
+                                  fontWeight: 600,
+                                  cursor: 'pointer'
+                                }}
+                              >
+                                <FileText size={12} />
+                                <span style={{ maxWidth: '140px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                  {v.fileName || 'View PDF'}
+                                </span>
+                              </button>
+                            ) : (
+                              <span style={{ color: 'var(--text-secondary)', fontSize: '0.75rem' }}>None attached</span>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>

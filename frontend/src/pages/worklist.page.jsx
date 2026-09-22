@@ -57,6 +57,7 @@ function MyWorklistPage({ onNavigate, searchQuery = '', user, isOrgWorklist = fa
   const [rowActionPrompt, setRowActionPrompt] = useState(null); // { item, action, title, color }
   const [rowActionCommentInput, setRowActionCommentInput] = useState('');
   const [rowActionCommentError, setRowActionCommentError] = useState('');
+  const [isActionSubmitting, setIsActionSubmitting] = useState(false);
   const [commentPopupData, setCommentPopupData] = useState(null);
 
   // Initial Filter State
@@ -90,10 +91,16 @@ function MyWorklistPage({ onNavigate, searchQuery = '', user, isOrgWorklist = fa
         const body = await res.json();
         const canUserActOnPreSpend = isPreSpendAdmin || isBoardUser || isSuperAdmin;
         return {
-          items: body.data && Array.isArray(body.data) ? body.data.map(i => ({
-            ...i,
-            canAct: canUserActOnPreSpend && (i.status === 'Pending Approval' || (i.status || '').toLowerCase().includes('pending'))
-          })) : [],
+          items: body.data && Array.isArray(body.data) ? body.data.map(i => {
+            const isSelf = Boolean(
+              (i.requesterId && (String(i.requesterId) === String(user?.id) || String(i.requesterId) === String(user?.userKey))) ||
+              (i.requesterEmail && user?.email && i.requesterEmail.trim().toLowerCase() === user.email.trim().toLowerCase())
+            );
+            return {
+              ...i,
+              canAct: !isSelf && canUserActOnPreSpend && (i.status === 'Pending Approval' || (i.status || '').toLowerCase().includes('pending'))
+            };
+          }) : [],
           statusCounts: body.statusCounts || { All: 0, Pending: 0, Approved: 0, Rejected: 0 },
           metrics: body.metrics || { pending: 0, approved: 0, rejected: 0 }
         };
@@ -106,9 +113,14 @@ function MyWorklistPage({ onNavigate, searchQuery = '', user, isOrgWorklist = fa
         return {
           items: body.data && Array.isArray(body.data) ? body.data.map(i => {
             const isPending = i.status === 'Pending Approval' || (i.status || '').toLowerCase().includes('pending');
+            const isSelf = Boolean(
+              (i.requesterId && (String(i.requesterId) === String(user?.id) || String(i.requesterId) === String(user?.userKey))) ||
+              (i.travellerEmail && user?.email && i.travellerEmail.trim().toLowerCase() === user.email.trim().toLowerCase()) ||
+              (i.employeeEmail && user?.email && i.employeeEmail.trim().toLowerCase() === user.email.trim().toLowerCase())
+            );
             // Rule: For short-notice flight (< 7 days), ONLY Board Member has the right to Approve / Reject
             let canAct = false;
-            if (isPending) {
+            if (isPending && !isSelf) {
               if (i.isShortNotice) {
                 canAct = isBoardUser; // strictly Board user only (disabled for Super Admin & Travel Admin)
               } else {
@@ -243,13 +255,20 @@ function MyWorklistPage({ onNavigate, searchQuery = '', user, isOrgWorklist = fa
   // Domain-specific worklist items
   const displayItems = items;
 
-  const filterTabs = [
-    { id: 'All', label: `All (${statusCounts.All || 0})` },
-    { id: 'Pending', label: `Pending (${statusCounts.Pending || 0})` },
-    { id: 'Approved', label: `Approved (${approvedCount})` },
-    { id: 'Implemented', label: `${activeModule === 'travel' ? 'Completed' : activeModule === 'prespend' ? 'Processed' : 'Implemented'} (${statusCounts.Implemented || 0})` },
-    { id: 'Rejected', label: `Rejected (${statusCounts.Rejected || 0})` }
-  ];
+  const filterTabs = activeModule === 'change_request'
+    ? [
+        { id: 'All', label: `All (${statusCounts.All || 0})` },
+        { id: 'Pending', label: `Pending (${statusCounts.Pending || 0})` },
+        { id: 'Approved', label: `Approved (${approvedCount})` },
+        { id: 'Implemented', label: `Implemented (${statusCounts.Implemented || 0})` },
+        { id: 'Rejected', label: `Rejected (${statusCounts.Rejected || 0})` }
+      ]
+    : [
+        { id: 'All', label: `All (${statusCounts.All || 0})` },
+        { id: 'Pending', label: `Pending (${statusCounts.Pending || 0})` },
+        { id: 'Approved', label: `${activeModule === 'travel' ? 'Ticketed & Confirmed' : 'Approved'} (${approvedCount})` },
+        { id: 'Rejected', label: `Rejected (${statusCounts.Rejected || 0})` }
+      ];
 
   // 1. Change Request Worklist Cards
   const crMetricCards = [
@@ -263,7 +282,6 @@ function MyWorklistPage({ onNavigate, searchQuery = '', user, isOrgWorklist = fa
   const prespendMetricCards = [
     { id: 'pending', title: 'Pending Budget Review', count: metrics?.pending ?? statusCounts.Pending ?? 0, subtext: 'Awaiting Sign-off', subtextColor: 'var(--text-secondary)', icon: Clock, iconBg: '#FEF3C7', iconColor: '#D97706' },
     { id: 'approved', title: 'Approved Spend', count: metrics?.approved ?? statusCounts.Approved ?? 0, subtext: 'Approved Budgets', subtextColor: '#059669', icon: Check, iconBg: '#ECFDF5', iconColor: '#059669' },
-    { id: 'implemented', title: 'Processed / Paid', count: metrics?.implemented ?? statusCounts.Implemented ?? 0, subtext: 'Disbursed', subtextColor: 'var(--text-secondary)', icon: RotateCw, iconBg: '#F3E8FF', iconColor: '#7C3AED' },
     { id: 'rejected', title: 'Rejected', count: metrics?.rejected ?? statusCounts.Rejected ?? 0, subtext: 'Declined Requests', subtextColor: 'var(--text-secondary)', icon: X, iconBg: '#FEE2E2', iconColor: '#DC2626' }
   ];
 
@@ -271,7 +289,6 @@ function MyWorklistPage({ onNavigate, searchQuery = '', user, isOrgWorklist = fa
   const travelMetricCards = [
     { id: 'pending', title: 'Pending Approval', count: metrics?.pending ?? statusCounts.Pending ?? 0, subtext: 'Awaiting Sign-off', subtextColor: 'var(--text-secondary)', icon: Clock, iconBg: '#FEF3C7', iconColor: '#D97706' },
     { id: 'approved', title: 'Ticketed & Confirmed', count: metrics?.approved ?? statusCounts.Approved ?? 0, subtext: 'Confirmed Itineraries', subtextColor: '#059669', icon: Check, iconBg: '#ECFDF5', iconColor: '#059669' },
-    { id: 'implemented', title: 'Completed', count: metrics?.implemented ?? statusCounts.Implemented ?? 0, subtext: 'Completed Journeys', subtextColor: 'var(--text-secondary)', icon: RotateCw, iconBg: '#F3E8FF', iconColor: '#7C3AED' },
     { id: 'rejected', title: 'Rejected', count: metrics?.rejected ?? statusCounts.Rejected ?? 0, subtext: 'Declined Bookings', subtextColor: 'var(--text-secondary)', icon: X, iconBg: '#FEE2E2', iconColor: '#DC2626' }
   ];
 
@@ -573,7 +590,7 @@ function MyWorklistPage({ onNavigate, searchQuery = '', user, isOrgWorklist = fa
                             }}>
                               Awaiting Board Approval
                             </span>
-                          ) : isItemApproved && status !== 'implemented' && (isAdmin || isImplementer) && !isSelfRequest ? (
+                          ) : activeModule === 'change_request' && isItemApproved && status !== 'implemented' && (isAdmin || isImplementer) && !isSelfRequest ? (
                             <button
                               type="button"
                               onClick={() => {
@@ -591,15 +608,15 @@ function MyWorklistPage({ onNavigate, searchQuery = '', user, isOrgWorklist = fa
                               borderRadius: 'var(--radius-lg)',
                               fontSize: '0.75rem',
                               fontWeight: 500,
-                              backgroundColor: status === 'implemented' ? '#F3E8FF' : isItemApproved ? '#FEF3C7' : isItemRejected ? '#FEE2E2' : '#FEF3C7',
-                              color: status === 'implemented' ? '#7C3AED' : isItemApproved ? '#D97706' : isItemRejected ? '#DC2626' : '#D97706'
+                              backgroundColor: status === 'implemented' ? '#F3E8FF' : isItemApproved ? '#ECFDF5' : isItemRejected ? '#FEF2F2' : '#FEF3C7',
+                              color: status === 'implemented' ? '#7C3AED' : isItemApproved ? '#059669' : isItemRejected ? '#DC2626' : '#D97706'
                             }}>
                               {status === 'implemented'
                                 ? 'Implemented'
                                 : item.myDecision === 'Moot'
                                 ? (isItemApproved ? `Approved by ${item.decidedBy || 'Approver'}` : `Rejected by ${item.decidedBy || 'Approver'}`)
                                 : isItemApproved
-                                ? 'Approved'
+                                ? (activeModule === 'travel' ? 'Ticketed & Confirmed' : 'Approved')
                                 : isItemRejected
                                 ? 'Rejected'
                                 : 'Pending'}
@@ -727,30 +744,69 @@ function MyWorklistPage({ onNavigate, searchQuery = '', user, isOrgWorklist = fa
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.65rem' }}>
               <button
                 type="button"
+                disabled={isActionSubmitting}
                 onClick={() => {
+                  if (isActionSubmitting) return;
                   setRowActionPrompt(null);
                   setRowActionCommentInput('');
                   setRowActionCommentError('');
                 }}
-                style={{ padding: '0.5rem 1rem', backgroundColor: 'var(--card-bg)', border: '1px solid var(--border-color)', borderRadius: '6px', fontSize: '0.825rem', fontWeight: 600, cursor: 'pointer' }}
+                style={{
+                  padding: '0.5rem 1rem',
+                  backgroundColor: 'var(--card-bg)',
+                  border: '1px solid var(--border-color)',
+                  borderRadius: '6px',
+                  fontSize: '0.825rem',
+                  fontWeight: 600,
+                  cursor: isActionSubmitting ? 'not-allowed' : 'pointer',
+                  opacity: isActionSubmitting ? 0.6 : 1
+                }}
               >
                 Cancel
               </button>
               <button
                 type="button"
-                onClick={() => {
+                disabled={isActionSubmitting}
+                onClick={async () => {
+                  if (isActionSubmitting) return;
                   if (!rowActionCommentInput.trim()) {
                     setRowActionCommentError('Please enter a comment.');
                     return;
                   }
-                  handleAction(rowActionPrompt.item.id, rowActionPrompt.action, rowActionCommentInput.trim());
-                  setRowActionPrompt(null);
-                  setRowActionCommentInput('');
-                  setRowActionCommentError('');
+                  setIsActionSubmitting(true);
+                  try {
+                    await handleAction(rowActionPrompt.item.id, rowActionPrompt.action, rowActionCommentInput.trim());
+                    setRowActionPrompt(null);
+                    setRowActionCommentInput('');
+                    setRowActionCommentError('');
+                  } finally {
+                    setIsActionSubmitting(false);
+                  }
                 }}
-                style={{ padding: '0.5rem 1.15rem', backgroundColor: rowActionPrompt.color, color: '#FFFFFF', border: 'none', borderRadius: '6px', fontSize: '0.825rem', fontWeight: 700, cursor: 'pointer', boxShadow: '0 1px 3px rgba(0,0,0,0.15)' }}
+                style={{
+                  padding: '0.5rem 1.15rem',
+                  backgroundColor: rowActionPrompt.color,
+                  color: '#FFFFFF',
+                  border: 'none',
+                  borderRadius: '6px',
+                  fontSize: '0.825rem',
+                  fontWeight: 700,
+                  cursor: isActionSubmitting ? 'not-allowed' : 'pointer',
+                  boxShadow: '0 1px 3px rgba(0,0,0,0.15)',
+                  opacity: isActionSubmitting ? 0.75 : 1,
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '0.45rem'
+                }}
               >
-                {rowActionPrompt.action === 'implement' ? 'Submit for Implement' : 'Submit'}
+                {isActionSubmitting && <LoadingSpinner size="sm" color="#FFFFFF" />}
+                <span>
+                  {isActionSubmitting
+                    ? 'Submitting...'
+                    : rowActionPrompt.action === 'implement'
+                    ? 'Submit for Implement'
+                    : 'Submit'}
+                </span>
               </button>
             </div>
           </div>

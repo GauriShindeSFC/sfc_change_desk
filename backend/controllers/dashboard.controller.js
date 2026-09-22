@@ -1,6 +1,3 @@
-// ────────────────────────────────────────────────────────────────
-//  Dashboard Controller – thin async HTTP handlers for Dashboard metrics & exports
-// ────────────────────────────────────────────────────────────────
 import PDFDocument from 'pdfkit';
 import { asyncHandler } from '../utils/asyncHandler.js';
 import {
@@ -9,6 +6,8 @@ import {
   getStatusBreakdownService,
   getFilteredChangeRequests
 } from '../services/dashboard.service.js';
+import { getPreSpendRequestsService } from '../services/preSpend.service.js';
+import { getTravelRequestsService } from '../services/travelDesk.service.js';
 
 // ---------- Dashboard analytics ---------------------------
 
@@ -47,9 +46,301 @@ export const getStatusBreakdown = asyncHandler(async (req, res) => {
 
 export const exportDashboardData = asyncHandler(async (req, res) => {
   const format = (req.query?.format || req.body?.format || 'csv').toLowerCase();
+  const moduleType = (req.query?.module || req.body?.module || 'change_request').toLowerCase();
   const { dateFilter, startDate, endDate, status } = req.query;
   const searchQuery = req.query.search || req.query.searchQuery || null;
+  const dateStamp = new Date().toISOString().slice(0, 10);
 
+  // ──────────────────────────────────────────────────────────
+  // A. PRE-SPEND EXPORT
+  // ──────────────────────────────────────────────────────────
+  if (moduleType === 'prespend') {
+    const psResult = await getPreSpendRequestsService({
+      user: null,
+      userId: null,
+      isWorklist: false,
+      isOrgWorklist: true,
+      status: status && status !== 'All' ? status : null,
+      searchQuery,
+      page: 1,
+      limit: 10000
+    });
+
+    const requests = psResult?.data || [];
+    const statusCounts = psResult?.statusCounts || { All: 0, Pending: 0, Approved: 0, Rejected: 0 };
+    const categoryCounts = psResult?.categoryCounts || {};
+
+    if (format === 'csv' || format === 'excel' || format === 'xlsx') {
+      const lines = [];
+      lines.push('ORGANIZATION PRE-SPEND REPORT');
+      lines.push(`"Generated At","${new Date().toLocaleString()}"`);
+      lines.push(`"Date Filter","${dateFilter || 'overall'}${dateFilter === 'custom' ? ` (${startDate} to ${endDate})` : ''}"`);
+      lines.push(`"Status Filter","${status || 'All'}"`);
+      if (searchQuery) lines.push(`"Search Query","${String(searchQuery).replace(/"/g, '""')}"`);
+      lines.push('');
+
+      // Summary Metrics
+      lines.push('--- SUMMARY METRICS ---');
+      lines.push('"Total Requests","Pending Review","Approved Spend","Processed / Paid","Rejected"');
+      lines.push(`${statusCounts.All || requests.length},${statusCounts.Pending || 0},${statusCounts.Approved || 0},${statusCounts.Implemented || 0},${statusCounts.Rejected || 0}`);
+      lines.push('');
+
+      // Spend by Category
+      lines.push('--- SPEND BY CATEGORY ---');
+      lines.push('"Category","Request Count"');
+      Object.entries(categoryCounts).forEach(([cat, count]) => {
+        lines.push(`"${cat.replace(/"/g, '""')}",${count}`);
+      });
+      lines.push('');
+
+      // Pre-Spend Requests Table
+      lines.push('--- PRE-SPEND REQUESTS ---');
+      lines.push('"PS ID","Item Description","Category","Subcategory","Estimated Amount (INR)","Cost Centre","Budget Line","Requester Name","Requester Email","Needed By Date","Selected Vendor","Commercial Exception","Status","Approved By"');
+      requests.forEach((r) => {
+        lines.push([
+          `"${(r.requestCode || r.id || '').replace(/"/g, '""')}"`,
+          `"${(r.itemDescription || '').replace(/"/g, '""')}"`,
+          `"${(r.category || '').replace(/"/g, '""')}"`,
+          `"${(r.subcategory || '').replace(/"/g, '""')}"`,
+          Number(r.estimatedAmount || 0),
+          `"${(r.costCentre || '').replace(/"/g, '""')}"`,
+          `"${(r.budgetLine || '').replace(/"/g, '""')}"`,
+          `"${(r.requesterName || '').replace(/"/g, '""')}"`,
+          `"${(r.requesterEmail || '').replace(/"/g, '""')}"`,
+          `"${(r.neededByDate ? new Date(r.neededByDate).toLocaleDateString('en-GB') : '—').replace(/"/g, '""')}"`,
+          `"${(r.selectedVendor || '').replace(/"/g, '""')}"`,
+          `"${(r.commercialException || 'None').replace(/"/g, '""')}"`,
+          `"${(r.status || 'Pending').replace(/"/g, '""')}"`,
+          `"${(r.decidedBy || r.approvedBy || (r.status === 'Approved' ? 'Approver' : '—')).replace(/"/g, '""')}"`
+        ].join(','));
+      });
+
+      const csvContent = '\uFEFF' + lines.join('\r\n');
+      res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+      res.setHeader('Content-Disposition', `attachment; filename="prespend_organization_dashboard_${dateStamp}.csv"`);
+      return res.send(csvContent);
+    }
+
+    if (format === 'pdf') {
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `attachment; filename="prespend_organization_dashboard_${dateStamp}.pdf"`);
+
+      const PDFDoc = PDFDocument.default || PDFDocument;
+      const doc = new PDFDoc({ margin: 36, size: 'A4', bufferPages: true });
+      doc.pipe(res);
+
+      doc.fontSize(10).fillColor('#1E3A8A').text('SFC CHANGE DESK', 36, 36, { characterSpacing: 1.5 });
+      doc.fontSize(18).fillColor('#0F172A').text('Organization Pre-Spend Report', 36, 50);
+      doc.fontSize(8.5).fillColor('#64748B').text(
+        `Generated on ${new Date().toLocaleString()}  |  Scope: Organization  |  Total Requests: ${requests.length}`,
+        36,
+        72
+      );
+      doc.moveTo(36, 92).lineTo(559, 92).strokeColor('#E2E8F0').lineWidth(1).stroke();
+
+      let currentY = 105;
+      doc.fontSize(10).fillColor('#0F172A').text(`Pre-Spend Requests (${requests.length})`, 36, currentY);
+      currentY += 16;
+
+      const drawPSHeader = (y) => {
+        doc.rect(36, y, 523, 18).fill('#F1F5F9');
+        doc.fontSize(7.2).fillColor('#334155');
+        doc.text('PS ID', 38, y + 5, { width: 55 });
+        doc.text('DESCRIPTION', 96, y + 5, { width: 120 });
+        doc.text('CATEGORY', 218, y + 5, { width: 75 });
+        doc.text('AMOUNT (INR)', 295, y + 5, { width: 65 });
+        doc.text('REQUESTER', 362, y + 5, { width: 75 });
+        doc.text('STATUS', 439, y + 5, { width: 60 });
+        doc.text('APPROVED BY', 501, y + 5, { width: 56, align: 'right' });
+        doc.moveTo(36, y + 18).lineTo(559, y + 18).strokeColor('#E2E8F0').lineWidth(0.5).stroke();
+      };
+
+      drawPSHeader(currentY);
+      currentY += 19;
+
+      requests.forEach((r, idx) => {
+        if (currentY > 780) {
+          doc.addPage();
+          currentY = 36;
+          drawPSHeader(currentY);
+          currentY += 19;
+        }
+        if (idx % 2 === 1) doc.rect(36, currentY - 1, 523, 15).fill('#F8FAFC');
+
+        const approver = r.decidedBy || r.approvedBy || (r.status === 'Approved' ? 'Approver' : '—');
+        doc.fontSize(7.2).fillColor('#1E3A8A').text(r.requestCode || r.id || '', 38, currentY, { width: 55 });
+        doc.fontSize(7.2).fillColor('#0F172A').text((r.itemDescription || '').substring(0, 30), 96, currentY, { width: 120, ellipsis: true });
+        doc.fontSize(7.2).fillColor('#0F172A').text((r.category || '').substring(0, 18), 218, currentY, { width: 75, ellipsis: true });
+        doc.fontSize(7.2).fillColor('#059669').text(`INR ${Number(r.estimatedAmount || 0).toLocaleString('en-IN')}`, 295, currentY, { width: 65 });
+        doc.fontSize(7.2).fillColor('#0F172A').text((r.requesterName || '').substring(0, 16), 362, currentY, { width: 75, ellipsis: true });
+        doc.fontSize(7.2).fillColor('#D97706').text(r.status || 'Pending', 439, currentY, { width: 60 });
+        doc.fontSize(7.2).fillColor('#334155').text(approver.substring(0, 14), 501, currentY, { width: 56, align: 'right', ellipsis: true });
+        currentY += 15;
+      });
+
+      const pageRange = doc.bufferedPageRange();
+      for (let i = 0; i < pageRange.count; i++) {
+        doc.switchToPage(i);
+        doc.fontSize(7.5).fillColor('#94A3B8').text(
+          `Page ${i + 1} of ${pageRange.count}   •   SFC Change Desk   •   Internal & Confidential`,
+          36,
+          812,
+          { align: 'center', width: 523 }
+        );
+      }
+      doc.end();
+      return;
+    }
+  }
+
+  // ──────────────────────────────────────────────────────────
+  // B. TRAVEL DESK EXPORT
+  // ──────────────────────────────────────────────────────────
+  if (moduleType === 'travel') {
+    const travelResult = await getTravelRequestsService({
+      user: null,
+      userId: null,
+      isWorklist: false,
+      isOrgWorklist: true,
+      status: status && status !== 'All' ? status : null,
+      searchQuery,
+      page: 1,
+      limit: 10000
+    });
+
+    const requests = travelResult?.data || [];
+    const statusCounts = travelResult?.statusCounts || { All: 0, Pending: 0, Approved: 0, Rejected: 0 };
+    const modeCounts = travelResult?.modeCounts || {};
+
+    if (format === 'csv' || format === 'excel' || format === 'xlsx') {
+      const lines = [];
+      lines.push('ORGANIZATION TRAVEL DESK REPORT');
+      lines.push(`"Generated At","${new Date().toLocaleString()}"`);
+      lines.push(`"Date Filter","${dateFilter || 'overall'}${dateFilter === 'custom' ? ` (${startDate} to ${endDate})` : ''}"`);
+      lines.push(`"Status Filter","${status || 'All'}"`);
+      if (searchQuery) lines.push(`"Search Query","${String(searchQuery).replace(/"/g, '""')}"`);
+      lines.push('');
+
+      // Summary Metrics
+      lines.push('--- SUMMARY METRICS ---');
+      lines.push('"Total Bookings","Pending Approvals","Ticketed & Confirmed","Completed","Rejected"');
+      lines.push(`${statusCounts.All || requests.length},${statusCounts.Pending || 0},${statusCounts.Approved || 0},${statusCounts.Implemented || 0},${statusCounts.Rejected || 0}`);
+      lines.push('');
+
+      // Travel by Mode
+      lines.push('--- TRAVEL BY MODE ---');
+      lines.push('"Mode","Booking Count"');
+      Object.entries(modeCounts).forEach(([mode, count]) => {
+        lines.push(`"${mode.replace(/"/g, '""')}",${count}`);
+      });
+      lines.push('');
+
+      // Travel Requests Table
+      lines.push('--- TRAVEL RESERVATIONS ---');
+      lines.push('"TR ID","Title / Description","Travel Mode","Origin","Destination","Travel Date","Return Date","Traveller Name","Traveller Email","Department","Purpose","Short Notice","Status","Approved By"');
+      requests.forEach((r) => {
+        lines.push([
+          `"${(r.requestCode || r.id || '').replace(/"/g, '""')}"`,
+          `"${(r.title || '').replace(/"/g, '""')}"`,
+          `"${(r.travelMode || 'Flight').replace(/"/g, '""')}"`,
+          `"${(r.fromLocation || '').replace(/"/g, '""')}"`,
+          `"${(r.toLocation || '').replace(/"/g, '""')}"`,
+          `"${(r.departureDate ? new Date(r.departureDate).toLocaleDateString('en-GB') : '—').replace(/"/g, '""')}"`,
+          `"${(r.returnDate ? new Date(r.returnDate).toLocaleDateString('en-GB') : '—').replace(/"/g, '""')}"`,
+          `"${(r.travellerName || '').replace(/"/g, '""')}"`,
+          `"${(r.travellerEmail || '').replace(/"/g, '""')}"`,
+          `"${(r.department || '').replace(/"/g, '""')}"`,
+          `"${(r.purpose || '').replace(/"/g, '""')}"`,
+          r.isShortNotice ? '"Yes (< 7 days)"' : '"No"',
+          `"${(r.status || 'Pending').replace(/"/g, '""')}"`,
+          `"${(r.decidedBy || r.approvedBy || (r.status === 'Approved' ? 'Approver' : '—')).replace(/"/g, '""')}"`
+        ].join(','));
+      });
+
+      const csvContent = '\uFEFF' + lines.join('\r\n');
+      res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+      res.setHeader('Content-Disposition', `attachment; filename="travel_organization_dashboard_${dateStamp}.csv"`);
+      return res.send(csvContent);
+    }
+
+    if (format === 'pdf') {
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `attachment; filename="travel_organization_dashboard_${dateStamp}.pdf"`);
+
+      const PDFDoc = PDFDocument.default || PDFDocument;
+      const doc = new PDFDoc({ margin: 36, size: 'A4', bufferPages: true });
+      doc.pipe(res);
+
+      doc.fontSize(10).fillColor('#1E3A8A').text('SFC CHANGE DESK', 36, 36, { characterSpacing: 1.5 });
+      doc.fontSize(18).fillColor('#0F172A').text('Organization Travel Desk Report', 36, 50);
+      doc.fontSize(8.5).fillColor('#64748B').text(
+        `Generated on ${new Date().toLocaleString()}  |  Scope: Organization  |  Total Requests: ${requests.length}`,
+        36,
+        72
+      );
+      doc.moveTo(36, 92).lineTo(559, 92).strokeColor('#E2E8F0').lineWidth(1).stroke();
+
+      let currentY = 105;
+      doc.fontSize(10).fillColor('#0F172A').text(`Travel Bookings (${requests.length})`, 36, currentY);
+      currentY += 16;
+
+      const drawTravelHeader = (y) => {
+        doc.rect(36, y, 523, 18).fill('#F1F5F9');
+        doc.fontSize(7.2).fillColor('#334155');
+        doc.text('TR ID', 38, y + 5, { width: 55 });
+        doc.text('MODE', 96, y + 5, { width: 55 });
+        doc.text('ROUTE', 153, y + 5, { width: 120 });
+        doc.text('TRAVEL DATE', 275, y + 5, { width: 65 });
+        doc.text('TRAVELLER', 342, y + 5, { width: 85 });
+        doc.text('STATUS', 430, y + 5, { width: 65 });
+        doc.text('APPROVED BY', 501, y + 5, { width: 56, align: 'right' });
+        doc.moveTo(36, y + 18).lineTo(559, y + 18).strokeColor('#E2E8F0').lineWidth(0.5).stroke();
+      };
+
+      drawTravelHeader(currentY);
+      currentY += 19;
+
+      requests.forEach((r, idx) => {
+        if (currentY > 780) {
+          doc.addPage();
+          currentY = 36;
+          drawTravelHeader(currentY);
+          currentY += 19;
+        }
+        if (idx % 2 === 1) doc.rect(36, currentY - 1, 523, 15).fill('#F8FAFC');
+
+        const approver = r.decidedBy || r.approvedBy || (r.status === 'Approved' ? 'Approver' : '—');
+        const route = `${r.fromLocation || '—'} -> ${r.toLocation || '—'}`;
+        const travelDate = r.departureDate ? new Date(r.departureDate).toLocaleDateString('en-GB') : '—';
+
+        doc.fontSize(7.2).fillColor('#1E3A8A').text(r.requestCode || r.id || '', 38, currentY, { width: 55 });
+        doc.fontSize(7.2).fillColor('#0F172A').text(r.travelMode || 'Flight', 96, currentY, { width: 55 });
+        doc.fontSize(7.2).fillColor('#0F172A').text(route.substring(0, 26), 153, currentY, { width: 120, ellipsis: true });
+        doc.fontSize(7.2).fillColor('#64748B').text(travelDate, 275, currentY, { width: 65 });
+        doc.fontSize(7.2).fillColor('#0F172A').text((r.travellerName || '').substring(0, 18), 342, currentY, { width: 85, ellipsis: true });
+        doc.fontSize(7.2).fillColor(r.isShortNotice ? '#DC2626' : '#D97706').text(r.status || 'Pending', 430, currentY, { width: 65 });
+        doc.fontSize(7.2).fillColor('#334155').text(approver.substring(0, 14), 501, currentY, { width: 56, align: 'right', ellipsis: true });
+        currentY += 15;
+      });
+
+      const pageRange = doc.bufferedPageRange();
+      for (let i = 0; i < pageRange.count; i++) {
+        doc.switchToPage(i);
+        doc.fontSize(7.5).fillColor('#94A3B8').text(
+          `Page ${i + 1} of ${pageRange.count}   •   SFC Change Desk   •   Internal & Confidential`,
+          36,
+          812,
+          { align: 'center', width: 523 }
+        );
+      }
+      doc.end();
+      return;
+    }
+  }
+
+  // ──────────────────────────────────────────────────────────
+  // C. CHANGE REQUEST EXPORT (DEFAULT)
+  // ──────────────────────────────────────────────────────────
   // 1. Fetch Categories, Status Breakdown, and Change Requests in Organization Scope
   const [categories, statusBreakdown, crResult] = await Promise.all([
     getCategoryMetricsService(null, { dateFilter, startDate, endDate }),
@@ -68,7 +359,6 @@ export const exportDashboardData = asyncHandler(async (req, res) => {
   ]);
 
   const changeRequests = crResult?.data || [];
-  const dateStamp = new Date().toISOString().slice(0, 10);
 
   // Calculate Requests by Location
   const locationMap = new Map();
@@ -156,14 +446,14 @@ export const exportDashboardData = asyncHandler(async (req, res) => {
 
     const csvContent = '\uFEFF' + lines.join('\r\n');
     res.setHeader('Content-Type', 'text/csv; charset=utf-8');
-    res.setHeader('Content-Disposition', `attachment; filename="organization_dashboard_${dateStamp}.csv"`);
+    res.setHeader('Content-Disposition', `attachment; filename="changedesk_organization_dashboard_${dateStamp}.csv"`);
     return res.send(csvContent);
   }
 
   // 3. PDF Generation
   if (format === 'pdf') {
     res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Disposition', `attachment; filename="organization_dashboard_${dateStamp}.pdf"`);
+    res.setHeader('Content-Disposition', `attachment; filename="changedesk_organization_dashboard_${dateStamp}.pdf"`);
 
     const PDFDoc = PDFDocument.default || PDFDocument;
     const doc = new PDFDoc({ margin: 36, size: 'A4', bufferPages: true });

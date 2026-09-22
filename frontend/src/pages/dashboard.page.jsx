@@ -259,6 +259,7 @@ function DashboardPage({ onNavigate, user, isOrgDashboard = false, searchQuery =
     try {
       const exportParams = new URLSearchParams({
         scope: 'organization',
+        module: activeModule,
         format,
         ...(activeFilter !== 'All' && { status: activeFilter }),
         ...(dateFilter !== 'overall' && { dateFilter }),
@@ -278,7 +279,8 @@ function DashboardPage({ onNavigate, user, isOrgDashboard = false, searchQuery =
       const link = document.createElement('a');
       link.href = url;
       const dateStr = new Date().toISOString().slice(0, 10);
-      link.download = `organization_dashboard_${dateStr}.${format}`;
+      const prefix = activeModule === 'prespend' ? 'prespend' : activeModule === 'travel' ? 'travel_desk' : 'change_desk';
+      link.download = `${prefix}_organization_dashboard_${dateStr}.${format}`;
       document.body.appendChild(link);
       link.click();
       link.remove();

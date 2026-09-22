@@ -498,7 +498,7 @@ export const generateChangeRequestReportHtml = ({ cr, requesterName, approveUrl,
           <h3>Change Implementer Action Required</h3>
           <p>Review the details above. Click the button below once implementation is complete:</p>
           <div class="btn-group">
-            <a href="${implementUrl}" class="btn btn-implement">⚡ Mark as Implemented</a>
+            <a href="${implementUrl}" class="btn btn-implement"> Mark as Implemented</a>
           </div>
         </div>
       ` : (approveUrl && rejectUrl) ? `
@@ -524,7 +524,7 @@ export const generateChangeRequestReportHtml = ({ cr, requesterName, approveUrl,
 // ---------- Low-level send ---------------------------------
 
 /** Never throws — returns a small status object. */
-export const sendMail = async ({ to, cc, subject, text, html, attachments }) => {
+export const sendMail = async ({ to, cc, subject, text, html, attachments, replyTo, from }) => {
   const toList = asList(to);
   const ccList = asList(cc).filter((a) => !toList.includes(a));
   const all = [...new Set([...toList, ...ccList])];
@@ -540,11 +540,12 @@ export const sendMail = async ({ to, cc, subject, text, html, attachments }) => 
   }
 
   try {
-    const fromAddr = env.MAIL_FROM || (etherealAccount ? `"ChangeDesk" <${etherealAccount.user}>` : (env.SMTP_USER || 'notifications@changedesk.local'));
+    const fromAddr = from || env.MAIL_FROM || (etherealAccount ? `"ChangeDesk" <${etherealAccount.user}>` : (env.SMTP_USER || 'notifications@changedesk.local'));
     const info = await t.sendMail({
       from: fromAddr,
       to: toList.length ? toList : ccList,
       cc: toList.length ? ccList : undefined,
+      replyTo: replyTo || undefined,
       subject,
       text,
       html,
@@ -1372,3 +1373,507 @@ export const sendUserInviteEmail = async ({ user, tempPassword, invitedByName })
 
   return sendMail({ to: user.email, subject, text, html, attachments: mailAttachments() });
 };
+
+// ============================================================================
+// PRE-SPEND EMAIL NOTIFICATIONS
+// ============================================================================
+
+/**
+ * Parses vendor file attachments (base64 data URIs) into Nodemailer attachments
+ */
+export const extractVendorAttachments = (vendors = []) => {
+  const attachments = [];
+  if (!Array.isArray(vendors)) return attachments;
+
+  vendors.forEach((v, idx) => {
+    const dataSrc = v.fileData || v.fileUrl || (typeof v.file === 'string' ? v.file : null);
+    if (dataSrc && dataSrc.startsWith('data:')) {
+      try {
+        const parts = dataSrc.split(';base64,');
+        const contentType = parts[0].replace('data:', '') || 'application/pdf';
+        const buffer = Buffer.from(parts[1], 'base64');
+        const ext = contentType.includes('pdf') ? '.pdf' : contentType.includes('png') ? '.png' : contentType.includes('jpeg') || contentType.includes('jpg') ? '.jpg' : '';
+        const filename = v.fileName || `Quotation_Vendor_${idx + 1}${ext}`;
+        attachments.push({
+          filename,
+          content: buffer,
+          contentType
+        });
+      } catch (err) {
+        console.warn(`[mail] Failed to parse attachment for vendor ${idx + 1}:`, err.message);
+      }
+    }
+  });
+
+  return attachments;
+};
+
+/**
+ * Pre-Spend Created -> Notify Pre-Spend Admin & Board (with attached Quotation PDFs)
+ */
+export const sendPreSpendCreatedEmail = async ({ preSpend, requesterName, requesterEmail, approverEmails }) => {
+  const to = asList(approverEmails);
+  const primary = to.length ? to : asList(env.MAIL_APPROVER_FALLBACK || 'prespend-admin@changedesk.local');
+  const worklistUrl = `${appUrl()}/`;
+
+  const secret = process.env.JWT_SECRET || 'sfc-change-desk-secure-jwt-secret-key-2026';
+  const token = jwt.sign(
+    { preSpendId: preSpend.id, approverEmail: primary[0] || 'approver@company.com' },
+    secret,
+    { expiresIn: '7d' }
+  );
+
+  const approveUrl = `${appUrl()}/approval-action?token=${encodeURIComponent(token)}&module=prespend&action=approve`;
+  const rejectUrl = `${appUrl()}/approval-action?token=${encodeURIComponent(token)}&module=prespend&action=reject`;
+
+  const submittedTime = formatCleanTime(preSpend.createdAt);
+  const neededByDate = formatCleanDate(preSpend.neededByDate);
+  const raisedDate = formatLongDate(preSpend.createdAt) || 'Today';
+  const reqName = preSpend.requesterName || requesterName || 'Requester';
+  const reqEmail = preSpend.requesterEmail || requesterEmail || '';
+  const amountFormatted = Number(preSpend.estimatedAmount || 0).toLocaleString('en-IN', { style: 'currency', currency: 'INR' });
+
+  const subject = `Pre-Spend Approval Required: ${preSpend.requestCode} — ${amountFormatted} (${preSpend.category})`;
+
+  const vendors = Array.isArray(preSpend.vendors) ? preSpend.vendors.filter(v => v && (v.name || v.amount)) : [];
+
+  const bodyHtml = `
+    <!-- Time Bar -->
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#F8FAFC;border-bottom:1px solid ${C.border};padding:10px 14px;margin-bottom:18px;border-radius:6px">
+      <tr>
+        <td style="font:600 12px Arial,sans-serif;color:${C.muted}">Requisition Submitted:</td>
+        <td align="right" style="font:700 12px monospace;color:${C.ink}">${esc(submittedTime)} · ${esc(raisedDate)}</td>
+      </tr>
+    </table>
+
+    <!-- Header & Status -->
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:14px">
+      <tr>
+        <td>
+          <span style="font:700 12px monospace;color:#2563EB">${esc(preSpend.requestCode)}</span>
+          <h2 style="font:700 17px Arial,sans-serif;color:${C.ink};margin:3px 0 2px">${esc(preSpend.itemDescription || preSpend.category)}</h2>
+          <span style="font:400 12px Arial,sans-serif;color:${C.muted}">${esc(preSpend.category)} · ${esc(preSpend.subcategory || 'General')}</span>
+        </td>
+        <td align="right" valign="top">
+          <span style="display:inline-block;padding:4px 12px;border-radius:99px;font:700 11px Arial,sans-serif;background:#FEF3C7;color:#D97706">
+            ● Pending Approval
+          </span>
+        </td>
+      </tr>
+    </table>
+
+    <!-- Section 1: Financial & Requester Details -->
+    <div style="border-top:1px solid ${C.border};padding-top:14px;margin-top:14px">
+      <div style="font:700 13px Arial,sans-serif;color:${C.ink};margin-bottom:10px">Section 1: Requisition Overview</div>
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;margin-bottom:14px">
+        <tr>
+          <td width="33%" style="padding:6px 10px 6px 0;vertical-align:top">
+            <div style="font:500 11px Arial,sans-serif;color:${C.muted};margin-bottom:2px">Requester</div>
+            <div style="font:600 13px Arial,sans-serif;color:${C.ink}">${esc(reqName)}</div>
+          </td>
+          <td width="33%" style="padding:6px 10px 6px 0;vertical-align:top">
+            <div style="font:500 11px Arial,sans-serif;color:${C.muted};margin-bottom:2px">Estimated Amount</div>
+            <div style="font:700 14px Arial,sans-serif;color:#2563EB">${esc(amountFormatted)}</div>
+          </td>
+          <td width="34%" style="padding:6px 0 6px 0;vertical-align:top">
+            <div style="font:500 11px Arial,sans-serif;color:${C.muted};margin-bottom:2px">Cost Centre</div>
+            <div style="font:600 13px Arial,sans-serif;color:${C.ink}">${esc(preSpend.costCentre || 'Corporate')}</div>
+          </td>
+        </tr>
+        <tr>
+          <td width="33%" style="padding:6px 10px 6px 0;vertical-align:top">
+            <div style="font:500 11px Arial,sans-serif;color:${C.muted};margin-bottom:2px">Requester Email</div>
+            <div style="font:600 12px Arial,sans-serif;color:${C.ink}">${esc(reqEmail || '—')}</div>
+          </td>
+          <td width="33%" style="padding:6px 10px 6px 0;vertical-align:top">
+            <div style="font:500 11px Arial,sans-serif;color:${C.muted};margin-bottom:2px">Needed By Date</div>
+            <div style="font:600 13px Arial,sans-serif;color:${C.ink}">${esc(neededByDate)}</div>
+          </td>
+          <td width="34%" style="padding:6px 0 6px 0;vertical-align:top">
+            <div style="font:500 11px Arial,sans-serif;color:${C.muted};margin-bottom:2px">Budget Line</div>
+            <div style="font:600 12px Arial,sans-serif;color:${C.ink}">${esc(preSpend.budgetLine || '—')}</div>
+          </td>
+        </tr>
+      </table>
+    </div>
+
+    <!-- Section 2: Vendors & Comparison -->
+    ${vendors.length > 0 ? `
+      <div style="border-top:1px solid ${C.border};padding-top:14px;margin-top:14px">
+        <div style="font:700 13px Arial,sans-serif;color:${C.ink};margin-bottom:10px">Section 2: Vendor Comparison (${vendors.length} Quotes)</div>
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;margin-bottom:14px;background:#F8FAFC;border:1px solid ${C.border};border-radius:8px;overflow:hidden">
+          <thead>
+            <tr style="background:#F1F5F9">
+              <th style="padding:8px 12px;font:700 11px Arial,sans-serif;color:#334155;text-align:left">Vendor Name</th>
+              <th style="padding:8px 12px;font:700 11px Arial,sans-serif;color:#334155;text-align:left">Quoted Amount</th>
+              <th style="padding:8px 12px;font:700 11px Arial,sans-serif;color:#334155;text-align:left">Quote Date</th>
+              <th style="padding:8px 12px;font:700 11px Arial,sans-serif;color:#334155;text-align:left">Attached File</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${vendors.map((v, i) => `
+              <tr style="border-top:1px solid ${C.border}">
+                <td style="padding:8px 12px;font:600 12px Arial,sans-serif;color:${C.ink}">
+                  ${esc(v.name || `Vendor ${i + 1}`)} ${i === 0 ? '<span style="font-size:10px;background:#E6F4EA;color:#137333;font-weight:700;padding:1px 5px;border-radius:4px;margin-left:4px">Primary</span>' : ''}
+                </td>
+                <td style="padding:8px 12px;font:700 12px Arial,sans-serif;color:#059669">${v.amount ? Number(v.amount).toLocaleString('en-IN', { style: 'currency', currency: 'INR' }) : '—'}</td>
+                <td style="padding:8px 12px;font:400 12px monospace;color:${C.muted}">${formatCleanDate(v.date)}</td>
+                <td style="padding:8px 12px;font:600 11px Arial,sans-serif;color:#2563EB">${v.fileName ? `📎 ${esc(v.fileName)}` : 'None'}</td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      </div>
+    ` : ''}
+
+    <!-- Section 3: Justification & Reason -->
+    <div style="border-top:1px solid ${C.border};padding-top:14px;margin-top:14px">
+      <div style="font:700 11px Arial,sans-serif;color:${C.ink};margin-bottom:4px">Reason for Selection</div>
+      <div style="font:600 13px Arial,sans-serif;color:${C.ink};margin-bottom:12px">${esc(preSpend.commercialReason || 'Lowest total cost')}</div>
+
+      <div style="font:700 11px Arial,sans-serif;color:${C.ink};margin-bottom:4px">Business & Vendor Selection Justification</div>
+      <div style="background:#F8FAFC;border:1px solid ${C.border};border-radius:6px;padding:10px 12px;font:400 13px/1.5 Arial,sans-serif;color:${C.ink}">
+        ${esc(preSpend.businessJustification || preSpend.commercialJustification || 'No justification specified.')}
+      </div>
+    </div>
+
+    <!-- Action Decision Buttons -->
+    <div style="margin:22px 0 8px;padding:16px;background:#F1F5F9;border-radius:10px;border:1px solid #CBD5E1">
+      <div style="font:700 12px Arial,sans-serif;color:#334155;margin-bottom:12px;text-align:center;letter-spacing:0.04em">
+        PRE-SPEND APPROVAL ACTION REQUIRED
+      </div>
+      <table role="presentation" cellpadding="0" cellspacing="0" width="100%">
+        <tr>
+          <td align="center" style="padding:6px">
+            <a href="${approveUrl}" style="display:inline-block;padding:11px 24px;background-color:#059669;color:#ffffff;font:700 13px Arial,sans-serif;text-decoration:none;border-radius:7px;box-shadow:0 2px 4px rgba(5,150,105,0.25)">
+              Approve Request
+            </a>
+          </td>
+          <td align="center" style="padding:6px">
+            <a href="${rejectUrl}" style="display:inline-block;padding:11px 24px;background-color:#DC2626;color:#ffffff;font:700 13px Arial,sans-serif;text-decoration:none;border-radius:7px;box-shadow:0 2px 4px rgba(220,38,38,0.25)">
+              Reject Request
+            </a>
+          </td>
+        </tr>
+      </table>
+      <div style="font:400 11px Arial,sans-serif;color:#64748B;text-align:center;margin-top:12px">
+        Quotations and vendor documents are attached directly to this email.
+      </div>
+    </div>
+  `;
+
+  const html = renderEmail({
+    preheader: `Pre-Spend Requisition ${preSpend.requestCode} (${amountFormatted}) is awaiting your review and approval`,
+    heading: `Pre-Spend Approval Required: ${preSpend.requestCode}`,
+    intro: `A new pre-spend requisition has been submitted by <strong>${esc(reqName)}</strong> (${esc(reqEmail)}) for <strong>${esc(amountFormatted)}</strong>.`,
+    rows: [],
+    bodyHtml,
+    footnote: 'Automated notification from <strong>ChangeDesk Pre-Spend Module</strong>.'
+  });
+
+  const text =
+    `Pre-Spend Approval Required: ${preSpend.requestCode}\n\n` +
+    `Requester: ${reqName} (${reqEmail})\n` +
+    `Amount: ${amountFormatted}\n` +
+    `Category: ${preSpend.category} - ${preSpend.subcategory}\n` +
+    `Approve: ${approveUrl}\n` +
+    `Reject: ${rejectUrl}\n`;
+
+  const vendorAttachments = extractVendorAttachments(preSpend.vendors);
+  const attachments = [...mailAttachments(), ...vendorAttachments];
+
+  return sendMail({
+    to: primary,
+    cc: reqEmail ? [reqEmail] : undefined,
+    replyTo: reqEmail || undefined,
+    subject,
+    text,
+    html,
+    attachments
+  });
+};
+
+/**
+ * Pre-Spend Decision -> Notify Requester (Approved / Rejected)
+ */
+export const sendPreSpendDecisionEmail = async ({ preSpend, action, comment, deciderName, deciderRole }) => {
+  const to = preSpend.requesterEmail;
+  if (!to) return { skipped: 'no-requester-email' };
+
+  const isApproved = action === 'approve' || preSpend.status === 'Approved';
+  const approver = deciderName || 'Approver';
+  const roleTitle = deciderRole || (isApproved ? 'Pre-Spend Approver' : 'Approver');
+  const amountFormatted = Number(preSpend.estimatedAmount || 0).toLocaleString('en-IN', { style: 'currency', currency: 'INR' });
+  const worklistUrl = `${appUrl()}/`;
+
+  const subject = `${isApproved ? 'Approved' : 'Rejected'}: Pre-Spend Request ${preSpend.requestCode}`;
+
+  const bodyHtml = `
+    <!-- Decision Banner -->
+    <div style="background:${isApproved ? '#ECFDF5' : '#FEF2F2'};border:1.5px solid ${isApproved ? '#A7F3D0' : '#FECACA'};border-radius:10px;padding:16px 18px;margin-bottom:18px">
+      <div style="font:700 15px Arial,sans-serif;color:${isApproved ? '#059669' : '#DC2626'};margin-bottom:4px">
+        Pre-Spend Request ${isApproved ? 'Approved' : 'Rejected'}
+      </div>
+      <div style="font:400 13px Arial,sans-serif;color:#334155;line-height:1.5">
+        This requisition was ${isApproved ? 'approved' : 'rejected'} by <strong>${esc(approver)}</strong> (${esc(roleTitle)}).
+      </div>
+      ${comment ? `
+        <div style="margin-top:10px;padding-top:10px;border-top:1px dashed ${isApproved ? '#A7F3D0' : '#FECACA'};font:400 13px/1.5 Arial,sans-serif;color:${isApproved ? '#065F46' : '#991B1B'}">
+          <strong>Decision Note / Comment:</strong><br>
+          ${esc(comment)}
+        </div>
+      ` : ''}
+    </div>
+
+    <div style="margin:22px 0 8px;text-align:center">
+      <a href="${worklistUrl}" style="display:inline-block;padding:11px 24px;background-color:#0F172A;color:#ffffff;font:700 13px Arial,sans-serif;text-decoration:none;border-radius:7px">
+        View in Dashboard →
+      </a>
+    </div>
+  `;
+
+  const html = renderEmail({
+    preheader: `Pre-Spend Request ${preSpend.requestCode} has been ${isApproved ? 'approved' : 'rejected'}`,
+    heading: `${isApproved ? 'Approved' : 'Rejected'}: ${preSpend.requestCode}`,
+    intro: `Your pre-spend request for <strong>${esc(amountFormatted)}</strong> (${esc(preSpend.category)}) has been <strong>${isApproved ? 'Approved' : 'Rejected'}</strong>.`,
+    rows: [],
+    bodyHtml,
+    footnote: 'Automated notification from <strong>ChangeDesk Pre-Spend Module</strong>.'
+  });
+
+  const text =
+    `${isApproved ? 'Approved' : 'Rejected'}: Pre-Spend Request ${preSpend.requestCode}\n\n` +
+    `Decided by: ${approver} (${roleTitle})\n` +
+    `Comment: ${comment || 'None'}\n\n` +
+    `View details: ${worklistUrl}\n`;
+
+  return sendMail({
+    to,
+    subject,
+    text,
+    html,
+    attachments: mailAttachments()
+  });
+};
+
+// ============================================================================
+// TRAVEL DESK EMAIL NOTIFICATIONS
+// ============================================================================
+
+/**
+ * Travel Request Created -> Notify Travel Admin & Board (Special short notice routing)
+ */
+export const sendTravelCreatedEmail = async ({ travelReq, requesterName, requesterEmail, approverEmails, isShortNotice = false }) => {
+  const to = asList(approverEmails);
+  const primary = to.length ? to : asList(env.MAIL_APPROVER_FALLBACK || 'travel-admin@changedesk.local');
+  const worklistUrl = `${appUrl()}/`;
+
+  const secret = process.env.JWT_SECRET || 'sfc-change-desk-secure-jwt-secret-key-2026';
+  const token = jwt.sign(
+    { travelId: travelReq.id, approverEmail: primary[0] || 'approver@company.com' },
+    secret,
+    { expiresIn: '7d' }
+  );
+
+  const approveUrl = `${appUrl()}/approval-action?token=${encodeURIComponent(token)}&module=travel&action=approve`;
+  const rejectUrl = `${appUrl()}/approval-action?token=${encodeURIComponent(token)}&module=travel&action=reject`;
+
+  const submittedTime = formatCleanTime(travelReq.createdAt);
+  const departureDate = formatCleanDate(travelReq.departureDate);
+  const returnDate = formatCleanDate(travelReq.returnDate);
+  const raisedDate = formatLongDate(travelReq.createdAt) || 'Today';
+  const travellerName = travelReq.travellerName || requesterName || 'Traveller';
+  const travellerEmail = travelReq.travellerEmail || requesterEmail || '';
+
+  const subject = `${isShortNotice ? 'URGENT (Board Approval Required): ' : 'Travel Booking Approval Required: '}${travelReq.requestCode} — ${travelReq.fromLocation} to ${travelReq.toLocation} (${travelReq.travelMode})`;
+
+  const bodyHtml = `
+    <!-- Time Bar -->
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#F8FAFC;border-bottom:1px solid ${C.border};padding:10px 14px;margin-bottom:18px;border-radius:6px">
+      <tr>
+        <td style="font:600 12px Arial,sans-serif;color:${C.muted}">Request Submitted:</td>
+        <td align="right" style="font:700 12px monospace;color:${C.ink}">${esc(submittedTime)} · ${esc(raisedDate)}</td>
+      </tr>
+    </table>
+
+    ${isShortNotice ? `
+      <!-- Urgent Notice Warning Banner -->
+      <div style="background:#FEF2F2;border:1.5px solid #FCA5A5;border-radius:8px;padding:12px 16px;margin-bottom:16px">
+        <div style="font:700 13px Arial,sans-serif;color:#DC2626;margin-bottom:2px">SHORT-NOTICE FLIGHT / TRAVEL BOOKING (&lt; 7 DAYS)</div>
+        <div style="font:400 12px Arial,sans-serif;color:#991B1B">
+          As per corporate travel policy, short-notice flights departing within 7 days strictly require <strong>Board Member authorization</strong>.
+        </div>
+      </div>
+    ` : ''}
+
+    <!-- Header & Status -->
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:14px">
+      <tr>
+        <td>
+          <span style="font:700 12px monospace;color:#2563EB">${esc(travelReq.requestCode)}</span>
+          <h2 style="font:700 17px Arial,sans-serif;color:${C.ink};margin:3px 0 2px">${esc(travelReq.travelMode)}: ${esc(travelReq.fromLocation)} → ${esc(travelReq.toLocation)}</h2>
+          <span style="font:400 12px Arial,sans-serif;color:${C.muted}">${esc(travelReq.tripType || 'One-Way')} · ${esc(travelReq.travelClass || 'Economy')}</span>
+        </td>
+        <td align="right" valign="top">
+          <span style="display:inline-block;padding:4px 12px;border-radius:99px;font:700 11px Arial,sans-serif;background:${isShortNotice ? '#FEF2F2' : '#FEF3C7'};color:${isShortNotice ? '#DC2626' : '#D97706'}">
+            ● ${isShortNotice ? 'Awaiting Board Approval' : 'Pending Approval'}
+          </span>
+        </td>
+      </tr>
+    </table>
+
+    <!-- Section 1: Travel Details -->
+    <div style="border-top:1px solid ${C.border};padding-top:14px;margin-top:14px">
+      <div style="font:700 13px Arial,sans-serif;color:${C.ink};margin-bottom:10px">Section 1: Traveller & Itinerary Details</div>
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;margin-bottom:14px">
+        <tr>
+          <td width="33%" style="padding:6px 10px 6px 0;vertical-align:top">
+            <div style="font:500 11px Arial,sans-serif;color:${C.muted};margin-bottom:2px">Traveller Name</div>
+            <div style="font:600 13px Arial,sans-serif;color:${C.ink}">${esc(travellerName)}</div>
+          </td>
+          <td width="33%" style="padding:6px 10px 6px 0;vertical-align:top">
+            <div style="font:500 11px Arial,sans-serif;color:${C.muted};margin-bottom:2px">Departure Date</div>
+            <div style="font:700 13px Arial,sans-serif;color:#2563EB">${esc(departureDate)}</div>
+          </td>
+          <td width="34%" style="padding:6px 0 6px 0;vertical-align:top">
+            <div style="font:500 11px Arial,sans-serif;color:${C.muted};margin-bottom:2px">Return Date</div>
+            <div style="font:600 13px Arial,sans-serif;color:${C.ink}">${esc(returnDate || 'N/A')}</div>
+          </td>
+        </tr>
+        <tr>
+          <td width="33%" style="padding:6px 10px 6px 0;vertical-align:top">
+            <div style="font:500 11px Arial,sans-serif;color:${C.muted};margin-bottom:2px">Department</div>
+            <div style="font:600 12px Arial,sans-serif;color:${C.ink}">${esc(travelReq.department || 'Corporate')}</div>
+          </td>
+          <td width="33%" style="padding:6px 10px 6px 0;vertical-align:top">
+            <div style="font:500 11px Arial,sans-serif;color:${C.muted};margin-bottom:2px">Preferred Time Slot</div>
+            <div style="font:600 13px Arial,sans-serif;color:${C.ink}">${esc(travelReq.preferredTimeSlot || 'Anytime')}</div>
+          </td>
+          <td width="34%" style="padding:6px 0 6px 0;vertical-align:top">
+            <div style="font:500 11px Arial,sans-serif;color:${C.muted};margin-bottom:2px">Traveller Email</div>
+            <div style="font:600 12px Arial,sans-serif;color:${C.ink}">${esc(travellerEmail || '—')}</div>
+          </td>
+        </tr>
+      </table>
+    </div>
+
+    <!-- Section 2: Purpose -->
+    <div style="border-top:1px solid ${C.border};padding-top:14px;margin-top:14px">
+      <div style="font:700 11px Arial,sans-serif;color:${C.ink};margin-bottom:4px">Purpose of Travel</div>
+      <div style="background:#F8FAFC;border:1px solid ${C.border};border-radius:6px;padding:10px 12px;font:400 13px/1.5 Arial,sans-serif;color:${C.ink}">
+        ${esc(travelReq.purpose || 'Business meeting / operational visit')}
+      </div>
+    </div>
+
+    <!-- Action Decision Buttons -->
+    <div style="margin:22px 0 8px;padding:16px;background:#F1F5F9;border-radius:10px;border:1px solid #CBD5E1">
+      <div style="font:700 12px Arial,sans-serif;color:#334155;margin-bottom:12px;text-align:center;letter-spacing:0.04em">
+        ${isShortNotice ? 'BOARD APPROVAL REQUIRED' : 'TRAVEL DESK ACTION REQUIRED'}
+      </div>
+      <table role="presentation" cellpadding="0" cellspacing="0" width="100%">
+        <tr>
+          <td align="center" style="padding:6px">
+            <a href="${approveUrl}" style="display:inline-block;padding:11px 24px;background-color:#059669;color:#ffffff;font:700 13px Arial,sans-serif;text-decoration:none;border-radius:7px;box-shadow:0 2px 4px rgba(5,150,105,0.25)">
+              Approve Request
+            </a>
+          </td>
+          <td align="center" style="padding:6px">
+            <a href="${rejectUrl}" style="display:inline-block;padding:11px 24px;background-color:#DC2626;color:#ffffff;font:700 13px Arial,sans-serif;text-decoration:none;border-radius:7px;box-shadow:0 2px 4px rgba(220,38,38,0.25)">
+              Reject Request
+            </a>
+          </td>
+        </tr>
+      </table>
+    </div>
+  `;
+
+  const html = renderEmail({
+    preheader: `Travel request ${travelReq.requestCode} (${travelReq.fromLocation} to ${travelReq.toLocation}) requires review`,
+    heading: `${isShortNotice ? 'Board Approval Required: ' : 'Travel Approval Required: '}${travelReq.requestCode}`,
+    intro: `A travel request has been submitted by <strong>${esc(travellerName)}</strong> (${esc(travellerEmail)}) for <strong>${esc(travelReq.fromLocation)} → ${esc(travelReq.toLocation)}</strong>.`,
+    rows: [],
+    bodyHtml,
+    footnote: 'Automated notification from <strong>ChangeDesk Travel Desk</strong>.'
+  });
+
+  const text =
+    `Travel Booking Approval Required: ${travelReq.requestCode}\n\n` +
+    `Traveller: ${travellerName} (${travellerEmail})\n` +
+    `Route: ${travelReq.fromLocation} to ${travelReq.toLocation}\n` +
+    `Departure: ${departureDate}\n` +
+    `Approve: ${approveUrl}\n` +
+    `Reject: ${rejectUrl}\n`;
+
+  return sendMail({
+    to: primary,
+    cc: travellerEmail ? [travellerEmail] : undefined,
+    replyTo: travellerEmail || undefined,
+    subject,
+    text,
+    html,
+    attachments: mailAttachments()
+  });
+};
+
+/**
+ * Travel Decision -> Notify Traveller (Approved / Rejected)
+ */
+export const sendTravelDecisionEmail = async ({ travelReq, action, comment, deciderName, deciderRole }) => {
+  const to = travelReq.travellerEmail;
+  if (!to) return { skipped: 'no-traveller-email' };
+
+  const isApproved = action === 'approve' || travelReq.status === 'Approved';
+  const approver = deciderName || 'Approver';
+  const roleTitle = deciderRole || (isApproved ? 'Travel Approver' : 'Approver');
+  const worklistUrl = `${appUrl()}/`;
+
+  const subject = `${isApproved ? 'Approved' : 'Rejected'}: Travel Booking Request ${travelReq.requestCode}`;
+
+  const bodyHtml = `
+    <!-- Decision Banner -->
+    <div style="background:${isApproved ? '#ECFDF5' : '#FEF2F2'};border:1.5px solid ${isApproved ? '#A7F3D0' : '#FECACA'};border-radius:10px;padding:16px 18px;margin-bottom:18px">
+      <div style="font:700 15px Arial,sans-serif;color:${isApproved ? '#059669' : '#DC2626'};margin-bottom:4px">
+        Travel Booking Request ${isApproved ? 'Approved' : 'Rejected'}
+      </div>
+      <div style="font:400 13px Arial,sans-serif;color:#334155;line-height:1.5">
+        Your booking request for <strong>${esc(travelReq.fromLocation)} → ${esc(travelReq.toLocation)}</strong> (${esc(travelReq.travelMode)}) was ${isApproved ? 'approved' : 'rejected'} by <strong>${esc(approver)}</strong> (${esc(roleTitle)}).
+      </div>
+      ${comment ? `
+        <div style="margin-top:10px;padding-top:10px;border-top:1px dashed ${isApproved ? '#A7F3D0' : '#FECACA'};font:400 13px/1.5 Arial,sans-serif;color:${isApproved ? '#065F46' : '#991B1B'}">
+          <strong>Decision Note / Instructions:</strong><br>
+          ${esc(comment)}
+        </div>
+      ` : ''}
+    </div>
+
+    <div style="margin:22px 0 8px;text-align:center">
+      <a href="${worklistUrl}" style="display:inline-block;padding:11px 24px;background-color:#0F172A;color:#ffffff;font:700 13px Arial,sans-serif;text-decoration:none;border-radius:7px">
+        View in Dashboard →
+      </a>
+    </div>
+  `;
+
+  const html = renderEmail({
+    preheader: `Travel Request ${travelReq.requestCode} has been ${isApproved ? 'approved' : 'rejected'}`,
+    heading: `${isApproved ? 'Approved' : 'Rejected'}: ${travelReq.requestCode}`,
+    intro: `Your travel request for <strong>${esc(travelReq.fromLocation)} → ${esc(travelReq.toLocation)}</strong> has been <strong>${isApproved ? 'Approved' : 'Rejected'}</strong>.`,
+    rows: [],
+    bodyHtml,
+    footnote: 'Automated notification from <strong>ChangeDesk Travel Desk</strong>.'
+  });
+
+  const text =
+    `${isApproved ? 'Approved' : 'Rejected'}: Travel Request ${travelReq.requestCode}\n\n` +
+    `Decided by: ${approver} (${roleTitle})\n` +
+    `Comment: ${comment || 'None'}\n\n` +
+    `View details: ${worklistUrl}\n`;
+
+  return sendMail({
+    to,
+    subject,
+    text,
+    html,
+    attachments: mailAttachments()
+  });
+};
+

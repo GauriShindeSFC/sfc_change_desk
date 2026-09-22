@@ -5,7 +5,10 @@ import {
   ArrowRight,
   IndianRupee,
   CheckCircle2,
-  Send
+  Send,
+  Paperclip,
+  FileText,
+  ExternalLink
 } from 'lucide-react';
 import {
   PRE_SPEND_CATEGORIES,
@@ -16,7 +19,7 @@ import {
 import { FormLabel } from '../components/ui/primitives.component';
 import { apiFetch } from '../lib/apiFetch.lib';
 
-const emptyVendor = () => ({ name: '', amount: '', date: '', file: null });
+const emptyVendor = () => ({ name: '', amount: '', date: '', file: null, fileName: '' });
 const money = value => Number(value || 0).toLocaleString('en-IN', { style: 'currency', currency: 'INR' });
 
 const ACTIVE_FIELD_STYLE = {
@@ -45,14 +48,14 @@ export default function PreSpendPage({ onNavigate, user, initialCostCentre = '',
     costCentre: resolvedCostCentre,
     budgetLine: '',
     justification: '',
-    urgent: false,
-    urgentReason: ''
+    urgent: false
   });
   const [vendors, setVendors] = useState([emptyVendor(), emptyVendor(), emptyVendor()]);
-  const [commercial, setCommercial] = useState({ exception: '', exceptionReason: '', reason: '', justification: '' });
+  const [commercial, setCommercial] = useState({ exception: 'Not applicable', exceptionReason: '', reason: '', justification: '' });
   const [certified, setCertified] = useState(false);
   const [notice, setNotice] = useState('');
   const [submitted, setSubmitted] = useState(false);
+  const [createdCode, setCreatedCode] = useState('');
 
   const changeDetails = (key, value) => {
     setDetails(old => ({ ...old, [key]: value }));
@@ -84,7 +87,18 @@ export default function PreSpendPage({ onNavigate, user, initialCostCentre = '',
   })();
 
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [createdCode, setCreatedCode] = useState('');
+  const fileToBase64 = (file) => {
+    return new Promise((resolve) => {
+      if (!file || !(file instanceof Blob || file instanceof File)) {
+        resolve(typeof file === 'string' ? file : null);
+        return;
+      }
+      const reader = new FileReader();
+      reader.onloadend = () => resolve(reader.result);
+      reader.onerror = () => resolve(null);
+      reader.readAsDataURL(file);
+    });
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -95,6 +109,24 @@ export default function PreSpendPage({ onNavigate, user, initialCostCentre = '',
     setIsSubmitting(true);
     setNotice('');
     try {
+      const processedVendors = await Promise.all(
+        vendors
+          .filter(v => v.name || v.amount || v.fileName)
+          .map(async (v) => {
+            let fileData = v.fileData || null;
+            if (v.file instanceof Blob || v.file instanceof File) {
+              fileData = await fileToBase64(v.file);
+            }
+            return {
+              name: v.name,
+              amount: v.amount,
+              date: v.date,
+              fileName: v.fileName || (v.file ? v.file.name : ''),
+              fileData: fileData
+            };
+          })
+      );
+
       const payload = {
         category,
         subcategory,
@@ -105,8 +137,7 @@ export default function PreSpendPage({ onNavigate, user, initialCostCentre = '',
         budgetLine: details.budgetLine,
         justification: details.justification,
         urgent: details.urgent,
-        urgentReason: details.urgentReason,
-        vendors: vendors.filter(v => v.name || v.amount),
+        vendors: processedVendors,
         commercial,
         certified
       };
@@ -423,6 +454,7 @@ export default function PreSpendPage({ onNavigate, user, initialCostCentre = '',
                   required
                   value={details.amount}
                   onChange={e => changeDetails('amount', e.target.value)}
+                  onWheel={e => e.target.blur()}
                   placeholder="0.00"
                   style={{ ...ACTIVE_FIELD_STYLE, paddingLeft: '2rem', fontFamily: 'var(--font-mono)' }}
                 />
@@ -455,18 +487,23 @@ export default function PreSpendPage({ onNavigate, user, initialCostCentre = '',
               />
             </div>
 
-            <div>
+            <div style={{ gridColumn: 'span 2' }}>
               <FormLabel required htmlFor={id('budgetLine')}>Budget Line</FormLabel>
               <select
                 id={id('budgetLine')}
                 required
                 value={details.budgetLine}
                 onChange={e => changeDetails('budgetLine', e.target.value)}
-                style={ACTIVE_FIELD_STYLE}
+                style={{
+                  ...ACTIVE_FIELD_STYLE,
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap',
+                  overflow: 'hidden'
+                }}
               >
                 <option value="">Select budget line</option>
                 {budgetLines.map(line => (
-                  <option key={line.value} value={line.value}>{line.label}</option>
+                  <option key={line.value} value={line.value} title={line.label}>{line.label}</option>
                 ))}
               </select>
             </div>
@@ -496,21 +533,6 @@ export default function PreSpendPage({ onNavigate, user, initialCostCentre = '',
                 Mark as urgent requirement
               </label>
             </div>
-
-            {details.urgent && (
-              <div style={{ gridColumn: '1 / -1' }}>
-                <FormLabel required htmlFor={id('urgentReason')} style={{ color: '#DC2626' }}>Urgency Reason</FormLabel>
-                <input
-                  id={id('urgentReason')}
-                  type="text"
-                  required={details.urgent}
-                  value={details.urgentReason}
-                  onChange={e => changeDetails('urgentReason', e.target.value)}
-                  placeholder="Explain why expedited approval is necessary"
-                  style={{ ...ACTIVE_FIELD_STYLE, borderColor: '#FCA5A5', backgroundColor: '#FEF2F2' }}
-                />
-              </div>
-            )}
           </div>
 
           <div style={{ display: 'flex', justifyContent: 'space-between', paddingTop: '1rem', borderTop: '1px solid var(--border-color)' }}>
@@ -560,145 +582,406 @@ export default function PreSpendPage({ onNavigate, user, initialCostCentre = '',
       {/* STEP 3: Vendors & Quotes */}
       {!submitted && step === 3 && (
         <form onSubmit={(e) => { e.preventDefault(); setStep(4); }} style={{
-          backgroundColor: 'var(--card-bg)',
-          border: '1px solid var(--border-color)',
-          borderRadius: '12px',
-          padding: '1.75rem',
+          backgroundColor: '#FFFFFF',
+          border: '1px solid #E2E8F0',
+          borderRadius: '16px',
+          padding: '2rem',
           display: 'flex',
           flexDirection: 'column',
-          gap: '1.5rem',
+          gap: '1.75rem',
           boxShadow: '0 1px 3px rgba(16, 21, 30, 0.04)'
         }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <div>
-              <h3 style={{ fontSize: '1rem', fontWeight: 600, color: 'var(--text-primary)', margin: 0 }}>
-                Vendor Quotes (3-Way Comparison)
-              </h3>
-              <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', margin: '0.2rem 0 0 0' }}>
-                Enter details for competing vendors or select a commercial exception below
-              </p>
-            </div>
-            <span style={{ fontSize: '0.775rem', fontWeight: 600, color: 'var(--text-secondary)' }}>
-              Step 3 of 4
-            </span>
+          <div>
+            <h2 style={{ fontSize: '1.25rem', fontWeight: 700, color: '#0F172A', margin: 0 }}>
+              Vendors & Quotes
+            </h2>
+            <p style={{ fontSize: '0.875rem', color: '#64748B', margin: '0.25rem 0 0 0' }}>
+              Compare your preferred vendor with available alternatives.
+            </p>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '1rem' }}>
-            {vendors.map((vendor, idx) => (
-              <div key={idx} style={{
-                padding: '1.25rem',
-                borderRadius: '10px',
-                border: '1px solid var(--border-color)',
-                backgroundColor: 'var(--input-bg)',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '0.85rem'
-              }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <span style={{ fontSize: '0.825rem', fontWeight: 700, color: 'var(--text-primary)' }}>
-                    Vendor {idx + 1} {idx === 0 ? '(Recommended)' : '(Comparison)'}
-                  </span>
-                  {idx === 0 && (
-                    <span style={{ fontSize: '0.7rem', backgroundColor: '#EFF6FF', color: '#1D4ED8', fontWeight: 700, padding: '0.2rem 0.5rem', borderRadius: '4px' }}>
-                      Primary
-                    </span>
-                  )}
-                </div>
+          {/* 2x2 Grid for Vendor Cards and Quote Exception */}
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))',
+            gap: '1.25rem'
+          }}>
+            {/* 1. Preferred Vendor */}
+            <div style={{
+              padding: '1.5rem',
+              borderRadius: '14px',
+              border: '1.5px solid #10B981',
+              backgroundColor: '#FFFFFF',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '1rem'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <span style={{ fontSize: '0.95rem', fontWeight: 700, color: '#0F172A' }}>
+                  Preferred Vendor
+                </span>
+                <span style={{
+                  fontSize: '0.75rem',
+                  backgroundColor: '#E6F4EA',
+                  color: '#137333',
+                  fontWeight: 700,
+                  padding: '0.2rem 0.65rem',
+                  borderRadius: '12px'
+                }}>
+                  Preferred
+                </span>
+              </div>
 
+              <div>
+                <FormLabel required htmlFor="vendor-0-name">Vendor name</FormLabel>
+                <input
+                  id="vendor-0-name"
+                  type="text"
+                  required={!commercial.exception || commercial.exception === 'Not applicable'}
+                  value={vendors[0]?.name || ''}
+                  onChange={e => changeVendor(0, 'name', e.target.value)}
+                  placeholder="Search or enter vendor"
+                  style={ACTIVE_FIELD_STYLE}
+                />
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
                 <div>
-                  <FormLabel htmlFor={`vendor-name-${idx}`}>Vendor Name</FormLabel>
+                  <FormLabel required htmlFor="vendor-0-amount">Quoted amount (₹)</FormLabel>
                   <input
-                    id={`vendor-name-${idx}`}
-                    type="text"
-                    required={idx === 0 && !commercial.exception}
-                    value={vendor.name}
-                    onChange={e => changeVendor(idx, 'name', e.target.value)}
-                    placeholder="Company name"
+                    id="vendor-0-amount"
+                    type="number"
+                    step="any"
+                    required={!commercial.exception || commercial.exception === 'Not applicable'}
+                    value={vendors[0]?.amount || ''}
+                    onChange={e => changeVendor(0, 'amount', e.target.value)}
+                    onWheel={e => e.target.blur()}
+                    placeholder="0"
                     style={ACTIVE_FIELD_STYLE}
                   />
                 </div>
-
                 <div>
-                  <FormLabel htmlFor={`vendor-amount-${idx}`}>Quotation Amount (INR)</FormLabel>
+                  <FormLabel required htmlFor="vendor-0-date">Quote date</FormLabel>
                   <input
-                    id={`vendor-amount-${idx}`}
-                    type="number"
-                    step="0.01"
-                    required={idx === 0 && !commercial.exception}
-                    value={vendor.amount}
-                    onChange={e => changeVendor(idx, 'amount', e.target.value)}
-                    placeholder="0.00"
-                    style={{ ...ACTIVE_FIELD_STYLE, fontFamily: 'var(--font-mono)' }}
-                  />
-                </div>
-
-                <div>
-                  <FormLabel htmlFor={`vendor-date-${idx}`}>Quote Date</FormLabel>
-                  <input
-                    id={`vendor-date-${idx}`}
+                    id="vendor-0-date"
                     type="date"
-                    value={vendor.date}
-                    onChange={e => changeVendor(idx, 'date', e.target.value)}
+                    required={!commercial.exception || commercial.exception === 'Not applicable'}
+                    value={vendors[0]?.date || ''}
+                    onChange={e => changeVendor(0, 'date', e.target.value)}
                     style={ACTIVE_FIELD_STYLE}
                   />
                 </div>
               </div>
-            ))}
-          </div>
 
-          {/* Commercial Exception Section */}
-          <div style={{ paddingTop: '1.25rem', borderTop: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-            <div className="cd-responsive-form-grid">
               <div>
-                <FormLabel htmlFor="commercial-exception">Commercial Exception (Optional)</FormLabel>
+                <FormLabel required htmlFor="vendor-0-file">Upload quotation</FormLabel>
+                <input
+                  id="vendor-0-file"
+                  type="file"
+                  style={{ display: 'none' }}
+                  onChange={e => {
+                    const f = e.target.files?.[0];
+                    if (f) {
+                      changeVendor(0, 'file', f);
+                      changeVendor(0, 'fileName', f.name);
+                    }
+                  }}
+                />
+                <label
+                  htmlFor="vendor-0-file"
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    height: '42px',
+                    border: '1px dashed #94A3B8',
+                    borderRadius: '8px',
+                    backgroundColor: '#F8FAFC',
+                    color: vendors[0]?.fileName ? '#0F172A' : '#475569',
+                    fontSize: '0.85rem',
+                    fontWeight: 500,
+                    cursor: 'pointer',
+                    textAlign: 'center',
+                    padding: '0 1rem',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap'
+                  }}
+                >
+                  {vendors[0]?.fileName ? vendors[0].fileName : 'Choose PDF, image or email quotation'}
+                </label>
+              </div>
+            </div>
+
+            {/* 2. Alternative Vendor 1 */}
+            <div style={{
+              padding: '1.5rem',
+              borderRadius: '14px',
+              border: '1px solid #E2E8F0',
+              backgroundColor: '#FFFFFF',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '1rem'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <span style={{ fontSize: '0.95rem', fontWeight: 700, color: '#0F172A' }}>
+                  Alternative Vendor 1
+                </span>
+              </div>
+
+              <div>
+                <FormLabel htmlFor="vendor-1-name">Vendor name</FormLabel>
+                <input
+                  id="vendor-1-name"
+                  type="text"
+                  value={vendors[1]?.name || ''}
+                  onChange={e => changeVendor(1, 'name', e.target.value)}
+                  placeholder="Enter vendor"
+                  style={ACTIVE_FIELD_STYLE}
+                />
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                <div>
+                  <FormLabel htmlFor="vendor-1-amount">Quoted amount (₹)</FormLabel>
+                  <input
+                    id="vendor-1-amount"
+                    type="number"
+                    step="any"
+                    value={vendors[1]?.amount || ''}
+                    onChange={e => changeVendor(1, 'amount', e.target.value)}
+                    onWheel={e => e.target.blur()}
+                    placeholder="0"
+                    style={ACTIVE_FIELD_STYLE}
+                  />
+                </div>
+                <div>
+                  <FormLabel htmlFor="vendor-1-date">Quote date</FormLabel>
+                  <input
+                    id="vendor-1-date"
+                    type="date"
+                    value={vendors[1]?.date || ''}
+                    onChange={e => changeVendor(1, 'date', e.target.value)}
+                    style={ACTIVE_FIELD_STYLE}
+                  />
+                </div>
+              </div>
+
+              <div>
+                <FormLabel htmlFor="vendor-1-file">Upload quotation</FormLabel>
+                <input
+                  id="vendor-1-file"
+                  type="file"
+                  style={{ display: 'none' }}
+                  onChange={e => {
+                    const f = e.target.files?.[0];
+                    if (f) {
+                      changeVendor(1, 'file', f);
+                      changeVendor(1, 'fileName', f.name);
+                    }
+                  }}
+                />
+                <label
+                  htmlFor="vendor-1-file"
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    height: '42px',
+                    border: '1px dashed #CBD5E1',
+                    borderRadius: '8px',
+                    backgroundColor: '#FFFFFF',
+                    color: vendors[1]?.fileName ? '#0F172A' : '#475569',
+                    fontSize: '0.85rem',
+                    fontWeight: 500,
+                    cursor: 'pointer',
+                    textAlign: 'center',
+                    padding: '0 1rem',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap'
+                  }}
+                >
+                  {vendors[1]?.fileName ? vendors[1].fileName : 'Choose quotation file'}
+                </label>
+              </div>
+            </div>
+
+            {/* 3. Alternative Vendor 2 */}
+            <div style={{
+              padding: '1.5rem',
+              borderRadius: '14px',
+              border: '1px solid #E2E8F0',
+              backgroundColor: '#FFFFFF',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '1rem'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <span style={{ fontSize: '0.95rem', fontWeight: 700, color: '#0F172A' }}>
+                  Alternative Vendor 2
+                </span>
+                <span style={{ fontSize: '0.75rem', color: '#64748B', fontWeight: 500 }}>
+                  Optional
+                </span>
+              </div>
+
+              <div>
+                <FormLabel htmlFor="vendor-2-name">Vendor name</FormLabel>
+                <input
+                  id="vendor-2-name"
+                  type="text"
+                  value={vendors[2]?.name || ''}
+                  onChange={e => changeVendor(2, 'name', e.target.value)}
+                  placeholder="Enter vendor"
+                  style={ACTIVE_FIELD_STYLE}
+                />
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                <div>
+                  <FormLabel htmlFor="vendor-2-amount">Quoted amount (₹)</FormLabel>
+                  <input
+                    id="vendor-2-amount"
+                    type="number"
+                    step="any"
+                    value={vendors[2]?.amount || ''}
+                    onChange={e => changeVendor(2, 'amount', e.target.value)}
+                    onWheel={e => e.target.blur()}
+                    placeholder="0"
+                    style={ACTIVE_FIELD_STYLE}
+                  />
+                </div>
+                <div>
+                  <FormLabel htmlFor="vendor-2-date">Quote date</FormLabel>
+                  <input
+                    id="vendor-2-date"
+                    type="date"
+                    value={vendors[2]?.date || ''}
+                    onChange={e => changeVendor(2, 'date', e.target.value)}
+                    style={ACTIVE_FIELD_STYLE}
+                  />
+                </div>
+              </div>
+
+              <div>
+                <FormLabel htmlFor="vendor-2-file">Upload quotation</FormLabel>
+                <input
+                  id="vendor-2-file"
+                  type="file"
+                  style={{ display: 'none' }}
+                  onChange={e => {
+                    const f = e.target.files?.[0];
+                    if (f) {
+                      changeVendor(2, 'file', f);
+                      changeVendor(2, 'fileName', f.name);
+                    }
+                  }}
+                />
+                <label
+                  htmlFor="vendor-2-file"
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    height: '42px',
+                    border: '1px dashed #CBD5E1',
+                    borderRadius: '8px',
+                    backgroundColor: '#FFFFFF',
+                    color: vendors[2]?.fileName ? '#0F172A' : '#475569',
+                    fontSize: '0.85rem',
+                    fontWeight: 500,
+                    cursor: 'pointer',
+                    textAlign: 'center',
+                    padding: '0 1rem',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap'
+                  }}
+                >
+                  {vendors[2]?.fileName ? vendors[2].fileName : 'Choose quotation file'}
+                </label>
+              </div>
+            </div>
+
+            {/* 4. Quote Exception Card */}
+            <div style={{
+              padding: '1.5rem',
+              borderRadius: '14px',
+              border: '1px solid #E2E8F0',
+              backgroundColor: '#FFFFFF',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '1rem'
+            }}>
+              <div>
+                <span style={{ fontSize: '0.95rem', fontWeight: 700, color: '#0F172A' }}>
+                  Quote Exception
+                </span>
+              </div>
+
+              <div>
+                <FormLabel htmlFor="commercial-exception">If alternative quotes are unavailable</FormLabel>
                 <select
                   id="commercial-exception"
                   value={commercial.exception}
                   onChange={e => changeCommercial('exception', e.target.value)}
                   style={ACTIVE_FIELD_STYLE}
                 >
-                  <option value="">None (Standard 3 quotes provided)</option>
                   {EXCEPTION_OPTIONS.map(opt => (
                     <option key={opt} value={opt}>{opt}</option>
                   ))}
                 </select>
               </div>
 
-              <div>
-                <FormLabel htmlFor="commercial-reason">Reason for Selection</FormLabel>
-                <select
-                  id="commercial-reason"
-                  value={commercial.reason}
-                  onChange={e => changeCommercial('reason', e.target.value)}
-                  style={ACTIVE_FIELD_STYLE}
-                >
-                  <option value="">Select reason</option>
-                  {COMMERCIAL_REASONS.map(r => (
-                    <option key={r} value={r}>{r}</option>
-                  ))}
-                </select>
+              <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+                <FormLabel htmlFor="exception-justification">Exception justification</FormLabel>
+                <textarea
+                  id="exception-justification"
+                  rows={3}
+                  value={commercial.exceptionReason}
+                  onChange={e => changeCommercial('exceptionReason', e.target.value)}
+                  placeholder="Explain why comparison quotes are not available"
+                  style={{ ...ACTIVE_FIELD_STYLE, flex: 1, minHeight: '74px', resize: 'vertical' }}
+                />
               </div>
-
-              {commercial.exception && (
-                <div style={{ gridColumn: '1 / -1' }}>
-                  <FormLabel required htmlFor="exception-justification" style={{ color: '#B45309' }}>
-                    Exception Justification
-                  </FormLabel>
-                  <textarea
-                    id="exception-justification"
-                    rows={2}
-                    required={Boolean(commercial.exception)}
-                    value={commercial.exceptionReason}
-                    onChange={e => changeCommercial('exceptionReason', e.target.value)}
-                    placeholder="Explain why competitive quotes could not be obtained"
-                    style={{ ...ACTIVE_FIELD_STYLE, borderColor: '#FDE68A', backgroundColor: '#FFFBEB', resize: 'vertical' }}
-                  />
-                </div>
-              )}
             </div>
           </div>
 
-          <div style={{ display: 'flex', justifyContent: 'space-between', paddingTop: '1rem', borderTop: '1px solid var(--border-color)' }}>
+          {/* Selection Reason and Commercial Justification Fields */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+            <div>
+              <FormLabel required htmlFor="commercial-reason">Why have you selected this vendor?</FormLabel>
+              <select
+                id="commercial-reason"
+                required
+                value={commercial.reason}
+                onChange={e => changeCommercial('reason', e.target.value)}
+                style={ACTIVE_FIELD_STYLE}
+              >
+                <option value="">Select primary reason</option>
+                {COMMERCIAL_REASONS.map(r => (
+                  <option key={r} value={r}>{r}</option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <FormLabel required htmlFor="vendor-selection-justification">Vendor selection justification</FormLabel>
+              <textarea
+                id="vendor-selection-justification"
+                rows={3}
+                required
+                value={commercial.justification}
+                onChange={e => changeCommercial('justification', e.target.value)}
+                placeholder="Explain the commercial and operational reason for selecting this vendor"
+                style={{ ...ACTIVE_FIELD_STYLE, resize: 'vertical', minHeight: '80px' }}
+              />
+            </div>
+          </div>
+
+          {/* Navigation Buttons */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '1rem', borderTop: '1px solid #E2E8F0' }}>
             <button
               type="button"
               onClick={() => setStep(2)}
@@ -706,17 +989,16 @@ export default function PreSpendPage({ onNavigate, user, initialCostCentre = '',
                 display: 'inline-flex',
                 alignItems: 'center',
                 gap: '0.45rem',
-                padding: '0.55rem 1rem',
-                backgroundColor: 'var(--card-bg)',
-                color: 'var(--text-primary)',
-                border: '1px solid var(--border-color)',
+                padding: '0.65rem 1.35rem',
+                backgroundColor: '#FFFFFF',
+                color: '#0F172A',
+                border: '1px solid #CBD5E1',
                 borderRadius: '8px',
-                fontSize: '0.825rem',
+                fontSize: '0.875rem',
                 fontWeight: 600,
                 cursor: 'pointer'
               }}
             >
-              <ArrowLeft size={14} />
               <span>Back</span>
             </button>
             <button
@@ -725,18 +1007,17 @@ export default function PreSpendPage({ onNavigate, user, initialCostCentre = '',
                 display: 'inline-flex',
                 alignItems: 'center',
                 gap: '0.45rem',
-                padding: '0.65rem 1.35rem',
-                backgroundColor: 'var(--brand-primary)',
+                padding: '0.65rem 1.6rem',
+                backgroundColor: '#0F172A',
                 color: '#FFFFFF',
                 border: 'none',
                 borderRadius: '8px',
-                fontSize: '0.85rem',
+                fontSize: '0.875rem',
                 fontWeight: 600,
                 cursor: 'pointer'
               }}
             >
-              <span>Next: Review & Submit</span>
-              <ArrowRight size={14} />
+              <span>Review Request</span>
             </button>
           </div>
         </form>
@@ -745,55 +1026,199 @@ export default function PreSpendPage({ onNavigate, user, initialCostCentre = '',
       {/* STEP 4: Review & Submit */}
       {!submitted && step === 4 && (
         <form onSubmit={handleSubmit} style={{
-          backgroundColor: 'var(--card-bg)',
-          border: '1px solid var(--border-color)',
-          borderRadius: '12px',
-          padding: '1.75rem',
+          backgroundColor: '#FFFFFF',
+          border: '1px solid #E2E8F0',
+          borderRadius: '16px',
+          padding: '2rem',
           display: 'flex',
           flexDirection: 'column',
-          gap: '1.5rem',
+          gap: '1.75rem',
           boxShadow: '0 1px 3px rgba(16, 21, 30, 0.04)'
         }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <div>
-              <h3 style={{ fontSize: '1rem', fontWeight: 600, color: 'var(--text-primary)', margin: 0 }}>
+              <h2 style={{ fontSize: '1.25rem', fontWeight: 700, color: '#0F172A', margin: 0 }}>
                 Review Pre-Spend Request
-              </h3>
-              <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', margin: '0.2rem 0 0 0' }}>
-                Verify all spend information before submitting for management approval
+              </h2>
+              <p style={{ fontSize: '0.875rem', color: '#64748B', margin: '0.25rem 0 0 0' }}>
+                Verify all spend information, vendor quotes, and attachments before submitting for approval
               </p>
             </div>
-            <span style={{ fontSize: '0.775rem', fontWeight: 600, color: 'var(--text-secondary)' }}>
+            <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#64748B', backgroundColor: '#F1F5F9', padding: '0.3rem 0.65rem', borderRadius: '6px' }}>
               Step 4 of 4
             </span>
           </div>
 
-          {/* Details Table */}
-          <div style={{ borderRadius: '10px', border: '1px solid var(--border-color)', overflow: 'hidden' }}>
-            <div style={{ padding: '0.65rem 1rem', backgroundColor: 'var(--input-bg)', borderBottom: '1px solid var(--border-color)', fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-primary)' }}>
-              Request Details Summary
+          {/* Section 1: Request Details */}
+          <div style={{ borderRadius: '12px', border: '1px solid #E2E8F0', overflow: 'hidden' }}>
+            <div style={{ padding: '0.75rem 1.25rem', backgroundColor: '#F8FAFC', borderBottom: '1px solid #E2E8F0', fontSize: '0.85rem', fontWeight: 700, color: '#0F172A' }}>
+              1. Request & Budget Details
             </div>
-            <div className="cd-responsive-form-grid" style={{ padding: '1rem', gap: '0.75rem', fontSize: '0.825rem' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ color: 'var(--text-secondary)' }}>Category:</span> <strong style={{ color: 'var(--text-primary)' }}>{category}</strong></div>
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ color: 'var(--text-secondary)' }}>Subcategory:</span> <strong style={{ color: 'var(--text-primary)' }}>{subcategory}</strong></div>
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ color: 'var(--text-secondary)' }}>Item:</span> <strong style={{ color: 'var(--text-primary)' }}>{details.buying}</strong></div>
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ color: 'var(--text-secondary)' }}>Estimated Value:</span> <strong style={{ color: '#2563EB', fontFamily: 'var(--font-mono)' }}>{money(details.amount)}</strong></div>
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ color: 'var(--text-secondary)' }}>Needed By:</span> <strong style={{ color: 'var(--text-primary)' }}>{details.neededBy}</strong></div>
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ color: 'var(--text-secondary)' }}>Cost Centre:</span> <strong style={{ color: 'var(--text-primary)' }}>{details.costCentre}</strong></div>
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ color: 'var(--text-secondary)' }}>Urgent:</span> <strong style={{ color: details.urgent ? '#DC2626' : 'var(--text-primary)' }}>{details.urgent ? `Yes (${details.urgentReason})` : 'No'}</strong></div>
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ color: 'var(--text-secondary)' }}>Selected Vendor:</span> <strong style={{ color: 'var(--text-primary)' }}>{vendors[0]?.name || 'N/A'}</strong></div>
+            <div style={{ padding: '1.25rem', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1rem', fontSize: '0.85rem' }}>
+              <div>
+                <span style={{ color: '#64748B', display: 'block', fontSize: '0.75rem', fontWeight: 600, textTransform: 'uppercase' }}>Category / Subcategory</span>
+                <span style={{ color: '#0F172A', fontWeight: 600 }}>{category} — {subcategory}</span>
+              </div>
+              <div>
+                <span style={{ color: '#64748B', display: 'block', fontSize: '0.75rem', fontWeight: 600, textTransform: 'uppercase' }}>Estimated Value</span>
+                <span style={{ color: '#2563EB', fontWeight: 700, fontFamily: 'var(--font-mono)', fontSize: '0.95rem' }}>{money(details.amount)}</span>
+              </div>
+              <div>
+                <span style={{ color: '#64748B', display: 'block', fontSize: '0.75rem', fontWeight: 600, textTransform: 'uppercase' }}>Request Date</span>
+                <span style={{ color: '#0F172A', fontWeight: 600 }}>{new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}</span>
+              </div>
+              <div>
+                <span style={{ color: '#64748B', display: 'block', fontSize: '0.75rem', fontWeight: 600, textTransform: 'uppercase' }}>Needed By Date</span>
+                <span style={{ color: '#0F172A', fontWeight: 600 }}>{details.neededBy || '—'}</span>
+              </div>
+              <div>
+                <span style={{ color: '#64748B', display: 'block', fontSize: '0.75rem', fontWeight: 600, textTransform: 'uppercase' }}>Cost Centre</span>
+                <span style={{ color: '#0F172A', fontWeight: 600 }}>{details.costCentre || '—'}</span>
+              </div>
+              <div style={{ gridColumn: '1 / -1' }}>
+                <span style={{ color: '#64748B', display: 'block', fontSize: '0.75rem', fontWeight: 600, textTransform: 'uppercase' }}>Budget Line</span>
+                <span style={{ color: '#0F172A', fontWeight: 600 }}>{budgetLines.find(b => b.value === details.budgetLine)?.label || details.budgetLine || '—'}</span>
+              </div>
+              <div style={{ gridColumn: '1 / -1' }}>
+                <span style={{ color: '#64748B', display: 'block', fontSize: '0.75rem', fontWeight: 600, textTransform: 'uppercase' }}>What are you buying? (Scope & Spec)</span>
+                <p style={{ color: '#0F172A', margin: '0.25rem 0 0 0', lineHeight: 1.5, whiteSpace: 'pre-wrap' }}>{details.buying}</p>
+              </div>
+              <div style={{ gridColumn: '1 / -1' }}>
+                <span style={{ color: '#64748B', display: 'block', fontSize: '0.75rem', fontWeight: 600, textTransform: 'uppercase' }}>Business Justification</span>
+                <p style={{ color: '#334155', margin: '0.25rem 0 0 0', lineHeight: 1.5, whiteSpace: 'pre-wrap' }}>{details.justification}</p>
+              </div>
+              {details.urgent && (
+                <div style={{ gridColumn: '1 / -1', padding: '0.75rem 1rem', backgroundColor: '#FEF2F2', border: '1px solid #FCA5A5', borderRadius: '8px' }}>
+                  <span style={{ color: '#DC2626', fontWeight: 700, display: 'block', fontSize: '0.8rem' }}>URGENT REQUIREMENT</span>
+                </div>
+              )}
             </div>
           </div>
 
-          {/* Justification Box */}
-          <div style={{ padding: '1rem 1.25rem', backgroundColor: 'var(--input-bg)', borderRadius: '10px', border: '1px solid var(--border-color)', fontSize: '0.825rem' }}>
-            <div style={{ fontWeight: 600, color: 'var(--text-primary)', marginBottom: '0.35rem' }}>Business Justification</div>
-            <p style={{ color: 'var(--text-secondary)', lineHeight: 1.5, margin: 0 }}>{details.justification}</p>
+          {/* Section 2: Vendors & Quotations Comparison */}
+          <div style={{ borderRadius: '12px', border: '1px solid #E2E8F0', overflow: 'hidden' }}>
+            <div style={{ padding: '0.75rem 1.25rem', backgroundColor: '#F8FAFC', borderBottom: '1px solid #E2E8F0', fontSize: '0.85rem', fontWeight: 700, color: '#0F172A' }}>
+              2. Vendor Quotations & Comparison
+            </div>
+            <div style={{ padding: '1.25rem', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1rem' }}>
+              {vendors.filter(v => v.name?.trim() || v.amount || v.fileName).map((v, i) => (
+                <div key={i} style={{
+                  padding: '1rem',
+                  borderRadius: '10px',
+                  border: i === 0 ? '1.5px solid #10B981' : '1px solid #E2E8F0',
+                  backgroundColor: i === 0 ? '#F0FDF4' : '#FFFFFF',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '0.65rem'
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <span style={{ fontSize: '0.875rem', fontWeight: 700, color: '#0F172A' }}>
+                      {i === 0 ? 'Preferred Vendor' : `Alternative Vendor ${i}`}
+                    </span>
+                    {i === 0 && (
+                      <span style={{ fontSize: '0.7rem', backgroundColor: '#E6F4EA', color: '#137333', fontWeight: 700, padding: '0.15rem 0.5rem', borderRadius: '10px' }}>
+                        Selected
+                      </span>
+                    )}
+                  </div>
+
+                  <div style={{ fontSize: '0.825rem' }}>
+                    <span style={{ color: '#64748B', display: 'block', fontSize: '0.75rem' }}>Vendor Name</span>
+                    <strong style={{ color: '#0F172A' }}>{v.name || '—'}</strong>
+                  </div>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem', fontSize: '0.825rem' }}>
+                    <div>
+                      <span style={{ color: '#64748B', display: 'block', fontSize: '0.75rem' }}>Quoted Amount</span>
+                      <strong style={{ color: '#0F172A', fontFamily: 'var(--font-mono)' }}>{v.amount ? money(v.amount) : '₹0'}</strong>
+                    </div>
+                    <div>
+                      <span style={{ color: '#64748B', display: 'block', fontSize: '0.75rem' }}>Quote Date</span>
+                      <strong style={{ color: '#0F172A' }}>{v.date || '—'}</strong>
+                    </div>
+                  </div>
+
+                  <div style={{ fontSize: '0.825rem', paddingTop: '0.35rem', borderTop: '1px dashed #CBD5E1' }}>
+                    <span style={{ color: '#64748B', display: 'block', fontSize: '0.75rem', marginBottom: '0.25rem' }}>Attached Quotation</span>
+                    {v.file || v.fileName ? (
+                      <button
+                        type="button"
+                        title="Click to preview attached quotation file"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          if (v.file instanceof Blob || v.file instanceof File) {
+                            const fileUrl = URL.createObjectURL(v.file);
+                            window.open(fileUrl, '_blank');
+                          } else if (typeof v.file === 'string' && v.file.startsWith('http')) {
+                            window.open(v.file, '_blank');
+                          } else {
+                            alert(`Quotation file: ${v.fileName || 'Document attached'}`);
+                          }
+                        }}
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '0.45rem',
+                          padding: '0.35rem 0.65rem',
+                          backgroundColor: '#EFF6FF',
+                          color: '#1D4ED8',
+                          border: '1px solid #BFDBFE',
+                          borderRadius: '6px',
+                          fontSize: '0.8rem',
+                          fontWeight: 600,
+                          cursor: 'pointer',
+                          transition: 'all 0.15s ease'
+                        }}
+                      >
+                        <FileText size={14} />
+                        <span style={{ maxWidth: '180px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {v.fileName || 'View Quotation'}
+                        </span>
+                        <ExternalLink size={12} style={{ opacity: 0.7 }} />
+                      </button>
+                    ) : (
+                      <span style={{ color: '#94A3B8', fontStyle: 'italic', fontSize: '0.8rem' }}>No quotation file uploaded</span>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
 
-          {/* Policy Certification Checkbox */}
-          <div style={{ padding: '1rem 1.25rem', backgroundColor: '#EFF6FF', border: '1px solid #BFDBFE', borderRadius: '10px', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-            <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.65rem' }}>
+          {/* Section 3: Commercial Evaluation & Justification */}
+          <div style={{ borderRadius: '12px', border: '1px solid #E2E8F0', overflow: 'hidden' }}>
+            <div style={{ padding: '0.75rem 1.25rem', backgroundColor: '#F8FAFC', borderBottom: '1px solid #E2E8F0', fontSize: '0.85rem', fontWeight: 700, color: '#0F172A' }}>
+              3. Commercial Evaluation & Justification
+            </div>
+            <div style={{ padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '0.85rem', fontSize: '0.85rem' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1rem' }}>
+                <div>
+                  <span style={{ color: '#64748B', display: 'block', fontSize: '0.75rem', fontWeight: 600, textTransform: 'uppercase' }}>Reason for Vendor Selection</span>
+                  <span style={{ color: '#0F172A', fontWeight: 600 }}>{commercial.reason || '—'}</span>
+                </div>
+                <div>
+                  <span style={{ color: '#64748B', display: 'block', fontSize: '0.75rem', fontWeight: 600, textTransform: 'uppercase' }}>Quote Exception Rule</span>
+                  <span style={{ color: '#0F172A', fontWeight: 600 }}>{commercial.exception || 'Not applicable'}</span>
+                </div>
+              </div>
+
+              {commercial.exception && commercial.exception !== 'Not applicable' && commercial.exceptionReason && (
+                <div>
+                  <span style={{ color: '#64748B', display: 'block', fontSize: '0.75rem', fontWeight: 600, textTransform: 'uppercase' }}>Exception Justification</span>
+                  <p style={{ color: '#334155', margin: '0.2rem 0 0 0', lineHeight: 1.5 }}>{commercial.exceptionReason}</p>
+                </div>
+              )}
+
+              <div>
+                <span style={{ color: '#64748B', display: 'block', fontSize: '0.75rem', fontWeight: 600, textTransform: 'uppercase' }}>Vendor Selection Justification</span>
+                <p style={{ color: '#334155', margin: '0.2rem 0 0 0', lineHeight: 1.5, whiteSpace: 'pre-wrap' }}>{commercial.justification || '—'}</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Section 4: Confirmation Checkbox */}
+          <div style={{ padding: '1rem 0', borderTop: '1px solid #E2E8F0', borderBottom: '1px solid #E2E8F0', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
               <input
                 id="certify"
                 type="checkbox"
@@ -803,16 +1228,17 @@ export default function PreSpendPage({ onNavigate, user, initialCostCentre = '',
                   setCertified(e.target.checked);
                   setNotice('');
                 }}
-                style={{ marginTop: '0.2rem', cursor: 'pointer', width: '16px', height: '16px' }}
+                style={{ cursor: 'pointer', width: '18px', height: '18px', accentColor: '#2563EB' }}
               />
-              <label htmlFor="certify" style={{ fontSize: '0.825rem', color: '#1E3A8A', fontWeight: 500, cursor: 'pointer', lineHeight: 1.45 }}>
-                I hereby declare that this spend is necessary for authorized business purposes, complies with company procurement thresholds, and quotations provided are authentic.
+              <label htmlFor="certify" style={{ fontSize: '0.9rem', color: '#0F172A', fontWeight: 500, cursor: 'pointer', lineHeight: 1.45 }}>
+                I confirm that no order, payment or vendor commitment has been made and the information provided is correct.
               </label>
             </div>
-            {notice && <div style={{ fontSize: '0.775rem', fontWeight: 600, color: '#DC2626', paddingLeft: '1.75rem' }}>{notice}</div>}
+            {notice && <div style={{ fontSize: '0.775rem', fontWeight: 600, color: '#DC2626', paddingLeft: '2.1rem' }}>{notice}</div>}
           </div>
 
-          <div style={{ display: 'flex', justifyContent: 'space-between', paddingTop: '1rem', borderTop: '1px solid var(--border-color)' }}>
+          {/* Navigation & Submit Buttons */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '0.5rem' }}>
             <button
               type="button"
               onClick={() => setStep(3)}
@@ -820,12 +1246,12 @@ export default function PreSpendPage({ onNavigate, user, initialCostCentre = '',
                 display: 'inline-flex',
                 alignItems: 'center',
                 gap: '0.45rem',
-                padding: '0.55rem 1rem',
-                backgroundColor: 'var(--card-bg)',
-                color: 'var(--text-primary)',
-                border: '1px solid var(--border-color)',
+                padding: '0.65rem 1.35rem',
+                backgroundColor: '#FFFFFF',
+                color: '#0F172A',
+                border: '1px solid #CBD5E1',
                 borderRadius: '8px',
-                fontSize: '0.825rem',
+                fontSize: '0.875rem',
                 fontWeight: 600,
                 cursor: 'pointer'
               }}
@@ -835,24 +1261,24 @@ export default function PreSpendPage({ onNavigate, user, initialCostCentre = '',
             </button>
             <button
               type="submit"
-              disabled={!certified}
+              disabled={!certified || isSubmitting}
               style={{
                 display: 'inline-flex',
                 alignItems: 'center',
-                gap: '0.45rem',
-                padding: '0.65rem 1.35rem',
-                backgroundColor: 'var(--brand-primary)',
+                gap: '0.5rem',
+                padding: '0.75rem 1.75rem',
+                backgroundColor: '#0F172A',
                 color: '#FFFFFF',
                 border: 'none',
                 borderRadius: '8px',
-                fontSize: '0.85rem',
+                fontSize: '0.9rem',
                 fontWeight: 600,
-                cursor: !certified ? 'not-allowed' : 'pointer',
-                opacity: !certified ? 0.5 : 1
+                cursor: (!certified || isSubmitting) ? 'not-allowed' : 'pointer',
+                opacity: (!certified || isSubmitting) ? 0.5 : 1
               }}
             >
-              <Send size={14} />
-              <span>Submit Pre-Spend Request</span>
+              <Send size={15} />
+              <span>{isSubmitting ? 'Submitting...' : 'Submit Pre-Spend Request'}</span>
             </button>
           </div>
         </form>
