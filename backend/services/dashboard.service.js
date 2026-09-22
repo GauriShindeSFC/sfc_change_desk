@@ -2447,3 +2447,22 @@ export const updateChangeImplementerCategoriesService = async (userId, categoryI
   return getChangeImplementerCategoriesService(userId);
 };
 
+export const getAllUsersListService = async () => {
+  const employees = await Employee.findAll({
+    where: { leftAt: null },
+    attributes: ['id', 'name', 'email'],
+    order: [['name', 'ASC']],
+    raw: true
+  });
+
+  return employees
+    .filter(e => e && e.name && e.email)
+    .map(e => ({
+      id: e.id,
+      name: e.name.trim(),
+      email: e.email.trim().toLowerCase()
+    }));
+};
+
+
+

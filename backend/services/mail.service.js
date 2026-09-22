@@ -258,8 +258,7 @@ const IGNORED_CUSTOM_KEYS = [
   'employeeName',
   'employeeEmail',
   'managerEmail',
-  'employeeId',
-  'location'
+  'employeeId'
 ];
 
 export const extractCustomFields = (cr) => {

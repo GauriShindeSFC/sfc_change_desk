@@ -1,5 +1,6 @@
 import express from 'express';
 import {
+  getAllUsers,
   getMyRequests,
   createChangeRequest,
   updateDraftChangeRequest,
@@ -10,6 +11,7 @@ import { createChangeRequestSchema } from '../validations/changeRequest.validati
 
 const router = express.Router();
 
+router.get('/users', getAllUsers);
 router.get('/my-requests', getMyRequests);
 router.post('/change-requests', validate(createChangeRequestSchema), createChangeRequest);
 router.patch('/change-requests/:id', updateDraftChangeRequest);
