@@ -2,80 +2,37 @@ import React, { useState, useEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Plus, X, Download } from 'lucide-react';
 import FilterBar from '../components/ui/filterBar.component';
-import { ExportButtonGroup } from '../components/ui/primitives.component';
+import { ExportButtonGroup, LoadingSpinner } from '../components/ui/primitives.component';
 import { apiFetch } from '../lib/apiFetch.lib';
+import { useToast } from '../context/ToastContext';
+
+/** Cleanly format raw SQL/ISO timestamps into '21 Sep 2026, 12:48 PM' (showing date, hour, and minute only) */
+const formatAuditTimestamp = (raw) => {
+  if (!raw) return '—';
+  try {
+    const d = new Date(raw);
+    if (isNaN(d.getTime())) {
+      // If it's already a formatted string like '26 Aug 2026, 10:42 AM', return as-is or strip milliseconds
+      return String(raw).replace(/\.\d{3}\s*\+00:00/i, '').replace(/:\d{2}\.\d{3}/i, '');
+    }
+    const day = d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+    const time = d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
+    return `${day}, ${time}`;
+  } catch {
+    return String(raw);
+  }
+};
 
 function SettingsPage({ user }) {
   const queryClient = useQueryClient();
+  const toast = useToast();
   const isSuperAdmin = user?.roleId === 'role-1' || (user?.role || '').toLowerCase() === 'super admin';
   const isRequester = !isSuperAdmin && (user?.roleId === 'role-4' || user?.role === 'Requester');
 
-  const defaultUsers = [];
+  const [isSavingUser, setIsSavingUser] = useState(false);
+  const [isLoadingCategories, setIsLoadingCategories] = useState(false);
 
-  const defaultAuditLogs = [
-    {
-      id: 'log-1',
-      timestamp: '26 Aug 2026, 10:42 AM',
-      actor: 'Aashini Shah',
-      action: 'Submitted change request',
-      reference: 'CR-2049',
-      details: 'Software Deployment · auto-routed to Change Manager review',
-      category: 'Change requests'
-    },
-    {
-      id: 'log-2',
-      timestamp: '26 Aug 2026, 09:15 AM',
-      actor: 'Pranav Joshi',
-      action: 'Approved change request',
-      reference: 'CR-2048',
-      details: 'Network & Connectivity · SLA met within 2 hours',
-      category: 'Change requests'
-    },
-    {
-      id: 'log-3',
-      actor: 'Devika Rao',
-      action: 'Modified catalog item',
-      reference: 'Server Patching',
-      details: 'Updated SLA from 7 to 5 business days',
-      category: 'Catalog & workflow'
-    },
-    {
-      id: 'log-4',
-      timestamp: '25 Aug 2026, 02:47 PM',
-      actor: 'Sana Iqbal',
-      action: 'Rejected change request',
-      reference: 'CR-2035',
-      details: 'Emergency rollback — checkout service v2.3',
-      category: 'Rejected'
-    },
-    {
-      id: 'log-5',
-      timestamp: '24 Aug 2026, 11:20 AM',
-      actor: 'Devika Rao',
-      action: 'Updated user status',
-      reference: 'Karan Bhatt',
-      details: 'Status changed to Disabled',
-      category: 'User & role changes'
-    },
-    {
-      id: 'log-6',
-      timestamp: '23 Aug 2026, 04:08 PM',
-      actor: 'Aashini Shah',
-      action: 'Created workflow',
-      reference: 'Expedited Workflow',
-      details: 'Applied to Emergency Change category',
-      category: 'Catalog & workflow'
-    },
-    {
-      id: 'log-7',
-      timestamp: '22 Aug 2026, 08:30 AM',
-      actor: 'Priya Nair',
-      action: 'Submitted change request',
-      reference: 'CR-2044',
-      details: 'Add VLAN for new Ahmedabad office floor',
-      category: 'Change requests'
-    }
-  ];
+  const defaultUsers = [];
 
   const [activeTab, setActiveTab] = useState(() => {
     const hash = (window.location.hash || '').replace('#', '').toLowerCase();
@@ -123,7 +80,7 @@ function SettingsPage({ user }) {
   });
   const categories = categoriesData || defaultCategoriesList;
 
-  const { data: usersData } = useQuery({
+  const { data: usersData, isLoading: isLoadingUsers } = useQuery({
     queryKey: ['settings-users'],
     enabled: activeTab === 'users',
     queryFn: async () => {
@@ -135,18 +92,18 @@ function SettingsPage({ user }) {
   });
   const users = usersData || defaultUsers;
 
-  const { data: auditLogsData } = useQuery({
+  const { data: auditLogsData, isLoading: isLoadingAuditLogs } = useQuery({
     queryKey: ['settings-audit-logs', auditFilter],
     enabled: activeTab === 'audit',
     queryFn: async () => {
       const queryParam = auditFilter && auditFilter !== 'All activity' ? `?filter=${encodeURIComponent(auditFilter)}` : '';
       const res = await apiFetch(`/settings/audit-logs${queryParam}`);
-      if (!res.ok) return null;
+      if (!res.ok) return [];
       const body = await res.json();
-      return body.data && Array.isArray(body.data) ? body.data : null;
+      return body.data && Array.isArray(body.data) ? body.data : [];
     }
   });
-  const auditLogs = auditLogsData || defaultAuditLogs;
+  const auditLogs = auditLogsData || [];
 
   const ROLE_TO_ID = {
     'Super Admin': 'role-1',
@@ -170,6 +127,7 @@ function SettingsPage({ user }) {
       role: normalizedRole
     });
     setEditingUserCategories(initialCats);
+    setIsLoadingCategories(true);
     try {
       const endpoint = targetUser.role === 'Change Implementer'
         ? `/settings/change-implementer-categories/${targetUser.id}`
@@ -183,12 +141,16 @@ function SettingsPage({ user }) {
       }
     } catch (err) {
       console.warn('Failed to fetch user categories:', err);
+    } finally {
+      setIsLoadingCategories(false);
     }
   };
 
   const handleSaveManageUser = async (e) => {
     if (e) e.preventDefault();
-    if (!editingUser) return;
+    if (!editingUser || isSavingUser) return;
+
+    setIsSavingUser(true);
 
     const roleId = ROLE_TO_ID[editingUser.role] || (editingUser.role === 'Change Manager' ? 'role-3' : editingUser.role === 'Change Implementer' ? 'role-5' : editingUser.role === 'Board' ? 'role-6' : 'role-2-change');
     const categoryIds = (editingUser.role === 'Change Manager' || editingUser.role === 'Change Implementer') ? editingUserCategories : [];
@@ -231,10 +193,13 @@ function SettingsPage({ user }) {
       }
 
       queryClient.invalidateQueries({ queryKey: ['settings-users'] });
+      toast.success('User changes saved successfully');
       setEditingUser(null);
     } catch (err) {
       console.error('Failed to update user via API:', err);
-      alert(`Error updating user: ${err.message}`);
+      toast.error(`Error updating user: ${err.message}`);
+    } finally {
+      setIsSavingUser(false);
     }
   };
 
@@ -348,11 +313,7 @@ function SettingsPage({ user }) {
     }
   };
 
-  const auditFilters = ['All activity', 'Change requests', 'Approvals', 'Rejected', 'Catalog & workflow', 'User & role changes'];
-
-  const filteredLogs = auditFilter === 'All activity'
-    ? auditLogs
-    : auditLogs.filter(log => log.category === auditFilter);
+  const auditFilters = ['All activity', 'Change requests', 'Approvals', 'Rejected', 'User & role changes'];
 
   if (!isSuperAdmin) {
     return (
@@ -452,32 +413,46 @@ function SettingsPage({ user }) {
                 </tr>
               </thead>
               <tbody>
-                {users.map((u, idx) => (
-                  <tr key={u.id} style={{ borderBottom: idx === users.length - 1 ? 'none' : '1px solid var(--border-color)' }}>
-                    <td style={{ padding: '0.75rem 0.85rem', fontSize: '0.875rem', fontWeight: 500, color: 'var(--text-primary)', whiteSpace: 'nowrap' }}>{u.name}</td>
-                    <td style={{ padding: '0.75rem 0.85rem', fontSize: '0.825rem', color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)', whiteSpace: 'nowrap' }}>{u.email}</td>
-                    <td style={{ padding: '0.75rem 0.85rem', fontSize: '0.825rem', color: 'var(--text-primary)', fontWeight: 600, whiteSpace: 'nowrap' }}>{u.role}</td>
-                    <td style={{ padding: '0.75rem 0.85rem', textAlign: 'right', whiteSpace: 'nowrap' }}>
-                      <button
-                        type="button"
-                        onClick={() => handleOpenManageUser(u)}
-                        disabled={isRequester}
-                        style={{
-                          background: 'none',
-                          border: 'none',
-                          color: isRequester ? 'var(--text-secondary)' : 'var(--brand-primary)',
-                          fontSize: '0.8rem',
-                          fontWeight: 600,
-                          cursor: isRequester ? 'not-allowed' : 'pointer',
-                          opacity: isRequester ? 0.4 : 1,
-                          whiteSpace: 'nowrap'
-                        }}
-                      >
-                        Manage user
-                      </button>
+                {isLoadingUsers ? (
+                  <tr>
+                    <td colSpan={4} style={{ padding: '3rem 1rem', textAlign: 'center' }}>
+                      <LoadingSpinner size="md" message="Loading users..." />
                     </td>
                   </tr>
-                ))}
+                ) : users.length === 0 ? (
+                  <tr>
+                    <td colSpan={4} style={{ padding: '2.5rem 1rem', textAlign: 'center', color: 'var(--text-secondary)', fontSize: '0.875rem' }}>
+                      No users found.
+                    </td>
+                  </tr>
+                ) : (
+                  users.map((u, idx) => (
+                    <tr key={u.id} style={{ borderBottom: idx === users.length - 1 ? 'none' : '1px solid var(--border-color)' }}>
+                      <td style={{ padding: '0.75rem 0.85rem', fontSize: '0.875rem', fontWeight: 500, color: 'var(--text-primary)', whiteSpace: 'nowrap' }}>{u.name}</td>
+                      <td style={{ padding: '0.75rem 0.85rem', fontSize: '0.825rem', color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)', whiteSpace: 'nowrap' }}>{u.email}</td>
+                      <td style={{ padding: '0.75rem 0.85rem', fontSize: '0.825rem', color: 'var(--text-primary)', fontWeight: 600, whiteSpace: 'nowrap' }}>{u.role}</td>
+                      <td style={{ padding: '0.75rem 0.85rem', textAlign: 'right', whiteSpace: 'nowrap' }}>
+                        <button
+                          type="button"
+                          onClick={() => handleOpenManageUser(u)}
+                          disabled={isRequester}
+                          style={{
+                            background: 'none',
+                            border: 'none',
+                            color: isRequester ? 'var(--text-secondary)' : 'var(--brand-primary)',
+                            fontSize: '0.8rem',
+                            fontWeight: 600,
+                            cursor: isRequester ? 'not-allowed' : 'pointer',
+                            opacity: isRequester ? 0.4 : 1,
+                            whiteSpace: 'nowrap'
+                          }}
+                        >
+                          Manage user
+                        </button>
+                      </td>
+                    </tr>
+                  ))
+                )}
               </tbody>
             </table>
           </div>
@@ -510,25 +485,39 @@ function SettingsPage({ user }) {
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredLogs.map((log, idx) => (
-                    <tr key={log.id} style={{ borderBottom: idx === filteredLogs.length - 1 ? 'none' : '1px solid var(--border-color)' }}>
-                      <td style={{ padding: '0.85rem 1rem', fontSize: '0.825rem', color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)' }}>
-                        {log.timestamp}
-                      </td>
-                      <td style={{ padding: '0.85rem 1rem', fontSize: '0.875rem', fontWeight: 500, color: 'var(--text-primary)' }}>
-                        {log.actor}
-                      </td>
-                      <td style={{ padding: '0.85rem 1rem', fontSize: '0.835rem', color: 'var(--text-primary)', fontWeight: 600 }}>
-                        {log.action}
-                      </td>
-                      <td style={{ padding: '0.85rem 1rem', fontSize: '0.825rem', color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)' }}>
-                        {log.reference}
-                      </td>
-                      <td style={{ padding: '0.85rem 1rem', fontSize: '0.825rem', color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)' }}>
-                        {log.employeeEmail || '—'}
+                  {isLoadingAuditLogs ? (
+                    <tr>
+                      <td colSpan={5} style={{ padding: '3rem 1rem', textAlign: 'center' }}>
+                        <LoadingSpinner size="md" message={`Loading audit records for "${auditFilter}"...`} />
                       </td>
                     </tr>
-                  ))}
+                  ) : auditLogs.length === 0 ? (
+                    <tr>
+                      <td colSpan={5} style={{ padding: '2.5rem 1rem', textAlign: 'center', color: 'var(--text-secondary)', fontSize: '0.875rem' }}>
+                        No audit records found for "{auditFilter}".
+                      </td>
+                    </tr>
+                  ) : (
+                    auditLogs.map((log, idx) => (
+                      <tr key={log.id} style={{ borderBottom: idx === auditLogs.length - 1 ? 'none' : '1px solid var(--border-color)' }}>
+                        <td style={{ padding: '0.85rem 1rem', fontSize: '0.825rem', color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)' }}>
+                          {formatAuditTimestamp(log.timestamp)}
+                        </td>
+                        <td style={{ padding: '0.85rem 1rem', fontSize: '0.875rem', fontWeight: 500, color: 'var(--text-primary)' }}>
+                          {log.actor}
+                        </td>
+                        <td style={{ padding: '0.85rem 1rem', fontSize: '0.835rem', color: 'var(--text-primary)', fontWeight: 600 }}>
+                          {log.action}
+                        </td>
+                        <td style={{ padding: '0.85rem 1rem', fontSize: '0.825rem', color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)' }}>
+                          {log.reference}
+                        </td>
+                        <td style={{ padding: '0.85rem 1rem', fontSize: '0.825rem', color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)' }}>
+                          {log.employeeEmail || '—'}
+                        </td>
+                      </tr>
+                    ))
+                  )}
                 </tbody>
               </table>
             </div>
@@ -887,27 +876,34 @@ function SettingsPage({ user }) {
                   <label style={{ display: 'block', fontSize: '0.825rem', fontWeight: 500, color: 'var(--text-primary)', marginBottom: '0.4rem' }}>
                     Appointed Categories ({editingUser.role}) *
                   </label>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem', backgroundColor: 'var(--input-bg)', padding: '0.75rem', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
-                    {categories.map((cat) => {
-                      const isChecked = editingUserCategories.includes(cat.id);
-                      return (
-                        <label key={cat.id} style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.825rem', color: 'var(--text-primary)', cursor: 'pointer' }}>
-                          <input
-                            type="checkbox"
-                            checked={isChecked}
-                            onChange={(e) => {
-                              if (e.target.checked) {
-                                setEditingUserCategories(prev => [...prev, cat.id]);
-                              } else {
-                                setEditingUserCategories(prev => prev.filter(c => c !== cat.id));
-                              }
-                            }}
-                          />
-                          <span>{cat.name}</span>
-                        </label>
-                      );
-                    })}
-                  </div>
+                  {isLoadingCategories ? (
+                    <div style={{ padding: '1rem', display: 'flex', justifyContent: 'center', backgroundColor: 'var(--input-bg)', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
+                      <LoadingSpinner size="xs" message="Loading categories..." />
+                    </div>
+                  ) : (
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem', backgroundColor: 'var(--input-bg)', padding: '0.75rem', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
+                      {categories.map((cat) => {
+                        const isChecked = editingUserCategories.includes(cat.id);
+                        return (
+                          <label key={cat.id} style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.825rem', color: 'var(--text-primary)', cursor: 'pointer' }}>
+                            <input
+                              type="checkbox"
+                              checked={isChecked}
+                              disabled={isSavingUser}
+                              onChange={(e) => {
+                                if (e.target.checked) {
+                                  setEditingUserCategories(prev => [...prev, cat.id]);
+                                } else {
+                                  setEditingUserCategories(prev => prev.filter(c => c !== cat.id));
+                                }
+                              }}
+                            />
+                            <span>{cat.name}</span>
+                          </label>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -916,6 +912,7 @@ function SettingsPage({ user }) {
                 <button
                   type="button"
                   onClick={() => setEditingUser(null)}
+                  disabled={isSavingUser}
                   style={{
                     padding: '0.6rem 1.25rem',
                     backgroundColor: 'var(--input-bg)',
@@ -924,13 +921,15 @@ function SettingsPage({ user }) {
                     borderRadius: '8px',
                     fontSize: '0.85rem',
                     fontWeight: 600,
-                    cursor: 'pointer'
+                    cursor: isSavingUser ? 'not-allowed' : 'pointer',
+                    opacity: isSavingUser ? 0.6 : 1
                   }}
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
+                  disabled={isSavingUser}
                   style={{
                     padding: '0.6rem 1.25rem',
                     backgroundColor: 'var(--brand-primary)',
@@ -939,10 +938,21 @@ function SettingsPage({ user }) {
                     borderRadius: '8px',
                     fontSize: '0.85rem',
                     fontWeight: 500,
-                    cursor: 'pointer'
+                    cursor: isSavingUser ? 'not-allowed' : 'pointer',
+                    opacity: isSavingUser ? 0.8 : 1,
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '0.5rem'
                   }}
                 >
-                  Save user
+                  {isSavingUser ? (
+                    <>
+                      <LoadingSpinner size="xs" color="#FFFFFF" center={false} />
+                      <span>Saving changes...</span>
+                    </>
+                  ) : (
+                    <span>Save user</span>
+                  )}
                 </button>
               </div>
             </form>

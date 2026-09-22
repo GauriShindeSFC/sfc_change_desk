@@ -547,3 +547,110 @@ export const ExportButtonGroup = ({
   );
 };
 
+/* ── Circular Loading Spinner ───────────────────────────────── */
+export const LoadingSpinner = ({
+  size = 'md',
+  message = '',
+  center = true,
+  className = '',
+  fullPage = false,
+  overlay = false,
+  color = '#00A4EF'
+}) => {
+  const sizeMap = {
+    xs: { dim: '14px', border: '2px' },
+    sm: { dim: '18px', border: '2px' },
+    md: { dim: '24px', border: '2.5px' },
+    lg: { dim: '36px', border: '3px' },
+    xl: { dim: '48px', border: '4px' }
+  };
+
+  const selectedSize = sizeMap[size] || sizeMap.md;
+
+  const spinner = (
+    <div
+      className={`inline-block rounded-full animate-spin ${className}`}
+      style={{
+        width: selectedSize.dim,
+        height: selectedSize.dim,
+        borderWidth: selectedSize.border,
+        borderStyle: 'solid',
+        borderColor: 'rgba(0, 164, 239, 0.18)',
+        borderTopColor: color,
+        borderRightColor: color,
+        boxSizing: 'border-box'
+      }}
+      role="status"
+      aria-label="loading"
+    />
+  );
+
+  if (fullPage) {
+    return (
+      <div style={{
+        position: 'fixed',
+        inset: 0,
+        zIndex: 9999,
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: 'rgba(255, 255, 255, 0.85)',
+        backdropFilter: 'blur(4px)'
+      }}>
+        {spinner}
+        {message && (
+          <p style={{ marginTop: '0.85rem', fontSize: '0.875rem', fontWeight: 500, color: 'var(--text-secondary)' }}>
+            {message}
+          </p>
+        )}
+      </div>
+    );
+  }
+
+  if (overlay) {
+    return (
+      <div style={{
+        position: 'absolute',
+        inset: 0,
+        zIndex: 50,
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: 'rgba(255, 255, 255, 0.75)',
+        backdropFilter: 'blur(2px)',
+        borderRadius: 'inherit'
+      }}>
+        {spinner}
+        {message && (
+          <p style={{ marginTop: '0.5rem', fontSize: '0.8rem', fontWeight: 500, color: 'var(--text-secondary)' }}>
+            {message}
+          </p>
+        )}
+      </div>
+    );
+  }
+
+  if (center) {
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', width: '100%', padding: '2.5rem 1rem' }}>
+        {spinner}
+        {message && (
+          <p style={{ marginTop: '0.75rem', fontSize: '0.85rem', fontWeight: 500, color: 'var(--text-secondary)' }}>
+            {message}
+          </p>
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem' }}>
+      {spinner}
+      {message && <span style={{ fontSize: '0.825rem', color: 'var(--text-secondary)' }}>{message}</span>}
+    </span>
+  );
+};
+
+

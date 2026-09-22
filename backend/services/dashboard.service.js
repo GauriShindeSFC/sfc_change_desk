@@ -25,7 +25,13 @@ import { IdentityResolver, resolveDualSourceIdentities, resolveEmailForUser } fr
 import bcrypt from 'bcryptjs';
 import { formatTimestamp } from '../data/store.js';
 import { generateTempPassword, checkUserInUserTable } from './auth.service.js';
-import { sendChangeRequestCreatedEmail, sendUserInviteEmail } from './mail.service.js';
+import {
+  sendChangeRequestCreatedEmail,
+  sendChangeRequestApprovedEmail,
+  sendChangeRequestImplementedEmail,
+  sendChangeRequestRejectedEmail,
+  sendUserInviteEmail
+} from './mail.service.js';
 import {
   serializeChangeRequest,
   serializeWorklistEntry,
@@ -914,6 +920,67 @@ const getApproverEmails = async (categoryNameOrId = null) => {
   return Array.from(new Set(adminEmails.filter(Boolean)));
 };
 
+const getImplementerEmails = async (categoryNameOrId = null) => {
+  const emails = [];
+
+  let targetCategoryId = null;
+  if (categoryNameOrId) {
+    const cat = await CatalogCategory.findOne({
+      where: {
+        [Op.or]: [
+          { id: categoryNameOrId },
+          sequelize.where(sequelize.fn('LOWER', sequelize.col('name')), String(categoryNameOrId).toLowerCase().trim())
+        ]
+      }
+    });
+    if (cat) {
+      targetCategoryId = cat.id;
+    } else {
+      targetCategoryId = categoryNameOrId;
+    }
+  }
+
+  // 1. Check specific Change Implementers assigned to this category
+  if (targetCategoryId) {
+    const ciAssignments = await ChangeImplementerCategory.findAll({
+      where: { categoryId: targetCategoryId },
+      raw: true
+    });
+
+    for (const ci of ciAssignments) {
+      const key = ci.userId;
+      const res = await IdentityResolver.resolveByKey(key);
+      if (res.status === 'SUCCESS' && res.identity.email) {
+        emails.push(res.identity.email.trim());
+      }
+    }
+  }
+
+  // 2. If one or more assigned Change Implementers were found, return them
+  const uniqueEmails = Array.from(new Set(emails.filter(Boolean)));
+  if (uniqueEmails.length > 0) {
+    return uniqueEmails;
+  }
+
+  // 3. Fallback: If no Change Implementer is assigned to this category, send to Super Admin & Admin
+  console.log(`[mail] No Change Implementer assigned to category "${categoryNameOrId || 'General'}" — routing to Super Admin & Admin`);
+  const adminRoles = await UserAppRole.findAll({
+    where: { roleId: { [Op.in]: ['role-1', 'role-2', 'role-2-change', 'role-5'] } },
+    raw: true
+  });
+
+  const adminEmails = [];
+  for (const r of adminRoles) {
+    const key = r.userKey || r.user_key;
+    const res = await IdentityResolver.resolveByKey(key);
+    if (res.status === 'SUCCESS' && res.identity.email) {
+      adminEmails.push(res.identity.email.trim());
+    }
+  }
+
+  return Array.from(new Set(adminEmails.filter(Boolean)));
+};
+
 const resolveUserId = async (idOrName, fallback = null) => {
   if (!idOrName) return fallback;
   if (typeof idOrName === 'string' && (idOrName.startsWith('S8-') || idOrName.startsWith('EMP-'))) {
@@ -942,6 +1009,7 @@ export const RESTRICTED_ACTIONS = [
 ];
 
 export const createChangeRequestService = async (payload = {}) => {
+  const id = await nextChangeRequestId();
   const risk = payload.risk || 'Medium';
   const status = 'Pending';
   const requesterId = await resolveUserId(payload.requesterId || payload.requester);
@@ -1269,6 +1337,24 @@ export const applyWorklistActionService = async ({ id, action, rejectionReason =
       await addAuditLog({ actorId, action: 'CR Implemented', ref: id, detail: `Marked Change Request ${id} as Implemented. Comment: ${actionComment || 'None'}` }, tx);
     });
 
+    // Notify Requester (+ Manager) that CR is Implemented & Closed
+    ChangeRequest.findByPk(id, { include: CR_INCLUDE })
+      .then((updatedCR) => {
+        if (updatedCR) {
+          const serialized = serializeChangeRequest(updatedCR);
+          sendChangeRequestImplementedEmail({
+            cr: serialized,
+            requesterName: serialized.employeeName || serialized.requester,
+            requesterEmail: serialized.employeeEmail || serialized.requesterEmail,
+            implementerName: actorName,
+            implementerEmail: identity?.email,
+            implementedComment: actionComment,
+            managerEmail: serialized.managerEmail
+          }).catch((err) => console.error('[mail] implement notification failed:', err.message));
+        }
+      })
+      .catch((err) => console.error('[mail] fetch updated CR for implement notification failed:', err.message));
+
     const metrics = await getConfig('worklist_metrics');
     return { id, action: 'implement', status: 'Implemented', closedAt: new Date(), implementedComment: actionComment, worklistMetrics: metrics };
   }
@@ -1396,6 +1482,40 @@ export const applyWorklistActionService = async ({ id, action, rejectionReason =
       t
     );
   });
+
+  // Dispatch lifecycle notification emails
+  ChangeRequest.findByPk(id, { include: CR_INCLUDE })
+    .then(async (updatedCR) => {
+      if (!updatedCR) return;
+      const serialized = serializeChangeRequest(updatedCR);
+
+      if (decision === 'Approved') {
+        const categoryTarget = serialized.categoryId || serialized.category;
+        const implementerEmails = await getImplementerEmails(categoryTarget);
+
+        await sendChangeRequestApprovedEmail({
+          cr: serialized,
+          requesterName: serialized.employeeName || serialized.requester,
+          requesterEmail: serialized.employeeEmail || serialized.requesterEmail,
+          approverName: actorName,
+          approverEmail: identity?.email,
+          approvalComment: actionComment,
+          implementerEmails,
+          managerEmail: serialized.managerEmail
+        });
+      } else if (decision === 'Rejected') {
+        await sendChangeRequestRejectedEmail({
+          cr: serialized,
+          requesterName: serialized.employeeName || serialized.requester,
+          requesterEmail: serialized.employeeEmail || serialized.requesterEmail,
+          decidedBy: actorName,
+          decidedByEmail: identity?.email,
+          rejectionReason: actionComment,
+          managerEmail: serialized.managerEmail
+        });
+      }
+    })
+    .catch((err) => console.error('[mail] decision notification failed:', err.message));
 
   const pending = await ChangeRequest.count({ where: { status: 'Pending' } });
   const metrics = await getConfig('worklist_metrics');
@@ -1800,6 +1920,11 @@ export const getSettingsUsersService = async () => {
       ? (ciMap.get(userKey) || (empKey ? ciMap.get(empKey) : null) || ciMap.get(`S8-${u.id}`) || ciMap.get(String(u.id)) || [])
       : (cmMap.get(userKey) || (empKey ? cmMap.get(empKey) : null) || cmMap.get(`S8-${u.id}`) || cmMap.get(String(u.id)) || []);
 
+    // Exclude exited employees (where left_at or left_reason is not null)
+    if (linkedEmp && IdentityResolver.isEmployeeExited(linkedEmp)) {
+      continue;
+    }
+
     // If the user has not been invited or assigned any explicit role or category, do not show them in Settings > Users
     if (!roleId && assignedCats.length === 0) {
       continue;
@@ -2130,10 +2255,9 @@ export const updateRolePermissionsService = async (roleId, permissions = [], act
 
 const AUDIT_FILTERS = {
   'change requests': (log) => /Created|Draft|Submitted|Sent Back/i.test(log.action),
-  approvals: (log) => /Approved/i.test(log.action),
+  approvals: (log) => /Approved|Implemented/i.test(log.action),
   rejected: (log) => /Rejected/i.test(log.action),
-  'catalog & workflow': (log) => /Catalog|Workflow/i.test(log.action),
-  'user & role changes': (log) => /User|Permission|Role/i.test(log.action)
+  'user & role changes': (log) => /User|Permission|Role|Catalog|Workflow/i.test(log.action)
 };
 
 export const getSettingsAuditLogsService = async (filter = 'All activity') => {
@@ -2195,8 +2319,18 @@ export const getSettingsAuditLogsService = async (filter = 'All activity') => {
     return serializeAuditLog(r, actorIdentity);
   });
 
-  const key = String(filter).toLowerCase();
-  return key === 'all activity' || !AUDIT_FILTERS[key] ? logs : logs.filter(AUDIT_FILTERS[key]);
+  const key = String(filter).toLowerCase().trim();
+  if (key === 'all activity' || !key) {
+    return logs;
+  }
+
+  return logs.filter((log) => {
+    if (log.category && log.category.toLowerCase().trim() === key) {
+      return true;
+    }
+    const filterFn = AUDIT_FILTERS[key];
+    return filterFn ? filterFn(log) : true;
+  });
 };
 
 // ---------- Change Manager Categories -----------------

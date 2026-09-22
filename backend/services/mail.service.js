@@ -285,11 +285,22 @@ export const extractCustomFields = (cr) => {
 
 // ---------- Attached Request Dossier HTML Generator -----------
 
-export const generateChangeRequestReportHtml = ({ cr, requesterName, approveUrl, rejectUrl }) => {
+export const generateChangeRequestReportHtml = ({ cr, requesterName, approveUrl, rejectUrl, implementUrl }) => {
   const customEntries = extractCustomFields(cr);
   const submittedTime = formatCleanTime(cr.submittedAt || cr.createdAt);
   const startDate = formatCleanDate(cr.startDate);
   const raisedDate = formatLongDate(cr.submittedAt || cr.createdAt) || cr.raisedDate || 'Today';
+
+  const isImplementedState = cr.status === 'Implemented';
+  const isApprovedState = cr.status === 'Approved' || Boolean(implementUrl);
+
+  const statusBadge = isImplementedState
+    ? `<span class="status-badge" style="background:#F5F3FF;color:#7C3AED;">● Implemented</span>`
+    : isApprovedState
+      ? `<span class="status-badge" style="background:#ECFDF5;color:#059669;">● Approved</span>`
+      : cr.status === 'Rejected'
+        ? `<span class="status-badge" style="background:#FEF2F2;color:#DC2626;">● Rejected</span>`
+        : `<span class="status-badge">● Pending</span>`;
 
   return `<!DOCTYPE html>
 <html lang="en">
@@ -349,6 +360,7 @@ export const generateChangeRequestReportHtml = ({ cr, requesterName, approveUrl,
     .btn { display: inline-block; padding: 11px 26px; border-radius: 8px; font-size: 13px; font-weight: 700; text-decoration: none; cursor: pointer; }
     .btn-approve { background: #059669; color: #FFFFFF; box-shadow: 0 2px 4px rgba(5,150,105,0.25); }
     .btn-reject { background: #DC2626; color: #FFFFFF; box-shadow: 0 2px 4px rgba(220,38,38,0.25); }
+    .btn-implement { background: #0D9488; color: #FFFFFF; box-shadow: 0 2px 6px rgba(13,148,136,0.3); }
     
     .footer { padding: 14px 28px; background: #F8FAFC; border-top: 1px solid #E2E8F0; text-align: center; font-size: 11px; color: #94A3B8; }
   </style>
@@ -373,7 +385,7 @@ export const generateChangeRequestReportHtml = ({ cr, requesterName, approveUrl,
           <h2>${esc(cr.id)}: ${esc(cr.title)}</h2>
           <p class="subtitle">${esc(cr.category)} · ${esc(cr.subCategory || 'Standard')}</p>
         </div>
-        <span class="status-badge">● Pending</span>
+        ${statusBadge}
       </div>
 
       <!-- Lifecycle Progress Tracker -->
@@ -387,14 +399,14 @@ export const generateChangeRequestReportHtml = ({ cr, requesterName, approveUrl,
             <span class="step-date">${esc(raisedDate)}</span>
           </div>
           <div class="step">
-            <div class="step-circle active">2</div>
+            <div class="step-circle ${isApprovedState || isImplementedState ? 'done' : 'active'}">${isApprovedState || isImplementedState ? '✓' : '2'}</div>
             <span class="step-label">2. Change Manager</span>
-            <span class="step-date" style="color: #D97706; font-weight: 600;">Pending Action</span>
+            <span class="step-date" style="color: ${isApprovedState || isImplementedState ? '#10B981' : '#D97706'}; font-weight: 600;">${isApprovedState || isImplementedState ? 'Approved' : 'Pending Action'}</span>
           </div>
           <div class="step">
-            <div class="step-circle pending">3</div>
+            <div class="step-circle ${isImplementedState ? 'done' : isApprovedState ? 'active' : 'pending'}">${isImplementedState ? '✓' : '3'}</div>
             <span class="step-label">3. Implementation</span>
-            <span class="step-date">Awaiting approval</span>
+            <span class="step-date" style="color: ${isImplementedState ? '#10B981' : isApprovedState ? '#0D9488' : '#64748B'}; font-weight: 600;">${isImplementedState ? 'Completed' : isApprovedState ? 'Ready to Implement' : 'Awaiting approval'}</span>
           </div>
         </div>
       </div>
@@ -482,14 +494,24 @@ export const generateChangeRequestReportHtml = ({ cr, requesterName, approveUrl,
       </div>
 
       <!-- Action Box -->
-      <div class="actions-box">
-        <h3>Change Manager Action Required</h3>
-        <p>Review the details above. Click either button below to record your decision:</p>
-        <div class="btn-group">
-          <a href="${approveUrl}" class="btn btn-approve">✓ Approve Change Request</a>
-          <a href="${rejectUrl}" class="btn btn-reject">✕ Reject Change Request</a>
+      ${implementUrl ? `
+        <div class="actions-box">
+          <h3>Change Implementer Action Required</h3>
+          <p>Review the details above. Click the button below once implementation is complete:</p>
+          <div class="btn-group">
+            <a href="${implementUrl}" class="btn btn-implement">⚡ Mark as Implemented</a>
+          </div>
         </div>
-      </div>
+      ` : (approveUrl && rejectUrl) ? `
+        <div class="actions-box">
+          <h3>Change Manager Action Required</h3>
+          <p>Review the details above. Click either button below to record your decision:</p>
+          <div class="btn-group">
+            <a href="${approveUrl}" class="btn btn-approve">✓ Approve Change Request</a>
+            <a href="${rejectUrl}" class="btn btn-reject">✕ Reject Change Request</a>
+          </div>
+        </div>
+      ` : ''}
     </div>
 
     <div class="footer">
@@ -773,6 +795,531 @@ export const sendChangeRequestCreatedEmail = async ({ cr, requesterName, approve
 
   const reportHtml = generateChangeRequestReportHtml({ cr, requesterName: reqName, approveUrl, rejectUrl });
 
+  const attachments = [
+    ...mailAttachments(),
+    {
+      filename: `${cr.id}_Details.html`,
+      content: reportHtml,
+      contentType: 'text/html'
+    }
+  ];
+
+  return sendMail({ to: primary, cc, subject, text, html, attachments });
+};
+
+/** Change request approved by Change Manager → notify Change Implementers (+ requester & manager). */
+export const sendChangeRequestApprovedEmail = async ({
+  cr,
+  requesterName,
+  requesterEmail,
+  approverName,
+  approverEmail,
+  approvalComment,
+  implementerEmails = [],
+  managerEmail
+}) => {
+  const to = asList(implementerEmails);
+  const cc = Array.from(new Set([...asList(requesterEmail), ...asList(managerEmail)].filter(Boolean)));
+  const primary = to.length ? to : asList(env.MAIL_APPROVER_FALLBACK || 'implementer@changedesk.local');
+
+  const secret = process.env.JWT_SECRET || 'sfc-change-desk-secure-jwt-secret-key-2026';
+  const token = jwt.sign(
+    { crId: cr.id, approverEmail: primary[0] || 'implementer@company.com', defaultAction: 'implement' },
+    secret,
+    { expiresIn: '7d' }
+  );
+
+  const implementUrl = `${appUrl()}/approval-action?token=${encodeURIComponent(token)}&action=implement`;
+
+  const customEntries = extractCustomFields(cr);
+  const startDate = formatCleanDate(cr.startDate);
+  const raisedDate = formatLongDate(cr.submittedAt || cr.createdAt) || cr.raisedDate || 'Today';
+  const approvedDate = formatLongDate(new Date()) || 'Today';
+  const approvedTime = formatCleanTime(new Date());
+  const reqName = cr.employeeName || cr.requester || requesterName || 'Requester';
+  const approver = approverName || cr.decidedBy || cr.approvedBy || 'Change Manager';
+  const worklistUrl = `${appUrl()}/worklist`;
+
+  const subject = `Approved & Ready for Implementation: ${cr.title} (${cr.id})`;
+
+  const bodyHtml = `
+    <!-- Header & Status -->
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:14px">
+      <tr>
+        <td>
+          <span style="font:700 12px monospace;color:#2563EB">${esc(cr.id)}</span>
+          <h2 style="font:700 17px Arial,sans-serif;color:${C.ink};margin:3px 0 2px">${esc(cr.title)}</h2>
+          <span style="font:400 12px Arial,sans-serif;color:${C.muted}">${esc(cr.category)} · ${esc(cr.subCategory || 'Standard')}</span>
+        </td>
+        <td align="right" valign="top">
+          <span style="display:inline-block;padding:4px 12px;border-radius:99px;font:700 11px Arial,sans-serif;background:#ECFDF5;color:#059669;border:1px solid #A7F3D0">
+            ● Approved (Awaiting Implementation)
+          </span>
+        </td>
+      </tr>
+    </table>
+
+    <!-- Approval Details Banner -->
+    <div style="background:#F0FDF4;border:1px solid #BBF7D0;border-radius:8px;padding:12px 16px;margin:14px 0 16px">
+      <div style="font:700 11px Arial,sans-serif;color:#166534;text-transform:uppercase;letter-spacing:0.04em;margin-bottom:6px">
+        ✓ Approved by Change Manager
+      </div>
+      <div style="font:600 13px Arial,sans-serif;color:#14532D">
+        Approved by <strong>${esc(approver)}</strong> ${approverEmail ? `(${esc(approverEmail)})` : ''} on ${esc(approvedDate)} at ${esc(approvedTime)}
+      </div>
+      ${approvalComment ? `
+        <div style="margin-top:8px;padding-top:8px;border-top:1px dashed #86EFAC;font:400 13px/1.45 Arial,sans-serif;color:#166534">
+          <strong>Approval Note:</strong> "${esc(approvalComment)}"
+        </div>
+      ` : ''}
+    </div>
+
+    <!-- Section 1: Requester Details -->
+    <div style="border-top:1px solid ${C.border};padding-top:14px;margin-top:14px">
+      <div style="font:700 13px Arial,sans-serif;color:${C.ink};margin-bottom:10px">Section 1: Requester Details</div>
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;margin-bottom:14px">
+        <tr>
+          <td width="33%" style="padding:6px 10px 6px 0;vertical-align:top">
+            <div style="font:500 11px Arial,sans-serif;color:${C.muted};margin-bottom:2px">Requester / Employee</div>
+            <div style="font:600 13px Arial,sans-serif;color:${C.ink}">${esc(reqName)}</div>
+          </td>
+          <td width="33%" style="padding:6px 10px 6px 0;vertical-align:top">
+            <div style="font:500 11px Arial,sans-serif;color:${C.muted};margin-bottom:2px">Approved By</div>
+            <div style="font:600 13px Arial,sans-serif;color:#059669">${esc(approver)}</div>
+          </td>
+          <td width="34%" style="padding:6px 0 6px 0;vertical-align:top">
+            <div style="font:500 11px Arial,sans-serif;color:${C.muted};margin-bottom:2px">Employee ID</div>
+            <div style="font:600 13px monospace;color:${C.ink}">${esc(cr.employeeId || cr.empId || 'N/A')}</div>
+          </td>
+        </tr>
+        <tr>
+          <td width="33%" style="padding:6px 10px 6px 0;vertical-align:top">
+            <div style="font:500 11px Arial,sans-serif;color:${C.muted};margin-bottom:2px">Employee Email</div>
+            <div style="font:600 12px Arial,sans-serif;color:${C.ink}">${esc(cr.employeeEmail || cr.requesterEmail || requesterEmail || '—')}</div>
+          </td>
+          <td width="33%" style="padding:6px 10px 6px 0;vertical-align:top">
+            <div style="font:500 11px Arial,sans-serif;color:${C.muted};margin-bottom:2px">Location</div>
+            <div style="font:600 13px Arial,sans-serif;color:${C.ink}">${esc(cr.location || 'Not specified')}</div>
+          </td>
+          <td width="34%" style="padding:6px 0 6px 0;vertical-align:top">
+            <div style="font:500 11px Arial,sans-serif;color:${C.muted};margin-bottom:2px">Manager Email</div>
+            <div style="font:600 12px Arial,sans-serif;color:${C.ink}">${esc(cr.managerEmail || managerEmail || '—')}</div>
+          </td>
+        </tr>
+      </table>
+    </div>
+
+    <!-- Section 2: Change Details -->
+    <div style="border-top:1px solid ${C.border};padding-top:14px;margin-top:14px">
+      <div style="font:700 13px Arial,sans-serif;color:${C.ink};margin-bottom:10px">Section 2: Change Details</div>
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;margin-bottom:14px">
+        <tr>
+          <td colspan="2" style="padding:6px 0;vertical-align:top">
+            <div style="font:500 11px Arial,sans-serif;color:${C.muted};margin-bottom:2px">Change Title</div>
+            <div style="font:700 13px Arial,sans-serif;color:${C.ink}">${esc(cr.title || 'Untitled Request')}</div>
+          </td>
+        </tr>
+        <tr>
+          <td width="50%" style="padding:6px 10px 6px 0;vertical-align:top">
+            <div style="font:500 11px Arial,sans-serif;color:${C.muted};margin-bottom:2px">Category</div>
+            <div style="font:600 13px Arial,sans-serif;color:${C.ink}">${esc(cr.category || '—')}</div>
+          </td>
+          <td width="50%" style="padding:6px 0;vertical-align:top">
+            <div style="font:500 11px Arial,sans-serif;color:${C.muted};margin-bottom:2px">Sub-category</div>
+            <div style="font:600 13px Arial,sans-serif;color:${C.ink}">${esc(cr.subCategory || 'Standard')}</div>
+          </td>
+        </tr>
+        <tr>
+          <td width="50%" style="padding:6px 10px 6px 0;vertical-align:top">
+            <div style="font:500 11px Arial,sans-serif;color:${C.muted};margin-bottom:2px">Start Date</div>
+            <div style="font:600 13px monospace;color:${C.ink}">${esc(startDate)}</div>
+          </td>
+          <td width="50%" style="padding:6px 0;vertical-align:top"></td>
+        </tr>
+      </table>
+    </div>
+
+    <!-- Dynamic Action & Specification Details Box -->
+    ${customEntries.length > 0 ? `
+      <div style="background:#F8FAFC;border:1px solid ${C.border};border-radius:8px;padding:14px 16px;margin:16px 0">
+        <div style="font:700 11px Arial,sans-serif;color:${C.ink};text-transform:uppercase;letter-spacing:0.04em;margin-bottom:10px">
+          ACTION &amp; SPECIFICATION DETAILS
+        </div>
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse">
+          ${(() => {
+            const rows = [];
+            for (let i = 0; i < customEntries.length; i += 2) {
+              const [k1, v1] = customEntries[i];
+              const second = customEntries[i + 1];
+              rows.push(`
+                <tr>
+                  <td width="50%" style="padding:6px 10px 6px 0;vertical-align:top">
+                    <div style="font:500 11px Arial,sans-serif;color:${C.muted};margin-bottom:2px">${esc(formatFieldLabel(k1))}</div>
+                    <div style="font:700 13px Arial,sans-serif;color:${C.ink};word-break:break-word">${esc(v1)}</div>
+                  </td>
+                  ${second ? `
+                    <td width="50%" style="padding:6px 0;vertical-align:top">
+                      <div style="font:500 11px Arial,sans-serif;color:${C.muted};margin-bottom:2px">${esc(formatFieldLabel(second[0]))}</div>
+                      <div style="font:700 13px Arial,sans-serif;color:${C.ink};word-break:break-word">${esc(second[1])}</div>
+                    </td>
+                  ` : `<td width="50%"></td>`}
+                </tr>
+              `);
+            }
+            return rows.join('');
+          })()}
+        </table>
+      </div>
+    ` : ''}
+
+    <!-- Raised Date & Business Justification -->
+    <div style="margin:14px 0 18px">
+      <div style="font:700 11px Arial,sans-serif;color:${C.ink};margin-bottom:2px">Raised Date</div>
+      <div style="font:500 13px Arial,sans-serif;color:${C.muted};margin-bottom:12px">${esc(raisedDate)}</div>
+
+      <div style="font:700 11px Arial,sans-serif;color:${C.ink};margin-bottom:4px">Business Justification</div>
+      <div style="background:#F8FAFC;border:1px solid ${C.border};border-radius:6px;padding:10px 12px;font:400 13px/1.5 Arial,sans-serif;color:${C.ink}">
+        ${esc(cr.justification || 'No justification entered.')}
+      </div>
+    </div>
+
+    <!-- Implementer Action Box -->
+    <div style="margin:22px 0 8px;padding:18px;background:#F1F5F9;border-radius:10px;border:1px solid #CBD5E1;text-align:center">
+      <div style="font:700 12px Arial,sans-serif;color:#334155;margin-bottom:8px;letter-spacing:0.04em">
+        CHANGE IMPLEMENTER ACTION REQUIRED
+      </div>
+      <p style="font:400 12px Arial,sans-serif;color:#64748B;margin:0 0 14px">
+        This change has been approved by the Change Manager. Once execution is complete, click the button below to mark as implemented:
+      </p>
+      <table role="presentation" cellpadding="0" cellspacing="0" width="100%">
+        <tr>
+          <td align="center" style="padding:6px">
+            <a href="${implementUrl}" style="display:inline-block;padding:12px 28px;background-color:#0D9488;color:#ffffff;font:700 14px Arial,sans-serif;text-decoration:none;border-radius:8px;box-shadow:0 2px 6px rgba(13,148,136,0.3)">
+              ⚡ Mark as Implemented
+            </a>
+          </td>
+        </tr>
+      </table>
+      <div style="font:400 11px Arial,sans-serif;color:#64748B;text-align:center;margin-top:12px">
+        Or open in portal: <a href="${worklistUrl}" style="color:#0D9488;text-decoration:underline">Open Worklist</a> · Full dossier attached as <strong>${esc(cr.id)}_Details.html</strong>
+      </div>
+    </div>
+  `;
+
+  const html = renderEmail({
+    preheader: `${cr.id} has been approved by Change Manager and is awaiting implementation`,
+    heading: `Approved: ${cr.id}`,
+    intro: `Change Request <strong>${esc(cr.id)} (${esc(cr.title)})</strong> has been <strong>approved</strong> by <strong>${esc(approver)}</strong> and is awaiting implementation.`,
+    rows: [],
+    bodyHtml,
+    footnote: 'You can mark as implemented directly using the button above or the attached dossier. Automated notification from <strong>ChangeDesk</strong>.'
+  });
+
+  const text =
+    `Approved & Ready for Implementation: ${cr.title} (${cr.id})\n\n` +
+    `Approved by ${approver}\n` +
+    (approvalComment ? `Approval Note: ${approvalComment}\n\n` : '\n') +
+    `Requester: ${reqName}\n` +
+    `Employee Email: ${cr.employeeEmail || requesterEmail || '—'}\n` +
+    `Category: ${cr.category} (${cr.subCategory || 'Standard'})\n` +
+    `Start Date: ${startDate}\n\n` +
+    `Mark as Implemented: ${implementUrl}\n` +
+    `Open Worklist: ${worklistUrl}\n\nFull dossier attached as ${cr.id}_Details.html\n`;
+
+  const reportHtml = generateChangeRequestReportHtml({ cr, requesterName: reqName, approveUrl: null, rejectUrl: null, implementUrl });
+  const attachments = [
+    ...mailAttachments(),
+    {
+      filename: `${cr.id}_Details.html`,
+      content: reportHtml,
+      contentType: 'text/html'
+    }
+  ];
+
+  return sendMail({ to: primary, cc, subject, text, html, attachments });
+};
+
+/** Change request marked as Implemented → notify Requester (+ manager & Change Manager as CC). */
+export const sendChangeRequestImplementedEmail = async ({
+  cr,
+  requesterName,
+  requesterEmail,
+  implementerName,
+  implementerEmail,
+  implementedComment,
+  managerEmail
+}) => {
+  const to = asList(requesterEmail || cr.employeeEmail || cr.requesterEmail);
+  const cc = asList(managerEmail || cr.managerEmail);
+  const primary = to.length ? to : asList(env.MAIL_APPROVER_FALLBACK || 'requester@changedesk.local');
+
+  const customEntries = extractCustomFields(cr);
+  const startDate = formatCleanDate(cr.startDate);
+  const raisedDate = formatLongDate(cr.submittedAt || cr.createdAt) || cr.raisedDate || 'Today';
+  const implementedDate = formatLongDate(new Date()) || 'Today';
+  const implementedTime = formatCleanTime(new Date());
+  const reqName = cr.employeeName || cr.requester || requesterName || 'Requester';
+  const implementer = implementerName || cr.implementedBy || 'Change Implementer';
+  const worklistUrl = `${appUrl()}/worklist`;
+
+  const subject = `Implemented & Closed: ${cr.title} (${cr.id})`;
+
+  const bodyHtml = `
+    <!-- Header & Status -->
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:14px">
+      <tr>
+        <td>
+          <span style="font:700 12px monospace;color:#2563EB">${esc(cr.id)}</span>
+          <h2 style="font:700 17px Arial,sans-serif;color:${C.ink};margin:3px 0 2px">${esc(cr.title)}</h2>
+          <span style="font:400 12px Arial,sans-serif;color:${C.muted}">${esc(cr.category)} · ${esc(cr.subCategory || 'Standard')}</span>
+        </td>
+        <td align="right" valign="top">
+          <span style="display:inline-block;padding:4px 12px;border-radius:99px;font:700 11px Arial,sans-serif;background:#F5F3FF;color:#7C3AED;border:1px solid #DDD6FE">
+            ● Implemented &amp; Closed
+          </span>
+        </td>
+      </tr>
+    </table>
+
+    <!-- Implementation Details Banner -->
+    <div style="background:#F5F3FF;border:1px solid #DDD6FE;border-radius:8px;padding:12px 16px;margin:14px 0 16px">
+      <div style="font:700 11px Arial,sans-serif;color:#6D28D9;text-transform:uppercase;letter-spacing:0.04em;margin-bottom:6px">
+        ✓ Implemented by Change Implementer
+      </div>
+      <div style="font:600 13px Arial,sans-serif;color:#5B21B6">
+        Implemented by <strong>${esc(implementer)}</strong> ${implementerEmail ? `(${esc(implementerEmail)})` : ''} on ${esc(implementedDate)} at ${esc(implementedTime)}
+      </div>
+      ${implementedComment ? `
+        <div style="margin-top:8px;padding-top:8px;border-top:1px dashed #C4B5FD;font:400 13px/1.45 Arial,sans-serif;color:#6D28D9">
+          <strong>Implementation Note:</strong> "${esc(implementedComment)}"
+        </div>
+      ` : ''}
+    </div>
+
+    <!-- Section 1: Requester Details -->
+    <div style="border-top:1px solid ${C.border};padding-top:14px;margin-top:14px">
+      <div style="font:700 13px Arial,sans-serif;color:${C.ink};margin-bottom:10px">Section 1: Requester Details</div>
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;margin-bottom:14px">
+        <tr>
+          <td width="33%" style="padding:6px 10px 6px 0;vertical-align:top">
+            <div style="font:500 11px Arial,sans-serif;color:${C.muted};margin-bottom:2px">Requester / Employee</div>
+            <div style="font:600 13px Arial,sans-serif;color:${C.ink}">${esc(reqName)}</div>
+          </td>
+          <td width="33%" style="padding:6px 10px 6px 0;vertical-align:top">
+            <div style="font:500 11px Arial,sans-serif;color:${C.muted};margin-bottom:2px">Implemented By</div>
+            <div style="font:600 13px Arial,sans-serif;color:#7C3AED">${esc(implementer)}</div>
+          </td>
+          <td width="34%" style="padding:6px 0 6px 0;vertical-align:top">
+            <div style="font:500 11px Arial,sans-serif;color:${C.muted};margin-bottom:2px">Employee ID</div>
+            <div style="font:600 13px monospace;color:${C.ink}">${esc(cr.employeeId || cr.empId || 'N/A')}</div>
+          </td>
+        </tr>
+        <tr>
+          <td width="33%" style="padding:6px 10px 6px 0;vertical-align:top">
+            <div style="font:500 11px Arial,sans-serif;color:${C.muted};margin-bottom:2px">Employee Email</div>
+            <div style="font:600 12px Arial,sans-serif;color:${C.ink}">${esc(cr.employeeEmail || cr.requesterEmail || requesterEmail || '—')}</div>
+          </td>
+          <td width="33%" style="padding:6px 10px 6px 0;vertical-align:top">
+            <div style="font:500 11px Arial,sans-serif;color:${C.muted};margin-bottom:2px">Location</div>
+            <div style="font:600 13px Arial,sans-serif;color:${C.ink}">${esc(cr.location || 'Not specified')}</div>
+          </td>
+          <td width="34%" style="padding:6px 0 6px 0;vertical-align:top">
+            <div style="font:500 11px Arial,sans-serif;color:${C.muted};margin-bottom:2px">Manager Email</div>
+            <div style="font:600 12px Arial,sans-serif;color:${C.ink}">${esc(cr.managerEmail || managerEmail || '—')}</div>
+          </td>
+        </tr>
+      </table>
+    </div>
+
+    <!-- Section 2: Change Details -->
+    <div style="border-top:1px solid ${C.border};padding-top:14px;margin-top:14px">
+      <div style="font:700 13px Arial,sans-serif;color:${C.ink};margin-bottom:10px">Section 2: Change Details</div>
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;margin-bottom:14px">
+        <tr>
+          <td colspan="2" style="padding:6px 0;vertical-align:top">
+            <div style="font:500 11px Arial,sans-serif;color:${C.muted};margin-bottom:2px">Change Title</div>
+            <div style="font:700 13px Arial,sans-serif;color:${C.ink}">${esc(cr.title || 'Untitled Request')}</div>
+          </td>
+        </tr>
+        <tr>
+          <td width="50%" style="padding:6px 10px 6px 0;vertical-align:top">
+            <div style="font:500 11px Arial,sans-serif;color:${C.muted};margin-bottom:2px">Category</div>
+            <div style="font:600 13px Arial,sans-serif;color:${C.ink}">${esc(cr.category || '—')}</div>
+          </td>
+          <td width="50%" style="padding:6px 0;vertical-align:top">
+            <div style="font:500 11px Arial,sans-serif;color:${C.muted};margin-bottom:2px">Sub-category</div>
+            <div style="font:600 13px Arial,sans-serif;color:${C.ink}">${esc(cr.subCategory || 'Standard')}</div>
+          </td>
+        </tr>
+      </table>
+    </div>
+
+    <!-- Dynamic Action & Specification Details Box -->
+    ${customEntries.length > 0 ? `
+      <div style="background:#F8FAFC;border:1px solid ${C.border};border-radius:8px;padding:14px 16px;margin:16px 0">
+        <div style="font:700 11px Arial,sans-serif;color:${C.ink};text-transform:uppercase;letter-spacing:0.04em;margin-bottom:10px">
+          ACTION &amp; SPECIFICATION DETAILS
+        </div>
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse">
+          ${(() => {
+            const rows = [];
+            for (let i = 0; i < customEntries.length; i += 2) {
+              const [k1, v1] = customEntries[i];
+              const second = customEntries[i + 1];
+              rows.push(`
+                <tr>
+                  <td width="50%" style="padding:6px 10px 6px 0;vertical-align:top">
+                    <div style="font:500 11px Arial,sans-serif;color:${C.muted};margin-bottom:2px">${esc(formatFieldLabel(k1))}</div>
+                    <div style="font:700 13px Arial,sans-serif;color:${C.ink};word-break:break-word">${esc(v1)}</div>
+                  </td>
+                  ${second ? `
+                    <td width="50%" style="padding:6px 0;vertical-align:top">
+                      <div style="font:500 11px Arial,sans-serif;color:${C.muted};margin-bottom:2px">${esc(formatFieldLabel(second[0]))}</div>
+                      <div style="font:700 13px Arial,sans-serif;color:${C.ink};word-break:break-word">${esc(second[1])}</div>
+                    </td>
+                  ` : `<td width="50%"></td>`}
+                </tr>
+              `);
+            }
+            return rows.join('');
+          })()}
+        </table>
+      </div>
+    ` : ''}
+
+    <div style="margin:22px 0 8px;text-align:center">
+      <a href="${worklistUrl}" style="display:inline-block;padding:11px 24px;background-color:#2563EB;color:#ffffff;font:700 13px Arial,sans-serif;text-decoration:none;border-radius:7px;box-shadow:0 2px 4px rgba(37,99,235,0.25)">
+        View Request in ChangeDesk →
+      </a>
+    </div>
+  `;
+
+  const html = renderEmail({
+    preheader: `${cr.id} has been implemented and closed`,
+    heading: `Implemented: ${cr.id}`,
+    intro: `Change Request <strong>${esc(cr.id)} (${esc(cr.title)})</strong> has been successfully <strong>implemented</strong> and closed.`,
+    rows: [],
+    bodyHtml,
+    footnote: 'Automated notification from <strong>ChangeDesk</strong>.'
+  });
+
+  const text =
+    `Implemented & Closed: ${cr.title} (${cr.id})\n\n` +
+    `Implemented by ${implementer}\n` +
+    (implementedComment ? `Implementation Note: ${implementedComment}\n\n` : '\n') +
+    `Requester: ${reqName}\n` +
+    `Category: ${cr.category} (${cr.subCategory || 'Standard'})\n` +
+    `View in ChangeDesk: ${worklistUrl}\n`;
+
+  const reportHtml = generateChangeRequestReportHtml({ cr, requesterName: reqName, approveUrl: null, rejectUrl: null });
+  const attachments = [
+    ...mailAttachments(),
+    {
+      filename: `${cr.id}_Details.html`,
+      content: reportHtml,
+      contentType: 'text/html'
+    }
+  ];
+
+  return sendMail({ to: primary, cc, subject, text, html, attachments });
+};
+
+/** Change request rejected → notify Requester (+ manager as CC). */
+export const sendChangeRequestRejectedEmail = async ({
+  cr,
+  requesterName,
+  requesterEmail,
+  decidedBy,
+  decidedByEmail,
+  rejectionReason,
+  managerEmail
+}) => {
+  const to = asList(requesterEmail || cr.employeeEmail || cr.requesterEmail);
+  const cc = asList(managerEmail || cr.managerEmail);
+  const primary = to.length ? to : asList(env.MAIL_APPROVER_FALLBACK || 'requester@changedesk.local');
+
+  const customEntries = extractCustomFields(cr);
+  const rejectedDate = formatLongDate(new Date()) || 'Today';
+  const reqName = cr.employeeName || cr.requester || requesterName || 'Requester';
+  const approver = decidedBy || cr.decidedBy || 'Change Manager';
+  const worklistUrl = `${appUrl()}/worklist`;
+
+  const subject = `Rejected: ${cr.title} (${cr.id})`;
+
+  const bodyHtml = `
+    <!-- Header & Status -->
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:14px">
+      <tr>
+        <td>
+          <span style="font:700 12px monospace;color:#2563EB">${esc(cr.id)}</span>
+          <h2 style="font:700 17px Arial,sans-serif;color:${C.ink};margin:3px 0 2px">${esc(cr.title)}</h2>
+          <span style="font:400 12px Arial,sans-serif;color:${C.muted}">${esc(cr.category)} · ${esc(cr.subCategory || 'Standard')}</span>
+        </td>
+        <td align="right" valign="top">
+          <span style="display:inline-block;padding:4px 12px;border-radius:99px;font:700 11px Arial,sans-serif;background:#FEF2F2;color:#DC2626;border:1px solid #FECACA">
+            ● Rejected
+          </span>
+        </td>
+      </tr>
+    </table>
+
+    <!-- Rejection Details Banner -->
+    <div style="background:#FEF2F2;border:1px solid #FECACA;border-radius:8px;padding:12px 16px;margin:14px 0 16px">
+      <div style="font:700 11px Arial,sans-serif;color:#991B1B;text-transform:uppercase;letter-spacing:0.04em;margin-bottom:6px">
+        ✕ Request Rejected
+      </div>
+      <div style="font:600 13px Arial,sans-serif;color:#7F1D1D">
+        Reviewed and rejected by <strong>${esc(approver)}</strong> on ${esc(rejectedDate)}
+      </div>
+      <div style="margin-top:8px;padding-top:8px;border-top:1px dashed #FCA5A5;font:400 13px/1.45 Arial,sans-serif;color:#991B1B">
+        <strong>Reason for Rejection:</strong> "${esc(rejectionReason || 'No reason specified.')}"
+      </div>
+    </div>
+
+    <!-- Section 1: Requester Details -->
+    <div style="border-top:1px solid ${C.border};padding-top:14px;margin-top:14px">
+      <div style="font:700 13px Arial,sans-serif;color:${C.ink};margin-bottom:10px">Section 1: Requester Details</div>
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;margin-bottom:14px">
+        <tr>
+          <td width="33%" style="padding:6px 10px 6px 0;vertical-align:top">
+            <div style="font:500 11px Arial,sans-serif;color:${C.muted};margin-bottom:2px">Requester / Employee</div>
+            <div style="font:600 13px Arial,sans-serif;color:${C.ink}">${esc(reqName)}</div>
+          </td>
+          <td width="33%" style="padding:6px 10px 6px 0;vertical-align:top">
+            <div style="font:500 11px Arial,sans-serif;color:${C.muted};margin-bottom:2px">Rejected By</div>
+            <div style="font:600 13px Arial,sans-serif;color:#DC2626">${esc(approver)}</div>
+          </td>
+          <td width="34%" style="padding:6px 0 6px 0;vertical-align:top">
+            <div style="font:500 11px Arial,sans-serif;color:${C.muted};margin-bottom:2px">Employee ID</div>
+            <div style="font:600 13px monospace;color:${C.ink}">${esc(cr.employeeId || cr.empId || 'N/A')}</div>
+          </td>
+        </tr>
+      </table>
+    </div>
+
+    <div style="margin:22px 0 8px;text-align:center">
+      <a href="${worklistUrl}" style="display:inline-block;padding:11px 24px;background-color:#2563EB;color:#ffffff;font:700 13px Arial,sans-serif;text-decoration:none;border-radius:7px;box-shadow:0 2px 4px rgba(37,99,235,0.25)">
+        View in ChangeDesk →
+      </a>
+    </div>
+  `;
+
+  const html = renderEmail({
+    preheader: `${cr.id} was rejected by Change Manager`,
+    heading: `Rejected: ${cr.id}`,
+    intro: `Change Request <strong>${esc(cr.id)} (${esc(cr.title)})</strong> has been rejected by <strong>${esc(approver)}</strong>.`,
+    rows: [],
+    bodyHtml,
+    footnote: 'Automated notification from <strong>ChangeDesk</strong>.'
+  });
+
+  const text =
+    `Rejected: ${cr.title} (${cr.id})\n\n` +
+    `Rejected by ${approver}\n` +
+    `Reason: ${rejectionReason || 'No reason specified.'}\n\n` +
+    `View in ChangeDesk: ${worklistUrl}\n`;
+
+  const reportHtml = generateChangeRequestReportHtml({ cr, requesterName: reqName, approveUrl: null, rejectUrl: null });
   const attachments = [
     ...mailAttachments(),
     {

@@ -7,6 +7,7 @@ import {
   addAuditLog
 } from '../services/dashboard.service.js';
 import { IdentityResolver } from '../services/identityResolver.service.js';
+import { publicActionRateLimiter } from '../middlewares/rateLimit.middleware.js';
 
 const CR_INCLUDE = [
   { model: Workflow, as: 'workflow', attributes: ['id', 'name'] },
@@ -15,6 +16,8 @@ const CR_INCLUDE = [
 
 const router = express.Router();
 const JWT_SECRET = process.env.JWT_SECRET || 'sfc-change-desk-secure-jwt-secret-key-2026';
+
+router.use(publicActionRateLimiter);
 
 // GET /api/public/change-request-action?token=...
 router.get('/change-request-action', async (req, res) => {
@@ -40,7 +43,8 @@ router.get('/change-request-action', async (req, res) => {
         cr: serialized,
         action: defaultAction || 'approve',
         approverEmail,
-        isPending: serialized.status === 'Pending'
+        isPending: serialized.status === 'Pending',
+        isApproved: serialized.status === 'Approved'
       }
     });
   } catch (err) {
@@ -58,8 +62,8 @@ router.post('/change-request-action', async (req, res) => {
   if (!token) {
     return res.status(400).json({ success: false, message: 'Missing action token' });
   }
-  if (!['approve', 'reject'].includes(action)) {
-    return res.status(400).json({ success: false, message: 'Action must be "approve" or "reject"' });
+  if (!['approve', 'reject', 'implement'].includes(action)) {
+    return res.status(400).json({ success: false, message: 'Action must be "approve", "reject", or "implement"' });
   }
   if (action === 'reject' && (!comment || !comment.trim())) {
     return res.status(400).json({ success: false, message: 'A rejection reason is required' });
@@ -73,14 +77,30 @@ router.post('/change-request-action', async (req, res) => {
     if (!cr) {
       return res.status(404).json({ success: false, message: `Change Request ${crId} not found` });
     }
-    if (cr.status !== 'Pending') {
-      return res.status(400).json({
-        success: false,
-        message: `This Change Request has already been marked as ${cr.status}.`
-      });
+
+    if (action === 'implement') {
+      if (cr.status === 'Implemented') {
+        return res.status(400).json({
+          success: false,
+          message: `Change Request ${crId} has already been marked as Implemented.`
+        });
+      }
+      if (cr.status !== 'Approved') {
+        return res.status(400).json({
+          success: false,
+          message: `Cannot implement Change Request in "${cr.status}" status (must be Approved).`
+        });
+      }
+    } else {
+      if (cr.status !== 'Pending') {
+        return res.status(400).json({
+          success: false,
+          message: `This Change Request has already been marked as ${cr.status}.`
+        });
+      }
     }
 
-    // Resolve approver's actorId from their email if available
+    // Resolve approver/implementer's actorId from their email if available
     let actorId = null;
     if (approverEmail) {
       const resIdentity = await IdentityResolver.resolveByEmail(approverEmail);
@@ -98,9 +118,11 @@ router.post('/change-request-action', async (req, res) => {
       actorId
     });
 
+    const actionText = action === 'approve' ? 'Approved' : action === 'implement' ? 'Implemented' : 'Rejected';
+
     return res.json({
       success: true,
-      message: `Change Request ${crId} has been ${action === 'approve' ? 'Approved' : 'Rejected'} successfully.`,
+      message: `Change Request ${crId} has been ${actionText} successfully.`,
       data: result
     });
   } catch (err) {
