@@ -66,6 +66,23 @@ function ChangeRequestRoute() {
 function WorklistRoute() {
   const { user, searchQuery, onNavigate } = useOutletContext();
   const location = useLocation();
+
+  const roleName = (user?.role || '').toLowerCase();
+  const roleId = user?.roleId || '';
+  const isSuperAdmin = roleId === 'role-1' || roleName.includes('super');
+  const isBoardUser = roleId === 'role-board' || roleName.includes('board');
+  const isTravelAdmin = roleId === 'role-2-travel' || (roleName.includes('admin') && roleName.includes('travel'));
+  const isPreSpendAdmin = roleId === 'role-2-prespend' || (roleName.includes('admin') && (roleName.includes('spend') || roleName.includes('prespend')));
+  const isChangeAdmin = roleId === 'role-2-change' || (roleName.includes('admin') && !isTravelAdmin && !isPreSpendAdmin && !isSuperAdmin);
+  const isAdmin = isSuperAdmin || isTravelAdmin || isPreSpendAdmin || isChangeAdmin || roleId === 'role-2' || roleName.includes('admin');
+  const isChangeManager = roleId === 'role-3' || roleName.includes('manager');
+  const isChangeImplementer = roleId === 'role-5' || roleName.includes('implementer');
+  const isApprover = isSuperAdmin || isBoardUser || isAdmin || isChangeManager || isChangeImplementer;
+
+  if (!isApprover) {
+    return <Navigate to="/dashboard" replace />;
+  }
+
   return (
     <MyWorklistPage
       user={user}
@@ -80,9 +97,8 @@ function SettingsRoute() {
   const { user, searchQuery, onNavigate } = useOutletContext();
   const roleName = (user?.role || '').toLowerCase();
   const isSuperAdmin = user?.roleId === 'role-1' || roleName.includes('super');
-  const isAdmin = isSuperAdmin || user?.roleId === 'role-2' || user?.roleId === 'role-2-change' || roleName.includes('admin');
 
-  if (!isAdmin) {
+  if (!isSuperAdmin) {
     return <Navigate to="/dashboard" replace />;
   }
 

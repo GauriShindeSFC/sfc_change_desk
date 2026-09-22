@@ -14,6 +14,7 @@ import {
   EXCEPTION_OPTIONS
 } from '../lib/preSpend.config.js';
 import { FormLabel } from '../components/ui/primitives.component';
+import { apiFetch } from '../lib/apiFetch.lib';
 
 const emptyVendor = () => ({ name: '', amount: '', date: '', file: null });
 const money = value => Number(value || 0).toLocaleString('en-IN', { style: 'currency', currency: 'INR' });
@@ -82,13 +83,49 @@ export default function PreSpendPage({ onNavigate, user, initialCostCentre = '',
     return `${year}-${month}-${day}`;
   })();
 
-  const handleSubmit = (e) => {
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [createdCode, setCreatedCode] = useState('');
+
+  const handleSubmit = async (e) => {
     e.preventDefault();
     if (!certified) {
       setNotice('Please confirm the policy certification declaration before submitting.');
       return;
     }
-    setSubmitted(true);
+    setIsSubmitting(true);
+    setNotice('');
+    try {
+      const payload = {
+        category,
+        subcategory,
+        buying: details.buying,
+        amount: details.amount,
+        neededBy: details.neededBy,
+        costCentre: details.costCentre,
+        budgetLine: details.budgetLine,
+        justification: details.justification,
+        urgent: details.urgent,
+        urgentReason: details.urgentReason,
+        vendors: vendors.filter(v => v.name || v.amount),
+        commercial,
+        certified
+      };
+      const res = await apiFetch('/pre-spend', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.message || 'Failed to submit pre-spend request');
+      }
+      setCreatedCode(data.data?.requestCode || '');
+      setSubmitted(true);
+    } catch (err) {
+      setNotice(err.message || 'Submission error');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const stepsList = ['Spend Category', 'Request Details', 'Vendors & Quotes', 'Review & Submit'];
@@ -178,10 +215,10 @@ export default function PreSpendPage({ onNavigate, user, initialCostCentre = '',
             <CheckCircle2 size={28} />
           </div>
           <h3 style={{ fontSize: '1.25rem', fontWeight: 700, color: '#065F46', margin: 0 }}>
-            Pre-Spend Request Recorded (Preview)
+            Pre-Spend Request Submitted Successfully
           </h3>
           <p style={{ fontSize: '0.85rem', color: '#047857', maxWidth: '480px', margin: 0, lineHeight: 1.5 }}>
-            Your pre-spend request for <strong>{details.buying || category}</strong> ({money(details.amount)}) has been staged. Full backend submission will be enabled once pre-spend APIs are connected.
+            Your pre-spend requisition <strong>{createdCode || ''}</strong> for <strong>{details.buying || category}</strong> ({money(details.amount)}) has been created and sent for approval.
           </p>
           <div style={{ display: 'flex', gap: '0.75rem', marginTop: '0.5rem' }}>
             <button

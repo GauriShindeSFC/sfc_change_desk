@@ -113,6 +113,7 @@ export const serializeWorklistEntry = (row) => {
 
   const decidedApproval = Array.isArray(cr.approvals) ? cr.approvals.find(a => (a.decision === 'Approved' || a.decision === 'Rejected' || a.action === 'Approved' || a.action === 'Rejected')) : null;
   const decidedBy = decidedApproval?.approver?.name || cr.decidedBy || null;
+  const decidedByEmail = decidedApproval?.approver?.email || cr.decidedByEmail || null;
   const decidedAt = decidedApproval?.decidedAt || decidedApproval?.updatedAt || null;
 
   const allComments = Array.isArray(cr.comments)
@@ -138,10 +139,12 @@ export const serializeWorklistEntry = (row) => {
 
   const appApproval = Array.isArray(cr.approvals) ? cr.approvals.find(a => a.decision === 'Approved' || a.action === 'Approved') : null;
   const approvedBy = cr.approvedBy || appApproval?.approver?.name || decidedBy || null;
+  const approvedByEmail = appApproval?.approver?.email || decidedByEmail || cr.approvedByEmail || null;
   const approvedDate = appApproval ? formatDate(new Date(appApproval.decidedAt || appApproval.updatedAt)) : (cr.status === 'Approved' || cr.status === 'Implemented' ? formatDate(new Date(decidedAt || cr.updatedAt)) : null);
   const approvedComment = cr.approvedComment || cr.approved_comment || cr.approvalRationale || cr.approval_rationale || appApproval?.rationale || appApproval?.comments || appApproval?.comment || foundAppComment || null;
 
   const rejectedBy = cr.rejectedBy || rejApproval?.approver?.name || decidedBy || null;
+  const rejectedByEmail = rejApproval?.approver?.email || decidedByEmail || cr.rejectedByEmail || null;
   const rejectedDate = rejApproval ? formatDate(new Date(rejApproval.decidedAt || rejApproval.updatedAt)) : (cr.status === 'Rejected' ? formatDate(new Date(decidedAt || cr.closedAt || cr.updatedAt)) : null);
   const rejectedComment = cr.rejectedComment || cr.rejected_comment || cr.rejectionReason || cr.rejection_reason || rejApproval?.rationale || rejApproval?.comments || rejApproval?.comment || foundRejComment || rationale;
 
@@ -185,11 +188,14 @@ export const serializeWorklistEntry = (row) => {
     risk: cr.risk,
     approvals: cr.approvals || [],
     decidedBy,
+    decidedByEmail,
     decidedAt,
     approvedBy,
+    approvedByEmail,
     approvedDate,
     approvedComment,
     rejectedBy,
+    rejectedByEmail,
     rejectedDate,
     rejectedComment,
     implementedDate,

@@ -1,7 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Clock, Check, X, RotateCw, FileText, IndianRupee, Plane } from 'lucide-react';
+import { Clock, Check, X, RotateCw, FileText, IndianRupee, Plane, MessageSquare } from 'lucide-react';
 import ChangeRequestModal from '../components/ui/changeRequestModal.component';
+import PreSpendDetailsModal from '../components/ui/PreSpendDetailsModal.component';
+import TravelDetailsModal from '../components/ui/TravelDetailsModal.component';
+import CommentPopupModal from '../components/ui/commentPopupModal.component';
 import FilterBar, { initCustomDateRange } from '../components/ui/filterBar.component';
 import ModuleSwitcher from '../components/ui/moduleSwitcher.component';
 import { Pagination } from '../components/ui/primitives.component';
@@ -9,14 +12,39 @@ import { apiFetch } from '../lib/apiFetch.lib';
 
 function MyWorklistPage({ onNavigate, searchQuery = '', user, isOrgWorklist = false }) {
   const queryClient = useQueryClient();
-  const [activeModule, setActiveModule] = useState('change_request');
   const roleName = (user?.role || '').toLowerCase();
   const roleId = user?.roleId || '';
   const isSuperAdmin = roleId === 'role-1' || roleName.includes('super');
-  const isAdmin = isSuperAdmin || roleId === 'role-2' || roleName.includes('admin');
+  const isBoardUser = roleId === 'role-board' || roleName.includes('board');
+  const isTravelAdmin = roleId === 'role-2-travel' || (roleName.includes('admin') && roleName.includes('travel'));
+  const isPreSpendAdmin = roleId === 'role-2-prespend' || (roleName.includes('admin') && (roleName.includes('spend') || roleName.includes('prespend')));
+  const isChangeAdmin = roleId === 'role-2-change' || (roleName.includes('admin') && !isTravelAdmin && !isPreSpendAdmin && !isSuperAdmin);
+  const isAdmin = isSuperAdmin || isTravelAdmin || isPreSpendAdmin || isChangeAdmin || roleId === 'role-2' || roleName.includes('admin');
+  const isChangeManager = roleId === 'role-3' || roleName.includes('manager');
   const isImplementer = roleId === 'role-5' || roleName.includes('implementer');
-  const isApprover = (user?.roleId && ['role-1', 'role-2', 'role-3', 'role-5'].includes(user.roleId)) || roleName.includes('manager') || roleName.includes('admin') || roleName.includes('implementer');
+  const isApprover = isSuperAdmin || isBoardUser || isAdmin || isChangeManager || isImplementer;
   const isRequester = !isApprover;
+
+  // Determine allowed modules for switcher
+  const allowedModules = isSuperAdmin
+    ? ['change_request', 'prespend', 'travel']
+    : isBoardUser
+    ? ['prespend', 'travel']
+    : isTravelAdmin
+    ? ['travel']
+    : isPreSpendAdmin
+    ? ['prespend']
+    : ['change_request'];
+
+  const defaultModule = isTravelAdmin
+    ? 'travel'
+    : isPreSpendAdmin
+    ? 'prespend'
+    : isBoardUser
+    ? 'prespend'
+    : 'change_request';
+
+  const [activeModule, setActiveModule] = useState(defaultModule);
 
   const [selectedCr, setSelectedCr] = useState(null);
   const [dateFilter, setDateFilter] = useState('last_7_days');
@@ -30,6 +58,7 @@ function MyWorklistPage({ onNavigate, searchQuery = '', user, isOrgWorklist = fa
   const [rowActionPrompt, setRowActionPrompt] = useState(null); // { item, action, title, color }
   const [rowActionCommentInput, setRowActionCommentInput] = useState('');
   const [rowActionCommentError, setRowActionCommentError] = useState('');
+  const [commentPopupData, setCommentPopupData] = useState(null);
 
   // Initial Filter State
   const [activeFilter, setActiveFilter] = useState(isImplementer ? 'Approved' : 'Pending');
@@ -42,9 +71,10 @@ function MyWorklistPage({ onNavigate, searchQuery = '', user, isOrgWorklist = fa
   const isCustomDateIncomplete = dateFilter === 'custom' && (!startDate || !endDate);
 
   const { data: worklistData, isLoading } = useQuery({
-    queryKey: ['worklist', { activeFilter, dateFilter, startDate, endDate, searchQuery, isOrgWorklist, userId: user?.id }],
+    queryKey: ['worklist', { activeModule, activeFilter, dateFilter, startDate, endDate, searchQuery, isOrgWorklist, userId: user?.id }],
     queryFn: async () => {
       const params = new URLSearchParams({
+        view: 'worklist',
         ...(activeFilter !== 'All' && { status: activeFilter }),
         ...(dateFilter !== 'overall' && { dateFilter }),
         ...(dateFilter === 'custom' && startDate && { startDate }),
@@ -52,11 +82,51 @@ function MyWorklistPage({ onNavigate, searchQuery = '', user, isOrgWorklist = fa
         ...(searchQuery && { search: searchQuery }),
         ...(isOrgWorklist && { scope: 'organization' })
       });
-      const res = await apiFetch(`/worklist?${params}`, {
-        headers: {
-          ...(user?.id ? { 'x-user-id': user.id } : {})
-        }
-      });
+
+      const headers = user?.id ? { 'x-user-id': user.id } : {};
+
+      if (activeModule === 'prespend') {
+        const res = await apiFetch(`/pre-spend?${params}`, { headers });
+        if (!res.ok) throw new Error('Failed to fetch pre-spend worklist');
+        const body = await res.json();
+        const canUserActOnPreSpend = isPreSpendAdmin || isBoardUser || isSuperAdmin;
+        return {
+          items: body.data && Array.isArray(body.data) ? body.data.map(i => ({
+            ...i,
+            canAct: canUserActOnPreSpend && (i.status === 'Pending Approval' || (i.status || '').toLowerCase().includes('pending'))
+          })) : [],
+          statusCounts: body.statusCounts || { All: 0, Pending: 0, Approved: 0, Rejected: 0 },
+          metrics: body.metrics || { pending: 0, approved: 0, rejected: 0 }
+        };
+      }
+
+      if (activeModule === 'travel') {
+        const res = await apiFetch(`/travel-desk?${params}`, { headers });
+        if (!res.ok) throw new Error('Failed to fetch travel worklist');
+        const body = await res.json();
+        return {
+          items: body.data && Array.isArray(body.data) ? body.data.map(i => {
+            const isPending = i.status === 'Pending Approval' || (i.status || '').toLowerCase().includes('pending');
+            // Rule: For short-notice flight (< 7 days), ONLY Board Member has the right to Approve / Reject
+            let canAct = false;
+            if (isPending) {
+              if (i.isShortNotice) {
+                canAct = isBoardUser; // strictly Board user only (disabled for Super Admin & Travel Admin)
+              } else {
+                canAct = isTravelAdmin || isBoardUser || isSuperAdmin;
+              }
+            }
+            return {
+              ...i,
+              canAct
+            };
+          }) : [],
+          statusCounts: body.statusCounts || { All: 0, Pending: 0, Approved: 0, Rejected: 0 },
+          metrics: body.metrics || { pending: 0, approved: 0, rejected: 0 }
+        };
+      }
+
+      const res = await apiFetch(`/worklist?${params}`, { headers });
       if (!res.ok) throw new Error('Failed to fetch worklist');
       const body = await res.json();
       return {
@@ -79,7 +149,13 @@ function MyWorklistPage({ onNavigate, searchQuery = '', user, isOrgWorklist = fa
 
   const handleAction = async (id, action, rejectionReason = '') => {
     try {
-      const res = await apiFetch('/worklist/action', {
+      const endpoint = activeModule === 'prespend'
+        ? '/pre-spend/action'
+        : activeModule === 'travel'
+        ? '/travel-desk/action'
+        : '/worklist/action';
+
+      const res = await apiFetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id, action, rejectionReason, comment: rejectionReason })
@@ -146,13 +222,7 @@ function MyWorklistPage({ onNavigate, searchQuery = '', user, isOrgWorklist = fa
           return prev;
         });
 
-        setMetrics(prev => ({
-          ...prev,
-          pending: Math.max(0, prev.pending - 1),
-          approved: action === 'approve' ? prev.approved + 1 : prev.approved,
-          rejected: action === 'reject' ? prev.rejected + 1 : prev.rejected,
-          implemented: action === 'implement' ? (prev.implemented || 0) + 1 : prev.implemented
-        }));
+        queryClient.invalidateQueries({ queryKey: ['worklist'] });
       } else {
         const errData = await res.json().catch(() => ({}));
         console.warn('Backend action request failed:', errData.message || res.statusText);
@@ -169,14 +239,14 @@ function MyWorklistPage({ onNavigate, searchQuery = '', user, isOrgWorklist = fa
   const approvedCount = statusCounts.Approved ?? statusCounts.InProcess ?? metrics?.approved ?? 0;
 
   // Domain-specific worklist items
-  const displayItems = activeModule === 'change_request' ? items : [];
+  const displayItems = items;
 
   const filterTabs = [
-    { id: 'All', label: `All (${activeModule === 'change_request' ? (statusCounts.All || 0) : 0})` },
-    { id: 'Pending', label: `Pending (${activeModule === 'change_request' ? (statusCounts.Pending || 0) : 0})` },
-    { id: 'Approved', label: `Approved (${activeModule === 'change_request' ? approvedCount : 0})` },
-    { id: 'Implemented', label: `${activeModule === 'travel' ? 'Completed' : activeModule === 'prespend' ? 'Processed' : 'Implemented'} (${activeModule === 'change_request' ? (statusCounts.Implemented || 0) : 0})` },
-    { id: 'Rejected', label: `Rejected (${activeModule === 'change_request' ? (statusCounts.Rejected || 0) : 0})` }
+    { id: 'All', label: `All (${statusCounts.All || 0})` },
+    { id: 'Pending', label: `Pending (${statusCounts.Pending || 0})` },
+    { id: 'Approved', label: `Approved (${approvedCount})` },
+    { id: 'Implemented', label: `${activeModule === 'travel' ? 'Completed' : activeModule === 'prespend' ? 'Processed' : 'Implemented'} (${statusCounts.Implemented || 0})` },
+    { id: 'Rejected', label: `Rejected (${statusCounts.Rejected || 0})` }
   ];
 
   // 1. Change Request Worklist Cards
@@ -189,18 +259,18 @@ function MyWorklistPage({ onNavigate, searchQuery = '', user, isOrgWorklist = fa
 
   // 2. Pre-Spend Worklist Cards
   const prespendMetricCards = [
-    { id: 'pending', title: 'Pending Budget Review', count: 0, subtext: 'Awaiting Manager Sign-off', subtextColor: 'var(--text-secondary)', icon: Clock, iconBg: '#FEF3C7', iconColor: '#D97706' },
-    { id: 'approved', title: 'Approved Spend', count: 0, subtext: 'Approved Budgets', subtextColor: '#059669', icon: Check, iconBg: '#ECFDF5', iconColor: '#059669' },
-    { id: 'implemented', title: 'Processed / Paid', count: 0, subtext: 'Disbursed', subtextColor: 'var(--text-secondary)', icon: RotateCw, iconBg: '#F3E8FF', iconColor: '#7C3AED' },
-    { id: 'rejected', title: 'Rejected', count: 0, subtext: 'Declined Requests', subtextColor: 'var(--text-secondary)', icon: X, iconBg: '#FEE2E2', iconColor: '#DC2626' }
+    { id: 'pending', title: 'Pending Budget Review', count: metrics?.pending ?? statusCounts.Pending ?? 0, subtext: 'Awaiting Sign-off', subtextColor: 'var(--text-secondary)', icon: Clock, iconBg: '#FEF3C7', iconColor: '#D97706' },
+    { id: 'approved', title: 'Approved Spend', count: metrics?.approved ?? statusCounts.Approved ?? 0, subtext: 'Approved Budgets', subtextColor: '#059669', icon: Check, iconBg: '#ECFDF5', iconColor: '#059669' },
+    { id: 'implemented', title: 'Processed / Paid', count: metrics?.implemented ?? statusCounts.Implemented ?? 0, subtext: 'Disbursed', subtextColor: 'var(--text-secondary)', icon: RotateCw, iconBg: '#F3E8FF', iconColor: '#7C3AED' },
+    { id: 'rejected', title: 'Rejected', count: metrics?.rejected ?? statusCounts.Rejected ?? 0, subtext: 'Declined Requests', subtextColor: 'var(--text-secondary)', icon: X, iconBg: '#FEE2E2', iconColor: '#DC2626' }
   ];
 
   // 3. Travel Desk Worklist Cards
   const travelMetricCards = [
-    { id: 'pending', title: 'Pending Approval', count: 0, subtext: 'Awaiting Travel Sign-off', subtextColor: 'var(--text-secondary)', icon: Clock, iconBg: '#FEF3C7', iconColor: '#D97706' },
-    { id: 'approved', title: 'Ticketed & Confirmed', count: 0, subtext: 'Confirmed Itineraries', subtextColor: '#059669', icon: Check, iconBg: '#ECFDF5', iconColor: '#059669' },
-    { id: 'implemented', title: 'Completed', count: 0, subtext: 'Completed Journeys', subtextColor: 'var(--text-secondary)', icon: RotateCw, iconBg: '#F3E8FF', iconColor: '#7C3AED' },
-    { id: 'rejected', title: 'Rejected', count: 0, subtext: 'Declined Bookings', subtextColor: 'var(--text-secondary)', icon: X, iconBg: '#FEE2E2', iconColor: '#DC2626' }
+    { id: 'pending', title: 'Pending Approval', count: metrics?.pending ?? statusCounts.Pending ?? 0, subtext: 'Awaiting Sign-off', subtextColor: 'var(--text-secondary)', icon: Clock, iconBg: '#FEF3C7', iconColor: '#D97706' },
+    { id: 'approved', title: 'Ticketed & Confirmed', count: metrics?.approved ?? statusCounts.Approved ?? 0, subtext: 'Confirmed Itineraries', subtextColor: '#059669', icon: Check, iconBg: '#ECFDF5', iconColor: '#059669' },
+    { id: 'implemented', title: 'Completed', count: metrics?.implemented ?? statusCounts.Implemented ?? 0, subtext: 'Completed Journeys', subtextColor: 'var(--text-secondary)', icon: RotateCw, iconBg: '#F3E8FF', iconColor: '#7C3AED' },
+    { id: 'rejected', title: 'Rejected', count: metrics?.rejected ?? statusCounts.Rejected ?? 0, subtext: 'Declined Bookings', subtextColor: 'var(--text-secondary)', icon: X, iconBg: '#FEE2E2', iconColor: '#DC2626' }
   ];
 
   const metricCards = activeModule === 'prespend'
@@ -228,11 +298,12 @@ function MyWorklistPage({ onNavigate, searchQuery = '', user, isOrgWorklist = fa
         </p>
       </div>
 
-      {/* Module Switcher Row: 3 Options on Left, Total Count at Extreme Right */}
+      {/* Module Switcher Row: Scoped Options on Left, Total Count at Extreme Right */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '1rem', width: '100%' }}>
         <ModuleSwitcher
           activeModule={activeModule}
           onModuleChange={setActiveModule}
+          allowedModules={allowedModules}
         />
 
         <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
@@ -298,11 +369,15 @@ function MyWorklistPage({ onNavigate, searchQuery = '', user, isOrgWorklist = fa
           <table style={{ width: '100%', minWidth: '1100px', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.85rem' }}>
             <thead>
               <tr style={{ backgroundColor: 'var(--input-bg)', borderBottom: '1px solid var(--border-color)', color: 'var(--text-secondary)', fontSize: '0.75rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                <th style={{ padding: '0.9rem 1.1rem', minWidth: '100px', whiteSpace: 'nowrap' }}>CR ID</th>
+                <th style={{ padding: '0.9rem 1.1rem', minWidth: '100px', whiteSpace: 'nowrap' }}>
+                  {activeModule === 'travel' ? 'TR ID' : activeModule === 'prespend' ? 'PS ID' : 'CR ID'}
+                </th>
                 <th style={{ padding: '0.9rem 1.1rem', minWidth: '280px' }}>Title</th>
                 <th style={{ padding: '0.9rem 1.1rem', minWidth: '180px' }}>Category</th>
                 <th style={{ padding: '0.9rem 1.1rem', minWidth: '180px', whiteSpace: 'nowrap' }}>Requester Details</th>
-                <th style={{ padding: '0.9rem 1.1rem', minWidth: '120px', whiteSpace: 'nowrap' }}>Raised Date</th>
+                <th style={{ padding: '0.9rem 1.1rem', minWidth: '120px', whiteSpace: 'nowrap' }}>
+                  {activeModule === 'travel' ? 'Travel Date' : 'Raised Date'}
+                </th>
                 <th style={{ padding: '0.9rem 1.1rem', minWidth: '120px', whiteSpace: 'nowrap' }}>Closed Date</th>
                 <th style={{ padding: '0.9rem 1.1rem', minWidth: '130px', whiteSpace: 'nowrap' }}>Approved By</th>
                 <th style={{ padding: '0.9rem 1.1rem', minWidth: '140px', whiteSpace: 'nowrap' }}>Status</th>
@@ -323,8 +398,15 @@ function MyWorklistPage({ onNavigate, searchQuery = '', user, isOrgWorklist = fa
                     (item.requesterEmail && user?.email && item.requesterEmail.trim().toLowerCase() === user.email.trim().toLowerCase())
                   );
 
-                  const emailVal = item.employeeEmail || item.managerEmail || item.requesterEmail || '';
-                  const displayName = item.employeeName || item.requester || item.requesterName || (emailVal ? emailVal.split('@')[0].replace(/[\._]/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) : '—');
+                  const emailVal = item.employeeEmail || item.requesterEmail || item.travellerEmail || item.managerEmail || '';
+                  const displayName = item.employeeName || item.requester || item.requesterName || item.travellerName || (emailVal ? emailVal.split('@')[0].replace(/[\._]/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) : '—');
+
+                  const approverName = item.decidedBy || item.approvedBy || (isItemApproved || isItemRejected ? (user?.name || 'Approver') : null);
+                  const approverEmail = item.decidedByEmail || item.approvedByEmail || (isItemApproved || isItemRejected ? user?.email : null);
+
+                  const hasComment = Boolean(item.approvedComment || item.rejectedComment || item.rejectionReason || item.implementedComment);
+
+                  const isShortNoticeFlight = activeModule === 'travel' && item.isShortNotice;
 
                   const statusBadgeLabel = status === 'implemented'
                     ? 'Implemented'
@@ -332,36 +414,20 @@ function MyWorklistPage({ onNavigate, searchQuery = '', user, isOrgWorklist = fa
                     ? 'Approved'
                     : isItemRejected
                     ? 'Rejected'
+                    : item.status === 'In Progress'
+                    ? 'In Progress'
+                    : isShortNoticeFlight
+                    ? 'Awaiting Board Approval'
                     : 'Pending';
 
-                  const statusBg = status === 'implemented'
-                    ? '#F3E8FF'
-                    : isItemApproved
-                    ? '#ECFDF5'
-                    : isItemRejected
-                    ? '#FEE2E2'
-                    : '#FEF3C7';
-
-                  const statusColor = status === 'implemented'
-                    ? '#7C3AED'
-                    : isItemApproved
-                    ? '#059669'
-                    : isItemRejected
-                    ? '#DC2626'
-                    : '#D97706';
-
-                  const statusDot = status === 'implemented'
-                    ? '#7C3AED'
-                    : isItemApproved
-                    ? '#10B981'
-                    : isItemRejected
-                    ? '#DC2626'
-                    : '#D97706';
+                  const statusColor = statusBadgeLabel === 'Approved' ? '#059669' : statusBadgeLabel === 'Rejected' ? '#DC2626' : statusBadgeLabel === 'Implemented' ? '#7C3AED' : isShortNoticeFlight ? '#DC2626' : '#D97706';
+                  const statusBg = statusBadgeLabel === 'Approved' ? '#ECFDF5' : statusBadgeLabel === 'Rejected' ? '#FEF2F2' : statusBadgeLabel === 'Implemented' ? '#F5F3FF' : isShortNoticeFlight ? '#FEF2F2' : '#FFFBEB';
+                  const statusDot = statusBadgeLabel === 'Approved' ? '#10B981' : statusBadgeLabel === 'Rejected' ? '#EF4444' : statusBadgeLabel === 'Implemented' ? '#8B5CF6' : isShortNoticeFlight ? '#EF4444' : '#F59E0B';
 
                   return (
                     <tr key={item.id} style={{ borderBottom: '1px solid var(--border-color)', transition: 'background-color 0.15s ease' }}>
                       <td style={{ padding: '1rem 1.1rem', fontWeight: 500, color: 'var(--text-primary)', fontFamily: 'var(--font-mono)', whiteSpace: 'nowrap' }}>
-                        {item.id}
+                        {item.requestCode || item.id}
                       </td>
                       <td style={{ padding: '1rem 1.1rem', fontWeight: 500, color: 'var(--text-primary)', minWidth: '280px' }}>
                         <span style={{ lineHeight: 1.4, color: 'var(--text-primary)', display: 'block' }}>{item.title}</span>
@@ -371,11 +437,11 @@ function MyWorklistPage({ onNavigate, searchQuery = '', user, isOrgWorklist = fa
                         {item.subCategory && <div style={{ fontSize: '0.775rem', color: 'var(--text-secondary)' }}>{item.subCategory}</div>}
                       </td>
                       <td style={{ padding: '1rem 1.1rem', color: 'var(--text-primary)', whiteSpace: 'nowrap' }}>
-                        <div style={{ fontWeight: 500, fontSize: '0.85rem', color: 'var(--text-primary)' }}>
+                        <div style={{ fontWeight: 600, fontSize: '0.85rem', color: 'var(--text-primary)' }}>
                           {displayName}
                         </div>
                         {emailVal && (
-                          <div style={{ fontSize: '0.775rem', color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)', marginTop: '0.15rem' }}>
+                          <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)', marginTop: '0.15rem' }}>
                             {emailVal}
                           </div>
                         )}
@@ -387,14 +453,14 @@ function MyWorklistPage({ onNavigate, searchQuery = '', user, isOrgWorklist = fa
                         {item.closedDate || (item.closedAt ? new Date(item.closedAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '—')}
                       </td>
                       <td style={{ padding: '1rem 1.1rem', color: 'var(--text-primary)', whiteSpace: 'nowrap' }}>
-                        {item.decidedBy || (isItemApproved || isItemRejected ? (user?.name || 'Approver') : null) ? (
+                        {approverName ? (
                           <>
-                            <div style={{ fontWeight: 500, fontSize: '0.85rem', color: 'var(--text-primary)' }}>
-                              {item.decidedBy || (isItemApproved || isItemRejected ? (user?.name || 'Approver') : '—')}
+                            <div style={{ fontWeight: 600, fontSize: '0.85rem', color: 'var(--text-primary)' }}>
+                              {approverName}
                             </div>
-                            {(item.decidedByEmail || item.approvedByEmail || (isItemApproved || isItemRejected ? user?.email : null)) && (
+                            {approverEmail && (
                               <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)', marginTop: '0.15rem' }}>
-                                {item.decidedByEmail || item.approvedByEmail || user?.email}
+                                {approverEmail}
                               </div>
                             )}
                           </>
@@ -430,12 +496,50 @@ function MyWorklistPage({ onNavigate, searchQuery = '', user, isOrgWorklist = fa
                           >
                             View
                           </button>
-                          {!isRequester && !isSelfRequest && item.canAct !== false && status === 'pending' && item.myDecision === 'Pending' ? (
+
+                          {/* Pop-up Comment Note Trigger */}
+                          {hasComment && (
+                            <button
+                              type="button"
+                              title="View Decision Comment"
+                              onClick={() => {
+                                const isApp = status === 'approved' || item.myDecision === 'Approved';
+                                const isRej = status === 'rejected' || item.myDecision === 'Rejected';
+                                const isImp = status === 'implemented' || item.myDecision === 'Implemented';
+                                setCommentPopupData({
+                                  title: isRej ? 'Rejection Reason' : isApp ? 'Approval Note' : isImp ? 'Implementation Note' : 'Decision Note',
+                                  action: isRej ? 'Rejected' : isApp ? 'Approved' : isImp ? 'Implemented' : status,
+                                  authorName: approverName || 'Approver',
+                                  authorEmail: approverEmail || '',
+                                  date: item.approvedDate || item.closedDate || item.raisedDate || 'Recently',
+                                  comment: item.approvedComment || item.rejectedComment || item.rejectionReason || item.implementedComment
+                                });
+                              }}
+                              style={{
+                                padding: '0.35rem 0.6rem',
+                                backgroundColor: isItemRejected ? '#FEF2F2' : isItemApproved ? '#ECFDF5' : 'var(--input-bg)',
+                                color: isItemRejected ? '#DC2626' : isItemApproved ? '#059669' : 'var(--text-primary)',
+                                border: `1px solid ${isItemRejected ? '#FECACA' : isItemApproved ? '#A7F3D0' : 'var(--border-color)'}`,
+                                borderRadius: '6px',
+                                fontSize: '0.775rem',
+                                fontWeight: 600,
+                                cursor: 'pointer',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '0.3rem'
+                              }}
+                            >
+                              <MessageSquare size={13} />
+                              <span>Note</span>
+                            </button>
+                          )}
+
+                          {!isRequester && !isSelfRequest && item.canAct !== false && (status === 'pending' || status === 'pending approval') && item.myDecision !== 'Approved' && item.myDecision !== 'Rejected' ? (
                             <>
                               <button
                                 type="button"
                                 onClick={() => {
-                                  setRowActionPrompt({ item, action: 'reject', title: 'Reject Change Request', color: '#DC2626' });
+                                  setRowActionPrompt({ item, action: 'reject', title: `Reject ${activeModule === 'travel' ? 'Travel Request' : activeModule === 'prespend' ? 'Pre-Spend Request' : 'Change Request'}`, color: '#DC2626' });
                                   setRowActionCommentInput('');
                                   setRowActionCommentError('');
                                 }}
@@ -446,7 +550,7 @@ function MyWorklistPage({ onNavigate, searchQuery = '', user, isOrgWorklist = fa
                               <button
                                 type="button"
                                 onClick={() => {
-                                  setRowActionPrompt({ item, action: 'approve', title: 'Approve Change Request', color: '#0D9488' });
+                                  setRowActionPrompt({ item, action: 'approve', title: `Approve ${activeModule === 'travel' ? 'Travel Request' : activeModule === 'prespend' ? 'Pre-Spend Request' : 'Change Request'}`, color: '#0D9488' });
                                   setRowActionCommentInput('');
                                   setRowActionCommentError('');
                                 }}
@@ -455,6 +559,18 @@ function MyWorklistPage({ onNavigate, searchQuery = '', user, isOrgWorklist = fa
                                 Approve
                               </button>
                             </>
+                          ) : isShortNoticeFlight && !isBoardUser && status === 'pending' ? (
+                            <span style={{
+                              padding: '0.3rem 0.65rem',
+                              borderRadius: 'var(--radius-lg)',
+                              fontSize: '0.75rem',
+                              fontWeight: 600,
+                              backgroundColor: '#FEF2F2',
+                              color: '#DC2626',
+                              border: '1px solid #FECACA'
+                            }}>
+                              Awaiting Board Approval
+                            </span>
                           ) : isItemApproved && status !== 'implemented' && (isAdmin || isImplementer) && !isSelfRequest ? (
                             <button
                               type="button"
@@ -642,8 +758,28 @@ function MyWorklistPage({ onNavigate, searchQuery = '', user, isOrgWorklist = fa
         </div>
       )}
 
-      {/* Details Modal */}
-      {selectedCr && (() => {
+      {/* Domain-Specific Details Modals */}
+      {selectedCr && activeModule === 'prespend' && (
+        <PreSpendDetailsModal
+          item={selectedCr}
+          user={user}
+          onClose={() => setSelectedCr(null)}
+          onApprove={(id, action, comment) => handleAction(id, 'approve', comment)}
+          onReject={(id, action, reason) => handleAction(id, 'reject', reason)}
+        />
+      )}
+
+      {selectedCr && activeModule === 'travel' && (
+        <TravelDetailsModal
+          item={selectedCr}
+          user={user}
+          onClose={() => setSelectedCr(null)}
+          onApprove={(id, action, comment) => handleAction(id, 'approve', comment)}
+          onReject={(id, action, reason) => handleAction(id, 'reject', reason)}
+        />
+      )}
+
+      {selectedCr && activeModule === 'change_request' && (() => {
         const isSelf = Boolean(
           (selectedCr.requesterId && (String(selectedCr.requesterId) === String(user?.id) || String(selectedCr.requesterId) === String(user?.userKey))) ||
           (selectedCr.employeeId && user?.employeeId && String(selectedCr.employeeId).trim().toLowerCase() === String(user.employeeId).trim().toLowerCase()) ||
@@ -662,6 +798,13 @@ function MyWorklistPage({ onNavigate, searchQuery = '', user, isOrgWorklist = fa
           />
         );
       })()}
+
+      {/* Pop-up Modal for Decision Comments / Notes */}
+      <CommentPopupModal
+        isOpen={Boolean(commentPopupData)}
+        onClose={() => setCommentPopupData(null)}
+        data={commentPopupData}
+      />
 
     </div>
   );

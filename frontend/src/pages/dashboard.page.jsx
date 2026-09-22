@@ -7,6 +7,8 @@ import {
 } from 'lucide-react';
 import FilterBar, { initCustomDateRange } from '../components/ui/filterBar.component';
 import ChangeRequestModal from '../components/ui/changeRequestModal.component';
+import PreSpendDetailsModal from '../components/ui/PreSpendDetailsModal.component';
+import TravelDetailsModal from '../components/ui/TravelDetailsModal.component';
 import ModuleSwitcher from '../components/ui/moduleSwitcher.component';
 import { Pagination, ExportButtonGroup } from '../components/ui/primitives.component';
 import { apiFetch } from '../lib/apiFetch.lib';
@@ -28,19 +30,20 @@ const getGreeting = () => {
 };
 
 const PRESPEND_CANONICAL_CATEGORIES = [
-  { category: 'Hardware & Devices', label: 'Hardware & Devices', count: 0, color: '#2563EB', percentage: 0 },
+  { category: 'IT Hardware', label: 'IT Hardware', count: 0, color: '#2563EB', percentage: 0 },
   { category: 'Software & SaaS', label: 'Software & SaaS', count: 0, color: '#7C3AED', percentage: 0 },
-  { category: 'Cloud Infrastructure', label: 'Cloud Infrastructure', count: 0, color: '#0D9488', percentage: 0 },
-  { category: 'Consulting & Services', label: 'Consulting & Services', count: 0, color: '#D97706', percentage: 0 },
-  { category: 'Office Assets', label: 'Office Assets', count: 0, color: '#475569', percentage: 0 }
+  { category: 'Professional Services', label: 'Professional Services', count: 0, color: '#0D9488', percentage: 0 },
+  { category: 'Marketing & Event', label: 'Marketing & Event', count: 0, color: '#D97706', percentage: 0 },
+  { category: 'Facilities & Housekeeping', label: 'Facilities & Housekeeping', count: 0, color: '#475569', percentage: 0 },
+  { category: 'Employee Welfare', label: 'Employee Welfare', count: 0, color: '#DC2626', percentage: 0 }
 ];
 
 const TRAVEL_CANONICAL_CATEGORIES = [
-  { category: 'Flight', label: 'Flights', count: 0, color: '#2563EB', percentage: 0 },
-  { category: 'Hotel', label: 'Hotel Rooms', count: 0, color: '#7C3AED', percentage: 0 },
-  { category: 'Cab', label: 'Cabs & Transfers', count: 0, color: '#D97706', percentage: 0 },
-  { category: 'Train', label: 'Train Bookings', count: 0, color: '#0D9488', percentage: 0 },
-  { category: 'Bus', label: 'Bus Reservations', count: 0, color: '#475569', percentage: 0 }
+  { category: 'Flight', label: 'Flight', count: 0, color: '#2563EB', percentage: 0 },
+  { category: 'Hotel', label: 'Hotel Room', count: 0, color: '#7C3AED', percentage: 0 },
+  { category: 'Cab', label: 'Cab', count: 0, color: '#D97706', percentage: 0 },
+  { category: 'Train', label: 'Train', count: 0, color: '#0D9488', percentage: 0 },
+  { category: 'Bus', label: 'Bus', count: 0, color: '#475569', percentage: 0 }
 ];
 
 const CANONICAL_METRICS = [
@@ -120,8 +123,44 @@ function DashboardPage({ onNavigate, user, isOrgDashboard = false, searchQuery =
   const isCustomDateIncomplete = dateFilter === 'custom' && (!startDate || !endDate);
 
   const { data: dashboardResult, isLoading: isLoadingRequests } = useQuery({
-    queryKey: ['dashboard', isOrgDashboard, activeFilter, dateFilter, startDate, endDate, searchQuery, user?.id],
+    queryKey: ['dashboard', isOrgDashboard, activeModule, activeFilter, dateFilter, startDate, endDate, searchQuery, user?.id],
     queryFn: async () => {
+      if (activeModule === 'prespend') {
+        const psRes = await apiFetch(`/pre-spend?${requestParams}`, { headers });
+        const psData = psRes.ok ? await psRes.json() : {};
+        return {
+          metrics: psData.metrics ? [
+            { id: 'total', title: 'Total Pre-Spend Requests', value: psData.metrics.total || 0, count: psData.metrics.total || 0, change: 'All Spend Requests', isTotal: true },
+            { id: 'pending', title: 'Pending Budget Review', value: psData.metrics.pending || 0, count: psData.metrics.pending || 0, change: 'Manager Review', isPending: true },
+            { id: 'approved', title: 'Approved Spend', value: psData.metrics.approved || 0, count: psData.metrics.approved || 0, change: 'Approved by Manager', isApproved: true },
+            { id: 'implemented', title: 'Total Spend (₹)', value: psData.metrics.totalAmount ? `₹${Number(psData.metrics.totalAmount).toLocaleString('en-IN')}` : '₹0', count: psData.metrics.totalAmount || 0, change: 'Total Requisition Value', isImplemented: true },
+            { id: 'rejected', title: 'Rejected', value: psData.metrics.rejected || 0, count: psData.metrics.rejected || 0, change: 'Rejected', isRejected: true }
+          ] : [],
+          categories: Array.isArray(psData.categories) && psData.categories.length > 0 ? psData.categories : PRESPEND_CANONICAL_CATEGORIES,
+          statusBreakdown: Array.isArray(psData.statusBreakdown) && psData.statusBreakdown.length > 0 ? psData.statusBreakdown : [],
+          requests: psData.data && Array.isArray(psData.data) ? psData.data : [],
+          statusCounts: psData.statusCounts || { All: 0, Pending: 0, Approved: 0, Rejected: 0 }
+        };
+      }
+
+      if (activeModule === 'travel') {
+        const trRes = await apiFetch(`/travel-desk?${requestParams}`, { headers });
+        const trData = trRes.ok ? await trRes.json() : {};
+        return {
+          metrics: trData.metrics ? [
+            { id: 'total', title: 'Total Travel Bookings', value: trData.metrics.total || 0, count: trData.metrics.total || 0, change: 'All Bookings', isTotal: true },
+            { id: 'pending', title: 'Pending Approvals', value: trData.metrics.pending || 0, count: trData.metrics.pending || 0, change: 'Awaiting approval', isPending: true },
+            { id: 'approved', title: 'Ticketed & Confirmed', value: trData.metrics.approved || 0, count: trData.metrics.approved || 0, change: 'Confirmed Bookings', isApproved: true },
+            { id: 'implemented', title: 'Completed', value: 0, count: 0, change: 'Completed Journeys', isInProgress: true },
+            { id: 'rejected', title: 'Rejected', value: trData.metrics.rejected || 0, count: trData.metrics.rejected || 0, change: 'Rejected', isRejected: true }
+          ] : [],
+          categories: Array.isArray(trData.categories) && trData.categories.length > 0 ? trData.categories : TRAVEL_CANONICAL_CATEGORIES,
+          statusBreakdown: Array.isArray(trData.statusBreakdown) && trData.statusBreakdown.length > 0 ? trData.statusBreakdown : [],
+          requests: trData.data && Array.isArray(trData.data) ? trData.data : [],
+          statusCounts: trData.statusCounts || { All: 0, Pending: 0, Approved: 0, Rejected: 0 }
+        };
+      }
+
       const [mRes, cRes, sRes, rRes] = await Promise.all([
         apiFetch(`/metrics?${metricsParams}`, { headers }),
         apiFetch(`/categories?${commonParams}`, { headers }),
@@ -157,76 +196,61 @@ function DashboardPage({ onNavigate, user, isOrgDashboard = false, searchQuery =
   const crRequests = dashboardResult?.requests || [];
   const statusCounts = dashboardResult?.statusCounts || { All: 0, Pending: 0, InProcess: 0, Implemented: 0, Rejected: 0 };
 
-  // 1. Change Request Domain Metrics
-  const crMetrics = (Array.isArray(rawMetrics) && rawMetrics.length > 0)
+  // 1. Dynamic Domain Metrics
+  const metrics = (Array.isArray(rawMetrics) && rawMetrics.length > 0)
     ? rawMetrics
     : [
-        { id: 'total', title: 'Total Change Requests', value: statusCounts.All || 0, count: statusCounts.All || 0, change: 'Total Requests', isTotal: true },
+        { id: 'total', title: activeModule === 'travel' ? 'Total Travel Bookings' : activeModule === 'prespend' ? 'Total Pre-Spend Requests' : 'Total Change Requests', value: statusCounts.All || 0, count: statusCounts.All || 0, change: 'Total Requests', isTotal: true },
         { id: 'pending', title: 'Pending Approvals', value: statusCounts.Pending || 0, count: statusCounts.Pending || 0, change: 'Awaiting review', isPending: true },
         { id: 'approved', title: 'Approved', value: statusCounts.Approved ?? statusCounts.InProcess ?? 0, count: statusCounts.Approved ?? statusCounts.InProcess ?? 0, change: 'Approved', isApproved: true },
-        { id: 'implemented', title: 'Implemented', value: statusCounts.Implemented || 0, count: statusCounts.Implemented || 0, change: 'Implemented', isImplemented: true, isInProgress: true },
+        { id: 'implemented', title: activeModule === 'travel' ? 'Completed' : activeModule === 'prespend' ? 'Processed' : 'Implemented', value: statusCounts.Implemented || 0, count: statusCounts.Implemented || 0, change: 'Completed', isImplemented: true, isInProgress: true },
         { id: 'rejected', title: 'Rejected', value: statusCounts.Rejected || 0, count: statusCounts.Rejected || 0, change: 'Rejected', isRejected: true }
       ];
 
-  // 2. Pre-Spend Domain Metrics
-  const prespendMetrics = [
-    { id: 'total', title: 'Total Pre-Spend Requests', value: 0, count: 0, change: 'All Spend Requests', isTotal: true },
-    { id: 'pending', title: 'Pending Budget Review', value: 0, count: 0, change: 'Manager Review', isPending: true },
-    { id: 'approved', title: 'Approved Spend', value: 0, count: 0, change: 'Approved by Manager', isApproved: true },
-    { id: 'implemented', title: 'Processed / Paid', value: 0, count: 0, change: 'Finance Processed', isImplemented: true },
-    { id: 'rejected', title: 'Rejected', value: 0, count: 0, change: 'Rejected', isRejected: true }
-  ];
-
-  // 3. Travel Desk Domain Metrics
-  const travelMetrics = [
-    { id: 'total', title: 'Total Travel Bookings', value: 0, count: 0, change: 'All Bookings', isTotal: true },
-    { id: 'pending', title: 'Pending Approvals', value: 0, count: 0, change: 'Awaiting approval', isPending: true },
-    { id: 'approved', title: 'Ticketed & Confirmed', value: 0, count: 0, change: 'Confirmed Bookings', isApproved: true },
-    { id: 'implemented', title: 'Completed', value: 0, count: 0, change: 'Completed Journeys', isInProgress: true },
-    { id: 'rejected', title: 'Rejected', value: 0, count: 0, change: 'Rejected', isRejected: true }
-  ];
-
-  // Resolve Active Metrics
-  const metrics = activeModule === 'prespend'
-    ? prespendMetrics
-    : activeModule === 'travel'
-    ? travelMetrics
-    : crMetrics;
-
-  // Resolve Active Categories
-  const displayCategories = activeModule === 'prespend'
+  // 2. Dynamic Categories (renders all valid domain categories with live counts merged in)
+  const canonicalCategoriesList = activeModule === 'prespend'
     ? PRESPEND_CANONICAL_CATEGORIES
     : activeModule === 'travel'
     ? TRAVEL_CANONICAL_CATEGORIES
-    : CANONICAL_CATEGORIES.map((def) => {
-        const found = categoryData.find(
-          (c) => (c.name || c.category || c.label || '').trim().toLowerCase() === def.category.toLowerCase()
-        );
-        return found ? { ...def, ...found } : def;
-      });
+    : CANONICAL_CATEGORIES;
+
+  const displayCategories = canonicalCategoriesList.map((def) => {
+    const found = categoryData.find(
+      (c) => (c.name || c.category || c.label || '').trim().toLowerCase() === def.category.toLowerCase()
+    );
+    return found ? { ...def, count: found.count || 0 } : def;
+  });
 
   const totalCategoryCount = displayCategories.reduce((sum, c) => sum + (c.count || 0), 0);
 
-  // Resolve Active Status Breakdown
-  const displayStatuses = activeModule === 'prespend' || activeModule === 'travel'
-    ? CANONICAL_STATUSES.map(def => ({ ...def, count: 0 }))
-    : CANONICAL_STATUSES.map((def) => {
-        const found = statusBreakdown.find(
-          (s) => (s.status || s.label || '').trim().toLowerCase() === def.status.toLowerCase()
-        );
-        return found ? { ...def, count: found.count || 0 } : def;
-      });
+  // 3. Dynamic Status Breakdown (renders all standard statuses with live counts merged in)
+  const displayStatuses = CANONICAL_STATUSES.map((def) => {
+    const found = statusBreakdown.find(
+      (s) => (s.status || s.label || '').trim().toLowerCase() === def.status.toLowerCase()
+    );
+    const fallbackCount = def.status === 'Pending'
+      ? statusCounts.Pending
+      : def.status === 'Approved'
+      ? (statusCounts.Approved ?? statusCounts.InProcess)
+      : def.status === 'Implemented'
+      ? statusCounts.Implemented
+      : def.status === 'Rejected'
+      ? statusCounts.Rejected
+      : 0;
 
-  const totalCRs = displayStatuses.reduce((sum, item) => sum + (item.count || 0), 0);
-  const requests = activeModule === 'change_request' ? crRequests : [];
+    return found ? { ...def, count: found.count ?? fallbackCount ?? 0 } : { ...def, count: fallbackCount ?? 0 };
+  });
+
+  const totalCRs = statusCounts.All || displayStatuses.reduce((sum, item) => sum + (item.count || 0), 0);
+  const requests = dashboardResult?.requests || [];
 
   // Filter Tabs
   const filterTabs = [
-    { id: 'All', label: 'All', count: activeModule === 'change_request' ? (statusCounts.All || totalCRs) : 0 },
-    { id: 'Pending', label: 'Pending Approvals', count: activeModule === 'change_request' ? statusCounts.Pending : 0 },
-    { id: 'Approved', label: 'Approved', count: activeModule === 'change_request' ? (statusCounts.Approved ?? statusCounts.InProcess) : 0 },
-    { id: 'Implemented', label: activeModule === 'travel' ? 'Completed' : activeModule === 'prespend' ? 'Processed' : 'Implemented', count: activeModule === 'change_request' ? statusCounts.Implemented : 0 },
-    { id: 'Rejected', label: 'Rejected', count: activeModule === 'change_request' ? statusCounts.Rejected : 0 }
+    { id: 'All', label: 'All', count: statusCounts.All || 0 },
+    { id: 'Pending', label: 'Pending Approvals', count: statusCounts.Pending || 0 },
+    { id: 'Approved', label: 'Approved', count: statusCounts.Approved ?? statusCounts.InProcess ?? 0 },
+    { id: 'Implemented', label: activeModule === 'travel' ? 'Completed' : activeModule === 'prespend' ? 'Processed' : 'Implemented', count: statusCounts.Implemented || 0 },
+    { id: 'Rejected', label: 'Rejected', count: statusCounts.Rejected || 0 }
   ];
 
   const handleExport = async (format) => {
@@ -617,7 +641,9 @@ function DashboardPage({ onNavigate, user, isOrgDashboard = false, searchQuery =
 
                 <div style={{ position: 'absolute', textAlign: 'center' }}>
                   <div style={{ fontSize: '1.45rem', fontWeight: 700, color: 'var(--text-primary)', lineHeight: 1 }}>{totalCRs}</div>
-                  <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', fontWeight: 500, marginTop: '0.15rem' }}>Total CRs</div>
+                  <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', fontWeight: 500, marginTop: '0.15rem' }}>
+                    {activeModule === 'travel' ? 'Total Trips' : activeModule === 'prespend' ? 'Total Reqs' : 'Total CRs'}
+                  </div>
                 </div>
               </div>
 
@@ -715,7 +741,7 @@ function DashboardPage({ onNavigate, user, isOrgDashboard = false, searchQuery =
             <thead>
               <tr style={{ backgroundColor: 'var(--input-bg)', borderBottom: '1px solid var(--border-color)' }}>
                 <th style={{ padding: '0.85rem 1rem', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', fontSize: '0.725rem', letterSpacing: '0.05em', width: '90px', minWidth: '90px', whiteSpace: 'nowrap' }}>
-                  {activeModule === 'travel' ? 'BOOKING ID' : activeModule === 'prespend' ? 'REQ ID' : 'CR ID'}
+                  {activeModule === 'travel' ? 'TR ID' : activeModule === 'prespend' ? 'PS ID' : 'CR ID'}
                 </th>
                 <th style={{ padding: '0.85rem 1rem', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', fontSize: '0.725rem', letterSpacing: '0.05em', minWidth: '220px' }}>
                   {activeModule === 'travel' ? 'Route / Location' : activeModule === 'prespend' ? 'Item / Description' : 'Title'}
@@ -751,7 +777,7 @@ function DashboardPage({ onNavigate, user, isOrgDashboard = false, searchQuery =
 
                   return (
                     <tr key={cr.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
-                      <td style={{ padding: '0.85rem 1rem', fontWeight: 500, color: 'var(--text-primary)', fontFamily: 'var(--font-mono)', whiteSpace: 'nowrap' }}>{cr.id}</td>
+                      <td style={{ padding: '0.85rem 1rem', fontWeight: 500, color: 'var(--text-primary)', fontFamily: 'var(--font-mono)', whiteSpace: 'nowrap' }}>{cr.requestCode || cr.id}</td>
                       <td style={{ padding: '0.85rem 1rem', fontWeight: 500, color: 'var(--text-primary)', minWidth: '260px', lineHeight: 1.4 }}>{cr.title}</td>
                       <td style={{ padding: '0.85rem 1rem', color: 'var(--text-secondary)', minWidth: '160px' }}>{cr.category}</td>
                       {isOrgDashboard && (
@@ -867,8 +893,24 @@ function DashboardPage({ onNavigate, user, isOrgDashboard = false, searchQuery =
         />
       </div>
 
-      {/* Change Request Details Modal */}
-      {selectedRequest && (
+      {/* Domain-Specific Details Modals */}
+      {selectedRequest && activeModule === 'prespend' && (
+        <PreSpendDetailsModal
+          item={selectedRequest}
+          user={user}
+          onClose={() => setSelectedRequest(null)}
+        />
+      )}
+
+      {selectedRequest && activeModule === 'travel' && (
+        <TravelDetailsModal
+          item={selectedRequest}
+          user={user}
+          onClose={() => setSelectedRequest(null)}
+        />
+      )}
+
+      {selectedRequest && activeModule === 'change_request' && (
         <ChangeRequestModal
           cr={selectedRequest}
           user={user}

@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { TRAVEL_MODES, TRAVEL_DESK_FIELDS } from '../lib/travelDesk.config.js';
 import { FormLabel } from '../components/ui/primitives.component';
+import { apiFetch } from '../lib/apiFetch.lib';
 
 const ICON_MAP = {
   Flight: Plane,
@@ -104,13 +105,51 @@ export default function TravelDeskPage({ onNavigate, user, travellerName = '', d
 
   const isShortNotice = requiresBoardApproval();
 
-  const handleSubmit = (e) => {
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [createdCode, setCreatedCode] = useState('');
+
+  const handleSubmit = async (e) => {
     e.preventDefault();
     if (!certified) {
       setMessage('Please confirm compliance with company travel policies.');
       return;
     }
-    setSubmitted(true);
+    setIsSubmitting(true);
+    setMessage('');
+    try {
+      const payload = {
+        category,
+        travelMode: category,
+        travellerName: valueOf({ name: 'Traveller' }),
+        department: valueOf({ name: 'Department / Cost Centre' }),
+        purpose: valueOf({ name: 'Purpose of visit' }),
+        tripType: valueOf({ name: 'Trip type' }) || valueOf({ name: 'Journey type' }) || '',
+        travelClass: valueOf({ name: 'Travel class' }) || valueOf({ name: 'Bus type' }) || valueOf({ name: 'Room type' }) || '',
+        fromLocation: valueOf({ name: 'From' }) || valueOf({ name: 'From station' }) || valueOf({ name: 'Pickup location' }) || '',
+        toLocation: valueOf({ name: 'To' }) || valueOf({ name: 'To station' }) || valueOf({ name: 'Final drop location' }) || valueOf({ name: 'City / Location' }) || '',
+        departureDate: values['Date of travel'] || values['Date of journey'] || values['Check-in date'] || '',
+        returnDate: values['Return / onward date'] || values['Return date'] || values['Check-out date'] || '',
+        preferredTimeSlot: values['Preferred departure time'] || values['Preferred time slot'] || values['Pickup time'] || '',
+        isShortNotice,
+        bookingDetails: values,
+        certified
+      };
+      const res = await apiFetch('/travel-desk', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.message || 'Failed to submit travel request');
+      }
+      setCreatedCode(data.data?.requestCode || '');
+      setSubmitted(true);
+    } catch (err) {
+      setMessage(err.message || 'Submission failed');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const stepsList = ['Travel Mode', 'Travel Details', 'Review & Submit'];
@@ -200,10 +239,10 @@ export default function TravelDeskPage({ onNavigate, user, travellerName = '', d
             <CheckCircle2 size={28} />
           </div>
           <h3 style={{ fontSize: '1.25rem', fontWeight: 700, color: '#065F46', margin: 0 }}>
-            Travel Request Recorded (Preview)
+            Travel Request Submitted Successfully
           </h3>
           <p style={{ fontSize: '0.85rem', color: '#047857', maxWidth: '480px', margin: 0, lineHeight: 1.5 }}>
-            Your <strong>{category}</strong> reservation request for <strong>{valueOf({ name: 'Traveller' })}</strong> has been staged. Full backend fulfillment will be enabled when travel APIs are connected.
+            Your <strong>{category}</strong> reservation request <strong>{createdCode || ''}</strong> for <strong>{valueOf({ name: 'Traveller' })}</strong> has been submitted and sent for approval.
           </p>
           <div style={{ display: 'flex', gap: '0.75rem', marginTop: '0.5rem' }}>
             <button

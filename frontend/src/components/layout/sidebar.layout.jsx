@@ -43,9 +43,14 @@ function Sidebar({
   const roleId = user?.roleId || '';
   
   const isSuperAdmin = roleId === 'role-1' || roleName.includes('super');
-  const isAdmin = isSuperAdmin || roleId === 'role-2' || roleName.includes('admin');
+  const isBoardUser = roleId === 'role-board' || roleName.includes('board');
+  const isTravelAdmin = roleId === 'role-2-travel' || (roleName.includes('admin') && roleName.includes('travel'));
+  const isPreSpendAdmin = roleId === 'role-2-prespend' || (roleName.includes('admin') && (roleName.includes('spend') || roleName.includes('prespend')));
+  const isChangeAdmin = roleId === 'role-2-change' || (roleName.includes('admin') && !isTravelAdmin && !isPreSpendAdmin && !isSuperAdmin);
+  const isAdmin = isSuperAdmin || isTravelAdmin || isPreSpendAdmin || isChangeAdmin || roleId === 'role-2' || roleName.includes('admin');
   const isChangeManager = roleId === 'role-3' || roleName.includes('manager');
   const isChangeImplementer = roleId === 'role-5' || roleName.includes('implementer');
+  const isApprover = isSuperAdmin || isBoardUser || isAdmin || isChangeManager || isChangeImplementer;
 
   const topNavItems = [
     { id: 'Dashboard', path: '/dashboard', label: 'My Dashboard', icon: LayoutGrid },
@@ -241,13 +246,13 @@ function Sidebar({
         ))}
       </nav>
 
-      {/* Management section (Visible to Change Manager, Change Implementer & Admin) */}
+      {/* Management section (Visible to Approvers & Admins, Hidden for standard requesters) */}
       {(() => {
-        if (!isAdmin && !isChangeManager && !isChangeImplementer) return null;
+        if (!isApprover) return null;
 
         const visibleMgmtItems = [];
 
-        if (isChangeManager || isChangeImplementer || isAdmin) {
+        if (isApprover) {
           visibleMgmtItems.push({ id: 'My Worklist', path: '/worklist', label: 'My Worklist', icon: CheckCircle2 });
         }
 

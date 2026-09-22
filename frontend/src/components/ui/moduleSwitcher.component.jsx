@@ -10,8 +10,13 @@ export const MODULES = [
 export default function ModuleSwitcher({
   activeModule = 'change_request',
   onModuleChange,
-  counts = {}
+  counts = {},
+  allowedModules = null // array of module IDs, or null for all
 }) {
+  const visibleModules = allowedModules
+    ? MODULES.filter(m => allowedModules.includes(m.id))
+    : MODULES;
+
   return (
     <div
       role="tablist"
@@ -28,7 +33,7 @@ export default function ModuleSwitcher({
         overflowX: 'auto'
       }}
     >
-      {MODULES.map(m => {
+      {visibleModules.map(m => {
         const Icon = m.icon;
         const isSelected = activeModule === m.id;
         const count = counts[m.id];

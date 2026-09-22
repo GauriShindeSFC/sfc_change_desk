@@ -12,6 +12,9 @@ import worklistRouter from './worklist.routes.js';
 import settingsRouter from './settings.routes.js';
 import catalogueRouter from './catalog.routes.js';
 
+import preSpendRouter from './preSpend.routes.js';
+import travelDeskRouter from './travelDesk.routes.js';
+
 const router = express.Router();
 
 // Apply authentication middleware globally
@@ -28,5 +31,7 @@ router.use('/', changeRequestsRouter);
 router.use('/', worklistRouter);
 router.use('/', settingsRouter);
 router.use('/', catalogueRouter);
+router.use('/pre-spend', preSpendRouter);
+router.use('/travel-desk', travelDeskRouter);
 
 export default router;

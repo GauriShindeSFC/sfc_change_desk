@@ -150,6 +150,10 @@ ChangeManagerCategory.belongsTo(CatalogCategory, { foreignKey: 'categoryId' });
 CatalogCategory.hasMany(ChangeImplementerCategory, { foreignKey: 'categoryId', as: 'assignedImplementers' });
 ChangeImplementerCategory.belongsTo(CatalogCategory, { foreignKey: 'categoryId' });
 
+import { PreSpendRequest } from './PreSpendRequest.js';
+import { TravelRequest } from './TravelRequest.js';
+export { PreSpendRequest, TravelRequest };
+
 export const models = {
   Role,
   Workflow,
@@ -164,7 +168,10 @@ export const models = {
   ChangeImplementerCategory,
   Employee,
   UserS8,
-  UserAppRole
+  UserAppRole,
+  PreSpendRequest,
+  TravelRequest
 };
 
 export { sequelize };
+
