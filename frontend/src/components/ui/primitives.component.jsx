@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { Loader2, X, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Loader2, X, ChevronLeft, ChevronRight, MessageSquare, CheckCircle, XCircle, Clock } from 'lucide-react';
 
 /* ── Button ─────────────────────────────────────────────────── */
 export const Button = React.forwardRef(({
@@ -546,4 +546,295 @@ export const ExportButtonGroup = ({
     </div>
   );
 };
+
+/* ── Circular Loading Spinner ───────────────────────────────── */
+export const LoadingSpinner = ({
+  size = 'md',
+  message = '',
+  center = true,
+  className = '',
+  fullPage = false,
+  overlay = false,
+  color = '#00A4EF'
+}) => {
+  const sizeMap = {
+    xs: { dim: '14px', border: '2px' },
+    sm: { dim: '18px', border: '2px' },
+    md: { dim: '24px', border: '2.5px' },
+    lg: { dim: '36px', border: '3px' },
+    xl: { dim: '48px', border: '4px' }
+  };
+
+  const selectedSize = sizeMap[size] || sizeMap.md;
+
+  const spinner = (
+    <div
+      className={`inline-block rounded-full animate-spin ${className}`}
+      style={{
+        width: selectedSize.dim,
+        height: selectedSize.dim,
+        borderWidth: selectedSize.border,
+        borderStyle: 'solid',
+        borderColor: 'rgba(0, 164, 239, 0.18)',
+        borderTopColor: color,
+        borderRightColor: color,
+        boxSizing: 'border-box'
+      }}
+      role="status"
+      aria-label="loading"
+    />
+  );
+
+  if (fullPage) {
+    return (
+      <div style={{
+        position: 'fixed',
+        inset: 0,
+        zIndex: 9999,
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: 'rgba(255, 255, 255, 0.85)',
+        backdropFilter: 'blur(4px)'
+      }}>
+        {spinner}
+        {message && (
+          <p style={{ marginTop: '0.85rem', fontSize: '0.875rem', fontWeight: 500, color: 'var(--text-secondary)' }}>
+            {message}
+          </p>
+        )}
+      </div>
+    );
+  }
+
+  if (overlay) {
+    return (
+      <div style={{
+        position: 'absolute',
+        inset: 0,
+        zIndex: 50,
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: 'rgba(255, 255, 255, 0.75)',
+        backdropFilter: 'blur(2px)',
+        borderRadius: 'inherit'
+      }}>
+        {spinner}
+        {message && (
+          <p style={{ marginTop: '0.5rem', fontSize: '0.8rem', fontWeight: 500, color: 'var(--text-secondary)' }}>
+            {message}
+          </p>
+        )}
+      </div>
+    );
+  }
+
+  if (center) {
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', width: '100%', padding: '2.5rem 1rem' }}>
+        {spinner}
+        {message && (
+          <p style={{ marginTop: '0.75rem', fontSize: '0.85rem', fontWeight: 500, color: 'var(--text-secondary)' }}>
+            {message}
+          </p>
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem' }}>
+      {spinner}
+      {message && <span style={{ fontSize: '0.825rem', color: 'var(--text-secondary)' }}>{message}</span>}
+    </span>
+  );
+};
+
+/* ── Decision Comment / Note Popup Modal ────────────────────── */
+export const CommentPopupModal = ({ isOpen, onClose, data }) => {
+  if (!isOpen || !data) return null;
+
+  const isApproved = data.action === 'Approved';
+  const isRejected = data.action === 'Rejected';
+  const isImplemented = data.action === 'Implemented';
+
+  const badgeBg = isRejected ? '#FEF2F2' : isApproved ? '#ECFDF5' : isImplemented ? '#F3E8FF' : '#FEF3C7';
+  const badgeColor = isRejected ? '#DC2626' : isApproved ? '#059669' : isImplemented ? '#7C3AED' : '#D97706';
+  const badgeBorder = isRejected ? '#FECACA' : isApproved ? '#A7F3D0' : isImplemented ? '#E9D5FF' : '#FDE68A';
+
+  return (
+    <div
+      style={{
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        backgroundColor: 'rgba(15, 23, 42, 0.65)',
+        backdropFilter: 'blur(4px)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        zIndex: 1000,
+        padding: '1rem'
+      }}
+      onClick={onClose}
+    >
+      <div
+        style={{
+          backgroundColor: 'var(--card-bg, #FFFFFF)',
+          border: '1px solid var(--border-color, #E2E8F0)',
+          borderRadius: '16px',
+          width: '100%',
+          maxWidth: '480px',
+          boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
+          overflow: 'hidden',
+          animation: 'fadeIn 0.15s ease'
+        }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div
+          style={{
+            padding: '1.25rem 1.5rem',
+            borderBottom: '1px solid var(--border-color, #E2E8F0)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between'
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
+            <div
+              style={{
+                width: '32px',
+                height: '32px',
+                borderRadius: '8px',
+                backgroundColor: badgeBg,
+                color: badgeColor,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}
+            >
+              {isRejected ? (
+                <XCircle size={18} />
+              ) : isApproved ? (
+                <CheckCircle size={18} />
+              ) : isImplemented ? (
+                <Clock size={18} />
+              ) : (
+                <MessageSquare size={18} />
+              )}
+            </div>
+            <div>
+              <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 600, color: 'var(--text-primary, #0F172A)' }}>
+                {data.title || 'Decision Note'}
+              </h3>
+              <span
+                style={{
+                  fontSize: '0.725rem',
+                  fontWeight: 600,
+                  color: badgeColor,
+                  backgroundColor: badgeBg,
+                  border: `1px solid ${badgeBorder}`,
+                  padding: '0.1rem 0.45rem',
+                  borderRadius: '12px',
+                  display: 'inline-block',
+                  marginTop: '0.2rem'
+                }}
+              >
+                {data.action}
+              </span>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            style={{
+              background: 'none',
+              border: 'none',
+              color: 'var(--text-secondary, #64748B)',
+              cursor: 'pointer',
+              padding: '0.25rem',
+              borderRadius: '6px'
+            }}
+          >
+            <X size={18} />
+          </button>
+        </div>
+
+        {/* Body */}
+        <div style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+          {/* Author Info */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.8rem' }}>
+            <div>
+              <span style={{ color: 'var(--text-secondary, #64748B)' }}>By: </span>
+              <strong style={{ color: 'var(--text-primary, #0F172A)' }}>{data.authorName || 'Approver'}</strong>
+              {data.authorEmail && (
+                <span style={{ color: 'var(--text-secondary, #64748B)', marginLeft: '0.35rem', fontFamily: 'var(--font-mono)' }}>
+                  ({data.authorEmail})
+                </span>
+              )}
+            </div>
+            <div style={{ color: 'var(--text-secondary, #64748B)', fontSize: '0.75rem' }}>
+              {data.date || ''}
+            </div>
+          </div>
+
+          {/* Comment Box */}
+          <div
+            style={{
+              backgroundColor: 'var(--input-bg, #F8FAFC)',
+              border: '1px solid var(--border-color, #E2E8F0)',
+              borderRadius: '10px',
+              padding: '1rem',
+              fontSize: '0.875rem',
+              color: 'var(--text-primary, #0F172A)',
+              lineHeight: 1.5,
+              whiteSpace: 'pre-wrap',
+              wordBreak: 'break-word',
+              maxHeight: '220px',
+              overflowY: 'auto'
+            }}
+          >
+            {data.comment || 'No remark or comment recorded.'}
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div
+          style={{
+            padding: '0.85rem 1.5rem',
+            borderTop: '1px solid var(--border-color, #E2E8F0)',
+            display: 'flex',
+            justifyContent: 'flex-end',
+            backgroundColor: 'var(--input-bg, #F8FAFC)'
+          }}
+        >
+          <button
+            type="button"
+            onClick={onClose}
+            style={{
+              padding: '0.5rem 1.25rem',
+              backgroundColor: 'var(--card-bg, #FFFFFF)',
+              color: 'var(--text-primary, #0F172A)',
+              border: '1px solid var(--border-color, #CBD5E1)',
+              borderRadius: '8px',
+              fontSize: '0.825rem',
+              fontWeight: 600,
+              cursor: 'pointer'
+            }}
+          >
+            Close
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+
 

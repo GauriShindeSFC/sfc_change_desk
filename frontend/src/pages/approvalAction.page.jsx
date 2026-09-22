@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { CheckCircle2, XCircle, AlertCircle, Send, ArrowRight, ShieldCheck, Clock } from 'lucide-react';
+import { LoadingSpinner } from '../components/ui/primitives.component';
 
 const formatFieldLabel = (key = '') => {
   return String(key)
@@ -90,7 +91,7 @@ const getCustomFields = (cr) => {
 
 export default function ApprovalActionPage() {
   const [token, setToken] = useState('');
-  const [action, setAction] = useState('approve'); // 'approve' | 'reject'
+  const [action, setAction] = useState('approve'); // 'approve' | 'reject' | 'implement'
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [crData, setCrData] = useState(null);
@@ -106,7 +107,7 @@ export default function ApprovalActionPage() {
     const urlToken = params.get('token');
     const urlAction = params.get('action');
 
-    if (urlAction && ['approve', 'reject'].includes(urlAction.toLowerCase())) {
+    if (urlAction && ['approve', 'reject', 'implement'].includes(urlAction.toLowerCase())) {
       setAction(urlAction.toLowerCase());
     }
     if (!urlToken) {
@@ -120,7 +121,7 @@ export default function ApprovalActionPage() {
     // Fetch Change Request details for confirmation
     const fetchCrDetails = async () => {
       try {
-        const res = await fetch(`http://localhost:5001/api/public/change-request-action?token=${encodeURIComponent(urlToken)}`);
+        const res = await fetch(`/api/public/change-request-action?token=${encodeURIComponent(urlToken)}`);
         const body = await res.json();
         if (!res.ok || !body.success) {
           throw new Error(body.message || 'Failed to verify action token.');
@@ -149,7 +150,7 @@ export default function ApprovalActionPage() {
     setSubmitting(true);
 
     try {
-      const res = await fetch('http://localhost:5001/api/public/change-request-action', {
+      const res = await fetch('/api/public/change-request-action', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -177,6 +178,8 @@ export default function ApprovalActionPage() {
   };
 
   const isApprove = action === 'approve';
+  const isImplement = action === 'implement';
+  const isReject = action === 'reject';
 
   return (
     <div style={{
@@ -200,7 +203,7 @@ export default function ApprovalActionPage() {
           </span>
         </div>
         <div style={{ fontSize: '0.75rem', fontWeight: 600, color: '#64748B', letterSpacing: '0.06em', textTransform: 'uppercase', marginTop: '0.25rem' }}>
-          Change Manager Authorization Portal
+          {isImplement ? 'Change Implementation Portal' : 'Change Manager Authorization Portal'}
         </div>
       </div>
 
@@ -216,9 +219,8 @@ export default function ApprovalActionPage() {
       }}>
         {/* Loading State */}
         {loading && (
-          <div style={{ padding: '4rem 2rem', textAlign: 'center', color: '#64748B' }}>
-            <div style={{ display: 'inline-block', width: '28px', height: '28px', border: '3px solid #E2E8F0', borderTopColor: '#0F172A', borderRadius: '50%', animation: 'spin 0.8s linear infinite', marginBottom: '1rem' }} />
-            <div style={{ fontSize: '0.95rem', fontWeight: 600 }}>Verifying secure token and fetching request details...</div>
+          <div style={{ padding: '4rem 2rem', textAlign: 'center' }}>
+            <LoadingSpinner size="lg" message="Verifying secure token and fetching request details..." />
           </div>
         )}
 
@@ -261,20 +263,24 @@ export default function ApprovalActionPage() {
               width: '64px',
               height: '64px',
               borderRadius: '50%',
-              backgroundColor: successResult.action === 'approve' ? '#D1FAE5' : '#FEE2E2',
-              color: successResult.action === 'approve' ? '#059669' : '#DC2626',
+              backgroundColor: successResult.action === 'implement' ? '#CCFBF1' : successResult.action === 'approve' ? '#D1FAE5' : '#FEE2E2',
+              color: successResult.action === 'implement' ? '#0D9488' : successResult.action === 'approve' ? '#059669' : '#DC2626',
               display: 'inline-flex',
               alignItems: 'center',
               justifyContent: 'center',
               marginBottom: '1.25rem'
             }}>
-              {successResult.action === 'approve' ? <CheckCircle2 size={36} /> : <XCircle size={36} />}
+              {successResult.action === 'reject' ? <XCircle size={36} /> : <CheckCircle2 size={36} />}
             </div>
             <h2 style={{ fontSize: '1.35rem', fontWeight: 800, color: '#0F172A', margin: '0 0 0.5rem' }}>
-              {successResult.action === 'approve' ? 'Change Request Approved' : 'Change Request Rejected'}
+              {successResult.action === 'implement'
+                ? 'Change Request Implemented & Closed'
+                : successResult.action === 'approve'
+                  ? 'Change Request Approved'
+                  : 'Change Request Rejected'}
             </h2>
             <p style={{ fontSize: '0.9rem', color: '#475569', maxWidth: '440px', margin: '0 auto 1.75rem', lineHeight: 1.55 }}>
-              Change Request <strong>{successResult.crId}</strong> has been marked as <strong>{successResult.action === 'approve' ? 'Approved' : 'Rejected'}</strong>. The database, audit logs, and ChangeDesk dashboards have been updated.
+              Change Request <strong>{successResult.crId}</strong> has been marked as <strong>{successResult.action === 'implement' ? 'Implemented' : successResult.action === 'approve' ? 'Approved' : 'Rejected'}</strong>. The database, audit logs, and ChangeDesk dashboards have been updated.
             </p>
             <a
               href="/"
@@ -304,8 +310,8 @@ export default function ApprovalActionPage() {
             {/* Top Banner indicating current action */}
             <div style={{
               padding: '1.25rem 1.75rem',
-              backgroundColor: isApprove ? '#F0FDF4' : '#FEF2F2',
-              borderBottom: isApprove ? '1px solid #BBF7D0' : '1px solid #FECACA',
+              backgroundColor: isImplement ? '#F0FDFA' : isApprove ? '#F0FDF4' : '#FEF2F2',
+              borderBottom: isImplement ? '1px solid #99F6E4' : isApprove ? '1px solid #BBF7D0' : '1px solid #FECACA',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'space-between',
@@ -317,43 +323,45 @@ export default function ApprovalActionPage() {
                   width: '32px',
                   height: '32px',
                   borderRadius: '50%',
-                  backgroundColor: isApprove ? '#DCFCE7' : '#FEE2E2',
-                  color: isApprove ? '#059669' : '#DC2626',
+                  backgroundColor: isImplement ? '#CCFBF1' : isApprove ? '#DCFCE7' : '#FEE2E2',
+                  color: isImplement ? '#0D9488' : isApprove ? '#059669' : '#DC2626',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center'
                 }}>
-                  {isApprove ? <CheckCircle2 size={18} /> : <XCircle size={18} />}
+                  {isReject ? <XCircle size={18} /> : <CheckCircle2 size={18} />}
                 </div>
                 <div>
-                  <h3 style={{ fontSize: '1rem', fontWeight: 700, color: isApprove ? '#166534' : '#991B1B', margin: 0 }}>
-                    {isApprove ? 'Approve Change Request' : 'Reject Change Request'}
+                  <h3 style={{ fontSize: '1rem', fontWeight: 700, color: isImplement ? '#115E59' : isApprove ? '#166534' : '#991B1B', margin: 0 }}>
+                    {isImplement ? 'Mark Change Request as Implemented' : isApprove ? 'Approve Change Request' : 'Reject Change Request'}
                   </h3>
-                  <span style={{ fontSize: '0.775rem', color: isApprove ? '#15803D' : '#B91C1C' }}>
-                    Confirm your decision for {crData.id}
+                  <span style={{ fontSize: '0.775rem', color: isImplement ? '#0F766E' : isApprove ? '#15803D' : '#B91C1C' }}>
+                    {isImplement ? `Confirm completion and execution notes for ${crData.id}` : `Confirm your decision for ${crData.id}`}
                   </span>
                 </div>
               </div>
 
-              {/* Action Switcher Toggle */}
-              <button
-                type="button"
-                onClick={() => {
-                  setAction(isApprove ? 'reject' : 'approve');
-                  setFormError('');
-                }}
-                style={{
-                  background: 'none',
-                  border: 'none',
-                  color: '#475569',
-                  fontSize: '0.8rem',
-                  fontWeight: 600,
-                  textDecoration: 'underline',
-                  cursor: 'pointer'
-                }}
-              >
-                Switch to {isApprove ? 'Reject' : 'Approve'}
-              </button>
+              {/* Action Switcher Toggle (Only between approve/reject if not implement) */}
+              {!isImplement && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAction(isApprove ? 'reject' : 'approve');
+                    setFormError('');
+                  }}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    color: '#475569',
+                    fontSize: '0.8rem',
+                    fontWeight: 600,
+                    textDecoration: 'underline',
+                    cursor: 'pointer'
+                  }}
+                >
+                  Switch to {isApprove ? 'Reject' : 'Approve'}
+                </button>
+              )}
             </div>
 
             {/* Request Summary Card */}
@@ -373,8 +381,8 @@ export default function ApprovalActionPage() {
                 <div style={{
                   padding: '0.35rem 0.8rem',
                   borderRadius: '99px',
-                  backgroundColor: '#FEF3C7',
-                  color: '#D97706',
+                  backgroundColor: crData.status === 'Approved' ? '#ECFDF5' : crData.status === 'Implemented' ? '#F5F3FF' : '#FEF3C7',
+                  color: crData.status === 'Approved' ? '#059669' : crData.status === 'Implemented' ? '#7C3AED' : '#D97706',
                   fontSize: '0.75rem',
                   fontWeight: 700,
                   whiteSpace: 'nowrap',
@@ -382,8 +390,8 @@ export default function ApprovalActionPage() {
                   alignItems: 'center',
                   gap: '0.35rem'
                 }}>
-                  <Clock size={13} />
-                  <span>Pending Approval</span>
+                  {crData.status === 'Approved' ? <CheckCircle2 size={13} /> : <Clock size={13} />}
+                  <span>{crData.status === 'Approved' ? 'Approved (Ready to Implement)' : crData.status === 'Implemented' ? 'Implemented' : 'Pending Approval'}</span>
                 </div>
               </div>
 
@@ -494,17 +502,23 @@ export default function ApprovalActionPage() {
             <form onSubmit={handleSubmitDecision} style={{ padding: '1.5rem 1.75rem' }}>
               <div style={{ marginBottom: '1.25rem' }}>
                 <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: '#0F172A', marginBottom: '0.5rem' }}>
-                  {isApprove ? 'Approval Comments / Rationale (Optional)' : 'Rejection Reason (Required) *'}
+                  {isImplement
+                    ? 'Implementation Remarks / Execution Notes (Optional)'
+                    : isApprove
+                      ? 'Approval Comments / Rationale (Optional)'
+                      : 'Rejection Reason (Required) *'}
                 </label>
                 <textarea
                   rows={4}
-                  required={!isApprove}
+                  required={isReject}
                   value={comment}
                   onChange={(e) => setComment(e.target.value)}
                   placeholder={
-                    isApprove
-                      ? 'Add any comments, conditions, or instructions for implementation...'
-                      : 'Please explain why this change request cannot be approved...'
+                    isImplement
+                      ? 'Add any execution notes, deployment logs, or verification comments...'
+                      : isApprove
+                        ? 'Add any comments, conditions, or instructions for implementation...'
+                        : 'Please explain why this change request cannot be approved...'
                   }
                   style={{
                     width: '100%',
@@ -534,7 +548,7 @@ export default function ApprovalActionPage() {
                     alignItems: 'center',
                     gap: '0.5rem',
                     padding: '0.75rem 1.75rem',
-                    backgroundColor: isApprove ? '#059669' : '#DC2626',
+                    backgroundColor: isImplement ? '#0D9488' : isApprove ? '#059669' : '#DC2626',
                     color: '#FFFFFF',
                     border: 'none',
                     borderRadius: '8px',
@@ -542,11 +556,19 @@ export default function ApprovalActionPage() {
                     fontWeight: 700,
                     cursor: submitting ? 'not-allowed' : 'pointer',
                     opacity: submitting ? 0.7 : 1,
-                    boxShadow: isApprove ? '0 2px 6px rgba(5, 150, 105, 0.3)' : '0 2px 6px rgba(220, 38, 38, 0.3)'
+                    boxShadow: isImplement ? '0 2px 6px rgba(13, 148, 136, 0.3)' : isApprove ? '0 2px 6px rgba(5, 150, 105, 0.3)' : '0 2px 6px rgba(220, 38, 38, 0.3)'
                   }}
                 >
                   <Send size={16} />
-                  <span>{submitting ? 'Submitting...' : isApprove ? 'Confirm Approval' : 'Confirm Rejection'}</span>
+                  <span>
+                    {submitting
+                      ? 'Submitting...'
+                      : isImplement
+                        ? 'Submit as Implemented'
+                        : isApprove
+                          ? 'Confirm Approval'
+                          : 'Confirm Rejection'}
+                  </span>
                 </button>
               </div>
             </form>

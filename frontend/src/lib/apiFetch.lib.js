@@ -32,15 +32,23 @@ export const apiFetch = async (path, options = {}) => {
     }
   }
 
-  const res = await responsePromise;
-  // A Response body may only be consumed once; clones let shared callers use
-  // res.json() independently.
-  const consumerResponse = cacheKey ? res.clone() : res;
+  try {
+    const res = await responsePromise;
+    // A Response body may only be consumed once; clones let shared callers use
+    // res.json() independently.
+    const consumerResponse = cacheKey ? res.clone() : res;
 
-  if (consumerResponse.status === 401) {
-    clearSession();
-    window.location.reload(); // App will render the login page
+    if (consumerResponse.status === 401) {
+      console.warn('[apiFetch] 401 Unauthorized encountered — clearing session');
+      clearSession();
+      if (!window.location.pathname.startsWith('/login') && !window.location.pathname.startsWith('/approval-action')) {
+        window.location.href = '/login';
+      }
+    }
+
+    return consumerResponse;
+  } catch (networkErr) {
+    console.error(`[apiFetch Network Error] ${method} ${url}:`, networkErr.message);
+    throw networkErr;
   }
-
-  return consumerResponse;
 };

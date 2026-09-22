@@ -10,7 +10,7 @@ import ChangeRequestModal from '../components/ui/changeRequestModal.component';
 import PreSpendDetailsModal from '../components/ui/PreSpendDetailsModal.component';
 import TravelDetailsModal from '../components/ui/TravelDetailsModal.component';
 import ModuleSwitcher from '../components/ui/moduleSwitcher.component';
-import { Pagination, ExportButtonGroup } from '../components/ui/primitives.component';
+import { Pagination, ExportButtonGroup, LoadingSpinner } from '../components/ui/primitives.component';
 import { apiFetch } from '../lib/apiFetch.lib';
 
 const METRIC_STYLES = [
@@ -856,11 +856,8 @@ function DashboardPage({ onNavigate, user, isOrgDashboard = false, searchQuery =
                 })
               ) : isLoadingRequests ? (
                 <tr>
-                  <td colSpan={isOrgDashboard ? 8 : 7} style={{ padding: '2.5rem', textAlign: 'center', color: 'var(--text-secondary)' }}>
-                    <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', fontWeight: 600, fontSize: '0.875rem' }}>
-                      <span style={{ display: 'inline-block', width: '16px', height: '16px', border: '2px solid var(--border-color)', borderTopColor: 'var(--brand-primary)', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
-                      <span>Loading...</span>
-                    </div>
+                  <td colSpan={isOrgDashboard ? 8 : 7} style={{ padding: '3rem', textAlign: 'center' }}>
+                    <LoadingSpinner size="md" message="Loading..." />
                   </td>
                 </tr>
               ) : (

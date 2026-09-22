@@ -4,10 +4,9 @@ import { Clock, Check, X, RotateCw, FileText, IndianRupee, Plane, MessageSquare 
 import ChangeRequestModal from '../components/ui/changeRequestModal.component';
 import PreSpendDetailsModal from '../components/ui/PreSpendDetailsModal.component';
 import TravelDetailsModal from '../components/ui/TravelDetailsModal.component';
-import CommentPopupModal from '../components/ui/commentPopupModal.component';
 import FilterBar, { initCustomDateRange } from '../components/ui/filterBar.component';
 import ModuleSwitcher from '../components/ui/moduleSwitcher.component';
-import { Pagination } from '../components/ui/primitives.component';
+import { Pagination, LoadingSpinner, CommentPopupModal } from '../components/ui/primitives.component';
 import { apiFetch } from '../lib/apiFetch.lib';
 
 function MyWorklistPage({ onNavigate, searchQuery = '', user, isOrgWorklist = false }) {
@@ -610,11 +609,8 @@ function MyWorklistPage({ onNavigate, searchQuery = '', user, isOrgWorklist = fa
                 })
               ) : isLoading ? (
                 <tr>
-                  <td colSpan={9} style={{ padding: '2.5rem', textAlign: 'center', color: 'var(--text-secondary)' }}>
-                    <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', fontWeight: 600, fontSize: '0.875rem' }}>
-                      <span style={{ display: 'inline-block', width: '16px', height: '16px', border: '2px solid var(--border-color)', borderTopColor: 'var(--brand-primary)', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
-                      <span>Loading worklist change requests...</span>
-                    </div>
+                  <td colSpan={9} style={{ padding: '3rem', textAlign: 'center' }}>
+                    <LoadingSpinner size="md" message="Loading worklist change requests..." />
                   </td>
                 </tr>
               ) : (

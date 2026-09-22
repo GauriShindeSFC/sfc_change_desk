@@ -250,12 +250,10 @@ export const serializeAuditLog = (row, actorIdentity = null) => {
   let category = 'User & role changes';
   if (/Rejected/i.test(act)) {
     category = 'Rejected';
-  } else if (/Approved/i.test(act)) {
+  } else if (/Approved|Implemented/i.test(act)) {
     category = 'Approvals';
-  } else if (/CR|Created|Draft|Submitted/i.test(act)) {
+  } else if (/CR|Created|Draft|Submitted|Sent Back/i.test(act)) {
     category = 'Change requests';
-  } else if (/Catalog|Subcategory|Workflow/i.test(act)) {
-    category = 'Catalog & workflow';
   }
 
   let actorName = null;
@@ -273,11 +271,26 @@ export const serializeAuditLog = (row, actorIdentity = null) => {
   }
 
   const employeeEmail = actorIdentity?.email || l.actor?.email || null;
-  const employeeId = actorIdentity?.employeeBusinessId || actorIdentity?.empId || null;
+  const employeeId = actorIdentity?.employeeBusinessId || null;
+  let cleanTimestamp = '—';
+  if (l.timestamp || l.createdAt) {
+    try {
+      const dt = new Date(l.timestamp || l.createdAt);
+      if (!isNaN(dt.getTime())) {
+        const dStr = dt.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+        const tStr = dt.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
+        cleanTimestamp = `${dStr}, ${tStr}`;
+      } else {
+        cleanTimestamp = String(l.timestamp || l.createdAt).replace(/\.\d{3}\s*\+00:00/i, '');
+      }
+    } catch {
+      cleanTimestamp = String(l.timestamp || l.createdAt);
+    }
+  }
 
   return {
     id: l.id,
-    timestamp: l.timestamp ? String(l.timestamp) : formatDate(new Date(l.createdAt || Date.now())),
+    timestamp: cleanTimestamp,
     actor: actorName,
     actorId: l.actorId || null,
     employeeId,
