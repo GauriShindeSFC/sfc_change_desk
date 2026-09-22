@@ -344,3 +344,43 @@ export const handlePreSpendActionService = async ({ id, action, comment, actor }
 
   return req;
 };
+
+export const getPastVendorBySubcategoryService = async (subcategory = '', category = '') => {
+  if (!subcategory && !category) return null;
+
+  const where = {};
+  if (subcategory) {
+    where.subcategory = { [Op.iLike]: `%${subcategory.trim()}%` };
+  }
+  if (category) {
+    where.category = { [Op.iLike]: `%${category.trim()}%` };
+  }
+
+  // Find the most recent approved or submitted pre-spend request with vendor information
+  const pastReq = await PreSpendRequest.findOne({
+    where,
+    order: [['createdAt', 'DESC']]
+  });
+
+  if (!pastReq) return null;
+
+  const vendors = Array.isArray(pastReq.vendors) ? pastReq.vendors : [];
+  const preferredVendor = vendors[0] || null;
+
+  if (!preferredVendor && !pastReq.selectedVendor) return null;
+
+  const vendorName = preferredVendor?.name || pastReq.selectedVendor;
+  const vendorAmount = preferredVendor?.amount || pastReq.estimatedAmount || 0;
+  const quoteDate = preferredVendor?.date || (pastReq.createdAt ? new Date(pastReq.createdAt).toISOString().split('T')[0] : '');
+
+  return {
+    vendorName,
+    vendorAmount: Number(vendorAmount),
+    subcategory: pastReq.subcategory || subcategory,
+    category: pastReq.category || category,
+    quoteDate,
+    requestCode: pastReq.requestCode,
+    status: pastReq.status
+  };
+};
+

@@ -1,4 +1,4 @@
-import React, { useId, useState } from 'react';
+import React, { useId, useState, useEffect } from 'react';
 import {
   Check,
   ArrowLeft,
@@ -8,7 +8,9 @@ import {
   Send,
   Paperclip,
   FileText,
-  ExternalLink
+  ExternalLink,
+  History,
+  Sparkles
 } from 'lucide-react';
 import {
   PRE_SPEND_CATEGORIES,
@@ -56,6 +58,36 @@ export default function PreSpendPage({ onNavigate, user, initialCostCentre = '',
   const [notice, setNotice] = useState('');
   const [submitted, setSubmitted] = useState(false);
   const [createdCode, setCreatedCode] = useState('');
+  
+  // Past Vendor Look-up State
+  const [pastVendor, setPastVendor] = useState(null);
+  const [usePastVendor, setUsePastVendor] = useState(false);
+
+  // Fetch previous preferred vendor whenever subcategory changes
+  useEffect(() => {
+    if (!subcategory) {
+      setPastVendor(null);
+      setUsePastVendor(false);
+      return;
+    }
+    const fetchPastVendor = async () => {
+      try {
+        const res = await apiFetch(`/pre-spend/past-vendor?subcategory=${encodeURIComponent(subcategory)}&category=${encodeURIComponent(category)}`);
+        if (res.ok) {
+          const body = await res.json();
+          if (body.data && body.data.vendorName) {
+            setPastVendor(body.data);
+          } else {
+            setPastVendor(null);
+            setUsePastVendor(false);
+          }
+        }
+      } catch (err) {
+        console.warn('Failed to fetch past vendor for subcategory:', err);
+      }
+    };
+    fetchPastVendor();
+  }, [subcategory, category]);
 
   const changeDetails = (key, value) => {
     setDetails(old => ({ ...old, [key]: value }));
@@ -600,6 +632,111 @@ export default function PreSpendPage({ onNavigate, user, initialCostCentre = '',
             </p>
           </div>
 
+          {/* Previous Approved Vendor Reference Banner (If available for this Subcategory) */}
+          {pastVendor && (
+            <div style={{
+              backgroundColor: usePastVendor ? '#F0FDF4' : '#F8FAFC',
+              border: `1.5px solid ${usePastVendor ? '#10B981' : '#CBD5E1'}`,
+              borderRadius: '12px',
+              padding: '1rem 1.25rem',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '0.75rem',
+              transition: 'all 0.2s ease'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.5rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <div style={{
+                    width: '28px',
+                    height: '28px',
+                    borderRadius: '8px',
+                    backgroundColor: usePastVendor ? '#DCFCE7' : '#E2E8F0',
+                    color: usePastVendor ? '#15803D' : '#475569',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center'
+                  }}>
+                    <History size={15} />
+                  </div>
+                  <div>
+                    <span style={{ fontSize: '0.825rem', fontWeight: 700, color: '#0F172A', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                      Previously Selected Vendor for <span style={{ color: '#2563EB' }}>{pastVendor.subcategory || subcategory}</span>
+                      <span style={{ fontSize: '0.65rem', backgroundColor: '#EFF6FF', color: '#1D4ED8', padding: '0.1rem 0.4rem', borderRadius: '4px', fontWeight: 600 }}>History</span>
+                    </span>
+                  </div>
+                </div>
+
+                <label style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '0.5rem',
+                  cursor: 'pointer',
+                  backgroundColor: usePastVendor ? '#10B981' : '#FFFFFF',
+                  color: usePastVendor ? '#FFFFFF' : '#0F172A',
+                  border: `1px solid ${usePastVendor ? '#059669' : '#CBD5E1'}`,
+                  padding: '0.4rem 0.85rem',
+                  borderRadius: '8px',
+                  fontSize: '0.8rem',
+                  fontWeight: 600,
+                  transition: 'all 0.15s ease',
+                  userSelect: 'none'
+                }}>
+                  <input
+                    type="checkbox"
+                    checked={usePastVendor}
+                    onChange={(e) => {
+                      const checked = e.target.checked;
+                      setUsePastVendor(checked);
+                      if (checked) {
+                        setVendors([
+                          {
+                            name: pastVendor.vendorName || '',
+                            amount: pastVendor.vendorAmount || details.amount || '',
+                            date: pastVendor.quoteDate || todayStr,
+                            file: null,
+                            fileName: 'Previously Approved Vendor'
+                          },
+                          emptyVendor(),
+                          emptyVendor()
+                        ]);
+                      }
+                    }}
+                    style={{ cursor: 'pointer', width: '15px', height: '15px' }}
+                  />
+                  <span>{usePastVendor ? 'Past Vendor Selected' : 'Select this past vendor'}</span>
+                </label>
+              </div>
+
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+                gap: '0.75rem',
+                backgroundColor: usePastVendor ? '#FFFFFF' : '#F1F5F9',
+                padding: '0.75rem 1rem',
+                borderRadius: '8px',
+                border: '1px solid #E2E8F0',
+                fontSize: '0.8rem'
+              }}>
+                <div>
+                  <span style={{ color: '#64748B', display: 'block', fontSize: '0.7rem', fontWeight: 600, textTransform: 'uppercase' }}>Vendor Name</span>
+                  <span style={{ fontWeight: 700, color: '#0F172A', fontSize: '0.875rem' }}>{pastVendor.vendorName}</span>
+                </div>
+                <div>
+                  <span style={{ color: '#64748B', display: 'block', fontSize: '0.7rem', fontWeight: 600, textTransform: 'uppercase' }}>Subcategory</span>
+                  <span style={{ fontWeight: 600, color: '#0F172A' }}>{pastVendor.subcategory || subcategory}</span>
+                </div>
+                <div>
+                  <span style={{ color: '#64748B', display: 'block', fontSize: '0.7rem', fontWeight: 600, textTransform: 'uppercase' }}>Historical Cost</span>
+                  <span style={{ fontWeight: 700, color: '#059669', fontFamily: 'var(--font-mono)' }}>{pastVendor.vendorAmount ? money(pastVendor.vendorAmount) : '—'}</span>
+                </div>
+                <div>
+                  <span style={{ color: '#64748B', display: 'block', fontSize: '0.7rem', fontWeight: 600, textTransform: 'uppercase' }}>Quote Date</span>
+                  <span style={{ fontWeight: 600, color: '#0F172A', fontFamily: 'var(--font-mono)' }}>{pastVendor.quoteDate || '—'}</span>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* 2x2 Grid for Vendor Cards and Quote Exception */}
           <div style={{
             display: 'grid',
@@ -633,11 +770,11 @@ export default function PreSpendPage({ onNavigate, user, initialCostCentre = '',
               </div>
 
               <div>
-                <FormLabel required htmlFor="vendor-0-name">Vendor name</FormLabel>
+                <FormLabel required={!usePastVendor} htmlFor="vendor-0-name">Vendor name</FormLabel>
                 <input
                   id="vendor-0-name"
                   type="text"
-                  required={!commercial.exception || commercial.exception === 'Not applicable'}
+                  required={!usePastVendor && (!commercial.exception || commercial.exception === 'Not applicable')}
                   value={vendors[0]?.name || ''}
                   onChange={e => changeVendor(0, 'name', e.target.value)}
                   placeholder="Search or enter vendor"
@@ -647,12 +784,12 @@ export default function PreSpendPage({ onNavigate, user, initialCostCentre = '',
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
                 <div>
-                  <FormLabel required htmlFor="vendor-0-amount">Quoted amount (₹)</FormLabel>
+                  <FormLabel required={!usePastVendor} htmlFor="vendor-0-amount">Quoted amount (₹)</FormLabel>
                   <input
                     id="vendor-0-amount"
                     type="number"
                     step="any"
-                    required={!commercial.exception || commercial.exception === 'Not applicable'}
+                    required={!usePastVendor && (!commercial.exception || commercial.exception === 'Not applicable')}
                     value={vendors[0]?.amount || ''}
                     onChange={e => changeVendor(0, 'amount', e.target.value)}
                     onWheel={e => e.target.blur()}
@@ -661,11 +798,11 @@ export default function PreSpendPage({ onNavigate, user, initialCostCentre = '',
                   />
                 </div>
                 <div>
-                  <FormLabel required htmlFor="vendor-0-date">Quote date</FormLabel>
+                  <FormLabel required={!usePastVendor} htmlFor="vendor-0-date">Quote date</FormLabel>
                   <input
                     id="vendor-0-date"
                     type="date"
-                    required={!commercial.exception || commercial.exception === 'Not applicable'}
+                    required={!usePastVendor && (!commercial.exception || commercial.exception === 'Not applicable')}
                     value={vendors[0]?.date || ''}
                     onChange={e => changeVendor(0, 'date', e.target.value)}
                     style={ACTIVE_FIELD_STYLE}
@@ -674,7 +811,7 @@ export default function PreSpendPage({ onNavigate, user, initialCostCentre = '',
               </div>
 
               <div>
-                <FormLabel required htmlFor="vendor-0-file">Upload quotation</FormLabel>
+                <FormLabel required={!usePastVendor} htmlFor="vendor-0-file">Upload quotation</FormLabel>
                 <input
                   id="vendor-0-file"
                   type="file"
@@ -1116,8 +1253,15 @@ export default function PreSpendPage({ onNavigate, user, initialCostCentre = '',
                       {i === 0 ? 'Preferred Vendor' : `Alternative Vendor ${i}`}
                     </span>
                     {i === 0 && (
-                      <span style={{ fontSize: '0.7rem', backgroundColor: '#E6F4EA', color: '#137333', fontWeight: 700, padding: '0.15rem 0.5rem', borderRadius: '10px' }}>
-                        Selected
+                      <span style={{
+                        fontSize: '0.7rem',
+                        backgroundColor: usePastVendor ? '#EFF6FF' : '#E6F4EA',
+                        color: usePastVendor ? '#1D4ED8' : '#137333',
+                        fontWeight: 700,
+                        padding: '0.15rem 0.5rem',
+                        borderRadius: '10px'
+                      }}>
+                        {usePastVendor ? '✓ Past Selected Vendor' : 'Selected'}
                       </span>
                     )}
                   </div>

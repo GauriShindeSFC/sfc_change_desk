@@ -3,10 +3,17 @@ import { asyncHandler } from '../utils/asyncHandler.js';
 import {
   createPreSpendService,
   getPreSpendRequestsService,
-  handlePreSpendActionService
+  handlePreSpendActionService,
+  getPastVendorBySubcategoryService
 } from '../services/preSpend.service.js';
 
 const router = express.Router();
+
+router.get('/past-vendor', asyncHandler(async (req, res) => {
+  const { subcategory, category } = req.query;
+  const result = await getPastVendorBySubcategoryService(subcategory, category);
+  res.json({ success: true, data: result });
+}));
 
 router.get('/', asyncHandler(async (req, res) => {
   const isWorklist = req.query.view === 'worklist';
