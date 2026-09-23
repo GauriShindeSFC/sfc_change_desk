@@ -59,7 +59,7 @@ export const publicUser = (identity) => {
     ciCategories: u.ciCategories || [],
     categoryIds: u.categoryIds || u.ciCategories || u.cmCategories || [],
     initials: initials(u.displayName || u.name || u.email),
-    isInUserTable: u.identityType === 'S8_USER'
+    isInUserTable: Boolean(u.isInUserTable)
   };
 };
 
@@ -234,21 +234,24 @@ export const handleMicrosoftCallbackService = async (code) => {
   // 3. Resolve ChangeDesk Identity
   const identity = await authenticate(email);
 
-  // 4. Update Microsoft ID and last login timestamp if user exists in UserS8 table
+  // 4. Update Microsoft login metadata in ChangeUser
   try {
-    const s8User = await UserS8.findOne({
+    const { ChangeUser } = await import('../models/ChangeUser.js');
+    const changeUser = await ChangeUser.findOne({
       where: sequelize.where(sequelize.fn('LOWER', sequelize.col('email')), email)
     });
 
-    if (s8User) {
-      await s8User.update({
-        microsoftId: microsoftId || s8User.microsoftId,
-        loginType: 1, // 1 = Microsoft SSO
-        lastLogin: new Date()
-      });
+    if (changeUser) {
+      const meta = changeUser.metadata && typeof changeUser.metadata === 'object' ? { ...changeUser.metadata } : {};
+      meta.microsoftId = microsoftId || meta.microsoftId;
+      meta.lastLogin = new Date().toISOString();
+      meta.loginType = 'Microsoft SSO';
+      changeUser.metadata = meta;
+      if (typeof changeUser.changed === 'function') changeUser.changed('metadata', true);
+      await changeUser.save();
     }
   } catch (dbErr) {
-    console.warn('[Microsoft SSO] Could not update UserS8 metadata:', dbErr.message);
+    console.warn('[Microsoft SSO] Could not update ChangeUser metadata:', dbErr.message);
   }
 
   // 5. Issue ChangeDesk JWT session token

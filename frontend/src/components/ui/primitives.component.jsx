@@ -12,20 +12,20 @@ export const Button = React.forwardRef(({
   icon: Icon,
   ...props
 }, ref) => {
-  const baseStyles = 'inline-flex items-center justify-center font-medium rounded-lg transition-all duration-150 focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed select-none cursor-pointer';
+  const baseStyles = 'inline-flex items-center justify-center font-medium rounded-md transition-all duration-150 focus:outline-none focus:ring-1 focus:ring-[var(--ring-color)] disabled:opacity-50 disabled:cursor-not-allowed select-none cursor-pointer';
 
   const variants = {
-    primary: 'bg-black text-white hover:bg-neutral-800 active:bg-neutral-900 shadow-sm',
-    secondary: 'bg-[var(--input-bg)] text-[var(--text-primary)] hover:bg-[var(--border-color)] border border-[var(--border-color)]',
-    outline: 'border border-[var(--border-color)] text-[var(--text-primary)] hover:bg-[var(--input-bg)] bg-transparent',
-    ghost: 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--input-bg)] bg-transparent',
-    danger: 'bg-red-600 text-white hover:bg-red-700 active:bg-red-800 shadow-sm'
+    primary: 'bg-[var(--primary)] text-[var(--primary-foreground)] hover:opacity-90 active:opacity-95 shadow-sm',
+    secondary: 'bg-[var(--secondary)] text-[var(--foreground)] hover:bg-[var(--accent)] border border-[var(--border)]',
+    outline: 'border border-[var(--border)] text-[var(--foreground)] hover:bg-[var(--accent)] bg-transparent',
+    ghost: 'text-[var(--muted-foreground)] hover:text-[var(--foreground)] hover:bg-[var(--accent)] bg-transparent',
+    danger: 'bg-[var(--destructive)] text-[var(--destructive-foreground)] hover:opacity-90 active:opacity-95 shadow-sm'
   };
 
   const sizes = {
-    sm: 'text-xs px-2.5 py-1.5 gap-1.5',
-    md: 'text-sm px-3.5 py-2 gap-2',
-    lg: 'text-base px-5 py-2.5 gap-2.5'
+    sm: 'text-xs h-8 px-3 gap-1.5',
+    md: 'text-sm h-9 px-4 gap-2',
+    lg: 'text-sm h-10 px-6 gap-2.5'
   };
 
   return (
@@ -56,22 +56,24 @@ export const Badge = ({
   className = '',
   ...props
 }) => {
-  const baseStyles = 'inline-flex items-center font-medium rounded-full select-none';
+  const baseStyles = 'inline-flex items-center font-medium rounded-md select-none border';
 
   const variants = {
-    default: 'bg-[var(--input-bg)] text-[var(--text-secondary)] border border-[var(--border-color)]',
-    success: 'bg-emerald-50 text-emerald-700 border border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-400 dark:border-emerald-800',
-    warning: 'bg-amber-50 text-amber-700 border border-amber-200 dark:bg-amber-950/40 dark:text-amber-400 dark:border-amber-800',
-    danger: 'bg-red-50 text-red-700 border border-red-200 dark:bg-red-950/40 dark:text-red-400 dark:border-red-800',
-    info: 'bg-blue-50 text-blue-700 border border-blue-200 dark:bg-blue-950/40 dark:text-blue-400 dark:border-blue-800',
-    purple: 'bg-purple-50 text-purple-700 border border-purple-200 dark:bg-purple-950/40 dark:text-purple-400 dark:border-purple-800',
-    teal: 'bg-teal-50 text-teal-700 border border-teal-200 dark:bg-teal-950/40 dark:text-teal-400 dark:border-teal-800'
+    default: 'bg-[var(--secondary)] text-[var(--muted-foreground)] border-[var(--border)]',
+    secondary: 'bg-[var(--secondary)] text-[var(--foreground)] border-[var(--border)]',
+    outline: 'bg-transparent text-[var(--foreground)] border-[var(--border)]',
+    success: 'bg-[var(--success)]/10 text-[var(--success)] border-[var(--success)]/30',
+    warning: 'bg-[var(--warning)]/10 text-[var(--warning)] border-[var(--warning)]/30',
+    danger: 'bg-[var(--destructive)]/10 text-[var(--destructive)] border-[var(--destructive)]/30',
+    info: 'bg-[var(--info)]/10 text-[var(--info)] border-[var(--info)]/30',
+    purple: 'bg-[var(--purple)]/10 text-[var(--purple)] border-[var(--purple)]/30',
+    teal: 'bg-[var(--teal)]/10 text-[var(--teal)] border-[var(--teal)]/30'
   };
 
   const sizes = {
     sm: 'text-[11px] px-2 py-0.5 gap-1',
-    md: 'text-xs px-2.5 py-1 gap-1.5',
-    lg: 'text-sm px-3 py-1.5 gap-2'
+    md: 'text-xs px-2.5 py-0.5 gap-1.5',
+    lg: 'text-sm px-3 py-1 gap-2'
   };
 
   return (
@@ -94,8 +96,8 @@ export const Input = React.forwardRef(({
   return (
     <input
       ref={ref}
-      className={`w-full px-3 py-2 text-sm bg-[var(--input-bg)] text-[var(--text-primary)] border rounded-lg transition-colors placeholder:text-[var(--text-secondary)]/60 focus:outline-none focus:ring-1 focus:ring-[var(--brand-primary)] ${
-        error ? 'border-red-500 focus:border-red-500' : 'border-[var(--border-color)] focus:border-[var(--brand-primary)]'
+      className={`w-full h-9 px-3 py-2 text-sm bg-[var(--input)] text-[var(--foreground)] border rounded-md transition-colors placeholder:text-[var(--muted-foreground)] focus:outline-none focus:ring-1 focus:ring-[var(--ring)] ${
+        error ? 'border-[var(--destructive)] focus:border-[var(--destructive)]' : 'border-[var(--border)] focus:border-[var(--primary)]'
       } disabled:opacity-50 disabled:cursor-not-allowed ${className}`}
       {...props}
     />
@@ -114,8 +116,8 @@ export const Select = React.forwardRef(({
   return (
     <select
       ref={ref}
-      className={`w-full px-3 py-2 text-sm bg-[var(--input-bg)] text-[var(--text-primary)] border rounded-lg transition-colors focus:outline-none focus:ring-1 focus:ring-[var(--brand-primary)] ${
-        error ? 'border-red-500 focus:border-red-500' : 'border-[var(--border-color)] focus:border-[var(--brand-primary)]'
+      className={`w-full h-9 px-3 py-2 text-sm bg-[var(--input)] text-[var(--foreground)] border rounded-md transition-colors focus:outline-none focus:ring-1 focus:ring-[var(--ring)] ${
+        error ? 'border-[var(--destructive)] focus:border-[var(--destructive)]' : 'border-[var(--border)] focus:border-[var(--primary)]'
       } disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer ${className}`}
       {...props}
     >
@@ -137,8 +139,8 @@ export const Textarea = React.forwardRef(({
     <textarea
       ref={ref}
       rows={rows}
-      className={`w-full px-3 py-2 text-sm bg-[var(--input-bg)] text-[var(--text-primary)] border rounded-lg transition-colors placeholder:text-[var(--text-secondary)]/60 focus:outline-none focus:ring-1 focus:ring-[var(--brand-primary)] ${
-        error ? 'border-red-500 focus:border-red-500' : 'border-[var(--border-color)] focus:border-[var(--brand-primary)]'
+      className={`w-full px-3 py-2 text-sm bg-[var(--input)] text-[var(--foreground)] border rounded-md transition-colors placeholder:text-[var(--muted-foreground)] focus:outline-none focus:ring-1 focus:ring-[var(--ring)] ${
+        error ? 'border-[var(--destructive)] focus:border-[var(--destructive)]' : 'border-[var(--border)] focus:border-[var(--primary)]'
       } disabled:opacity-50 disabled:cursor-not-allowed resize-y ${className}`}
       {...props}
     />
@@ -205,7 +207,7 @@ export const FormField = ({
 
 /* ── Card ───────────────────────────────────────────────────── */
 export const Card = ({ children, className = '', ...props }) => (
-  <div className={`bg-[var(--card-bg)] border border-[var(--border-color)] rounded-xl shadow-[var(--shadow-card)] ${className}`} {...props}>
+  <div className={`bg-[var(--card)] text-[var(--card-foreground)] border border-[var(--border)] rounded-lg shadow-[var(--shadow-card)] ${className}`} {...props}>
     {children}
   </div>
 );

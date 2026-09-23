@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { Send, ArrowLeft, Check } from 'lucide-react';
+import { Send, ArrowLeft, Check, Search, ChevronDown } from 'lucide-react';
 import { apiFetch } from '../lib/apiFetch.lib';
 import { getSession } from '../lib/auth.lib';
 import { FormLabel } from '../components/ui/primitives.component';
@@ -104,8 +104,22 @@ function ChangeRequestFormPage({ onNavigate, user, initialData, searchQuery = ''
 
   const [availableUsers, setAvailableUsers] = useState([]);
   const [loadingUsers, setLoadingUsers] = useState(false);
+  const [managerDropdownOpen, setManagerDropdownOpen] = useState(false);
+  const [managerSearchTerm, setManagerSearchTerm] = useState('');
+  const managerDropdownRef = useRef(null);
 
-  // Fetch active employees for Manager dropdown
+  // Close manager dropdown on click outside
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (managerDropdownRef.current && !managerDropdownRef.current.contains(e.target)) {
+        setManagerDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  // Fetch active employees for Manager dropdown from employees table
   useEffect(() => {
     const fetchUsers = async () => {
       setLoadingUsers(true);
@@ -338,7 +352,11 @@ function ChangeRequestFormPage({ onNavigate, user, initialData, searchQuery = ''
   const handleSubmit = async (e) => {
     if (e) e.preventDefault();
     setIsSubmitting(true);
-    setErrorMessage('');
+    if (!formData.startDate) {
+      setErrorMessage('Start Date is compulsory. Please select a start date.');
+      setIsSubmitting(false);
+      return;
+    }
 
     if (customFieldValues.actionRequired === 'Other' && !customFieldValues.otherAction?.trim()) {
       setErrorMessage('Please specify the details for the Other action option.');
@@ -616,30 +634,139 @@ function ChangeRequestFormPage({ onNavigate, user, initialData, searchQuery = ''
                 style={READONLY_FIELD_STYLE}
               />
             </div>
-            {/* Manager Name Dropdown */}
-            <div>
+            {/* Searchable Manager Combobox Dropdown */}
+            <div ref={managerDropdownRef} style={{ position: 'relative' }}>
               <FormLabel required>Manager Name</FormLabel>
-              <select
-                required
-                value={formData.managerName || ''}
-                onChange={(e) => {
-                  const selectedName = e.target.value;
-                  const matched = availableUsers.find(u => u.name === selectedName);
-                  setFormData(prev => ({
-                    ...prev,
-                    managerName: selectedName,
-                    managerEmail: matched ? matched.email : ''
-                  }));
+              <div
+                tabIndex={0}
+                onClick={() => setManagerDropdownOpen(prev => !prev)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    setManagerDropdownOpen(prev => !prev);
+                  }
                 }}
-                style={ACTIVE_FIELD_STYLE}
+                style={{
+                  ...ACTIVE_FIELD_STYLE,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  backgroundColor: '#FFFFFF',
+                  userSelect: 'none'
+                }}
               >
-                <option value="">{loadingUsers ? 'Loading users...' : 'Select Reporting Manager...'}</option>
-                {availableUsers.map((u) => (
-                  <option key={u.id || u.email} value={u.name}>
-                    {u.name} {u.department ? `(${u.department})` : ''}
-                  </option>
-                ))}
-              </select>
+                <span style={{ color: formData.managerName ? 'var(--text-primary)' : 'var(--text-secondary)' }}>
+                  {formData.managerName || (loadingUsers ? 'Loading employees...' : 'Select Reporting Manager...')}
+                </span>
+                <ChevronDown size={16} style={{ color: 'var(--text-secondary)', transition: 'transform 0.2s', transform: managerDropdownOpen ? 'rotate(180deg)' : 'none' }} />
+              </div>
+
+              {/* Dropdown Menu with Top Search Bar */}
+              {managerDropdownOpen && (
+                <div style={{
+                  position: 'absolute',
+                  top: '100%',
+                  left: 0,
+                  right: 0,
+                  zIndex: 50,
+                  marginTop: '0.35rem',
+                  backgroundColor: '#FFFFFF',
+                  border: '1px solid var(--border-color)',
+                  borderRadius: '10px',
+                  boxShadow: '0 8px 24px rgba(15, 23, 42, 0.12)',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  overflow: 'hidden'
+                }}>
+                  {/* Top Search Bar */}
+                  <div style={{ padding: '0.65rem', borderBottom: '1px solid var(--border-color)', backgroundColor: '#F8FAFC' }}>
+                    <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                      <Search size={14} style={{ position: 'absolute', left: '0.65rem', color: '#94A3B8' }} />
+                      <input
+                        type="text"
+                        autoFocus
+                        value={managerSearchTerm}
+                        onChange={(e) => setManagerSearchTerm(e.target.value)}
+                        placeholder="Search manager by name or email..."
+                        style={{
+                          width: '100%',
+                          padding: '0.45rem 0.65rem 0.45rem 2rem',
+                          fontSize: '0.8rem',
+                          border: '1px solid #CBD5E1',
+                          borderRadius: '6px',
+                          outline: 'none',
+                          backgroundColor: '#FFFFFF',
+                          boxSizing: 'border-box'
+                        }}
+                      />
+                    </div>
+                  </div>
+
+                  {/* List of Active Employees */}
+                  <div style={{ maxHeight: '200px', overflowY: 'auto', padding: '0.25rem 0' }}>
+                    {availableUsers
+                      .filter((u) => {
+                        if (!managerSearchTerm.trim()) return true;
+                        const term = managerSearchTerm.toLowerCase().trim();
+                        const nameMatch = (u.name || '').toLowerCase().includes(term);
+                        const emailMatch = (u.email || '').toLowerCase().includes(term);
+                        const empIdMatch = (u.empId || '').toLowerCase().includes(term);
+                        return nameMatch || emailMatch || empIdMatch;
+                      })
+                      .map((u) => {
+                        const isSelected = formData.managerName === u.name;
+                        return (
+                          <div
+                            key={u.id || u.email}
+                            onClick={() => {
+                              setFormData(prev => ({
+                                ...prev,
+                                managerName: u.name,
+                                managerEmail: u.email || ''
+                              }));
+                              setManagerDropdownOpen(false);
+                              setManagerSearchTerm('');
+                            }}
+                            style={{
+                              padding: '0.55rem 0.85rem',
+                              fontSize: '0.825rem',
+                              cursor: 'pointer',
+                              backgroundColor: isSelected ? '#EFF6FF' : 'transparent',
+                              color: isSelected ? '#1D4ED8' : 'var(--text-primary)',
+                              display: 'flex',
+                              flexDirection: 'column',
+                              gap: '0.1rem',
+                              transition: 'background-color 0.15s'
+                            }}
+                            onMouseEnter={(e) => {
+                              if (!isSelected) e.currentTarget.style.backgroundColor = '#F8FAFC';
+                            }}
+                            onMouseLeave={(e) => {
+                              if (!isSelected) e.currentTarget.style.backgroundColor = 'transparent';
+                            }}
+                          >
+                            <div style={{ fontWeight: isSelected ? 700 : 500 }}>
+                              {u.name}
+                            </div>
+                            <div style={{ fontSize: '0.725rem', color: '#64748B', fontFamily: 'var(--font-mono)' }}>
+                              {u.email} {u.empId ? `• ${u.empId}` : ''}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    {availableUsers.filter((u) => {
+                      if (!managerSearchTerm.trim()) return true;
+                      const term = managerSearchTerm.toLowerCase().trim();
+                      return (u.name || '').toLowerCase().includes(term) || (u.email || '').toLowerCase().includes(term);
+                    }).length === 0 && (
+                      <div style={{ padding: '0.85rem', textAlign: 'center', fontSize: '0.8rem', color: '#94A3B8' }}>
+                        No employees found matching "{managerSearchTerm}"
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Manager Email (Auto-filled & Greyed Out) */}
@@ -672,16 +799,16 @@ function ChangeRequestFormPage({ onNavigate, user, initialData, searchQuery = ''
           </div>
 
           <div className="cd-responsive-form-grid">
-            {/* Change Title */}
+            {/* Change Title (Auto-generated & Non-editable) */}
             <div>
-              <FormLabel required>Change Title</FormLabel>
+              <FormLabel>Change Title</FormLabel>
               <input
                 type="text"
-                required
-                placeholder="e.g. Create a New Server - Server Lifecycle"
+                readOnly
+                disabled
+                placeholder="Auto-generated from action and sub-category"
                 value={formData.title}
-                onChange={(e) => handleInputChange('title', e.target.value)}
-                style={ACTIVE_FIELD_STYLE}
+                style={READONLY_FIELD_STYLE}
               />
             </div>
 
@@ -709,11 +836,12 @@ function ChangeRequestFormPage({ onNavigate, user, initialData, searchQuery = ''
               />
             </div>
 
-            {/* Start Date */}
+            {/* Start Date (Compulsory) */}
             <div>
-              <FormLabel>Start Date</FormLabel>
+              <FormLabel required>Start Date</FormLabel>
               <input
                 type="date"
+                required
                 min={new Date().toISOString().split('T')[0]}
                 value={formData.startDate}
                 onChange={(e) => handleInputChange('startDate', e.target.value)}

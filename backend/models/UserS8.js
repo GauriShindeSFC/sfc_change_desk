@@ -48,6 +48,11 @@ export const UserS8 = sequelize.define(
       allowNull: true,
       field: 'last_login'
     },
+    role: {
+      type: DataTypes.STRING,
+      allowNull: true,
+      field: 'role'
+    },
     createdAt: {
       type: DataTypes.DATE,
       field: 'created_at'

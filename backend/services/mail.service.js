@@ -74,7 +74,6 @@ const getTransporter = async () => {
   // Automatic Ethereal test inbox fallback for effortless local testing
   if (!transporter) {
     try {
-      console.log('[mail] No SMTP_HOST found — creating free Ethereal virtual mailbox for testing...');
       etherealAccount = await nodemailer.createTestAccount();
       transporter = nodemailer.createTransport({
         host: 'smtp.ethereal.email',
@@ -85,9 +84,7 @@ const getTransporter = async () => {
           pass: etherealAccount.pass
         }
       });
-      console.log(`[mail] Ethereal virtual mailbox ready (${etherealAccount.user})`);
     } catch (err) {
-      console.warn('[mail] Failed to create Ethereal test mailbox:', err.message);
       return null;
     }
   }
@@ -551,14 +548,7 @@ export const sendMail = async ({ to, cc, subject, text, html, attachments, reply
       html,
       attachments: attachments && attachments.length ? attachments : undefined
     });
-    const preview = nodemailer.getTestMessageUrl?.(info);
-    console.log(`\n======================================================`);
-    console.log(`[mail] SENT: "${subject}" to ${all.join(', ')} (id ${info.messageId})`);
-    if (preview) {
-      console.log(`[mail] ✉️  PREVIEW EMAIL LINK: ${preview}`);
-    }
-    console.log(`======================================================\n`);
-    return { sent: true, messageId: info.messageId, previewUrl: preview || null };
+    return { sent: true, messageId: info.messageId, previewUrl: null };
   } catch (err) {
     console.error(`[mail] FAILED "${subject}": ${err.message}`);
     return { error: err.message };

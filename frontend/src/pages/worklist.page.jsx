@@ -602,26 +602,7 @@ function MyWorklistPage({ onNavigate, searchQuery = '', user, isOrgWorklist = fa
                             >
                               Implement
                             </button>
-                          ) : (
-                            <span style={{
-                              padding: '0.3rem 0.65rem',
-                              borderRadius: 'var(--radius-lg)',
-                              fontSize: '0.75rem',
-                              fontWeight: 500,
-                              backgroundColor: status === 'implemented' ? '#F3E8FF' : isItemApproved ? '#ECFDF5' : isItemRejected ? '#FEF2F2' : '#FEF3C7',
-                              color: status === 'implemented' ? '#7C3AED' : isItemApproved ? '#059669' : isItemRejected ? '#DC2626' : '#D97706'
-                            }}>
-                              {status === 'implemented'
-                                ? 'Implemented'
-                                : item.myDecision === 'Moot'
-                                ? (isItemApproved ? `Approved by ${item.decidedBy || 'Approver'}` : `Rejected by ${item.decidedBy || 'Approver'}`)
-                                : isItemApproved
-                                ? (activeModule === 'travel' ? 'Ticketed & Confirmed' : 'Approved')
-                                : isItemRejected
-                                ? 'Rejected'
-                                : 'Pending'}
-                            </span>
-                          )}
+                          ) : null}
                         </div>
                       </td>
                     </tr>
