@@ -9,7 +9,10 @@ export const createChangeRequestSchema = {
     category: Joi.string().trim().allow('', null).optional(),
     subCategory: Joi.string().trim().allow('', null).optional(),
     subcategoryId: Joi.string().trim().allow('', null).optional(),
-    startDate: Joi.string().allow('', null).optional(),
+    startDate: Joi.string().trim().required().messages({
+      'string.empty': 'Start Date is required',
+      'any.required': 'Start Date is required'
+    }),
     endDate: Joi.string().allow('', null).optional(),
     justification: Joi.string().trim().allow('', null).optional(),
     employeeName: Joi.string().trim().allow('', null).optional(),

@@ -64,6 +64,15 @@ export const serializeChangeRequest = (row) => {
     ? (closedAt ? formatDate(new Date(closedAt)) : (cr.updatedAt ? formatDate(new Date(cr.updatedAt)) : null))
     : null;
 
+  const foundImpCommentObj = [...allComments].reverse().find(c => {
+    const act = (c.action || c.type || c.decision || '').toLowerCase();
+    return act === 'implemented' || act === 'implement';
+  });
+  const foundImpAuthor = foundImpCommentObj?.authorName;
+
+  const implementedBy = cr.implementedBy || cr.customFieldValues?.implementedBy || foundImpAuthor || null;
+  const implementedByEmail = cr.implementedByEmail || cr.customFieldValues?.implementedByEmail || null;
+
   return {
     ...rest,
     requesterId: requesterId || cr.requester_id || cr.requesterId || null,
@@ -78,6 +87,8 @@ export const serializeChangeRequest = (row) => {
     rejectedBy,
     rejectedDate,
     rejectedComment,
+    implementedBy,
+    implementedByEmail,
     implementedDate,
     implementedComment,
     closedDate,
@@ -153,6 +164,15 @@ export const serializeWorklistEntry = (row) => {
     ? (cr.closedAt ? formatDate(new Date(cr.closedAt)) : (cr.updatedAt ? formatDate(new Date(cr.updatedAt)) : null))
     : null;
 
+  const foundImpCommentObj = [...allComments].reverse().find(c => {
+    const act = (c.action || c.type || c.decision || '').toLowerCase();
+    return act === 'implemented' || act === 'implement';
+  });
+  const foundImpAuthor = foundImpCommentObj?.authorName;
+
+  const implementedBy = cr.implementedBy || cr.customFieldValues?.implementedBy || foundImpAuthor || null;
+  const implementedByEmail = cr.implementedByEmail || cr.customFieldValues?.implementedByEmail || null;
+
   return {
     id: cr.id,
     title: cr.title,
@@ -192,6 +212,8 @@ export const serializeWorklistEntry = (row) => {
     rejectedBy,
     rejectedDate,
     rejectedComment,
+    implementedBy,
+    implementedByEmail,
     implementedDate,
     implementedComment,
     ...riskStyle(cr.risk),

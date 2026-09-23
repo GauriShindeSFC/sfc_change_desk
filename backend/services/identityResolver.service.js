@@ -1,38 +1,12 @@
+import { ChangeUser } from '../models/ChangeUser.js';
 import { UserS8 } from '../models/UserS8.js';
-import { Employee } from '../models/Employee.js';
-import { UserAppRole } from '../models/UserAppRole.js';
-import { Role, ChangeManagerCategory, ChangeImplementerCategory } from '../models/index.js';
+import { ChangeManagerCategory, ChangeImplementerCategory } from '../models/index.js';
 import { Op } from 'sequelize';
 import { sequelize } from '../config/database.js';
 
-const ROLE_NAME_MAP = {
-  'role-1': 'Super Admin',
-  'role-2-change': 'Change Desk Admin',
-  'role-2-prespend': 'Pre-Spend Admin',
-  'role-2-travel': 'Travel Desk Admin',
-  'role-2': 'Admin',
-  'role-3': 'Change Manager',
-  'role-4': 'Requester',
-  'role-5': 'Change Implementer',
-  'role-6': 'Board'
-};
-
-const APP_ROLE_MAP = {
-  'role-1': 'SUPER_ADMIN',
-  'role-2-change': 'CHANGE_ADMIN',
-  'role-2-prespend': 'PRESPEND_ADMIN',
-  'role-2-travel': 'TRAVEL_ADMIN',
-  'role-2': 'ADMIN',
-  'role-3': 'CHANGE_MANAGER',
-  'role-4': 'REQUESTER',
-  'role-5': 'CHANGE_IMPLEMENTER',
-  'role-6': 'BOARD'
-};
+import { ROLE_ID_TO_NAME as ROLE_NAME_MAP, APP_ROLE_MAP } from '../config/constants.js';
 
 export class IdentityResolver {
-  // Repeated dashboard, badge, and notification requests resolve the same
-  // identities. A short cache removes that duplicate database work while
-  // keeping role/category changes visible quickly.
   static keyCache = new Map();
   static CACHE_TTL_MS = 30_000;
 
@@ -44,16 +18,26 @@ export class IdentityResolver {
     }
   }
 
-  /** Check if an employee has exited/left the organization */
-  static isEmployeeExited(emp) {
-    if (!emp) return false;
-    return Boolean(emp.leftAt || emp.leftReason || emp.leftBy);
+  /** Check if email exists in DB's User table (UserS8 / public.users) */
+  static async checkUserInUserTable(email) {
+    if (!email) return false;
+    try {
+      const s8User = await UserS8.findOne({
+        where: sequelize.where(sequelize.fn('LOWER', sequelize.col('email')), email.trim().toLowerCase())
+      });
+      return Boolean(s8User);
+    } catch {
+      return false;
+    }
   }
 
   /**
-   * Resolves identity by email address.
-   * Checks both public.users (UserS8) and employees (Employee).
-   * Supports dual-source identities (S8-* admin role preferred for login if present).
+   * Resolves identity by email address:
+   * 1. Validates presence and active status in the 'employees' table.
+   *    - If not found in employees table -> BLOCKED
+   *    - If left_at / left_reason / left_by is NOT NULL (exited) -> BLOCKED
+   *    - If IS NULL (active) -> ALLOWED
+   * 2. Resolves application profile and permissions from 'change_user' table.
    */
   static async resolveByEmail(rawEmail) {
     if (!rawEmail || typeof rawEmail !== 'string') {
@@ -62,82 +46,58 @@ export class IdentityResolver {
 
     const email = rawEmail.trim().toLowerCase();
 
-    // Query both identity sources
-    const [s8Users, employees] = await Promise.all([
-      UserS8.findAll({
-        where: sequelize.where(sequelize.fn('LOWER', sequelize.col('email')), email)
-      }),
-      Employee.findAll({
-        where: sequelize.where(sequelize.fn('LOWER', sequelize.col('email')), email)
-      })
-    ]);
+    // 1. Enforce Employee Table Validation Gate
+    const { Employee } = await import('../models/Employee.js');
+    const employee = await Employee.findOne({
+      where: sequelize.where(sequelize.fn('LOWER', sequelize.col('email')), email)
+    });
 
-    const totalMatches = s8Users.length + employees.length;
-
-    if (totalMatches === 0) {
-      return { status: 'NOT_FOUND', message: `No account found for email: ${email}` };
-    }
-
-    // Check if intra-table duplicate exists (multiple rows inside S8 or multiple rows inside Employees)
-    if (s8Users.length > 1 || employees.length > 1) {
-      console.warn(`[IdentityResolver] Intra-table duplicate email detected for "${email}".`);
+    if (!employee) {
       return {
-        status: 'AMBIGUOUS',
-        message: `Multiple records found for email ${email} in single directory. Contact administrator.`
+        status: 'NOT_FOUND',
+        message: 'Access Denied: Email address not found in employee directory.'
       };
     }
 
-    // Check if employee record exists and has exited the organization
-    if (employees.length === 1 && this.isEmployeeExited(employees[0])) {
+    if (employee.leftAt || employee.leftReason || employee.leftBy) {
       return {
         status: 'USER_INACTIVE',
         message: 'Access Denied: Your account is deactivated as you are no longer with the organization.'
       };
     }
 
-    // Dual-source person (1 S8 user + 1 Employee record)
-    // 1. Check if S8 identity has an assigned ChangeDesk role
-    if (s8Users.length === 1) {
-      const s8User = s8Users[0];
-      const s8Key = `S8-${s8User.id}`;
-      const s8Res = await this._buildIdentityDTO('S8_USER', s8User, s8Key);
-      if (s8Res.status === 'USER_INACTIVE') {
-        return s8Res;
+    // 2. Lookup in change_user table
+    let changeUser = await ChangeUser.findOne({
+      where: sequelize.where(sequelize.fn('LOWER', sequelize.col('email')), email)
+    });
+
+    if (changeUser) {
+      if (changeUser.status === 'Inactive' || changeUser.status === 'Suspended') {
+        return {
+          status: 'USER_INACTIVE',
+          message: 'Access Denied: Your account is deactivated.'
+        };
       }
-      if (s8Res.status === 'SUCCESS' && s8Res.identity?.isExplicitRole) {
-        return s8Res; // S8 administrative identity takes precedence if an explicit role was assigned
-      }
+      return await this._buildIdentityDTO(changeUser, employee);
     }
 
-    // 2. Next check if Employee identity exists (with assigned role or default Requester)
-    if (employees.length === 1) {
-      const employee = employees[0];
-      const empKey = `EMP-${employee.id}`;
-      const empRes = await this._buildIdentityDTO('EMPLOYEE', employee, empKey);
-      if (empRes.status === 'USER_INACTIVE') {
-        return empRes;
-      }
-      if (empRes.status === 'SUCCESS') {
-        empRes.identity.isInUserTable = s8Users.length > 0;
-        return empRes;
-      }
-    }
+    // 3. If employee exists and active, but not yet explicitly invited to change_user, create default Requester record
+    const displayName = employee.name || email.split('@')[0];
+    changeUser = await ChangeUser.create({
+      id: String(employee.id),
+      name: displayName,
+      email,
+      roleId: 'role-4',
+      roleName: 'Requester',
+      status: 'Active',
+      metadata: { source: 'Employee_directory', empId: employee.empId }
+    });
 
-    // 3. If only S8 user exists without explicit role, allow login as default Requester
-    if (s8Users.length === 1) {
-      const s8User = s8Users[0];
-      const s8Key = `S8-${s8User.id}`;
-      return await this._buildIdentityDTO('S8_USER', s8User, s8Key);
-    }
-
-    return {
-      status: 'NOT_FOUND',
-      message: `Account "${email}" not found.`
-    };
+    return await this._buildIdentityDTO(changeUser, employee);
   }
 
   /**
-   * Resolves identity by userKey (e.g., 'S8-17' or 'EMP-152').
+   * Resolves identity by ID or UserKey directly from ChangeUser table.
    */
   static async resolveByKey(userKey) {
     const key = String(userKey || '');
@@ -154,218 +114,118 @@ export class IdentityResolver {
       return { status: 'NOT_FOUND', message: 'User key is required' };
     }
 
-    if (userKey.startsWith('S8-')) {
-      const id = parseInt(userKey.replace('S8-', ''), 10);
-      if (isNaN(id)) return { status: 'NOT_FOUND', message: 'Invalid S8 key format' };
+    // Direct lookup by ID or numeric ID
+    let changeUser = await ChangeUser.findByPk(userKey);
 
-      const s8User = await UserS8.findByPk(id);
-      if (!s8User) return { status: 'NOT_FOUND', message: `S8 User not found: ${userKey}` };
-
-      return await this._buildIdentityDTO('S8_USER', s8User, userKey);
-    } else if (userKey.startsWith('EMP-')) {
-      const id = parseInt(userKey.replace('EMP-', ''), 10);
-      if (isNaN(id)) return { status: 'NOT_FOUND', message: 'Invalid Employee key format' };
-
-      const employee = await Employee.findByPk(id);
-      if (!employee) return { status: 'NOT_FOUND', message: `Employee not found: ${userKey}` };
-
-      return await this._buildIdentityDTO('EMPLOYEE', employee, userKey);
-    } else if (userKey.startsWith('usr-')) {
-      const id = parseInt(userKey.replace('usr-', ''), 10);
-      if (!isNaN(id)) {
-        const employee = await Employee.findByPk(id);
-        if (employee) return await this._buildIdentityDTO('EMPLOYEE', employee, `EMP-${id}`);
-        const s8User = await UserS8.findByPk(id);
-        if (s8User) return await this._buildIdentityDTO('S8_USER', s8User, `S8-${id}`);
+    // If not found, try stripped prefix (S8-xx, EMP-xx, usr-xx)
+    if (!changeUser) {
+      const rawId = userKey.replace(/^(S8-|EMP-|usr-)/, '');
+      if (rawId && rawId !== userKey) {
+        changeUser = await ChangeUser.findByPk(rawId);
       }
-    } else if (!isNaN(Number(userKey))) {
-      const id = parseInt(userKey, 10);
-      const employee = await Employee.findByPk(id);
-      if (employee) return await this._buildIdentityDTO('EMPLOYEE', employee, `EMP-${id}`);
-      const s8User = await UserS8.findByPk(id);
-      if (s8User) return await this._buildIdentityDTO('S8_USER', s8User, `S8-${id}`);
     }
 
-    return { status: 'NOT_FOUND', message: `Unrecognized identity key prefix: ${userKey}` };
+    // If still not found, search by email
+    if (!changeUser && userKey.includes('@')) {
+      changeUser = await ChangeUser.findOne({
+        where: sequelize.where(sequelize.fn('LOWER', sequelize.col('email')), userKey.trim().toLowerCase())
+      });
+    }
+
+    if (changeUser) {
+      return await this._buildIdentityDTO(changeUser);
+    }
+
+    return { status: 'NOT_FOUND', message: `User not found: ${userKey}` };
   }
 
   /**
-   * Helper to fetch role assignment and construct normalized DTO.
+   * Helper to fetch role assignment and construct normalized DTO from ChangeUser record.
    */
-  static async _buildIdentityDTO(identityType, record, userKey) {
-    let employeeObj = null;
-    let employeeBusinessId = null;
-    let location = null;
-
-    if (identityType === 'EMPLOYEE') {
-      if (this.isEmployeeExited(record)) {
-        return {
-          status: 'USER_INACTIVE',
-          message: 'Access Denied: Your account is deactivated as you are no longer with the organization.'
-        };
-      }
-      employeeBusinessId = record.empId || null;
-      location = record.location || null;
-      employeeObj = {
-        sourceId: record.id,
-        employeeBusinessId,
-        empId: employeeBusinessId,
-        name: record.name || record.email,
-        email: record.email,
-        location
-      };
-    } else if (identityType === 'S8_USER') {
-      if (record.email) {
-        const empMatch = await Employee.findOne({
-          where: sequelize.where(sequelize.fn('LOWER', sequelize.col('email')), record.email.trim().toLowerCase())
-        });
-        if (empMatch) {
-          if (this.isEmployeeExited(empMatch)) {
-            return {
-              status: 'USER_INACTIVE',
-              message: 'Access Denied: Your account is deactivated as you are no longer with the organization.'
-            };
-          }
-          employeeBusinessId = empMatch.empId || null;
-          location = empMatch.location || null;
-          employeeObj = {
-            sourceId: empMatch.id,
-            employeeBusinessId,
-            empId: employeeBusinessId,
-            name: empMatch.name || record.displayName,
-            email: empMatch.email || record.email,
-            location
-          };
-        }
-      }
-    }
-
-    // Resolve all possible key aliases for this identity (EMP-*, S8-*, usr-*, numeric id, business id)
-    const roleKeys = new Set([userKey, String(record.id), `usr-${record.id}`]);
-    if (identityType === 'EMPLOYEE') {
-      roleKeys.add(`EMP-${record.id}`);
-      if (record.empId) roleKeys.add(String(record.empId));
-      if (record.email) {
-        const s8Match = await UserS8.findOne({
-          where: sequelize.where(sequelize.fn('LOWER', sequelize.col('email')), record.email.trim().toLowerCase())
-        });
-        if (s8Match) {
-          roleKeys.add(`S8-${s8Match.id}`);
-          roleKeys.add(`usr-${s8Match.id}`);
-          roleKeys.add(String(s8Match.id));
-        }
-      }
-    } else {
-      roleKeys.add(`S8-${record.id}`);
-      if (employeeObj?.sourceId) {
-        roleKeys.add(`EMP-${employeeObj.sourceId}`);
-        roleKeys.add(String(employeeObj.sourceId));
-        roleKeys.add(`usr-${employeeObj.sourceId}`);
-      }
-      if (employeeBusinessId) roleKeys.add(String(employeeBusinessId));
-    }
-
-    const allRoleMappings = await UserAppRole.findAll({
-      where: { userKey: { [Op.in]: Array.from(roleKeys) } },
-      order: [['updatedAt', 'DESC'], ['createdAt', 'DESC']]
-    });
-
-    // Role hierarchy rank (lower number = higher administrative privilege)
-    const ROLE_RANK = { 'role-1': 1, 'role-2': 2, 'role-2-change': 2, 'role-2-prespend': 2, 'role-2-travel': 2, 'role-3': 3, 'role-5': 4, 'role-6': 4, 'role-4': 5 };
-
-    // 1. Check if the exact userKey being resolved has a mapping
-    const exactMapping = allRoleMappings.find(m => m.userKey === userKey);
-
-    // 2. Find the highest-privilege role among all aliases
-    const sortedByPrivilege = [...allRoleMappings].sort((a, b) => {
-      const rankA = ROLE_RANK[a.roleId] || 99;
-      const rankB = ROLE_RANK[b.roleId] || 99;
-      return rankA - rankB;
-    });
-    const highestPrivilegeMapping = sortedByPrivilege[0] || null;
-
-    // Prefer exact mapping if it's an elevated role; otherwise pick the highest privilege mapping
-    const roleMapping = (exactMapping && (ROLE_RANK[exactMapping.roleId] || 99) < ROLE_RANK['role-4'])
-      ? exactMapping
-      : (highestPrivilegeMapping || exactMapping || allRoleMappings[0] || null);
-
-    const displayName = identityType === 'S8_USER'
-      ? (record.displayName || `${record.givenName || ''} ${record.familyName || ''}`.trim() || record.email)
-      : (record.name || record.email);
-
-    // If no explicit role mapping in changedesk_identity_roles, default to Requester (role-4)
-    // without modifying the database or inserting into the user table
-    const roleId = roleMapping ? roleMapping.roleId : 'role-4';
-    const isExplicitRole = Boolean(roleMapping);
-
-    // Validate valid application roles
-    if (!['role-1', 'role-2', 'role-2-change', 'role-2-prespend', 'role-2-travel', 'role-3', 'role-4', 'role-5', 'role-6'].includes(roleId)) {
-      console.error(`[IdentityResolver] Invalid role ${roleId} assigned to ${userKey}`);
-      return {
-        status: 'INVALID_ROLE_COMBINATION',
-        message: `User assigned invalid role ${roleId}. Access Denied.`
-      };
-    }
-
+  static async _buildIdentityDTO(changeUser, employeeRecord = null) {
+    const email = changeUser.email.trim().toLowerCase();
+    const roleId = changeUser.roleId || 'role-4';
+    const roleName = changeUser.roleName || ROLE_NAME_MAP[roleId] || 'Requester';
     const applicationRole = APP_ROLE_MAP[roleId] || 'REQUESTER';
-    const roleName = ROLE_NAME_MAP[roleId] || 'Requester';
 
-    let cmCategories = [];
-    let ciCategories = [];
+    // If employeeRecord is not provided, fetch from employees table
+    let emp = employeeRecord;
+    if (!emp) {
+      const { Employee } = await import('../models/Employee.js');
+      emp = await Employee.findOne({
+        where: sequelize.where(sequelize.fn('LOWER', sequelize.col('email')), email)
+      });
+    }
+
+    const authoritativeEmpId = emp?.empId || changeUser.metadata?.empId || changeUser.id;
+    const authoritativeLocation = emp?.location || null;
 
     // Fetch CM category assignments
+    const keysToCheck = [String(changeUser.id), `S8-${changeUser.id}`, `EMP-${changeUser.id}`, `usr-${changeUser.id}`, email];
     const cmAssignments = await ChangeManagerCategory.findAll({
-      where: {
-        userId: { [Op.in]: Array.from(roleKeys) }
-      }
+      where: { userId: { [Op.in]: keysToCheck } }
     });
-    cmCategories = cmAssignments.map(a => a.categoryId);
+    const cmCategories = cmAssignments.map(a => a.categoryId);
 
     // Fetch CI category assignments
     const ciAssignments = await ChangeImplementerCategory.findAll({
-      where: {
-        userId: { [Op.in]: Array.from(roleKeys) }
-      }
+      where: { userId: { [Op.in]: keysToCheck } }
     });
-    ciCategories = ciAssignments.map(a => a.categoryId);
+    const ciCategories = ciAssignments.map(a => a.categoryId);
 
-    // Automatically recognize role if categories are assigned
-    let resolvedRoleId = roleId;
-    let resolvedRoleName = roleName;
-    let resolvedAppRole = applicationRole;
-    if (resolvedRoleId === 'role-4') {
-      if (ciCategories.length > 0) {
-        resolvedRoleId = 'role-5';
-        resolvedRoleName = 'Change Implementer';
-        resolvedAppRole = 'CHANGE_IMPLEMENTER';
-      } else if (cmCategories.length > 0) {
-        resolvedRoleId = 'role-3';
-        resolvedRoleName = 'Change Manager';
-        resolvedAppRole = 'CHANGE_MANAGER';
-      }
+    // Check presence in the DB's User table (UserS8)
+    const isInUserTable = await this.checkUserInUserTable(email);
+
+    const rawRoles = changeUser.metadata?.roles || [];
+    let rolesList = Array.isArray(rawRoles) && rawRoles.length > 0
+      ? rawRoles.map(r => typeof r === 'string' ? { roleId: r, roleName: ROLE_NAME_MAP[r] || r } : r)
+      : [{ roleId, roleName }];
+
+    if (!rolesList.some(r => r.roleId === roleId)) {
+      rolesList.unshift({ roleId, roleName });
     }
 
+    const assignedRoleIds = rolesList.map(r => r.roleId);
+
     const dto = {
-      identityType,
-      sourceId: record.id,
-      userKey,
-      id: userKey, // Backward compatible id field
-      email: record.email,
-      displayName,
-      name: displayName,
-      applicationRole: resolvedAppRole,
-      roleId: resolvedRoleId,
-      role: resolvedRoleName,
-      isExplicitRole,
-      employeeBusinessId,
-      employeeId: employeeBusinessId,
-      location,
-      employee: employeeObj,
+      identityType: 'CHANGE_USER',
+      sourceId: changeUser.id,
+      userKey: String(changeUser.id),
+      id: String(changeUser.id),
+      email: changeUser.email,
+      displayName: changeUser.name,
+      name: changeUser.name,
+      designation: changeUser.designation || '',
+      applicationRole,
+      roleId,
+      role: roleName,
+      roles: rolesList,
+      rolesList: assignedRoleIds,
+      isSuperAdmin: assignedRoleIds.includes('role-1'),
+      isChangeAdmin: assignedRoleIds.includes('role-1') || assignedRoleIds.includes('role-2') || assignedRoleIds.includes('role-2-change'),
+      isPreSpendAdmin: assignedRoleIds.includes('role-1') || assignedRoleIds.includes('role-2-prespend'),
+      isTravelAdmin: assignedRoleIds.includes('role-1') || assignedRoleIds.includes('role-2-travel'),
+      isChangeManager: assignedRoleIds.includes('role-3') || cmCategories.length > 0,
+      isChangeImplementer: assignedRoleIds.includes('role-5') || ciCategories.length > 0,
+      isBoardMember: assignedRoleIds.includes('role-6'),
+      status: changeUser.status || 'Active',
+      isExplicitRole: roleId !== 'role-4',
+      employeeBusinessId: authoritativeEmpId,
+      employeeId: authoritativeEmpId,
+      empId: authoritativeEmpId,
+      location: authoritativeLocation,
+      employee: {
+        id: emp?.id || changeUser.id,
+        name: changeUser.name,
+        email: changeUser.email,
+        empId: authoritativeEmpId,
+        location: authoritativeLocation
+      },
       cmCategories,
       ciCategories,
       categoryIds: roleId === 'role-5' ? ciCategories : cmCategories,
-      aliases: Array.from(roleKeys),
-      isInUserTable: identityType === 'S8_USER'
+      aliases: keysToCheck,
+      isInUserTable
     };
 
     return { status: 'SUCCESS', identity: dto };
@@ -382,17 +242,5 @@ export const resolveDualSourceIdentities = async (userId) => {
   if (!userId) return [];
   const res = await IdentityResolver.resolveByKey(String(userId));
   if (res.status !== 'SUCCESS' || !res.identity) return [];
-  const identity = res.identity;
-  const keys = new Set();
-  if (Array.isArray(identity.aliases)) {
-    identity.aliases.forEach(k => keys.add(k));
-  }
-  if (identity.userKey) keys.add(identity.userKey);
-  if (identity.employeeBusinessId) keys.add(String(identity.employeeBusinessId));
-  if (identity.employee?.empId) keys.add(String(identity.employee.empId));
-  if (identity.employee?.sourceId) {
-    keys.add(`EMP-${identity.employee.sourceId}`);
-    keys.add(String(identity.employee.sourceId));
-  }
-  return Array.from(keys);
+  return res.identity.aliases || [String(userId)];
 };

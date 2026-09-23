@@ -153,17 +153,17 @@ function Header({
             type="button"
             onClick={() => setShowProfileMenu((v) => !v)}
             style={{
-              width: '34px',
-              height: '34px',
-              borderRadius: '50%',
-              backgroundColor: '#27354A',
+              width: '36px',
+              height: '36px',
+              borderRadius: '8px',
+              backgroundColor: 'var(--primary, #173C4E)',
               color: '#FFFFFF',
               border: 'none',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              fontSize: '0.75rem',
-              fontWeight: 500,
+              fontSize: '0.85rem',
+              fontWeight: 600,
               cursor: 'pointer',
               flexShrink: 0
             }}

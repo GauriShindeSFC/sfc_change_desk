@@ -88,16 +88,16 @@ function Sidebar({
           justifyContent: mini ? 'center' : 'flex-start',
           borderRadius: '8px',
           border: 'none',
-          backgroundColor: isActive ? '#1E293B' : 'transparent',
+          backgroundColor: isActive ? 'var(--primary, #173C4E)' : 'transparent',
           color: isActive ? '#FFFFFF' : '#94A3B8',
-          fontWeight: 500,
+          fontWeight: isActive ? 600 : 500,
           fontSize: '0.85rem',
           cursor: 'pointer',
           transition: 'background-color 0.15s ease, color 0.15s ease',
           position: 'relative'
         }}
       >
-        <Icon size={18} style={{ color: isActive ? '#FFFFFF' : '#64748B', flexShrink: 0 }} />
+        <Icon size={18} style={{ color: isActive ? '#FFFFFF' : '#64748B', flexShrink: 0, strokeWidth: isActive ? 2.25 : 2 }} />
         {!mini && (
           <span style={{ flex: 1, textAlign: 'left', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
             {item.label}
@@ -131,7 +131,7 @@ function Sidebar({
               borderRadius: 'var(--radius-lg)',
               fontSize: '0.7rem',
               fontWeight: 500,
-              backgroundColor: 'var(--brand-primary)',
+              backgroundColor: 'var(--primary, #173C4E)',
               color: '#FFFFFF'
             }}
           >

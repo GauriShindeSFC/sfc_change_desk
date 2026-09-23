@@ -545,6 +545,24 @@ export default function ChangeRequestModal({ cr, onClose, onApprove, onReject, o
               <div style={{ fontSize: '0.8rem', fontWeight: 500, color: 'var(--text-primary)', marginBottom: '0.25rem' }}>Employee Email</div>
               <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>{cr.employeeEmail || cr.requesterEmail || 'N/A'}</div>
             </div>
+            {(isImplemented || cr.implementedBy || cr.implementedComment) && (
+              <>
+                <div>
+                  <div style={{ fontSize: '0.8rem', fontWeight: 500, color: 'var(--text-primary)', marginBottom: '0.25rem' }}>Implemented By</div>
+                  <div style={{ fontSize: '0.85rem', fontWeight: 600, color: '#7C3AED' }}>
+                    {cr.implementedBy || cr.customFieldValues?.implementedBy || cr.decidedBy || 'Implementer'}
+                  </div>
+                </div>
+                {Boolean(cr.implementedByEmail || cr.customFieldValues?.implementedByEmail) && (
+                  <div>
+                    <div style={{ fontSize: '0.8rem', fontWeight: 500, color: 'var(--text-primary)', marginBottom: '0.25rem' }}>Implementer Email</div>
+                    <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
+                      {cr.implementedByEmail || cr.customFieldValues?.implementedByEmail}
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
             <div>
               <div style={{ fontSize: '0.8rem', fontWeight: 500, color: 'var(--text-primary)', marginBottom: '0.25rem' }}>Location</div>
               <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>{cr.location || 'Not specified'}</div>

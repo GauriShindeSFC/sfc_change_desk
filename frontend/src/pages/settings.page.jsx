@@ -104,32 +104,47 @@ function SettingsPage({ user }) {
     }
   });
   const auditLogs = auditLogsData || [];
-
   const ROLE_TO_ID = {
     'Super Admin': 'role-1',
     'Change Desk Admin': 'role-2-change',
     'Pre-Spend Admin': 'role-2-prespend',
     'Travel Desk Admin': 'role-2-travel',
-    'Admin': 'role-2-change',
     'Change Manager': 'role-3',
     'Change Implementer': 'role-5',
-    'Board': 'role-6'
+    'Board Member': 'role-6'
   };
 
+  const ALL_ASSIGNABLE_ROLES = [
+    'Change Desk Admin',
+    'Pre-Spend Admin',
+    'Travel Desk Admin',
+    'Change Manager',
+    'Change Implementer',
+    'Board Member',
+    'Super Admin'
+  ];
+
   const handleOpenManageUser = async (targetUser) => {
-    if (isRequester) return; // Block role-4 Requester from opening Manage User modal
+    if (isRequester) return;
     const initialCats = targetUser.categoryIds || [];
-    const normalizedRole = targetUser.role === 'Admin' ? 'Change Desk Admin' : (targetUser.role === 'Unassigned' ? 'Change Desk Admin' : (targetUser.role || 'Change Desk Admin'));
+    
+    // Extract existing roles
+    const existingRoles = Array.isArray(targetUser.roles) && targetUser.roles.length > 0
+      ? targetUser.roles.map(r => typeof r === 'string' ? r : r.roleName || r.name).filter(Boolean)
+      : [targetUser.role || 'Change Desk Admin'];
+
     setEditingUser({
       id: targetUser.id,
       name: targetUser.name || '',
-      empId: targetUser.empId || targetUser.employeeId || 'EMP-10432',
-      role: normalizedRole
+      empId: targetUser.empId || targetUser.employeeId || '',
+      roles: existingRoles,
+      selectedRoleToAdd: ALL_ASSIGNABLE_ROLES[0]
     });
     setEditingUserCategories(initialCats);
     setIsLoadingCategories(true);
     try {
-      const endpoint = targetUser.role === 'Change Implementer'
+      const hasCI = existingRoles.includes('Change Implementer');
+      const endpoint = hasCI
         ? `/settings/change-implementer-categories/${targetUser.id}`
         : `/settings/change-manager-categories/${targetUser.id}`;
       const res = await apiFetch(endpoint);
@@ -150,16 +165,24 @@ function SettingsPage({ user }) {
     if (e) e.preventDefault();
     if (!editingUser || isSavingUser) return;
 
+    const assignedRoles = editingUser.roles && editingUser.roles.length > 0
+      ? editingUser.roles
+      : ['Change Desk Admin'];
+
     setIsSavingUser(true);
 
-    const roleId = ROLE_TO_ID[editingUser.role] || (editingUser.role === 'Change Manager' ? 'role-3' : editingUser.role === 'Change Implementer' ? 'role-5' : editingUser.role === 'Board' ? 'role-6' : 'role-2-change');
-    const categoryIds = (editingUser.role === 'Change Manager' || editingUser.role === 'Change Implementer') ? editingUserCategories : [];
+    const primaryRoleName = assignedRoles[0];
+    const roleId = ROLE_TO_ID[primaryRoleName] || 'role-2-change';
+    const hasCM = assignedRoles.includes('Change Manager');
+    const hasCI = assignedRoles.includes('Change Implementer');
+    const categoryIds = (hasCM || hasCI) ? editingUserCategories : [];
 
     const updatedUserObj = {
       name: editingUser.name,
       empId: editingUser.empId,
-      role: editingUser.role,
+      role: primaryRoleName,
       roleId,
+      roles: assignedRoles,
       categoryIds
     };
 
@@ -174,22 +197,17 @@ function SettingsPage({ user }) {
         throw new Error(errorData.message || errorData.error || `Failed to update user (${res.status})`);
       }
 
-      if (editingUser.role === 'Change Manager') {
-        const cmRes = await apiFetch(`/settings/change-manager-categories/${editingUser.id}`, {
+      if (hasCM) {
+        await apiFetch(`/settings/change-manager-categories/${editingUser.id}`, {
           method: 'PUT',
           body: JSON.stringify({ categoryIds: editingUserCategories })
-        });
-        if (!cmRes.ok) {
-          console.warn('Failed to update change manager categories:', cmRes.status);
-        }
-      } else if (editingUser.role === 'Change Implementer') {
-        const ciRes = await apiFetch(`/settings/change-implementer-categories/${editingUser.id}`, {
+        }).catch(err => console.warn('Failed to update CM categories:', err));
+      }
+      if (hasCI) {
+        await apiFetch(`/settings/change-implementer-categories/${editingUser.id}`, {
           method: 'PUT',
           body: JSON.stringify({ categoryIds: editingUserCategories })
-        });
-        if (!ciRes.ok) {
-          console.warn('Failed to update change implementer categories:', ciRes.status);
-        }
+        }).catch(err => console.warn('Failed to update CI categories:', err));
       }
 
       queryClient.invalidateQueries({ queryKey: ['settings-users'] });
@@ -208,23 +226,32 @@ function SettingsPage({ user }) {
     name: '',
     email: '',
     empId: '',
-    role: 'Change Desk Admin'
+    roles: ['Change Desk Admin'],
+    selectedRoleToAdd: ALL_ASSIGNABLE_ROLES[0]
   });
 
   const handleSaveInviteUser = async (e) => {
     e.preventDefault();
     if (!newUser.name || !newUser.email) return;
 
-    const roleId = ROLE_TO_ID[newUser.role] || (newUser.role === 'Change Manager' ? 'role-3' : newUser.role === 'Change Implementer' ? 'role-5' : newUser.role === 'Board' ? 'role-6' : 'role-2-change');
-    const categoryIds = (newUser.role === 'Change Manager' || newUser.role === 'Change Implementer') ? newUserCategories : [];
+    const assignedRoles = newUser.roles && newUser.roles.length > 0
+      ? newUser.roles
+      : ['Change Desk Admin'];
+
+    const primaryRoleName = assignedRoles[0];
+    const roleId = ROLE_TO_ID[primaryRoleName] || 'role-2-change';
+    const hasCM = assignedRoles.includes('Change Manager');
+    const hasCI = assignedRoles.includes('Change Implementer');
+    const categoryIds = (hasCM || hasCI) ? newUserCategories : [];
 
     const invitePayload = {
       name: newUser.name,
       email: newUser.email,
       empId: newUser.empId || undefined,
       employeeId: newUser.empId || undefined,
-      role: newUser.role,
+      role: primaryRoleName,
       roleId,
+      roles: assignedRoles,
       categoryIds,
       status: newUser.status
     };
@@ -244,26 +271,33 @@ function SettingsPage({ user }) {
       const savedUser = body.data;
       const savedUserId = savedUser?.id || savedUser?.userKey;
 
-      if (newUser.role === 'Change Manager' && savedUserId && newUserCategories.length > 0) {
+      if (hasCM && savedUserId && newUserCategories.length > 0) {
         await apiFetch(`/settings/change-manager-categories/${savedUserId}`, {
           method: 'PUT',
           body: JSON.stringify({ categoryIds: newUserCategories })
-        });
-      } else if (newUser.role === 'Change Implementer' && savedUserId && newUserCategories.length > 0) {
+        }).catch(() => {});
+      }
+      if (hasCI && savedUserId && newUserCategories.length > 0) {
         await apiFetch(`/settings/change-implementer-categories/${savedUserId}`, {
           method: 'PUT',
           body: JSON.stringify({ categoryIds: newUserCategories })
-        });
+        }).catch(() => {});
       }
 
       queryClient.invalidateQueries({ queryKey: ['settings-users'] });
-
+      toast.success('User invited successfully');
       setIsInviteModalOpen(false);
-      setNewUser({ name: '', email: '', empId: '', role: 'Change Desk Admin', status: 'Enabled' });
+      setNewUser({
+        name: '',
+        email: '',
+        empId: '',
+        roles: ['Change Desk Admin'],
+        selectedRoleToAdd: ALL_ASSIGNABLE_ROLES[0]
+      });
       setNewUserCategories([]);
     } catch (err) {
       console.error('Failed to invite user via API:', err);
-      alert(`Error inviting user: ${err.message}`);
+      toast.error(`Error inviting user: ${err.message}`);
     }
   };
 
@@ -430,7 +464,29 @@ function SettingsPage({ user }) {
                     <tr key={u.id} style={{ borderBottom: idx === users.length - 1 ? 'none' : '1px solid var(--border-color)' }}>
                       <td style={{ padding: '0.75rem 0.85rem', fontSize: '0.875rem', fontWeight: 500, color: 'var(--text-primary)', whiteSpace: 'nowrap' }}>{u.name}</td>
                       <td style={{ padding: '0.75rem 0.85rem', fontSize: '0.825rem', color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)', whiteSpace: 'nowrap' }}>{u.email}</td>
-                      <td style={{ padding: '0.75rem 0.85rem', fontSize: '0.825rem', color: 'var(--text-primary)', fontWeight: 600, whiteSpace: 'nowrap' }}>{u.role}</td>
+                      <td style={{ padding: '0.75rem 0.85rem', whiteSpace: 'nowrap' }}>
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.35rem', alignItems: 'center' }}>
+                          {(Array.isArray(u.roles) && u.roles.length > 0 ? u.roles : [{ roleName: u.role || 'Change Desk Admin' }]).map((r, rIdx) => {
+                            const rName = typeof r === 'string' ? r : (r.roleName || r.name);
+                            return (
+                              <span
+                                key={rIdx}
+                                style={{
+                                  padding: '0.2rem 0.55rem',
+                                  borderRadius: '5px',
+                                  fontSize: '0.75rem',
+                                  fontWeight: 500,
+                                  backgroundColor: 'var(--input-bg)',
+                                  color: 'var(--text-primary)',
+                                  border: '1px solid var(--border-color)'
+                                }}
+                              >
+                                {rName}
+                              </span>
+                            );
+                          })}
+                        </div>
+                      </td>
                       <td style={{ padding: '0.75rem 0.85rem', textAlign: 'right', whiteSpace: 'nowrap' }}>
                         <button
                           type="button"
@@ -644,19 +700,22 @@ function SettingsPage({ user }) {
                 />
               </div>
 
-              {/* Role Select */}
-              <div style={{ marginBottom: '1.25rem' }}>
-                  <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.35rem', marginBottom: '0.4rem' }}>
-                    <label style={{ fontSize: '0.825rem', fontWeight: 500, color: 'var(--text-primary)' }}>
-                      Role
-                    </label>
-                    <span style={{ fontSize: '0.725rem', color: 'var(--text-secondary)' }}>defined under Roles</span>
-                  </div>
+              {/* Multi-Role Tag Builder */}
+              <div>
+                <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.35rem', marginBottom: '0.4rem' }}>
+                  <label style={{ fontSize: '0.825rem', fontWeight: 500, color: 'var(--text-primary)' }}>
+                    Assigned Roles *
+                  </label>
+                  <span style={{ fontSize: '0.725rem', color: 'var(--text-secondary)' }}>(Add one or more roles)</span>
+                </div>
+
+                {/* Role Selector + Add Role Button */}
+                <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.6rem' }}>
                   <select
-                    value={newUser.role}
-                    onChange={(e) => setNewUser(prev => ({ ...prev, role: e.target.value }))}
+                    value={newUser.selectedRoleToAdd || ALL_ASSIGNABLE_ROLES[0]}
+                    onChange={(e) => setNewUser(prev => ({ ...prev, selectedRoleToAdd: e.target.value }))}
                     style={{
-                      width: '100%',
+                      flex: 1,
                       padding: '0.65rem 0.85rem',
                       backgroundColor: 'var(--input-bg)',
                       border: '1px solid var(--border-color)',
@@ -666,21 +725,104 @@ function SettingsPage({ user }) {
                       outline: 'none'
                     }}
                   >
-                    <option value="Super Admin">Super Admin</option>
-                    <option value="Change Desk Admin">Change Desk Admin</option>
-                    <option value="Pre-Spend Admin">Pre-Spend Admin</option>
-                    <option value="Travel Desk Admin">Travel Desk Admin</option>
-                    <option value="Change Manager">Change Manager</option>
-                    <option value="Change Implementer">Change Implementer</option>
-                    <option value="Board">Board</option>
+                    {ALL_ASSIGNABLE_ROLES.map(r => (
+                      <option key={r} value={r} disabled={newUser.roles?.includes(r)}>{r}</option>
+                    ))}
                   </select>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const roleToAdd = newUser.selectedRoleToAdd || ALL_ASSIGNABLE_ROLES[0];
+                      if (roleToAdd && !newUser.roles?.includes(roleToAdd)) {
+                        setNewUser(prev => ({
+                          ...prev,
+                          roles: [...(prev.roles || []), roleToAdd]
+                        }));
+                      }
+                    }}
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '0.35rem',
+                      padding: '0.65rem 1rem',
+                      backgroundColor: 'var(--brand-primary)',
+                      color: '#FFFFFF',
+                      border: 'none',
+                      borderRadius: '8px',
+                      fontSize: '0.825rem',
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                      whiteSpace: 'nowrap'
+                    }}
+                  >
+                    <Plus size={15} />
+                    <span>Add Role</span>
+                  </button>
                 </div>
 
+                {/* Active Role Tags with Cross Icon to Delete */}
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.45rem', minHeight: '34px', padding: '0.45rem', backgroundColor: 'var(--input-bg)', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
+                  {newUser.roles && newUser.roles.length > 0 ? (
+                    newUser.roles.map(rName => (
+                      <span
+                        key={rName}
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '0.35rem',
+                          padding: '0.25rem 0.6rem',
+                          backgroundColor: '#FFFFFF',
+                          border: '1px solid #CBD5E1',
+                          borderRadius: '6px',
+                          fontSize: '0.8rem',
+                          fontWeight: 600,
+                          color: 'var(--text-primary)',
+                          boxShadow: '0 1px 2px rgba(0,0,0,0.05)'
+                        }}
+                      >
+                        <span>{rName}</span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (newUser.roles.length <= 1) {
+                              toast.error('User must have at least one assigned role.');
+                              return;
+                            }
+                            setNewUser(prev => ({
+                              ...prev,
+                              roles: prev.roles.filter(r => r !== rName)
+                            }));
+                          }}
+                          style={{
+                            background: 'none',
+                            border: 'none',
+                            color: '#94A3B8',
+                            cursor: 'pointer',
+                            padding: '0.1rem',
+                            display: 'flex',
+                            alignItems: 'center'
+                          }}
+                          onMouseEnter={(e) => e.currentTarget.style.color = '#DC2626'}
+                          onMouseLeave={(e) => e.currentTarget.style.color = '#94A3B8'}
+                        >
+                          <X size={13} />
+                        </button>
+                      </span>
+                    ))
+                  ) : (
+                    <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', alignSelf: 'center', padding: '0.2rem' }}>
+                      No roles added yet. Please select a role above and click "+ Add Role".
+                    </span>
+                  )}
+                </div>
+              </div>
+
               {/* Dynamic Category Assignment Dropdown for Change Manager or Change Implementer */}
-              {(newUser.role === 'Change Manager' || newUser.role === 'Change Implementer') && (
-                <div style={{ marginBottom: '1.25rem' }}>
+              {(newUser.roles?.includes('Change Manager') || newUser.roles?.includes('Change Implementer')) && (
+                <div style={{ marginBottom: '0.5rem' }}>
                   <label style={{ display: 'block', fontSize: '0.825rem', fontWeight: 500, color: 'var(--text-primary)', marginBottom: '0.4rem' }}>
-                    Appointed Categories ({newUser.role}) *
+                    Appointed Categories (Change Manager / Implementer) *
                   </label>
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem', backgroundColor: 'var(--input-bg)', padding: '0.75rem', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
                     {categories.map((cat) => {
@@ -840,17 +982,22 @@ function SettingsPage({ user }) {
                 </div>
               </div>
 
-              {/* Role Select */}
-              <div style={{ marginBottom: '1.25rem' }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.4rem' }}>
-                  <label style={{ fontSize: '0.825rem', fontWeight: 500, color: 'var(--text-primary)' }}>Role</label>
-                  <span style={{ fontSize: '0.725rem', color: 'var(--text-secondary)' }}>defined under Roles</span>
+              {/* Multi-Role Tag Builder for Edit Modal */}
+              <div>
+                <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.35rem', marginBottom: '0.4rem' }}>
+                  <label style={{ fontSize: '0.825rem', fontWeight: 500, color: 'var(--text-primary)' }}>
+                    Assigned Roles *
+                  </label>
+                  <span style={{ fontSize: '0.725rem', color: 'var(--text-secondary)' }}>(Add one or more roles)</span>
                 </div>
+
+                {/* Role Selector + Add Role Button */}
+                <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.6rem' }}>
                   <select
-                    value={editingUser.role}
-                    onChange={(e) => setEditingUser(prev => ({ ...prev, role: e.target.value }))}
+                    value={editingUser.selectedRoleToAdd || ALL_ASSIGNABLE_ROLES[0]}
+                    onChange={(e) => setEditingUser(prev => ({ ...prev, selectedRoleToAdd: e.target.value }))}
                     style={{
-                      width: '100%',
+                      flex: 1,
                       padding: '0.65rem 0.85rem',
                       backgroundColor: 'var(--input-bg)',
                       border: '1px solid var(--border-color)',
@@ -860,21 +1007,104 @@ function SettingsPage({ user }) {
                       outline: 'none'
                     }}
                   >
-                    <option value="Super Admin">Super Admin</option>
-                    <option value="Change Desk Admin">Change Desk Admin</option>
-                    <option value="Pre-Spend Admin">Pre-Spend Admin</option>
-                    <option value="Travel Desk Admin">Travel Desk Admin</option>
-                    <option value="Change Manager">Change Manager</option>
-                    <option value="Change Implementer">Change Implementer</option>
-                    <option value="Board">Board</option>
+                    {ALL_ASSIGNABLE_ROLES.map(r => (
+                      <option key={r} value={r} disabled={editingUser.roles?.includes(r)}>{r}</option>
+                    ))}
                   </select>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const roleToAdd = editingUser.selectedRoleToAdd || ALL_ASSIGNABLE_ROLES[0];
+                      if (roleToAdd && !editingUser.roles?.includes(roleToAdd)) {
+                        setEditingUser(prev => ({
+                          ...prev,
+                          roles: [...(prev.roles || []), roleToAdd]
+                        }));
+                      }
+                    }}
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '0.35rem',
+                      padding: '0.65rem 1rem',
+                      backgroundColor: 'var(--brand-primary)',
+                      color: '#FFFFFF',
+                      border: 'none',
+                      borderRadius: '8px',
+                      fontSize: '0.825rem',
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                      whiteSpace: 'nowrap'
+                    }}
+                  >
+                    <Plus size={15} />
+                    <span>Add Role</span>
+                  </button>
                 </div>
 
+                {/* Active Role Tags with Cross Icon to Delete */}
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.45rem', minHeight: '34px', padding: '0.45rem', backgroundColor: 'var(--input-bg)', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
+                  {editingUser.roles && editingUser.roles.length > 0 ? (
+                    editingUser.roles.map(rName => (
+                      <span
+                        key={rName}
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '0.35rem',
+                          padding: '0.25rem 0.6rem',
+                          backgroundColor: '#FFFFFF',
+                          border: '1px solid #CBD5E1',
+                          borderRadius: '6px',
+                          fontSize: '0.8rem',
+                          fontWeight: 600,
+                          color: 'var(--text-primary)',
+                          boxShadow: '0 1px 2px rgba(0,0,0,0.05)'
+                        }}
+                      >
+                        <span>{rName}</span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (editingUser.roles.length <= 1) {
+                              toast.error('User must have at least one assigned role.');
+                              return;
+                            }
+                            setEditingUser(prev => ({
+                              ...prev,
+                              roles: prev.roles.filter(r => r !== rName)
+                            }));
+                          }}
+                          style={{
+                            background: 'none',
+                            border: 'none',
+                            color: '#94A3B8',
+                            cursor: 'pointer',
+                            padding: '0.1rem',
+                            display: 'flex',
+                            alignItems: 'center'
+                          }}
+                          onMouseEnter={(e) => e.currentTarget.style.color = '#DC2626'}
+                          onMouseLeave={(e) => e.currentTarget.style.color = '#94A3B8'}
+                        >
+                          <X size={13} />
+                        </button>
+                      </span>
+                    ))
+                  ) : (
+                    <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', alignSelf: 'center', padding: '0.2rem' }}>
+                      No roles added yet. Please select a role above and click "+ Add Role".
+                    </span>
+                  )}
+                </div>
+              </div>
+
               {/* Dynamic Category Assignment Dropdown for Change Manager or Change Implementer */}
-              {(editingUser.role === 'Change Manager' || editingUser.role === 'Change Implementer') && (
-                <div style={{ marginBottom: '1.25rem' }}>
+              {(editingUser.roles?.includes('Change Manager') || editingUser.roles?.includes('Change Implementer')) && (
+                <div style={{ marginBottom: '0.5rem' }}>
                   <label style={{ display: 'block', fontSize: '0.825rem', fontWeight: 500, color: 'var(--text-primary)', marginBottom: '0.4rem' }}>
-                    Appointed Categories ({editingUser.role}) *
+                    Appointed Categories (Change Manager / Implementer) *
                   </label>
                   {isLoadingCategories ? (
                     <div style={{ padding: '1rem', display: 'flex', justifyContent: 'center', backgroundColor: 'var(--input-bg)', borderRadius: '8px', border: '1px solid var(--border-color)' }}>

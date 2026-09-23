@@ -27,3 +27,7 @@ Thumbs.db
 .idea/
 frontend/src/pages/CatalogueManagementPage.jsx
 
+# Ethereal Mail / Local SMTP Test Configs
+.ethereal*
+ethereal*
+*.ethereal.json
