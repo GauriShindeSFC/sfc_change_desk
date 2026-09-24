@@ -45,9 +45,10 @@ export const createPreSpendService = async (data, user) => {
     category: data.category || 'General',
     subcategory: data.subcategory || '',
     itemDescription: data.buying || data.itemDescription || '',
-    estimatedAmount: Number(data.amount || data.estimatedAmount || 0),
+    location: data.location || '',
+    estimatedAmount: Number(data.amount || data.estimatedAmount || data.vendors?.[0]?.amount || 0),
     neededByDate: data.neededBy || data.neededByDate || null,
-    costCentre: data.costCentre || user?.department || '',
+    costCentre: data.costCentre || '',
     budgetLine: data.budgetLine || '',
     businessJustification: data.justification || data.businessJustification || '',
     isUrgent: Boolean(data.urgent || data.isUrgent),
@@ -76,13 +77,14 @@ export const createPreSpendService = async (data, user) => {
   return created;
 };
 
-export const getPreSpendRequestsService = async ({ user, userId, isWorklist = false, isOrgWorklist = false, status, searchQuery, page = 1, limit = 10 }) => {
+export const getPreSpendRequestsService = async ({ user, userId, isWorklist = false, isOrgWorklist = false, organizationScope = false, status, searchQuery, page = 1, limit = 10 }) => {
   const where = {};
   const currentUserId = user?.userKey || user?.id || userId || '';
   const currentUserEmail = (user?.email || '').toLowerCase().trim();
+  const isOrgView = isOrgWorklist || organizationScope;
 
-  // 1. My Dashboard View (not worklist): Only requests raised by the logged-in user
-  if (!isWorklist && currentUserId) {
+  // 1. My Dashboard View (not worklist and not organization scope): Only requests raised by the logged-in user
+  if (!isWorklist && !isOrgView && currentUserId) {
     if (currentUserEmail) {
       where[Op.or] = [
         { requesterId: currentUserId },

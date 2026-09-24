@@ -38,11 +38,13 @@ function DashboardRoute({ isOrg = false }) {
 
 function CatalogRoute() {
   const { user, searchQuery, onNavigate } = useOutletContext();
+  const location = useLocation();
   return (
     <ChangeCatalogPage
       user={user}
       searchQuery={searchQuery}
       onNavigate={onNavigate}
+      initialData={location.state}
     />
   );
 }

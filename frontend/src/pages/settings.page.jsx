@@ -152,7 +152,7 @@ function SettingsPage({ user }) {
       name: targetUser.name || '',
       empId: targetUser.empId || targetUser.employeeId || '',
       roles: existingRoles,
-      selectedRoleToAdd: ALL_ASSIGNABLE_ROLES[0]
+      selectedRoleToAdd: ''
     });
     setEditingUserCategories(initialCats);
     setIsLoadingCategories(true);
@@ -240,17 +240,20 @@ function SettingsPage({ user }) {
     name: '',
     email: '',
     empId: '',
-    roles: ['Change Desk Admin'],
-    selectedRoleToAdd: ALL_ASSIGNABLE_ROLES[0]
+    roles: [],
+    selectedRoleToAdd: ''
   });
 
   const handleSaveInviteUser = async (e) => {
     e.preventDefault();
     if (!newUser.name || !newUser.email) return;
 
-    const assignedRoles = newUser.roles && newUser.roles.length > 0
-      ? newUser.roles
-      : ['Change Desk Admin'];
+    if (!newUser.roles || newUser.roles.length === 0) {
+      toast.error('Please assign at least one role to this user.');
+      return;
+    }
+
+    const assignedRoles = newUser.roles;
 
     const primaryRoleName = assignedRoles[0];
     const roleId = ROLE_TO_ID[primaryRoleName] || 'role-2-change';
@@ -756,7 +759,7 @@ function SettingsPage({ user }) {
                 {/* Role Selector + Add Role Button */}
                 <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.6rem' }}>
                   <select
-                    value={newUser.selectedRoleToAdd || ALL_ASSIGNABLE_ROLES[0]}
+                    value={newUser.selectedRoleToAdd || ''}
                     onChange={(e) => setNewUser(prev => ({ ...prev, selectedRoleToAdd: e.target.value }))}
                     style={{
                       flex: 1,
@@ -769,6 +772,7 @@ function SettingsPage({ user }) {
                       outline: 'none'
                     }}
                   >
+                    <option value="" disabled>Select a role</option>
                     {ALL_ASSIGNABLE_ROLES.map(r => (
                       <option key={r} value={r} disabled={newUser.roles?.includes(r)}>{r}</option>
                     ))}
@@ -777,26 +781,28 @@ function SettingsPage({ user }) {
                   <button
                     type="button"
                     onClick={() => {
-                      const roleToAdd = newUser.selectedRoleToAdd || ALL_ASSIGNABLE_ROLES[0];
+                      const roleToAdd = newUser.selectedRoleToAdd;
                       if (roleToAdd && !newUser.roles?.includes(roleToAdd)) {
                         setNewUser(prev => ({
                           ...prev,
-                          roles: [...(prev.roles || []), roleToAdd]
+                          roles: [...(prev.roles || []), roleToAdd],
+                          selectedRoleToAdd: ''
                         }));
                       }
                     }}
+                    disabled={!newUser.selectedRoleToAdd}
                     style={{
                       display: 'inline-flex',
                       alignItems: 'center',
                       gap: '0.35rem',
                       padding: '0.65rem 1rem',
-                      backgroundColor: 'var(--brand-primary)',
-                      color: '#FFFFFF',
+                      backgroundColor: !newUser.selectedRoleToAdd ? 'var(--input-bg)' : 'var(--brand-primary)',
+                      color: !newUser.selectedRoleToAdd ? 'var(--text-secondary)' : '#FFFFFF',
                       border: 'none',
                       borderRadius: '8px',
                       fontSize: '0.825rem',
                       fontWeight: 600,
-                      cursor: 'pointer',
+                      cursor: !newUser.selectedRoleToAdd ? 'not-allowed' : 'pointer',
                       whiteSpace: 'nowrap'
                     }}
                   >
@@ -1038,7 +1044,7 @@ function SettingsPage({ user }) {
                 {/* Role Selector + Add Role Button */}
                 <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.6rem' }}>
                   <select
-                    value={editingUser.selectedRoleToAdd || ALL_ASSIGNABLE_ROLES[0]}
+                    value={editingUser.selectedRoleToAdd || ''}
                     onChange={(e) => setEditingUser(prev => ({ ...prev, selectedRoleToAdd: e.target.value }))}
                     style={{
                       flex: 1,
@@ -1051,6 +1057,7 @@ function SettingsPage({ user }) {
                       outline: 'none'
                     }}
                   >
+                    <option value="" disabled>Select a role</option>
                     {ALL_ASSIGNABLE_ROLES.map(r => (
                       <option key={r} value={r} disabled={editingUser.roles?.includes(r)}>{r}</option>
                     ))}
@@ -1059,26 +1066,28 @@ function SettingsPage({ user }) {
                   <button
                     type="button"
                     onClick={() => {
-                      const roleToAdd = editingUser.selectedRoleToAdd || ALL_ASSIGNABLE_ROLES[0];
+                      const roleToAdd = editingUser.selectedRoleToAdd;
                       if (roleToAdd && !editingUser.roles?.includes(roleToAdd)) {
                         setEditingUser(prev => ({
                           ...prev,
-                          roles: [...(prev.roles || []), roleToAdd]
+                          roles: [...(prev.roles || []), roleToAdd],
+                          selectedRoleToAdd: ''
                         }));
                       }
                     }}
+                    disabled={!editingUser.selectedRoleToAdd}
                     style={{
                       display: 'inline-flex',
                       alignItems: 'center',
                       gap: '0.35rem',
                       padding: '0.65rem 1rem',
-                      backgroundColor: 'var(--brand-primary)',
-                      color: '#FFFFFF',
+                      backgroundColor: !editingUser.selectedRoleToAdd ? 'var(--input-bg)' : 'var(--brand-primary)',
+                      color: !editingUser.selectedRoleToAdd ? 'var(--text-secondary)' : '#FFFFFF',
                       border: 'none',
                       borderRadius: '8px',
                       fontSize: '0.825rem',
                       fontWeight: 600,
-                      cursor: 'pointer',
+                      cursor: !editingUser.selectedRoleToAdd ? 'not-allowed' : 'pointer',
                       whiteSpace: 'nowrap'
                     }}
                   >

@@ -76,12 +76,17 @@ export default function FilterBar({
         >
           {tabs.map((tab) => {
             const isActive = activeTab === tab.id;
+            const hasPendingDot = tab.hasPending || (tab.id === 'Pending' && typeof tab.count === 'number' && tab.count > 0);
             return (
               <button
                 key={tab.id}
                 type="button"
                 onClick={() => onTabChange?.(tab.id)}
                 style={{
+                  position: 'relative',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '0.4rem',
                   padding: '0.4rem 0.75rem',
                   backgroundColor: isActive ? 'var(--brand-primary)' : 'transparent',
                   color: isActive ? '#FFFFFF' : 'var(--text-secondary)',
@@ -95,7 +100,20 @@ export default function FilterBar({
                   flexShrink: 0
                 }}
               >
-                {tab.label}
+                {hasPendingDot && (
+                  <span
+                    style={{
+                      width: '7px',
+                      height: '7px',
+                      borderRadius: '50%',
+                      backgroundColor: '#D97706',
+                      display: 'inline-block',
+                      flexShrink: 0,
+                      boxShadow: '0 0 0 1.5px rgba(217, 119, 6, 0.25)'
+                    }}
+                  />
+                )}
+                <span>{tab.label}</span>
                 {typeof tab.count === 'number' ? ` (${tab.count})` : ''}
               </button>
             );

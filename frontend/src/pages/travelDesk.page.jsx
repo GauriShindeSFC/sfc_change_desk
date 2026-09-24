@@ -1,4 +1,4 @@
-import React, { useId, useState } from 'react';
+import React, { useId, useState, useEffect, useRef } from 'react';
 import {
   Plane,
   Car,
@@ -10,7 +10,10 @@ import {
   ArrowRight,
   Send,
   CheckCircle2,
-  Luggage
+  Luggage,
+  ChevronDown,
+  Search,
+  AlertTriangle
 } from 'lucide-react';
 import { TRAVEL_MODES, TRAVEL_DESK_FIELDS } from '../lib/travelDesk.config.js';
 import { FormLabel } from '../components/ui/primitives.component';
@@ -37,6 +40,36 @@ const ACTIVE_FIELD_STYLE = {
   boxSizing: 'border-box'
 };
 
+const READONLY_FIELD_STYLE = {
+  width: '100%',
+  padding: '0.65rem 0.85rem',
+  backgroundColor: 'var(--input-bg, #F8FAFC)',
+  border: '1px solid var(--border-color, #E2E8F0)',
+  borderRadius: '8px',
+  fontSize: '0.85rem',
+  fontFamily: 'inherit',
+  color: 'var(--text-secondary, #64748B)',
+  cursor: 'not-allowed',
+  boxSizing: 'border-box'
+};
+
+const resolveEmpBusinessId = (u, initialVal) => {
+  if (initialVal && typeof initialVal === 'string' && !initialVal.startsWith('S8-') && !initialVal.startsWith('EMP-')) return initialVal;
+  if (u?.employee?.empId) return u.employee.empId;
+  if (u?.employee?.employeeBusinessId) return u.employee.employeeBusinessId;
+  if (u?.employeeBusinessId) return u.employeeBusinessId;
+  if (u?.employeeId && typeof u.employeeId === 'string' && !u.employeeId.startsWith('S8-') && !u.employeeId.startsWith('EMP-')) return u.employeeId;
+  if (u?.empId && typeof u.empId === 'string' && !u.empId.startsWith('S8-') && !u.empId.startsWith('EMP-')) return u.empId;
+  return '';
+};
+
+const resolveEmpLocation = (u, initialVal) => {
+  if (initialVal && typeof initialVal === 'string' && !initialVal.includes('Auto-fetched') && !initialVal.includes('Not specified')) return initialVal;
+  if (u?.employee?.location) return u.employee.location;
+  if (u?.location) return u.location;
+  return '';
+};
+
 const formatDateDisplay = (dateStr) => {
   if (!dateStr) return '';
   const parts = String(dateStr).split('-');
@@ -52,11 +85,115 @@ const formatDateDisplay = (dateStr) => {
 export default function TravelDeskPage({ onNavigate, user, travellerName = '', department = '' }) {
   const uid = useId();
   const [category, setCategory] = useState('');
-  const [step, setStep] = useState(1);
+  const [hoveredCategory, setHoveredCategory] = useState(null);
+  const [step, setStepState] = useState(1);
   const [drafts, setDrafts] = useState({});
   const [certified, setCertified] = useState(false);
   const [message, setMessage] = useState('');
   const [submitted, setSubmitted] = useState(false);
+
+  // Synchronize internal steps with browser history for touchpad / back gesture support
+  const setStep = (nextStep, replace = false) => {
+    setStepState(nextStep);
+    if (typeof window !== 'undefined') {
+      const stateObj = { travelStep: nextStep, travelCategory: category };
+      if (replace) {
+        window.history.replaceState(stateObj, '');
+      } else {
+        window.history.pushState(stateObj, '');
+      }
+    }
+  };
+
+  useEffect(() => {
+    // Initialize history state on mount
+    if (typeof window !== 'undefined') {
+      window.history.replaceState({ travelStep: 1, travelCategory: '' }, '');
+    }
+
+    const handlePopState = (event) => {
+      if (event.state && typeof event.state.travelStep === 'number') {
+        setStepState(event.state.travelStep);
+        if (event.state.travelCategory !== undefined) {
+          setCategory(event.state.travelCategory);
+        }
+      } else {
+        setStepState(1);
+      }
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
+
+  const [currentSessionUser, setCurrentSessionUser] = useState(() => user || JSON.parse(localStorage.getItem('sfc_user') || '{}'));
+  const activeSessionUser = currentSessionUser || user || JSON.parse(localStorage.getItem('sfc_user') || '{}');
+
+  const [requesterDetails, setRequesterDetails] = useState(() => ({
+    employeeName: travellerName || activeSessionUser?.employee?.name || activeSessionUser?.name || '',
+    employeeEmail: activeSessionUser?.employee?.email || activeSessionUser?.email || '',
+    employeeId: resolveEmpBusinessId(activeSessionUser),
+    location: resolveEmpLocation(activeSessionUser) || '',
+    managerName: '',
+    managerEmail: ''
+  }));
+
+  const [availableUsers, setAvailableUsers] = useState([]);
+  const [loadingUsers, setLoadingUsers] = useState(false);
+  const [managerDropdownOpen, setManagerDropdownOpen] = useState(false);
+  const [managerSearchTerm, setManagerSearchTerm] = useState('');
+  const managerDropdownRef = useRef(null);
+
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (managerDropdownRef.current && !managerDropdownRef.current.contains(e.target)) {
+        setManagerDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  useEffect(() => {
+    const fetchUsers = async () => {
+      setLoadingUsers(true);
+      try {
+        const res = await apiFetch('/users');
+        if (res.ok) {
+          const data = await res.json();
+          if (data && Array.isArray(data.data)) {
+            const list = data.data.map(u => ({
+              id: u.id,
+              name: u.name || u.employee?.name || (u.email ? u.email.split('@')[0] : 'User'),
+              email: u.email || u.employee?.email || '',
+              department: u.department || u.employee?.department || '',
+              location: u.location || u.employee?.location || ''
+            })).filter(u => u.name && u.email);
+            setAvailableUsers(list);
+          }
+        }
+      } catch (err) {
+        console.warn('Failed to load active employees for manager dropdown:', err);
+      } finally {
+        setLoadingUsers(false);
+      }
+    };
+    fetchUsers();
+  }, []);
+
+  useEffect(() => {
+    const currentUser = user || JSON.parse(localStorage.getItem('sfc_user') || '{}');
+    if (currentUser) {
+      setCurrentSessionUser(currentUser);
+      setRequesterDetails(prev => ({
+        ...prev,
+        employeeName: prev.employeeName || currentUser.employee?.name || currentUser.name || '',
+        employeeEmail: prev.employeeEmail || currentUser.employee?.email || currentUser.email || '',
+        employeeId: resolveEmpBusinessId(currentUser, prev.employeeId),
+        location: resolveEmpLocation(currentUser, prev.location)
+      }));
+    }
+  }, [user]);
 
   const values = drafts[category] || {};
   const effectiveTraveller = travellerName || user?.name || '';
@@ -73,10 +210,16 @@ export default function TravelDeskPage({ onNavigate, user, travellerName = '', d
     setMessage('');
   };
 
-  const visibleFields = (TRAVEL_DESK_FIELDS[category] || []).filter(field =>
-    (!field.conditional || values[field.conditional] === 'Yes') &&
-    (!field.group || (values['Trip type'] || 'Return') !== 'One-way')
-  );
+  const visibleFields = (TRAVEL_DESK_FIELDS[category] || []).filter(field => {
+    if (field.conditional) {
+      const expectedVal = field.conditionalValue || 'Yes';
+      if (values[field.conditional] !== expectedVal) return false;
+    }
+    if (field.group && (values['Trip type'] || 'Return') === 'One-way') {
+      return false;
+    }
+    return true;
+  });
 
   const todayStr = (() => {
     const now = new Date();
@@ -87,26 +230,79 @@ export default function TravelDeskPage({ onNavigate, user, travellerName = '', d
   })();
 
   const isFlight = category?.toLowerCase() === 'flight' || category?.toLowerCase() === 'flights';
+  const isCab = category?.toLowerCase() === 'cab' || category?.toLowerCase() === 'cabs';
 
-  const requiresBoardApproval = () => {
-    if (!isFlight) return false;
-    const travelDateStr = values['Date of travel'] || values['Date of journey'] || values['Check-in date'];
-    if (!travelDateStr) return false;
+  const checkBoardApprovalRequired = () => {
+    // 1. Flight Board Approval Rules: Premium Economy / Business OR < 7 days notice
+    if (isFlight) {
+      const travelClass = String(values['Travel class'] || 'Economy').toLowerCase();
+      if (travelClass.includes('premium') || travelClass.includes('business')) {
+        return {
+          required: true,
+          reason: `${values['Travel class'] || 'Premium/Business'} class flight booking selected. The request will be routed for additional Board approval.`
+        };
+      }
 
-    const parts = travelDateStr.split('-');
-    if (parts.length !== 3) return false;
-    const travelDate = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
-    if (isNaN(travelDate.getTime())) return false;
+      const travelDateStr = values['Date of travel'] || values['Date of journey'] || values['Check-in date'];
+      if (!travelDateStr) return { required: false, reason: '' };
 
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    travelDate.setHours(0, 0, 0, 0);
+      const parts = travelDateStr.split('-');
+      if (parts.length !== 3) return { required: false, reason: '' };
+      const travelDate = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
+      if (isNaN(travelDate.getTime())) return { required: false, reason: '' };
 
-    const diffDays = Math.ceil((travelDate - today) / (1000 * 60 * 60 * 24));
-    return diffDays >= 0 && diffDays < 7;
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      travelDate.setHours(0, 0, 0, 0);
+
+      const diffDays = Math.ceil((travelDate - today) / (1000 * 60 * 60 * 24));
+      if (diffDays >= 0 && diffDays < 7) {
+        return {
+          required: true,
+          reason: 'This travel date is less than 7 days from today. The request will be routed for additional Board approval.'
+        };
+      }
+    }
+
+    // 2. Cab Board Approval Rules
+    if (isCab) {
+      const passengers = parseInt(values['Number of passengers'] || '1', 10) || 1;
+      const cabTypeStr = String(values['Cab type'] || 'Hatchback').toLowerCase();
+
+      // Rule 2: Premium (Innova, etc.) always requires board approval
+      if (cabTypeStr.includes('premium') || cabTypeStr.includes('innova')) {
+        return {
+          required: true,
+          reason: 'Premium cab booking selected. The request will be routed for additional Board approval.'
+        };
+      }
+
+      // Rule 1: SUV with < 3 passengers requires board approval
+      if (cabTypeStr.includes('suv') || cabTypeStr.includes('ertiga')) {
+        if (passengers < 3) {
+          return {
+            required: true,
+            reason: `SUV requested for ${passengers} passenger${passengers > 1 ? 's' : ''} (less than 3 passengers). The request will be routed for additional Board approval.`
+          };
+        }
+      }
+
+      // Rule 3: Sedan with < 2 passengers (single passenger) requires board approval
+      if (cabTypeStr.includes('sedan') || cabTypeStr.includes('dzire') || cabTypeStr.includes('aura')) {
+        if (passengers < 2) {
+          return {
+            required: true,
+            reason: 'Sedan requested for a single passenger. The request will be routed for additional Board approval.'
+          };
+        }
+      }
+    }
+
+    return { required: false, reason: '' };
   };
 
-  const isShortNotice = requiresBoardApproval();
+  const boardApprovalInfo = checkBoardApprovalRequired();
+  const isShortNotice = boardApprovalInfo.required;
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [createdCode, setCreatedCode] = useState('');
@@ -123,7 +319,12 @@ export default function TravelDeskPage({ onNavigate, user, travellerName = '', d
       const payload = {
         category,
         travelMode: category,
-        travellerName: valueOf({ name: 'Traveller' }),
+        travellerName: requesterDetails.employeeName || valueOf({ name: 'Traveller' }),
+        employeeEmail: requesterDetails.employeeEmail || '',
+        employeeId: requesterDetails.employeeId || '',
+        location: requesterDetails.location || '',
+        managerName: requesterDetails.managerName || '',
+        managerEmail: requesterDetails.managerEmail || '',
         department: valueOf({ name: 'Department / Cost Centre' }),
         purpose: valueOf({ name: 'Purpose of visit' }),
         tripType: valueOf({ name: 'Trip type' }) || valueOf({ name: 'Journey type' }) || '',
@@ -162,10 +363,10 @@ export default function TravelDeskPage({ onNavigate, user, travellerName = '', d
       
       {/* Top Header */}
       <div>
-        <h1 style={{ fontSize: '1.45rem', fontWeight: 800, color: 'var(--text-primary)', lineHeight: 1.2, margin: 0 }}>
+        <h1 style={{ fontSize: '1.45rem', fontWeight: 600, color: 'var(--text-primary)', lineHeight: 1.2, margin: 0 }}>
           Travel &amp; Stay Desk
         </h1>
-        <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginTop: '0.2rem', margin: 0 }}>
+        <p style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', marginTop: '0.25rem', margin: 0 }}>
           Book corporate flights, trains, cabs, buses, and hotel accommodations
         </p>
       </div>
@@ -314,40 +515,59 @@ export default function TravelDeskPage({ onNavigate, user, travellerName = '', d
               {TRAVEL_MODES.map(mode => {
                 const IconComponent = ICON_MAP[mode.id] || Luggage;
                 const selected = category === mode.id;
+                const isHovered = hoveredCategory === mode.id;
                 return (
                   <button
                     key={mode.id}
                     type="button"
                     onClick={() => setCategory(mode.id)}
+                    onMouseEnter={() => setHoveredCategory(mode.id)}
+                    onMouseLeave={() => setHoveredCategory(null)}
                     style={{
                       padding: '1.25rem',
-                      borderRadius: '10px',
+                      borderRadius: '12px',
                       textAlign: 'left',
-                      border: selected ? '1.5px solid #2563EB' : '1px solid var(--border-color)',
-                      backgroundColor: selected ? '#EFF6FF' : 'var(--card-bg)',
+                      border: selected
+                        ? '2px solid var(--brand-primary, #173C4E)'
+                        : isHovered
+                        ? '1.5px solid var(--brand-primary, #173C4E)'
+                        : '1px solid var(--border-color)',
+                      backgroundColor: selected ? 'var(--input-bg, #F4F5F7)' : 'var(--card-bg)',
+                      boxShadow: selected
+                        ? '0 0 0 3px rgba(23, 60, 78, 0.12)'
+                        : isHovered
+                        ? '0 12px 24px -4px rgba(23, 60, 78, 0.14), 0 4px 12px -2px rgba(0, 0, 0, 0.06)'
+                        : '0 1px 3px rgba(16, 21, 30, 0.04)',
                       display: 'flex',
                       alignItems: 'flex-start',
                       gap: '1rem',
+                      transform: isHovered ? 'translateY(-5px)' : 'translateY(0)',
                       cursor: 'pointer',
-                      transition: 'all 0.15s ease'
+                      transition: 'transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease'
                     }}
                   >
                     <div
                       style={{
                         padding: '0.65rem',
-                        borderRadius: '8px',
+                        borderRadius: '10px',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
-                        backgroundColor: selected ? '#2563EB' : 'var(--input-bg)',
-                        color: selected ? '#FFFFFF' : 'var(--text-primary)',
-                        flexShrink: 0
+                        backgroundColor: selected
+                          ? 'var(--brand-primary, #173C4E)'
+                          : isHovered
+                          ? 'rgba(23, 60, 78, 0.08)'
+                          : 'var(--input-bg)',
+                        color: selected ? '#FFFFFF' : 'var(--brand-primary, #173C4E)',
+                        flexShrink: 0,
+                        transform: isHovered ? 'scale(1.08)' : 'scale(1)',
+                        transition: 'transform 0.2s ease, background-color 0.2s ease, color 0.2s ease'
                       }}
                     >
                       <IconComponent size={20} />
                     </div>
                     <div>
-                      <div style={{ fontSize: '0.875rem', fontWeight: 700, color: 'var(--text-primary)' }}>{mode.label}</div>
+                      <div style={{ fontSize: '0.875rem', fontWeight: 600, color: 'var(--text-primary)' }}>{mode.label}</div>
                       <div style={{ fontSize: '0.775rem', color: 'var(--text-secondary)', marginTop: '0.25rem', lineHeight: 1.4 }}>{mode.description}</div>
                     </div>
                   </button>
@@ -395,12 +615,197 @@ export default function TravelDeskPage({ onNavigate, user, travellerName = '', d
           gap: '1.5rem',
           boxShadow: '0 1px 3px rgba(16, 21, 30, 0.04)'
         }}>
+          {/* Section 1: Requester Details */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <h3 style={{ fontSize: '1rem', fontWeight: 600, color: 'var(--text-primary)', margin: 0 }}>
+                Requester Details
+              </h3>
+              <span style={{ fontSize: '0.775rem', fontWeight: 600, color: 'var(--text-secondary)' }}>
+                Section 1 of 2
+              </span>
+            </div>
+
+            <div className="cd-responsive-form-grid">
+              <div>
+                <FormLabel>Requester Name</FormLabel>
+                <input
+                  type="text"
+                  readOnly
+                  disabled
+                  value={requesterDetails.employeeName}
+                  style={READONLY_FIELD_STYLE}
+                />
+              </div>
+              <div>
+                <FormLabel>Employee Email</FormLabel>
+                <input
+                  type="email"
+                  readOnly
+                  disabled
+                  placeholder="e.g. employee@company.com"
+                  value={requesterDetails.employeeEmail}
+                  style={READONLY_FIELD_STYLE}
+                />
+              </div>
+              <div>
+                <FormLabel>Employee ID</FormLabel>
+                <input
+                  type="text"
+                  readOnly
+                  disabled
+                  placeholder="e.g. SFC-0083"
+                  value={requesterDetails.employeeId}
+                  style={READONLY_FIELD_STYLE}
+                />
+              </div>
+              <div>
+                <FormLabel>Location</FormLabel>
+                <input
+                  type="text"
+                  readOnly
+                  disabled
+                  placeholder="e.g. Mumbai DC, Ahmedabad HQ, Remote"
+                  value={requesterDetails.location || resolveEmpLocation(activeSessionUser) || ''}
+                  style={READONLY_FIELD_STYLE}
+                />
+              </div>
+
+              {/* Searchable Manager Combobox Dropdown */}
+              <div ref={managerDropdownRef} style={{ position: 'relative' }}>
+                <FormLabel required>Manager Name</FormLabel>
+                <div
+                  tabIndex={0}
+                  onClick={() => setManagerDropdownOpen(prev => !prev)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      setManagerDropdownOpen(prev => !prev);
+                    }
+                  }}
+                  style={{
+                    ...ACTIVE_FIELD_STYLE,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    backgroundColor: '#FFFFFF',
+                    userSelect: 'none'
+                  }}
+                >
+                  <span style={{ color: requesterDetails.managerName ? 'var(--text-primary)' : 'var(--text-secondary)' }}>
+                    {requesterDetails.managerName || (loadingUsers ? 'Loading employees...' : 'Select Reporting Manager...')}
+                  </span>
+                  <ChevronDown size={16} style={{ color: 'var(--text-secondary)', transition: 'transform 0.2s', transform: managerDropdownOpen ? 'rotate(180deg)' : 'none' }} />
+                </div>
+
+                {managerDropdownOpen && (
+                  <div style={{
+                    position: 'absolute',
+                    top: '100%',
+                    left: 0,
+                    right: 0,
+                    zIndex: 50,
+                    marginTop: '0.35rem',
+                    backgroundColor: '#FFFFFF',
+                    border: '1px solid var(--border-color)',
+                    borderRadius: '10px',
+                    boxShadow: '0 8px 24px rgba(15, 23, 42, 0.12)',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    overflow: 'hidden'
+                  }}>
+                    <div style={{ padding: '0.65rem', borderBottom: '1px solid var(--border-color)', backgroundColor: '#F8FAFC' }}>
+                      <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                        <Search size={14} style={{ position: 'absolute', left: '0.65rem', color: '#94A3B8' }} />
+                        <input
+                          type="text"
+                          autoFocus
+                          value={managerSearchTerm}
+                          onChange={(e) => setManagerSearchTerm(e.target.value)}
+                          placeholder="Search manager by name or email..."
+                          style={{
+                            width: '100%',
+                            padding: '0.45rem 0.65rem 0.45rem 2rem',
+                            fontSize: '0.8rem',
+                            border: '1px solid #CBD5E1',
+                            borderRadius: '6px',
+                            outline: 'none',
+                            backgroundColor: '#FFFFFF',
+                            boxSizing: 'border-box'
+                          }}
+                        />
+                      </div>
+                    </div>
+
+                    <div style={{ maxHeight: '200px', overflowY: 'auto' }}>
+                      {availableUsers
+                        .filter(u => {
+                          if (!managerSearchTerm.trim()) return true;
+                          const term = managerSearchTerm.toLowerCase();
+                          return (u.name && u.name.toLowerCase().includes(term)) || (u.email && u.email.toLowerCase().includes(term));
+                        })
+                        .map(u => (
+                          <div
+                            key={u.id || u.email}
+                            onClick={() => {
+                              setRequesterDetails(prev => ({
+                                ...prev,
+                                managerName: u.name,
+                                managerEmail: u.email
+                              }));
+                              setManagerDropdownOpen(false);
+                              setManagerSearchTerm('');
+                            }}
+                            style={{
+                              padding: '0.6rem 0.85rem',
+                              cursor: 'pointer',
+                              display: 'flex',
+                              flexDirection: 'column',
+                              gap: '0.15rem',
+                              borderBottom: '1px solid var(--border-color)',
+                              backgroundColor: requesterDetails.managerEmail === u.email ? '#EFF6FF' : 'transparent',
+                              transition: 'background-color 0.15s'
+                            }}
+                            onMouseEnter={(e) => {
+                              if (requesterDetails.managerEmail !== u.email) e.currentTarget.style.backgroundColor = '#F8FAFC';
+                            }}
+                            onMouseLeave={(e) => {
+                              if (requesterDetails.managerEmail !== u.email) e.currentTarget.style.backgroundColor = 'transparent';
+                            }}
+                          >
+                            <span style={{ fontSize: '0.825rem', fontWeight: 600, color: 'var(--text-primary)' }}>{u.name}</span>
+                            <span style={{ fontSize: '0.725rem', color: 'var(--text-secondary)' }}>{u.email}</span>
+                          </div>
+                        ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <div>
+                <FormLabel>Manager Email</FormLabel>
+                <input
+                  type="email"
+                  readOnly
+                  disabled
+                  placeholder="Selected manager's email"
+                  value={requesterDetails.managerEmail}
+                  style={READONLY_FIELD_STYLE}
+                />
+              </div>
+            </div>
+          </div>
+
+          <div style={{ height: '1px', backgroundColor: 'var(--border-color)' }} />
+
+          {/* Section 2: Reservation Details */}
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <h3 style={{ fontSize: '1rem', fontWeight: 600, color: 'var(--text-primary)', margin: 0 }}>
               {category} Reservation Details
             </h3>
             <span style={{ fontSize: '0.775rem', fontWeight: 600, color: 'var(--text-secondary)' }}>
-              Step 2 of 3
+              Section 2 of 2
             </span>
           </div>
 
@@ -475,15 +880,15 @@ export default function TravelDeskPage({ onNavigate, user, travellerName = '', d
                   borderLeft: '5px solid #CA8A04'
                 }}
               >
-                <div style={{ color: '#854D0E', flexShrink: 0, marginTop: '2px', fontSize: '1rem' }}>
-                  ⚠️
+                <div style={{ color: '#854D0E', flexShrink: 0, marginTop: '2px' }}>
+                  <AlertTriangle size={18} />
                 </div>
                 <div>
                   <div style={{ color: '#854D0E', fontWeight: 700, fontSize: '0.85rem', lineHeight: 1.3 }}>
                     Board approval will be required
                   </div>
                   <p style={{ color: '#713F12', fontSize: '0.8rem', marginTop: '0.2rem', lineHeight: 1.45, margin: 0 }}>
-                    This travel date is less than 7 days from today. The request will be routed for additional Board approval.
+                    {boardApprovalInfo.reason || 'This booking requires additional Board member sign-off per corporate travel policy.'}
                   </p>
                 </div>
               </div>
@@ -549,10 +954,10 @@ export default function TravelDeskPage({ onNavigate, user, travellerName = '', d
           {/* Header Row with Edit details Action */}
           <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: '1rem' }}>
             <div>
-              <h2 style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--text-primary)', margin: 0 }}>
+              <h2 style={{ fontSize: '1.25rem', fontWeight: 600, color: 'var(--text-primary)', margin: 0 }}>
                 Review &amp; Submit
               </h2>
-              <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginTop: '0.25rem', margin: 0 }}>
+              <p style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', marginTop: '0.25rem', margin: 0 }}>
                 Confirm the details before submitting.
               </p>
             </div>
@@ -562,9 +967,9 @@ export default function TravelDeskPage({ onNavigate, user, travellerName = '', d
               style={{
                 background: 'none',
                 border: 'none',
-                color: '#2563EB',
-                fontSize: '0.9rem',
-                fontWeight: 700,
+                color: 'var(--brand-primary)',
+                fontSize: '0.875rem',
+                fontWeight: 600,
                 cursor: 'pointer',
                 padding: '0.25rem 0.5rem',
                 borderRadius: '6px'
@@ -612,7 +1017,7 @@ export default function TravelDeskPage({ onNavigate, user, travellerName = '', d
             flexDirection: 'column',
             gap: '1rem'
           }}>
-            <h3 style={{ fontSize: '1rem', fontWeight: 800, color: 'var(--text-primary)', margin: 0 }}>
+            <h3 style={{ fontSize: '1rem', fontWeight: 600, color: 'var(--text-primary)', margin: 0 }}>
               Travel request summary
             </h3>
 
@@ -620,13 +1025,13 @@ export default function TravelDeskPage({ onNavigate, user, travellerName = '', d
               {/* Category */}
               <div style={{ display: 'grid', gridTemplateColumns: 'minmax(180px, 240px) 1fr', alignItems: 'baseline', gap: '1rem' }}>
                 <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', fontWeight: 500 }}>Category</span>
-                <span style={{ fontSize: '0.85rem', color: 'var(--text-primary)', fontWeight: 700 }}>{category}</span>
+                <span style={{ fontSize: '0.85rem', color: 'var(--text-primary)', fontWeight: 600 }}>{category}</span>
               </div>
 
               {/* Traveller */}
               <div style={{ display: 'grid', gridTemplateColumns: 'minmax(180px, 240px) 1fr', alignItems: 'baseline', gap: '1rem' }}>
                 <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', fontWeight: 500 }}>Traveller</span>
-                <span style={{ fontSize: '0.85rem', color: 'var(--text-primary)', fontWeight: 700 }}>
+                <span style={{ fontSize: '0.85rem', color: 'var(--text-primary)', fontWeight: 600 }}>
                   {valueOf({ name: 'Traveller' }) || effectiveTraveller || '—'}
                 </span>
               </div>
@@ -634,7 +1039,7 @@ export default function TravelDeskPage({ onNavigate, user, travellerName = '', d
               {/* Department */}
               <div style={{ display: 'grid', gridTemplateColumns: 'minmax(180px, 240px) 1fr', alignItems: 'baseline', gap: '1rem' }}>
                 <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', fontWeight: 500 }}>Department / Cost Centre</span>
-                <span style={{ fontSize: '0.85rem', color: 'var(--text-primary)', fontWeight: 700 }}>
+                <span style={{ fontSize: '0.85rem', color: 'var(--text-primary)', fontWeight: 600 }}>
                   {valueOf({ name: 'Department / Cost Centre' }) || effectiveDept || '—'}
                 </span>
               </div>
@@ -652,7 +1057,7 @@ export default function TravelDeskPage({ onNavigate, user, travellerName = '', d
                       <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', fontWeight: 500 }}>
                         {field.name || field.label}
                       </span>
-                      <span style={{ fontSize: '0.85rem', color: 'var(--text-primary)', fontWeight: 700, wordBreak: 'break-word' }}>
+                      <span style={{ fontSize: '0.85rem', color: 'var(--text-primary)', fontWeight: 600, wordBreak: 'break-word' }}>
                         {displayVal}
                       </span>
                     </div>

@@ -7,7 +7,7 @@ import { apiFetch } from '../lib/apiFetch.lib';
 function ChangeCatalogPage({ onNavigate, searchQuery = '', initialData }) {
   const defaultItems = [
     // 1. Server & Infra
-    { id: 'subcat-srv-lc', title: 'Server Lifecycle', category: 'Server & Infra', description: 'Create, modify, migrate, or decommission server instances.', sla: '3 business days', iconBg: '#EBF5FF', iconColor: '#2563EB' },
+    { id: 'subcat-srv-lc', title: 'Server Lifecycle', category: 'Server & Infra', description: 'Create, modify, migrate, or hosting server instances.', sla: '3 business days', iconBg: '#EBF5FF', iconColor: '#2563EB' },
     { id: 'subcat-srv-patch', title: 'OS / Patching', category: 'Server & Infra', description: 'Upgrade operating system version or apply security kernel patches.', sla: '5 business days', iconBg: '#D1FAE5', iconColor: '#059669' },
     { id: 'subcat-srv-oth', title: 'Other Server Changes', category: 'Server & Infra', description: 'Any other changes related to server infrastructure.', sla: '3 business days', iconBg: '#EBF5FF', iconColor: '#2563EB' },
 
@@ -48,16 +48,25 @@ function ChangeCatalogPage({ onNavigate, searchQuery = '', initialData }) {
     { id: 'cat-srv', name: 'Server & Infra' }
   ];
 
-  const [activeCategory, setActiveCategory] = useState(initialData?.activeCategory || initialData?.category || 'IT Asset');
+  const [activeCategory, setActiveCategory] = useState(() => {
+    return initialData?.activeCategory || initialData?.category || sessionStorage.getItem('sfc_change_active_category') || 'IT Asset';
+  });
   const [hoveredCardId, setHoveredCardId] = useState(null);
 
   useEffect(() => {
     if (initialData?.activeCategory) {
       setActiveCategory(initialData.activeCategory);
+      sessionStorage.setItem('sfc_change_active_category', initialData.activeCategory);
     } else if (initialData?.category) {
       setActiveCategory(initialData.category);
+      sessionStorage.setItem('sfc_change_active_category', initialData.category);
     }
   }, [initialData]);
+
+  const handleTabChange = (catName) => {
+    setActiveCategory(catName);
+    sessionStorage.setItem('sfc_change_active_category', catName);
+  };
 
   const { data: catalogResult, isError: loadFailed } = useQuery({
     queryKey: ['catalog-categories'],
@@ -201,7 +210,7 @@ function ChangeCatalogPage({ onNavigate, searchQuery = '', initialData }) {
           variant="inline"
           tabs={categories.map((cat) => ({ id: cat.name, label: cat.name }))}
           activeTab={activeCategory}
-          onTabChange={setActiveCategory}
+          onTabChange={handleTabChange}
         />
       )}
 
@@ -225,7 +234,7 @@ function ChangeCatalogPage({ onNavigate, searchQuery = '', initialData }) {
       )}
 
       {/* Catalog Cards Responsive Grid */}
-      <div className="cd-responsive-3col">
+      <div className="cd-responsive-4col">
         {filteredItems.map(item => {
           const handleCardClick = () => {
             if (onNavigate) {
@@ -251,14 +260,14 @@ function ChangeCatalogPage({ onNavigate, searchQuery = '', initialData }) {
                 backgroundColor: 'var(--card-bg)',
                 border: isHovered ? '1.5px solid #2563EB' : '1px solid var(--border-color)',
                 borderRadius: '12px',
-                padding: '1.35rem 1.25rem',
+                padding: '1.1rem 1rem',
                 display: 'flex',
                 flexDirection: 'column',
                 justifyContent: 'space-between',
                 boxShadow: isHovered
                   ? '0 12px 24px -4px rgba(37, 99, 235, 0.16), 0 4px 12px -2px rgba(0, 0, 0, 0.08)'
                   : '0 1px 3px rgba(16, 21, 30, 0.04)',
-                minHeight: '200px',
+                minHeight: '160px',
                 cursor: 'pointer',
                 transform: isHovered ? 'translateY(-5px)' : 'translateY(0)',
                 transition: 'transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease'
@@ -274,15 +283,15 @@ function ChangeCatalogPage({ onNavigate, searchQuery = '', initialData }) {
                   }}
                   title={`Start request for ${item.title}`}
                   style={{
-                    width: '44px',
-                    height: '44px',
-                    borderRadius: '12px',
+                    width: '36px',
+                    height: '36px',
+                    borderRadius: '10px',
                     backgroundColor: item.iconBg || '#EBF5FF',
                     border: 'none',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    marginBottom: '1rem',
+                    marginBottom: '0.8rem',
                     cursor: 'pointer',
                     transition: 'transform 0.15s ease, opacity 0.15s ease, box-shadow 0.15s ease',
                     outline: 'none',
@@ -297,47 +306,16 @@ function ChangeCatalogPage({ onNavigate, searchQuery = '', initialData }) {
                     e.currentTarget.style.boxShadow = '0 2px 5px rgba(0, 0, 0, 0.08)';
                   }}
                 >
-                  <Plus size={22} color={item.iconColor || '#2563EB'} strokeWidth={2.5} />
+                  <Plus size={18} color={item.iconColor || '#2563EB'} strokeWidth={2.5} />
                 </button>
 
-                <h3 style={{ fontSize: '1.05rem', fontWeight: 800, color: 'var(--text-primary)', marginBottom: '0.45rem', lineHeight: 1.3 }}>
+                <h3 style={{ fontSize: '1.05rem', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '0.45rem', lineHeight: 1.3 }}>
                   {item.title}
                 </h3>
-                <p style={{ fontSize: '0.825rem', color: 'var(--text-secondary)', lineHeight: 1.45, marginBottom: '1.25rem' }}>
+                <p style={{ fontSize: '0.825rem', color: 'var(--text-secondary)', lineHeight: 1.45, margin: 0 }}>
                   {item.description}
                 </p>
               </div>
-
-              {/* Bottom Action: Visible only on hover */}
-              <div style={{ minHeight: '26px', display: 'flex', alignItems: 'center' }}>
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleCardClick();
-                  }}
-                  style={{
-                    background: 'none',
-                    border: 'none',
-                    color: '#2563EB',
-                    fontSize: '0.85rem',
-                    fontWeight: 700,
-                    cursor: 'pointer',
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '0.35rem',
-                    padding: 0,
-                    textAlign: 'left',
-                    opacity: isHovered ? 1 : 0,
-                    transform: isHovered ? 'translateX(0)' : 'translateX(-4px)',
-                    pointerEvents: isHovered ? 'auto' : 'none',
-                    transition: 'opacity 0.2s ease, transform 0.2s ease, color 0.15s ease'
-                  }}
-                >
-                  <span>Start request →</span>
-                </button>
-              </div>
-
             </div>
           );
         })}

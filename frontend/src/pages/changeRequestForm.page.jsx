@@ -26,7 +26,16 @@ export const getFieldOptions = (field, currentUser) => {
   if (field?.fieldKey === 'actionRequired' && !opts.includes('Other')) {
     opts.push('Other');
   }
-  if (field?.fieldKey === 'actionRequired' && currentUser && currentUser.isInUserTable === false) {
+  const isSuperAdmin = Boolean(
+    currentUser?.isSuperAdmin ||
+    currentUser?.roleId === 'role-1' ||
+    currentUser?.role === 'Super Admin' ||
+    currentUser?.role === 'ChangeDesk Super Admin' ||
+    currentUser?.roleName === 'Super Admin' ||
+    currentUser?.roleName === 'ChangeDesk Super Admin'
+  );
+  const hasRestrictedAccess = isSuperAdmin || currentUser?.isInUserTable === true;
+  if (field?.fieldKey === 'actionRequired' && currentUser && !hasRestrictedAccess) {
     opts = opts.filter(opt => !RESTRICTED_ACTIONS.includes(String(opt).trim().toLowerCase()));
   }
   return opts;
@@ -89,9 +98,17 @@ function ChangeRequestFormPage({ onNavigate, user, initialData, searchQuery = ''
     return '';
   };
 
+  const getTodayDateString = () => {
+    const d = new Date();
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
   const [formData, setFormData] = useState(() => ({
     title: initialData?.title || '',
-    startDate: initialData?.startDate || '',
+    startDate: initialData?.startDate || getTodayDateString(),
     endDate: initialData?.endDate || '',
     justification: initialData?.justification || initialData?.description || '',
     employeeName: initialData?.employeeName || activeSessionUser?.employee?.name || activeSessionUser?.name || '',
@@ -237,20 +254,28 @@ function ChangeRequestFormPage({ onNavigate, user, initialData, searchQuery = ''
         if (res.ok) {
           const body = await res.json();
           if (body.data && Array.isArray(body.data)) {
-            const sanitizedFields = body.data.map(f => ({
-              ...f,
-              fieldLabel: f.fieldLabel && f.fieldLabel.toLowerCase() === 'current configuration'
-                ? 'Current Configuration'
-                : f.fieldLabel
-                  ? f.fieldLabel.replace(/congfig/gi, 'Config').replace(/figuraiton/gi, 'figuration').replace('Proess', 'Process')
-                  : f.fieldLabel,
-              options: Array.isArray(f.options)
-                ? f.options.map(opt => (typeof opt === 'string' ? opt.replace(/Exisitng/g, 'Existing') : opt))
-                : f.options,
-              appliesToActions: Array.isArray(f.appliesToActions)
-                ? f.appliesToActions.map(act => (typeof act === 'string' ? act.replace(/Exisitng/g, 'Existing') : act))
-                : f.appliesToActions
-            }));
+            const sanitizedFields = body.data
+              .filter(f => {
+                const label = (f.fieldLabel || '').trim().toLowerCase();
+                const key = (f.fieldKey || '').trim().toLowerCase();
+                return label !== 'purpose / reason' && label !== 'purpose/reason' && key !== 'purposereason';
+              })
+              .map(f => ({
+                ...f,
+                fieldLabel: f.fieldLabel && f.fieldLabel.toLowerCase() === 'current configuration'
+                  ? 'Current Configuration'
+                  : f.fieldLabel
+                    ? f.fieldLabel.replace(/congfig/gi, 'Config').replace(/figuraiton/gi, 'figuration').replace('Proess', 'Process')
+                    : f.fieldLabel,
+                options: Array.isArray(f.options)
+                  ? f.options.map(opt => (typeof opt === 'string' ? opt.replace(/Exisitng/g, 'Existing') : opt))
+                  : f.options,
+                appliesToActions: (f.id === 'f-hw-assetid' || (selectedSubcategoryId === 'subcat-asset-hw' && f.fieldKey === 'assetId'))
+                  ? ['Return IT Asset', ...(Array.isArray(f.appliesToActions) ? f.appliesToActions.filter(a => a !== 'Return IT Asset') : ['Repair Request', 'Dispose Request'])]
+                  : Array.isArray(f.appliesToActions)
+                    ? f.appliesToActions.map(act => (typeof act === 'string' ? act.replace(/Exisitng/g, 'Existing') : act))
+                    : f.appliesToActions
+              }));
             setFields(sanitizedFields);
             const initialVals = { ...(initialData?.customFieldValues || {}) };
             const isOtherSubcat = selectedSubcategory?.name?.toLowerCase() === 'other' || selectedSubcategoryId?.endsWith('-oth');
@@ -497,20 +522,36 @@ function ChangeRequestFormPage({ onNavigate, user, initialData, searchQuery = ''
     );
   }
 
-  const actionRequiredValue = customFieldValues.actionRequired || '';
-  const OTHER_ACTION_ALLOWED_KEYS = ['actionRequired', 'description', 'purposeReason', 'purpose'];
+  const actionRequiredValue = (customFieldValues.actionRequired || '').trim().toLowerCase();
+  const OTHER_ACTION_ALLOWED_KEYS = ['actionrequired', 'description', 'purposereason', 'purpose'];
+  const DUPLICATE_EXCLUDED_KEYS = ['replacementpurposereason', 'purposereason'];
   const visibleFields = fields.filter((f) => {
-    if (actionRequiredValue === 'Other') {
-      return OTHER_ACTION_ALLOWED_KEYS.includes(f.fieldKey);
+    const key = (f.fieldKey || '').toLowerCase();
+    const label = (f.fieldLabel || '').toLowerCase();
+    if (DUPLICATE_EXCLUDED_KEYS.includes(key) || label.includes('replacement purpose') || label === 'purpose / reason') {
+      return false;
     }
-    if (!f.appliesToActions || !Array.isArray(f.appliesToActions)) return true;
-    return f.appliesToActions.includes(actionRequiredValue);
+    if (actionRequiredValue === 'other') {
+      return OTHER_ACTION_ALLOWED_KEYS.includes(key);
+    }
+    if (!f.appliesToActions || !Array.isArray(f.appliesToActions) || f.appliesToActions.length === 0) return true;
+    return f.appliesToActions.some(act => String(act).trim().toLowerCase() === actionRequiredValue);
   });
 
   const handleGoBack = () => {
+    const currentCatObj = categories.find((c) => c.id === selectedCategoryId);
+    const targetCategory =
+      currentCatObj?.name ||
+      initialData?.fromCategory ||
+      initialData?.activeCategory ||
+      initialData?.category ||
+      sessionStorage.getItem('sfc_change_active_category') ||
+      'IT Asset';
+
+    sessionStorage.setItem('sfc_change_active_category', targetCategory);
+
     if (onNavigate) {
-      const targetCategory = initialData?.fromCategory || initialData?.activeCategory || initialData?.category || 'Server & Infra';
-      onNavigate('Change Catalog', { activeCategory: targetCategory });
+      onNavigate('Change Catalog', { activeCategory: targetCategory, category: targetCategory });
     }
   };
 
@@ -520,10 +561,10 @@ function ChangeRequestFormPage({ onNavigate, user, initialData, searchQuery = ''
       {/* Top Header with Change Category Button on the Top Right */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '1rem' }}>
         <div>
-          <h1 style={{ fontSize: '1.45rem', fontWeight: 800, color: 'var(--text-primary)', lineHeight: 1.2, margin: 0 }}>
+          <h1 style={{ fontSize: '1.45rem', fontWeight: 600, color: 'var(--text-primary)', lineHeight: 1.2, margin: 0 }}>
             Create Change Request
           </h1>
-          <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginTop: '0.2rem', margin: 0 }}>
+          <p style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', marginTop: '0.25rem', margin: 0 }}>
             Fill in employee and change details, then submit for Change Manager approval
           </p>
         </div>
@@ -776,8 +817,7 @@ function ChangeRequestFormPage({ onNavigate, user, initialData, searchQuery = ''
                 type="email"
                 readOnly
                 disabled
-                placeholder="Auto-populated from manager selection"
-                value={formData.managerEmail}
+                value={formData.managerEmail || ''}
                 style={READONLY_FIELD_STYLE}
               />
             </div>
@@ -1004,7 +1044,7 @@ function ChangeRequestFormPage({ onNavigate, user, initialData, searchQuery = ''
               <textarea
                 rows={4}
                 required
-                placeholder="Explain why this change is required and the business impact of not implementing it..."
+                placeholder="Enter Text"
                 value={formData.justification}
                 onChange={(e) => handleInputChange('justification', e.target.value)}
                 style={{
@@ -1046,47 +1086,52 @@ function ChangeRequestFormPage({ onNavigate, user, initialData, searchQuery = ''
           <span>Back</span>
         </button>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-          <button
-            type="button"
-            onClick={handleGoBack}
-            disabled={isSubmitting}
-            style={{
-              padding: '0.6rem 1.25rem',
-              backgroundColor: 'var(--card-bg)',
-              color: 'var(--text-secondary)',
-              border: '1px solid var(--border-color)',
-              borderRadius: '8px',
-              fontSize: '0.85rem',
-              fontWeight: 600,
-              cursor: isSubmitting ? 'not-allowed' : 'pointer',
-              opacity: isSubmitting ? 0.6 : 1
-            }}
-          >
-            Cancel
-          </button>
-          <button
-            type="submit"
-            disabled={isSubmitting}
-            style={{
-              padding: '0.6rem 1.35rem',
-              backgroundColor: isSubmitting ? 'var(--border-color)' : 'var(--brand-primary)',
-              color: '#FFFFFF',
-              border: 'none',
-              borderRadius: '8px',
-              fontSize: '0.85rem',
-              fontWeight: 500,
-              cursor: isSubmitting ? 'not-allowed' : 'pointer',
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '0.45rem',
-              boxShadow: '0 1px 3px rgba(0, 0, 0, 0.2)',
-              opacity: isSubmitting ? 0.7 : 1
-            }}
-          >
-            <Send size={16} />
-            <span>{isSubmitting ? 'Submitting...' : 'Submit for approval'}</span>
-          </button>
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '0.45rem' }}>
+          <span style={{ fontSize: '0.775rem', color: 'var(--text-secondary)', fontWeight: 500 }}>
+            This request will be sent to your reporting manager and change manager
+          </span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+            <button
+              type="button"
+              onClick={handleGoBack}
+              disabled={isSubmitting}
+              style={{
+                padding: '0.6rem 1.25rem',
+                backgroundColor: 'var(--card-bg)',
+                color: 'var(--text-secondary)',
+                border: '1px solid var(--border-color)',
+                borderRadius: '8px',
+                fontSize: '0.85rem',
+                fontWeight: 600,
+                cursor: isSubmitting ? 'not-allowed' : 'pointer',
+                opacity: isSubmitting ? 0.6 : 1
+              }}
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={isSubmitting}
+              style={{
+                padding: '0.6rem 1.35rem',
+                backgroundColor: isSubmitting ? 'var(--border-color)' : 'var(--brand-primary)',
+                color: '#FFFFFF',
+                border: 'none',
+                borderRadius: '8px',
+                fontSize: '0.85rem',
+                fontWeight: 500,
+                cursor: isSubmitting ? 'not-allowed' : 'pointer',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '0.45rem',
+                boxShadow: '0 1px 3px rgba(0, 0, 0, 0.2)',
+                opacity: isSubmitting ? 0.7 : 1
+              }}
+            >
+              <Send size={16} />
+              <span>{isSubmitting ? 'Submitting...' : 'Submit for approval'}</span>
+            </button>
+          </div>
         </div>
       </div>
 

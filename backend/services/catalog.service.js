@@ -134,8 +134,26 @@ export const getSubcategoryFieldsService = async (subcategoryId) => {
     where: { subcategoryId },
     order: [['sortOrder', 'ASC']]
   });
-  return rows.map((f) => {
-    const plain = f.get({ plain: true });
+  const list = rows
+    .filter((f) => {
+      const label = (f.fieldLabel || '').trim().toLowerCase();
+      const key = (f.fieldKey || '').trim().toLowerCase();
+      const isDuplicateReason =
+        label === 'purpose / reason' ||
+        label === 'purpose/reason' ||
+        label === 'replacement purpose / reason' ||
+        label === 'replacement purpose/reason' ||
+        key === 'purposereason' ||
+        key === 'replacementpurposereason' ||
+        f.id === 'f-dev-replreason';
+
+      if (isDuplicateReason && f.id) {
+        CatalogSubcategoryField.destroy({ where: { id: f.id } }).catch(() => {});
+      }
+      return !isDuplicateReason;
+    })
+    .map((f) => {
+      const plain = f.get({ plain: true });
     let dbNeedsUpdate = false;
     if (plain.fieldLabel && (plain.fieldLabel.toLowerCase() === 'current configuration' || plain.fieldLabel.includes('Congfig') || plain.fieldLabel.includes('figuraiton') || plain.fieldLabel.toLowerCase().includes('congfig'))) {
       plain.fieldLabel = 'Current Configuration';
@@ -152,10 +170,33 @@ export const getSubcategoryFieldsService = async (subcategoryId) => {
         dbNeedsUpdate = true;
       }
     }
-    if (plain.appliesToActions && Array.isArray(plain.appliesToActions)) {
-      const fixedActs = plain.appliesToActions.map(act => (typeof act === 'string' ? act.replace(/Exisitng/g, 'Existing') : act));
-      if (JSON.stringify(fixedActs) !== JSON.stringify(plain.appliesToActions)) {
-        plain.appliesToActions = fixedActs;
+    if (plain.id === 'f-hw-assetid' || (subcategoryId === 'subcat-asset-hw' && plain.fieldKey === 'assetId')) {
+      if (!Array.isArray(plain.appliesToActions) || !plain.appliesToActions.includes('Return IT Asset')) {
+        const current = Array.isArray(plain.appliesToActions) ? [...plain.appliesToActions] : ['Repair Request', 'Dispose Request'];
+        if (!current.includes('Return IT Asset')) current.unshift('Return IT Asset');
+        plain.appliesToActions = current;
+        dbNeedsUpdate = true;
+      }
+    }
+    if (subcategoryId === 'subcat-srv-lc' && plain.fieldKey === 'actionRequired') {
+      if (Array.isArray(plain.options)) {
+        const updatedOpts = plain.options.map(opt => (opt === 'Create a New Server' || opt === 'Create a Server' ? 'Deploy a Server' : opt));
+        if (!updatedOpts.includes('Deploy a Server')) updatedOpts.unshift('Deploy a Server');
+        plain.options = updatedOpts;
+        dbNeedsUpdate = true;
+      }
+    }
+    if (subcategoryId === 'subcat-srv-lc' && plain.fieldKey === 'hostingType') {
+      const targetActs = ['Deploy a Server', 'Change / Modify an Existing Server'];
+      if (JSON.stringify(plain.appliesToActions) !== JSON.stringify(targetActs)) {
+        plain.appliesToActions = targetActs;
+        dbNeedsUpdate = true;
+      }
+    }
+    if (subcategoryId === 'subcat-srv-lc' && Array.isArray(plain.appliesToActions) && plain.fieldKey !== 'hostingType') {
+      const updatedActs = plain.appliesToActions.map(act => (act === 'Create a New Server' || act === 'Create a Server' ? 'Deploy a Server' : act));
+      if (JSON.stringify(updatedActs) !== JSON.stringify(plain.appliesToActions)) {
+        plain.appliesToActions = updatedActs;
         dbNeedsUpdate = true;
       }
     }
@@ -168,6 +209,102 @@ export const getSubcategoryFieldsService = async (subcategoryId) => {
     }
     return plain;
   });
+
+  if (subcategoryId === 'subcat-srv-lc') {
+    // 1. Ensure sourceHosting exists
+    if (!list.some(f => f.fieldKey === 'sourceHosting')) {
+      const field = await CatalogSubcategoryField.findOrCreate({
+        where: { id: 'f-srv-srchosting' },
+        defaults: {
+          id: 'f-srv-srchosting',
+          subcategoryId: 'subcat-srv-lc',
+          fieldKey: 'sourceHosting',
+          fieldLabel: 'Source Hosting',
+          fieldType: 'dropdown',
+          isRequired: true,
+          sortOrder: 3,
+          appliesToActions: ['Migrate a Server'],
+          options: ['AWS Cloud', 'Azure Cloud', 'GCP', 'Other Private Cloud', 'On Premise']
+        }
+      });
+      list.push(field[0].get({ plain: true }));
+    }
+    // 2. Ensure destination exists
+    if (!list.some(f => f.fieldKey === 'destination')) {
+      const field = await CatalogSubcategoryField.findOrCreate({
+        where: { id: 'f-srv-desthosting' },
+        defaults: {
+          id: 'f-srv-desthosting',
+          subcategoryId: 'subcat-srv-lc',
+          fieldKey: 'destination',
+          fieldLabel: 'Destination',
+          fieldType: 'dropdown',
+          isRequired: true,
+          sortOrder: 4,
+          appliesToActions: ['Migrate a Server'],
+          options: ['AWS Cloud', 'Azure Cloud', 'GCP', 'Other Private Cloud', 'On Premise']
+        }
+      });
+      list.push(field[0].get({ plain: true }));
+    }
+    // 3. Ensure hostingServer exists
+    if (!list.some(f => f.fieldKey === 'hostingServer')) {
+      const field = await CatalogSubcategoryField.findOrCreate({
+        where: { id: 'f-srv-hostingserver' },
+        defaults: {
+          id: 'f-srv-hostingserver',
+          subcategoryId: 'subcat-srv-lc',
+          fieldKey: 'hostingServer',
+          fieldLabel: 'Hosting Server',
+          fieldType: 'dropdown',
+          isRequired: true,
+          sortOrder: 5,
+          appliesToActions: ['Decommission a Server'],
+          options: ['AWS Cloud', 'Azure Cloud', 'GCP', 'Other Private Cloud', 'On Premise']
+        }
+      });
+      list.push(field[0].get({ plain: true }));
+    }
+
+    // Sort Migrate a Server fields in the exact order requested: Server Name, IP Address, Source Hosting, Destination
+    const MIGRATE_ORDER_MAP = {
+      actionRequired: 0,
+      serverName: 1,
+      ipAddress: 2,
+      sourceHosting: 3,
+      destination: 4,
+      hostingServer: 5,
+      purpose: 6,
+      hostingType: 7,
+      operatingSystem: 8,
+      cpu: 9,
+      ram: 10,
+      storage: 11,
+      vlanRequirement: 12,
+      backupRequired: 13
+    };
+    list.sort((a, b) => (MIGRATE_ORDER_MAP[a.fieldKey] ?? 99) - (MIGRATE_ORDER_MAP[b.fieldKey] ?? 99));
+  }
+
+  if (subcategoryId === 'subcat-net-fw' && !list.some(f => f.fieldKey === 'existingFirewall')) {
+    const existingField = await CatalogSubcategoryField.findOrCreate({
+      where: { id: 'f-fw-existing' },
+      defaults: {
+        id: 'f-fw-existing',
+        subcategoryId: 'subcat-net-fw',
+        fieldKey: 'existingFirewall',
+        fieldLabel: 'Existing Firewall',
+        fieldType: 'text',
+        isRequired: true,
+        sortOrder: 1,
+        appliesToActions: ['Modify Existing Firewall Rule'],
+        options: null
+      }
+    });
+    list.splice(1, 0, existingField[0].get({ plain: true }));
+  }
+
+  return list;
 };
 
 export const createCatalogSubcategoryService = async (payload = {}) => {

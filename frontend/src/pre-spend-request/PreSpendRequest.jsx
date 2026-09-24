@@ -17,8 +17,7 @@ export default function PreSpendRequest({ onNavigate, user, initialCostCentre = 
   const [step, setStep] = useState(1);
   const [category, setCategory] = useState('');
   const [subcategory, setSubcategory] = useState('');
-  const resolvedCostCentre = initialCostCentre || user?.costCenter || user?.department || user?.dept || '';
-  const [details, setDetails] = useState({ buying: '', amount: '', neededBy: '', costCentre: resolvedCostCentre, budgetLine: '', justification: '', urgent: false });
+  const [details, setDetails] = useState({ buying: '', location: '', neededBy: '', justification: '', urgent: false });
   const [vendors, setVendors] = useState([emptyVendor(), emptyVendor(), emptyVendor()]);
   const [commercial, setCommercial] = useState({ exception: '', exceptionReason: '', reason: '', justification: '' });
   const [certified, setCertified] = useState(false);
@@ -44,8 +43,7 @@ export default function PreSpendRequest({ onNavigate, user, initialCostCentre = 
   const nav = (back, label) => <div className="actions"><button className="btn" type="button" onClick={() => setStep(back)}>← Back</button><button className="btn primary" type="submit">{label} →</button></div>;
   const summary = [
     ['Spend category', category], ['Subcategory', subcategory], ['What are you buying?', details.buying],
-    ['Estimated value', money(details.amount)], ['Needed by', details.neededBy], ['Cost centre', details.costCentre],
-    ['Budget line', budgetLines.find(line => line.value === details.budgetLine)?.label || details.budgetLine],
+    ['Location', details.location], ['Needed by', details.neededBy],
     ['Business justification', details.justification], ['Urgent', details.urgent ? 'Yes' : 'No'],
   ];
   return <div className="pre-spend-request"><div className="content">
@@ -60,10 +58,8 @@ export default function PreSpendRequest({ onNavigate, user, initialCostCentre = 
     {step === 1 && <form onSubmit={e => next(e, 2)}><section className="panel"><div className="section-title"><div><h2>What type of spend is this?</h2><p>Select a spend category and subcategory.</p></div></div><div className="categories">{categories.map((item, index) => <button key={item.name} className={`category ${category === item.name ? 'selected' : ''}`} type="button" aria-pressed={category === item.name} onClick={() => { if (category !== item.name) { setCategory(item.name); setSubcategory(''); setCertified(false); setNotice(''); } }}><span className="cat-icon" aria-hidden="true">{['▣', '◇', '◎', '☆', '⌂', '♡', '✈', '!'][index]}</span><strong>{item.name}</strong><small>{item.description}</small></button>)}</div>{selected && <div className="field subcategory"><label htmlFor={id('subcategory')}>Spend subcategory</label><select id={id('subcategory')} required value={subcategory} onChange={e => {setSubcategory(e.target.value);setCertified(false);setNotice('');}}><option value="">Select subcategory</option>{selected.subcategories.map(value => <option key={value}>{value}</option>)}</select></div>}</section><div className="actions outside"><span /><button className="btn primary" disabled={!category || !subcategory}>Continue to Request Details →</button></div></form>}
     {step === 2 && <form onSubmit={e => next(e, 3)}><section className="panel request-details"><div className="section-title"><h2>Request details</h2></div><div className="form-grid">
       {detailField('buying', 'What are you buying?', { full: true, placeholder: 'e.g. 12 MT polypropylene granules for September build' })}
-      {detailField('amount', 'Estimated value (INR)', { type: 'number', placeholder: 'e.g. 1200000' })}
+      {detailField('location', 'Location', { placeholder: 'e.g. Mumbai DC, Pune HQ' })}
       {detailField('neededBy', 'Needed by', { type: 'date' })}
-      {detailField('costCentre', 'Cost centre', { placeholder: 'e.g. MFG-PUN-02' })}
-      <div className="field"><label htmlFor={id('budgetLine')}>Budget line (required)</label><select id={id('budgetLine')} required value={details.budgetLine} onChange={e => changeDetails('budgetLine', e.target.value)}><option value="">Select budget line</option>{budgetLines.map(line => <option value={line.value} key={line.value}>{line.label}</option>)}</select></div>
       {detailField('justification', 'Business justification', { type: 'textarea', full: true, placeholder: 'Why is this spend needed now, and what happens if it waits?' })}
       <div className="urgent-row"><div><label htmlFor={id('urgent')}>Mark as urgent</label></div><button id={id('urgent')} type="button" role="switch" aria-checked={details.urgent} className={`urgent-switch ${details.urgent ? 'on' : ''}`} aria-label="Mark as urgent" onClick={() => changeDetails('urgent', !details.urgent)}><span /></button></div>
     </div></section>{nav(1, 'Continue')}</form>}

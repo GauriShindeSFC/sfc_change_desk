@@ -1,4 +1,4 @@
-import React, { useId, useState, useEffect } from 'react';
+import React, { useId, useState, useEffect, useRef } from 'react';
 import {
   Check,
   ArrowLeft,
@@ -10,7 +10,9 @@ import {
   FileText,
   ExternalLink,
   History,
-  Sparkles
+  Sparkles,
+  ChevronDown,
+  Search
 } from 'lucide-react';
 import {
   PRE_SPEND_CATEGORIES,
@@ -37,18 +39,115 @@ const ACTIVE_FIELD_STYLE = {
   boxSizing: 'border-box'
 };
 
+const READONLY_FIELD_STYLE = {
+  width: '100%',
+  padding: '0.65rem 0.85rem',
+  backgroundColor: 'var(--input-bg, #F8FAFC)',
+  border: '1px solid var(--border-color, #E2E8F0)',
+  borderRadius: '8px',
+  fontSize: '0.85rem',
+  fontFamily: 'inherit',
+  color: 'var(--text-secondary, #64748B)',
+  cursor: 'not-allowed',
+  boxSizing: 'border-box'
+};
+
+const resolveEmpBusinessId = (u, initialVal) => {
+  if (initialVal && typeof initialVal === 'string' && !initialVal.startsWith('S8-') && !initialVal.startsWith('EMP-')) return initialVal;
+  if (u?.employee?.empId) return u.employee.empId;
+  if (u?.employee?.employeeBusinessId) return u.employee.employeeBusinessId;
+  if (u?.employeeBusinessId) return u.employeeBusinessId;
+  if (u?.employeeId && typeof u.employeeId === 'string' && !u.employeeId.startsWith('S8-') && !u.employeeId.startsWith('EMP-')) return u.employeeId;
+  if (u?.empId && typeof u.empId === 'string' && !u.empId.startsWith('S8-') && !u.empId.startsWith('EMP-')) return u.empId;
+  return '';
+};
+
+const resolveEmpLocation = (u, initialVal) => {
+  if (initialVal && typeof initialVal === 'string' && !initialVal.includes('Auto-fetched') && !initialVal.includes('Not specified')) return initialVal;
+  if (u?.employee?.location) return u.employee.location;
+  if (u?.location) return u.location;
+  return '';
+};
+
 export default function PreSpendPage({ onNavigate, user, initialCostCentre = '', budgetLines = SAMPLE_BUDGET_LINES }) {
   const uid = useId();
   const [step, setStep] = useState(1);
   const [category, setCategory] = useState('');
   const [subcategory, setSubcategory] = useState('');
-  const resolvedCostCentre = initialCostCentre || user?.costCenter || user?.department || user?.dept || '';
+
+  const [currentSessionUser, setCurrentSessionUser] = useState(() => user || JSON.parse(localStorage.getItem('sfc_user') || '{}'));
+  const activeSessionUser = currentSessionUser || user || JSON.parse(localStorage.getItem('sfc_user') || '{}');
+
+  const [requesterDetails, setRequesterDetails] = useState(() => ({
+    employeeName: activeSessionUser?.employee?.name || activeSessionUser?.name || '',
+    employeeEmail: activeSessionUser?.employee?.email || activeSessionUser?.email || '',
+    employeeId: resolveEmpBusinessId(activeSessionUser),
+    location: resolveEmpLocation(activeSessionUser) || '',
+    managerName: '',
+    managerEmail: ''
+  }));
+
+  const [availableUsers, setAvailableUsers] = useState([]);
+  const [loadingUsers, setLoadingUsers] = useState(false);
+  const [managerDropdownOpen, setManagerDropdownOpen] = useState(false);
+  const [managerSearchTerm, setManagerSearchTerm] = useState('');
+  const managerDropdownRef = useRef(null);
+
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (managerDropdownRef.current && !managerDropdownRef.current.contains(e.target)) {
+        setManagerDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  useEffect(() => {
+    const fetchUsers = async () => {
+      setLoadingUsers(true);
+      try {
+        const res = await apiFetch('/users');
+        if (res.ok) {
+          const data = await res.json();
+          if (data && Array.isArray(data.data)) {
+            const list = data.data.map(u => ({
+              id: u.id,
+              name: u.name || u.employee?.name || (u.email ? u.email.split('@')[0] : 'User'),
+              email: u.email || u.employee?.email || '',
+              department: u.department || u.employee?.department || '',
+              location: u.location || u.employee?.location || ''
+            })).filter(u => u.name && u.email);
+            setAvailableUsers(list);
+          }
+        }
+      } catch (err) {
+        console.warn('Failed to load active employees for manager dropdown:', err);
+      } finally {
+        setLoadingUsers(false);
+      }
+    };
+    fetchUsers();
+  }, []);
+
+  useEffect(() => {
+    const currentUser = user || JSON.parse(localStorage.getItem('sfc_user') || '{}');
+    if (currentUser) {
+      setCurrentSessionUser(currentUser);
+      setRequesterDetails(prev => ({
+        ...prev,
+        employeeName: prev.employeeName || currentUser.employee?.name || currentUser.name || '',
+        employeeEmail: prev.employeeEmail || currentUser.employee?.email || currentUser.email || '',
+        employeeId: resolveEmpBusinessId(currentUser, prev.employeeId),
+        location: resolveEmpLocation(currentUser, prev.location)
+      }));
+    }
+  }, [user]);
+
   const [details, setDetails] = useState({
     buying: '',
-    amount: '',
+    location: '',
     neededBy: '',
-    costCentre: resolvedCostCentre,
-    budgetLine: '',
     justification: '',
     urgent: false
   });
@@ -62,6 +161,8 @@ export default function PreSpendPage({ onNavigate, user, initialCostCentre = '',
   // Past Vendor Look-up State
   const [pastVendor, setPastVendor] = useState(null);
   const [usePastVendor, setUsePastVendor] = useState(false);
+  const [hoveredCat, setHoveredCat] = useState(null);
+  const [hoveredSubcat, setHoveredSubcat] = useState(null);
 
   // Fetch previous preferred vendor whenever subcategory changes
   useEffect(() => {
@@ -162,11 +263,14 @@ export default function PreSpendPage({ onNavigate, user, initialCostCentre = '',
       const payload = {
         category,
         subcategory,
+        employeeName: requesterDetails.employeeName || '',
+        employeeEmail: requesterDetails.employeeEmail || '',
+        employeeId: requesterDetails.employeeId || '',
+        managerName: requesterDetails.managerName || '',
+        managerEmail: requesterDetails.managerEmail || '',
         buying: details.buying,
-        amount: details.amount,
+        location: requesterDetails.location || details.location,
         neededBy: details.neededBy,
-        costCentre: details.costCentre,
-        budgetLine: details.budgetLine,
         justification: details.justification,
         urgent: details.urgent,
         vendors: processedVendors,
@@ -198,10 +302,10 @@ export default function PreSpendPage({ onNavigate, user, initialCostCentre = '',
       
       {/* Top Header */}
       <div>
-        <h1 style={{ fontSize: '1.45rem', fontWeight: 800, color: 'var(--text-primary)', lineHeight: 1.2, margin: 0 }}>
+        <h1 style={{ fontSize: '1.45rem', fontWeight: 600, color: 'var(--text-primary)', lineHeight: 1.2, margin: 0 }}>
           New Pre-Spend Request
         </h1>
-        <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginTop: '0.2rem', margin: 0 }}>
+        <p style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', marginTop: '0.25rem', margin: 0 }}>
           Obtain financial approval before placing an order or committing to a vendor
         </p>
       </div>
@@ -281,7 +385,7 @@ export default function PreSpendPage({ onNavigate, user, initialCostCentre = '',
             Pre-Spend Request Submitted Successfully
           </h3>
           <p style={{ fontSize: '0.85rem', color: '#047857', maxWidth: '480px', margin: 0, lineHeight: 1.5 }}>
-            Your pre-spend requisition <strong>{createdCode || ''}</strong> for <strong>{details.buying || category}</strong> ({money(details.amount)}) has been created and sent for approval.
+            Your pre-spend requisition <strong>{createdCode || ''}</strong> for <strong>{details.buying || category}</strong> has been created and sent for approval.
           </p>
           <div style={{ display: 'flex', gap: '0.75rem', marginTop: '0.5rem' }}>
             <button
@@ -350,6 +454,7 @@ export default function PreSpendPage({ onNavigate, user, initialCostCentre = '',
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '0.75rem' }}>
               {PRE_SPEND_CATEGORIES.map(item => {
                 const selected = category === item.name;
+                const isHovered = hoveredCat === item.name;
                 return (
                   <button
                     key={item.name}
@@ -358,17 +463,29 @@ export default function PreSpendPage({ onNavigate, user, initialCostCentre = '',
                       setCategory(item.name);
                       setSubcategory('');
                     }}
+                    onMouseEnter={() => setHoveredCat(item.name)}
+                    onMouseLeave={() => setHoveredCat(null)}
                     style={{
                       padding: '1.1rem',
-                      borderRadius: '10px',
+                      borderRadius: '12px',
                       textAlign: 'left',
-                      border: selected ? '1.5px solid #2563EB' : '1px solid var(--border-color)',
-                      backgroundColor: selected ? '#EFF6FF' : 'var(--card-bg)',
+                      border: selected
+                        ? '2px solid var(--brand-primary, #173C4E)'
+                        : isHovered
+                        ? '1.5px solid var(--brand-primary, #173C4E)'
+                        : '1px solid var(--border-color)',
+                      backgroundColor: selected ? 'var(--input-bg, #F4F5F7)' : 'var(--card-bg)',
+                      boxShadow: selected
+                        ? '0 0 0 3px rgba(23, 60, 78, 0.12)'
+                        : isHovered
+                        ? '0 12px 24px -4px rgba(23, 60, 78, 0.14), 0 4px 12px -2px rgba(0, 0, 0, 0.06)'
+                        : '0 1px 3px rgba(16, 21, 30, 0.04)',
+                      transform: isHovered ? 'translateY(-5px)' : 'translateY(0)',
                       cursor: 'pointer',
-                      transition: 'all 0.15s ease'
+                      transition: 'transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease'
                     }}
                   >
-                    <div style={{ fontSize: '0.875rem', fontWeight: 700, color: 'var(--text-primary)' }}>{item.name}</div>
+                    <div style={{ fontSize: '0.875rem', fontWeight: 600, color: 'var(--text-primary)' }}>{item.name}</div>
                     <div style={{ fontSize: '0.775rem', color: 'var(--text-secondary)', marginTop: '0.25rem', lineHeight: 1.4 }}>{item.description}</div>
                   </button>
                 );
@@ -378,28 +495,41 @@ export default function PreSpendPage({ onNavigate, user, initialCostCentre = '',
 
           {selectedCategory && (
             <div style={{ paddingTop: '1.25rem', borderTop: '1px solid var(--border-color)' }}>
-              <FormLabel>
+              <h3 style={{ fontSize: '1rem', fontWeight: 600, color: 'var(--text-primary)', margin: '0 0 0.75rem 0' }}>
                 2. Select Subcategory for {selectedCategory.name}
-              </FormLabel>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '0.6rem', marginTop: '0.5rem' }}>
+              </h3>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '0.6rem' }}>
                 {selectedCategory.subcategories.map(sub => {
                   const selected = subcategory === sub;
+                  const isHovered = hoveredSubcat === sub;
                   return (
                     <button
                       key={sub}
                       type="button"
                       onClick={() => setSubcategory(sub)}
+                      onMouseEnter={() => setHoveredSubcat(sub)}
+                      onMouseLeave={() => setHoveredSubcat(null)}
                       style={{
                         padding: '0.65rem 0.85rem',
                         borderRadius: '8px',
                         fontSize: '0.825rem',
                         fontWeight: selected ? 600 : 500,
                         textAlign: 'left',
-                        border: selected ? '1px solid #2563EB' : '1px solid var(--border-color)',
-                        backgroundColor: selected ? '#2563EB' : 'var(--card-bg)',
-                        color: selected ? '#FFFFFF' : 'var(--text-primary)',
+                        border: selected
+                          ? '2px solid var(--brand-primary, #173C4E)'
+                          : isHovered
+                          ? '1.5px solid var(--brand-primary, #173C4E)'
+                          : '1px solid var(--border-color)',
+                        backgroundColor: 'transparent',
+                        color: 'var(--text-primary)',
+                        boxShadow: selected
+                          ? '0 0 0 3px rgba(23, 60, 78, 0.12)'
+                          : isHovered
+                          ? '0 6px 14px -2px rgba(23, 60, 78, 0.12)'
+                          : 'none',
+                        transform: isHovered ? 'translateY(-3px)' : 'translateY(0)',
                         cursor: 'pointer',
-                        transition: 'all 0.15s ease'
+                        transition: 'transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease'
                       }}
                     >
                       {sub}
@@ -449,12 +579,197 @@ export default function PreSpendPage({ onNavigate, user, initialCostCentre = '',
           gap: '1.5rem',
           boxShadow: '0 1px 3px rgba(16, 21, 30, 0.04)'
         }}>
+          {/* Section 1: Requester Details */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <h3 style={{ fontSize: '1rem', fontWeight: 600, color: 'var(--text-primary)', margin: 0 }}>
+                Requester Details
+              </h3>
+              <span style={{ fontSize: '0.775rem', fontWeight: 600, color: 'var(--text-secondary)' }}>
+                Section 1 of 2
+              </span>
+            </div>
+
+            <div className="cd-responsive-form-grid">
+              <div>
+                <FormLabel>Requester Name</FormLabel>
+                <input
+                  type="text"
+                  readOnly
+                  disabled
+                  value={requesterDetails.employeeName}
+                  style={READONLY_FIELD_STYLE}
+                />
+              </div>
+              <div>
+                <FormLabel>Employee Email</FormLabel>
+                <input
+                  type="email"
+                  readOnly
+                  disabled
+                  placeholder="e.g. employee@company.com"
+                  value={requesterDetails.employeeEmail}
+                  style={READONLY_FIELD_STYLE}
+                />
+              </div>
+              <div>
+                <FormLabel>Employee ID</FormLabel>
+                <input
+                  type="text"
+                  readOnly
+                  disabled
+                  placeholder="e.g. SFC-0083"
+                  value={requesterDetails.employeeId}
+                  style={READONLY_FIELD_STYLE}
+                />
+              </div>
+              <div>
+                <FormLabel>Location</FormLabel>
+                <input
+                  type="text"
+                  readOnly
+                  disabled
+                  placeholder="e.g. Mumbai DC, Ahmedabad HQ, Remote"
+                  value={requesterDetails.location || resolveEmpLocation(activeSessionUser) || ''}
+                  style={READONLY_FIELD_STYLE}
+                />
+              </div>
+
+              {/* Searchable Manager Combobox Dropdown */}
+              <div ref={managerDropdownRef} style={{ position: 'relative' }}>
+                <FormLabel required>Manager Name</FormLabel>
+                <div
+                  tabIndex={0}
+                  onClick={() => setManagerDropdownOpen(prev => !prev)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      setManagerDropdownOpen(prev => !prev);
+                    }
+                  }}
+                  style={{
+                    ...ACTIVE_FIELD_STYLE,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    backgroundColor: '#FFFFFF',
+                    userSelect: 'none'
+                  }}
+                >
+                  <span style={{ color: requesterDetails.managerName ? 'var(--text-primary)' : 'var(--text-secondary)' }}>
+                    {requesterDetails.managerName || (loadingUsers ? 'Loading employees...' : 'Select Reporting Manager...')}
+                  </span>
+                  <ChevronDown size={16} style={{ color: 'var(--text-secondary)', transition: 'transform 0.2s', transform: managerDropdownOpen ? 'rotate(180deg)' : 'none' }} />
+                </div>
+
+                {managerDropdownOpen && (
+                  <div style={{
+                    position: 'absolute',
+                    top: '100%',
+                    left: 0,
+                    right: 0,
+                    zIndex: 50,
+                    marginTop: '0.35rem',
+                    backgroundColor: '#FFFFFF',
+                    border: '1px solid var(--border-color)',
+                    borderRadius: '10px',
+                    boxShadow: '0 8px 24px rgba(15, 23, 42, 0.12)',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    overflow: 'hidden'
+                  }}>
+                    <div style={{ padding: '0.65rem', borderBottom: '1px solid var(--border-color)', backgroundColor: '#F8FAFC' }}>
+                      <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                        <Search size={14} style={{ position: 'absolute', left: '0.65rem', color: '#94A3B8' }} />
+                        <input
+                          type="text"
+                          autoFocus
+                          value={managerSearchTerm}
+                          onChange={(e) => setManagerSearchTerm(e.target.value)}
+                          placeholder="Search manager by name or email..."
+                          style={{
+                            width: '100%',
+                            padding: '0.45rem 0.65rem 0.45rem 2rem',
+                            fontSize: '0.8rem',
+                            border: '1px solid #CBD5E1',
+                            borderRadius: '6px',
+                            outline: 'none',
+                            backgroundColor: '#FFFFFF',
+                            boxSizing: 'border-box'
+                          }}
+                        />
+                      </div>
+                    </div>
+
+                    <div style={{ maxHeight: '200px', overflowY: 'auto' }}>
+                      {availableUsers
+                        .filter(u => {
+                          if (!managerSearchTerm.trim()) return true;
+                          const term = managerSearchTerm.toLowerCase();
+                          return (u.name && u.name.toLowerCase().includes(term)) || (u.email && u.email.toLowerCase().includes(term));
+                        })
+                        .map(u => (
+                          <div
+                            key={u.id || u.email}
+                            onClick={() => {
+                              setRequesterDetails(prev => ({
+                                ...prev,
+                                managerName: u.name,
+                                managerEmail: u.email
+                              }));
+                              setManagerDropdownOpen(false);
+                              setManagerSearchTerm('');
+                            }}
+                            style={{
+                              padding: '0.6rem 0.85rem',
+                              cursor: 'pointer',
+                              display: 'flex',
+                              flexDirection: 'column',
+                              gap: '0.15rem',
+                              borderBottom: '1px solid var(--border-color)',
+                              backgroundColor: requesterDetails.managerEmail === u.email ? '#EFF6FF' : 'transparent',
+                              transition: 'background-color 0.15s'
+                            }}
+                            onMouseEnter={(e) => {
+                              if (requesterDetails.managerEmail !== u.email) e.currentTarget.style.backgroundColor = '#F8FAFC';
+                            }}
+                            onMouseLeave={(e) => {
+                              if (requesterDetails.managerEmail !== u.email) e.currentTarget.style.backgroundColor = 'transparent';
+                            }}
+                          >
+                            <span style={{ fontSize: '0.825rem', fontWeight: 600, color: 'var(--text-primary)' }}>{u.name}</span>
+                            <span style={{ fontSize: '0.725rem', color: 'var(--text-secondary)' }}>{u.email}</span>
+                          </div>
+                        ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <div>
+                <FormLabel>Manager Email</FormLabel>
+                <input
+                  type="email"
+                  readOnly
+                  disabled
+                  placeholder="Selected manager's email"
+                  value={requesterDetails.managerEmail}
+                  style={READONLY_FIELD_STYLE}
+                />
+              </div>
+            </div>
+          </div>
+
+          <div style={{ height: '1px', backgroundColor: 'var(--border-color)' }} />
+
+          {/* Section 2: Requisition Details */}
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <h3 style={{ fontSize: '1rem', fontWeight: 600, color: 'var(--text-primary)', margin: 0 }}>
-              Request Details ({category} - {subcategory})
+              Requisition Details ({category} - {subcategory})
             </h3>
             <span style={{ fontSize: '0.775rem', fontWeight: 600, color: 'var(--text-secondary)' }}>
-              Step 2 of 4
+              Section 2 of 2
             </span>
           </div>
 
@@ -473,24 +788,19 @@ export default function PreSpendPage({ onNavigate, user, initialCostCentre = '',
             </div>
 
             <div>
-              <FormLabel required htmlFor={id('amount')}>Estimated Value (INR)</FormLabel>
-              <div style={{ position: 'relative' }}>
-                <div style={{ position: 'absolute', left: '0.75rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center' }}>
-                  <IndianRupee size={14} />
-                </div>
-                <input
-                  id={id('amount')}
-                  type="number"
-                  step="0.01"
-                  min="0.01"
-                  required
-                  value={details.amount}
-                  onChange={e => changeDetails('amount', e.target.value)}
-                  onWheel={e => e.target.blur()}
-                  placeholder="0.00"
-                  style={{ ...ACTIVE_FIELD_STYLE, paddingLeft: '2rem', fontFamily: 'var(--font-mono)' }}
-                />
-              </div>
+              <FormLabel required htmlFor={id('location')}>Location</FormLabel>
+              <input
+                id={id('location')}
+                type="text"
+                required
+                value={details.location}
+                onChange={e => {
+                  const val = e.target.value.replace(/\b\w/g, c => c.toUpperCase());
+                  changeDetails('location', val);
+                }}
+                placeholder="e.g. Mumbai DC, Pune HQ"
+                style={ACTIVE_FIELD_STYLE}
+              />
             </div>
 
             <div>
@@ -504,40 +814,6 @@ export default function PreSpendPage({ onNavigate, user, initialCostCentre = '',
                 onChange={e => changeDetails('neededBy', e.target.value)}
                 style={ACTIVE_FIELD_STYLE}
               />
-            </div>
-
-            <div>
-              <FormLabel required htmlFor={id('costCentre')}>Cost Centre / Department</FormLabel>
-              <input
-                id={id('costCentre')}
-                type="text"
-                required
-                value={details.costCentre}
-                onChange={e => changeDetails('costCentre', e.target.value)}
-                placeholder="e.g. Technology / Corporate"
-                style={ACTIVE_FIELD_STYLE}
-              />
-            </div>
-
-            <div style={{ gridColumn: 'span 2' }}>
-              <FormLabel required htmlFor={id('budgetLine')}>Budget Line</FormLabel>
-              <select
-                id={id('budgetLine')}
-                required
-                value={details.budgetLine}
-                onChange={e => changeDetails('budgetLine', e.target.value)}
-                style={{
-                  ...ACTIVE_FIELD_STYLE,
-                  textOverflow: 'ellipsis',
-                  whiteSpace: 'nowrap',
-                  overflow: 'hidden'
-                }}
-              >
-                <option value="">Select budget line</option>
-                {budgetLines.map(line => (
-                  <option key={line.value} value={line.value} title={line.label}>{line.label}</option>
-                ))}
-              </select>
             </div>
 
             <div style={{ gridColumn: '1 / -1' }}>
@@ -624,10 +900,10 @@ export default function PreSpendPage({ onNavigate, user, initialCostCentre = '',
           boxShadow: '0 1px 3px rgba(16, 21, 30, 0.04)'
         }}>
           <div>
-            <h2 style={{ fontSize: '1.25rem', fontWeight: 700, color: '#0F172A', margin: 0 }}>
+            <h2 style={{ fontSize: '1.25rem', fontWeight: 600, color: 'var(--text-primary)', margin: 0 }}>
               Vendors & Quotes
             </h2>
-            <p style={{ fontSize: '0.875rem', color: '#64748B', margin: '0.25rem 0 0 0' }}>
+            <p style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', margin: '0.25rem 0 0 0' }}>
               Compare your preferred vendor with available alternatives.
             </p>
           </div>
@@ -659,9 +935,9 @@ export default function PreSpendPage({ onNavigate, user, initialCostCentre = '',
                     <History size={15} />
                   </div>
                   <div>
-                    <span style={{ fontSize: '0.825rem', fontWeight: 700, color: '#0F172A', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-                      Previously Selected Vendor for <span style={{ color: '#2563EB' }}>{pastVendor.subcategory || subcategory}</span>
-                      <span style={{ fontSize: '0.65rem', backgroundColor: '#EFF6FF', color: '#1D4ED8', padding: '0.1rem 0.4rem', borderRadius: '4px', fontWeight: 600 }}>History</span>
+                    <span style={{ fontSize: '0.825rem', fontWeight: 600, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                      Previously Selected Vendor for <span style={{ color: 'var(--brand-primary)' }}>{pastVendor.subcategory || subcategory}</span>
+                      <span style={{ fontSize: '0.65rem', backgroundColor: 'var(--input-bg)', color: 'var(--brand-primary)', padding: '0.1rem 0.4rem', borderRadius: '4px', fontWeight: 600, border: '1px solid var(--border-color)' }}>History</span>
                     </span>
                   </div>
                 </div>
@@ -718,372 +994,457 @@ export default function PreSpendPage({ onNavigate, user, initialCostCentre = '',
                 fontSize: '0.8rem'
               }}>
                 <div>
-                  <span style={{ color: '#64748B', display: 'block', fontSize: '0.7rem', fontWeight: 600, textTransform: 'uppercase' }}>Vendor Name</span>
-                  <span style={{ fontWeight: 700, color: '#0F172A', fontSize: '0.875rem' }}>{pastVendor.vendorName}</span>
+                  <span style={{ color: 'var(--text-secondary)', display: 'block', fontSize: '0.7rem', fontWeight: 600, textTransform: 'uppercase' }}>Vendor Name</span>
+                  <span style={{ fontWeight: 600, color: 'var(--text-primary)', fontSize: '0.875rem' }}>{pastVendor.vendorName}</span>
                 </div>
                 <div>
-                  <span style={{ color: '#64748B', display: 'block', fontSize: '0.7rem', fontWeight: 600, textTransform: 'uppercase' }}>Subcategory</span>
-                  <span style={{ fontWeight: 600, color: '#0F172A' }}>{pastVendor.subcategory || subcategory}</span>
+                  <span style={{ color: 'var(--text-secondary)', display: 'block', fontSize: '0.7rem', fontWeight: 600, textTransform: 'uppercase' }}>Subcategory</span>
+                  <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{pastVendor.subcategory || subcategory}</span>
                 </div>
                 <div>
-                  <span style={{ color: '#64748B', display: 'block', fontSize: '0.7rem', fontWeight: 600, textTransform: 'uppercase' }}>Historical Cost</span>
-                  <span style={{ fontWeight: 700, color: '#059669', fontFamily: 'var(--font-mono)' }}>{pastVendor.vendorAmount ? money(pastVendor.vendorAmount) : '—'}</span>
+                  <span style={{ color: 'var(--text-secondary)', display: 'block', fontSize: '0.7rem', fontWeight: 600, textTransform: 'uppercase' }}>Historical Cost</span>
+                  <span style={{ fontWeight: 600, color: '#059669', fontFamily: 'var(--font-mono)' }}>{pastVendor.vendorAmount ? money(pastVendor.vendorAmount) : '—'}</span>
                 </div>
                 <div>
-                  <span style={{ color: '#64748B', display: 'block', fontSize: '0.7rem', fontWeight: 600, textTransform: 'uppercase' }}>Quote Date</span>
-                  <span style={{ fontWeight: 600, color: '#0F172A', fontFamily: 'var(--font-mono)' }}>{pastVendor.quoteDate || '—'}</span>
+                  <span style={{ color: 'var(--text-secondary)', display: 'block', fontSize: '0.7rem', fontWeight: 600, textTransform: 'uppercase' }}>Quote Date</span>
+                  <span style={{ fontWeight: 600, color: 'var(--text-primary)', fontFamily: 'var(--font-mono)' }}>{pastVendor.quoteDate || '—'}</span>
                 </div>
               </div>
             </div>
           )}
 
           {/* 2x2 Grid for Vendor Cards and Quote Exception */}
-          <div style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))',
-            gap: '1.25rem'
-          }}>
-            {/* 1. Preferred Vendor */}
-            <div style={{
-              padding: '1.5rem',
-              borderRadius: '14px',
-              border: '1.5px solid #10B981',
-              backgroundColor: '#FFFFFF',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '1rem'
-            }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <span style={{ fontSize: '0.95rem', fontWeight: 700, color: '#0F172A' }}>
-                  Preferred Vendor
-                </span>
-                <span style={{
-                  fontSize: '0.75rem',
-                  backgroundColor: '#E6F4EA',
-                  color: '#137333',
-                  fontWeight: 700,
-                  padding: '0.2rem 0.65rem',
-                  borderRadius: '12px'
+          {(() => {
+            const isVendor1Started = Boolean(
+              vendors[1]?.name?.trim() ||
+              vendors[1]?.amount ||
+              vendors[1]?.date ||
+              vendors[1]?.fileName
+            );
+            const isExceptionSelected = Boolean(
+              commercial.exception &&
+              commercial.exception !== 'Not applicable'
+            );
+
+            // Vendor 1 is disabled if an exception is selected
+            const isVendor1Disabled = isExceptionSelected;
+            // Vendor 2 is disabled unless Vendor 1 has been started AND no exception is selected
+            const isVendor2Disabled = !isVendor1Started || isExceptionSelected;
+            // Quote Exception is disabled if Vendor 1 has been started
+            const isExceptionDisabled = isVendor1Started;
+
+            const DISABLED_CARD_STYLE = {
+              opacity: 0.55,
+              backgroundColor: '#F8FAFC',
+              borderColor: '#E2E8F0',
+              pointerEvents: 'none',
+              filter: 'grayscale(0.6)'
+            };
+
+            return (
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))',
+                gap: '1.25rem'
+              }}>
+                {/* 1. Preferred Vendor */}
+                <div style={{
+                  padding: '1.5rem',
+                  borderRadius: '14px',
+                  border: '1.5px solid #10B981',
+                  backgroundColor: '#FFFFFF',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '1rem'
                 }}>
-                  Preferred
-                </span>
-              </div>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <span style={{ fontSize: '0.95rem', fontWeight: 600, color: 'var(--text-primary)' }}>
+                      Preferred Vendor
+                    </span>
+                    <span style={{
+                      fontSize: '0.75rem',
+                      backgroundColor: '#E6F4EA',
+                      color: '#137333',
+                      fontWeight: 700,
+                      padding: '0.2rem 0.65rem',
+                      borderRadius: '12px'
+                    }}>
+                      Preferred
+                    </span>
+                  </div>
 
-              <div>
-                <FormLabel required={!usePastVendor} htmlFor="vendor-0-name">Vendor name</FormLabel>
-                <input
-                  id="vendor-0-name"
-                  type="text"
-                  required={!usePastVendor && (!commercial.exception || commercial.exception === 'Not applicable')}
-                  value={vendors[0]?.name || ''}
-                  onChange={e => changeVendor(0, 'name', e.target.value)}
-                  placeholder="Search or enter vendor"
-                  style={ACTIVE_FIELD_STYLE}
-                />
-              </div>
+                  <div>
+                    <FormLabel required={!usePastVendor} htmlFor="vendor-0-name">Vendor name</FormLabel>
+                    <input
+                      id="vendor-0-name"
+                      type="text"
+                      required={!usePastVendor && (!commercial.exception || commercial.exception === 'Not applicable')}
+                      value={vendors[0]?.name || ''}
+                      onChange={e => changeVendor(0, 'name', e.target.value)}
+                      placeholder="Search or enter vendor"
+                      style={ACTIVE_FIELD_STYLE}
+                    />
+                  </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
-                <div>
-                  <FormLabel required={!usePastVendor} htmlFor="vendor-0-amount">Quoted amount (₹)</FormLabel>
-                  <input
-                    id="vendor-0-amount"
-                    type="number"
-                    step="any"
-                    required={!usePastVendor && (!commercial.exception || commercial.exception === 'Not applicable')}
-                    value={vendors[0]?.amount || ''}
-                    onChange={e => changeVendor(0, 'amount', e.target.value)}
-                    onWheel={e => e.target.blur()}
-                    placeholder="0"
-                    style={ACTIVE_FIELD_STYLE}
-                  />
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                    <div>
+                      <FormLabel required={!usePastVendor} htmlFor="vendor-0-amount">Quoted amount (₹)</FormLabel>
+                      <input
+                        id="vendor-0-amount"
+                        type="number"
+                        step="any"
+                        required={!usePastVendor && (!commercial.exception || commercial.exception === 'Not applicable')}
+                        value={vendors[0]?.amount || ''}
+                        onChange={e => changeVendor(0, 'amount', e.target.value)}
+                        onWheel={e => e.target.blur()}
+                        placeholder="0"
+                        style={ACTIVE_FIELD_STYLE}
+                      />
+                    </div>
+                    <div>
+                      <FormLabel required={!usePastVendor} htmlFor="vendor-0-date">Quote date</FormLabel>
+                      <input
+                        id="vendor-0-date"
+                        type="date"
+                        required={!usePastVendor && (!commercial.exception || commercial.exception === 'Not applicable')}
+                        value={vendors[0]?.date || ''}
+                        onChange={e => changeVendor(0, 'date', e.target.value)}
+                        style={ACTIVE_FIELD_STYLE}
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <FormLabel required={!usePastVendor} htmlFor="vendor-0-file">Upload quotation</FormLabel>
+                    <input
+                      id="vendor-0-file"
+                      type="file"
+                      style={{ display: 'none' }}
+                      onChange={e => {
+                        const f = e.target.files?.[0];
+                        if (f) {
+                          changeVendor(0, 'file', f);
+                          changeVendor(0, 'fileName', f.name);
+                        }
+                      }}
+                    />
+                    <label
+                      htmlFor="vendor-0-file"
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        height: '42px',
+                        border: '1px dashed #94A3B8',
+                        borderRadius: '8px',
+                        backgroundColor: '#F8FAFC',
+                        color: vendors[0]?.fileName ? '#0F172A' : '#475569',
+                        fontSize: '0.85rem',
+                        fontWeight: 500,
+                        cursor: 'pointer',
+                        textAlign: 'center',
+                        padding: '0 1rem',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap'
+                      }}
+                    >
+                      {vendors[0]?.fileName ? vendors[0].fileName : 'Choose PDF, image or email quotation'}
+                    </label>
+                  </div>
                 </div>
-                <div>
-                  <FormLabel required={!usePastVendor} htmlFor="vendor-0-date">Quote date</FormLabel>
-                  <input
-                    id="vendor-0-date"
-                    type="date"
-                    required={!usePastVendor && (!commercial.exception || commercial.exception === 'Not applicable')}
-                    value={vendors[0]?.date || ''}
-                    onChange={e => changeVendor(0, 'date', e.target.value)}
-                    style={ACTIVE_FIELD_STYLE}
-                  />
+
+                {/* 2. Alternative Vendor 1 */}
+                <div style={{
+                  padding: '1.5rem',
+                  borderRadius: '14px',
+                  border: '1px solid #E2E8F0',
+                  backgroundColor: '#FFFFFF',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '1rem',
+                  transition: 'all 0.2s ease',
+                  ...(isVendor1Disabled ? DISABLED_CARD_STYLE : {})
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <span style={{ fontSize: '0.95rem', fontWeight: 600, color: 'var(--text-primary)' }}>
+                      Alternative Vendor 1
+                    </span>
+                    {isVendor1Disabled && (
+                      <span style={{ fontSize: '0.75rem', color: '#94A3B8', fontWeight: 500 }}>
+                        Locked (Exception Selected)
+                      </span>
+                    )}
+                  </div>
+
+                  <div>
+                    <FormLabel htmlFor="vendor-1-name">Vendor name</FormLabel>
+                    <input
+                      id="vendor-1-name"
+                      type="text"
+                      disabled={isVendor1Disabled}
+                      value={vendors[1]?.name || ''}
+                      onChange={e => {
+                        changeVendor(1, 'name', e.target.value);
+                        if (e.target.value.trim() && commercial.exception && commercial.exception !== 'Not applicable') {
+                          changeCommercial('exception', 'Not applicable');
+                          changeCommercial('exceptionReason', '');
+                        }
+                      }}
+                      placeholder="Enter vendor"
+                      style={isVendor1Disabled ? READONLY_FIELD_STYLE : ACTIVE_FIELD_STYLE}
+                    />
+                  </div>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                    <div>
+                      <FormLabel htmlFor="vendor-1-amount">Quoted amount (₹)</FormLabel>
+                      <input
+                        id="vendor-1-amount"
+                        type="number"
+                        step="any"
+                        disabled={isVendor1Disabled}
+                        value={vendors[1]?.amount || ''}
+                        onChange={e => {
+                          changeVendor(1, 'amount', e.target.value);
+                          if (e.target.value && commercial.exception && commercial.exception !== 'Not applicable') {
+                            changeCommercial('exception', 'Not applicable');
+                            changeCommercial('exceptionReason', '');
+                          }
+                        }}
+                        onWheel={e => e.target.blur()}
+                        placeholder="0"
+                        style={isVendor1Disabled ? READONLY_FIELD_STYLE : ACTIVE_FIELD_STYLE}
+                      />
+                    </div>
+                    <div>
+                      <FormLabel htmlFor="vendor-1-date">Quote date</FormLabel>
+                      <input
+                        id="vendor-1-date"
+                        type="date"
+                        disabled={isVendor1Disabled}
+                        value={vendors[1]?.date || ''}
+                        onChange={e => {
+                          changeVendor(1, 'date', e.target.value);
+                          if (e.target.value && commercial.exception && commercial.exception !== 'Not applicable') {
+                            changeCommercial('exception', 'Not applicable');
+                            changeCommercial('exceptionReason', '');
+                          }
+                        }}
+                        style={isVendor1Disabled ? READONLY_FIELD_STYLE : ACTIVE_FIELD_STYLE}
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <FormLabel htmlFor="vendor-1-file">Upload quotation</FormLabel>
+                    <input
+                      id="vendor-1-file"
+                      type="file"
+                      disabled={isVendor1Disabled}
+                      style={{ display: 'none' }}
+                      onChange={e => {
+                        const f = e.target.files?.[0];
+                        if (f) {
+                          changeVendor(1, 'file', f);
+                          changeVendor(1, 'fileName', f.name);
+                          if (commercial.exception && commercial.exception !== 'Not applicable') {
+                            changeCommercial('exception', 'Not applicable');
+                            changeCommercial('exceptionReason', '');
+                          }
+                        }
+                      }}
+                    />
+                    <label
+                      htmlFor={isVendor1Disabled ? undefined : "vendor-1-file"}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        height: '42px',
+                        border: '1px dashed #CBD5E1',
+                        borderRadius: '8px',
+                        backgroundColor: isVendor1Disabled ? 'var(--input-bg)' : '#FFFFFF',
+                        color: vendors[1]?.fileName ? '#0F172A' : '#475569',
+                        fontSize: '0.85rem',
+                        fontWeight: 500,
+                        cursor: isVendor1Disabled ? 'not-allowed' : 'pointer',
+                        textAlign: 'center',
+                        padding: '0 1rem',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap'
+                      }}
+                    >
+                      {vendors[1]?.fileName ? vendors[1].fileName : 'Choose quotation file'}
+                    </label>
+                  </div>
+                </div>
+
+                {/* 3. Alternative Vendor 2 */}
+                <div style={{
+                  padding: '1.5rem',
+                  borderRadius: '14px',
+                  border: '1px solid #E2E8F0',
+                  backgroundColor: '#FFFFFF',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '1rem',
+                  transition: 'all 0.2s ease',
+                  ...(isVendor2Disabled ? DISABLED_CARD_STYLE : {})
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <span style={{ fontSize: '0.95rem', fontWeight: 600, color: 'var(--text-primary)' }}>
+                      Alternative Vendor 2
+                    </span>
+                    <span style={{ fontSize: '0.75rem', color: isVendor2Disabled ? '#94A3B8' : 'var(--text-secondary)', fontWeight: 500 }}>
+                      {isVendor2Disabled ? 'Locked (Fill Vendor 1 first)' : 'Optional'}
+                    </span>
+                  </div>
+
+                  <div>
+                    <FormLabel htmlFor="vendor-2-name">Vendor name</FormLabel>
+                    <input
+                      id="vendor-2-name"
+                      type="text"
+                      disabled={isVendor2Disabled}
+                      value={vendors[2]?.name || ''}
+                      onChange={e => changeVendor(2, 'name', e.target.value)}
+                      placeholder={isVendor2Disabled ? 'Complete Alternative Vendor 1 first' : 'Enter vendor'}
+                      style={isVendor2Disabled ? READONLY_FIELD_STYLE : ACTIVE_FIELD_STYLE}
+                    />
+                  </div>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                    <div>
+                      <FormLabel htmlFor="vendor-2-amount">Quoted amount (₹)</FormLabel>
+                      <input
+                        id="vendor-2-amount"
+                        type="number"
+                        step="any"
+                        disabled={isVendor2Disabled}
+                        value={vendors[2]?.amount || ''}
+                        onChange={e => changeVendor(2, 'amount', e.target.value)}
+                        onWheel={e => e.target.blur()}
+                        placeholder="0"
+                        style={isVendor2Disabled ? READONLY_FIELD_STYLE : ACTIVE_FIELD_STYLE}
+                      />
+                    </div>
+                    <div>
+                      <FormLabel htmlFor="vendor-2-date">Quote date</FormLabel>
+                      <input
+                        id="vendor-2-date"
+                        type="date"
+                        disabled={isVendor2Disabled}
+                        value={vendors[2]?.date || ''}
+                        onChange={e => changeVendor(2, 'date', e.target.value)}
+                        style={isVendor2Disabled ? READONLY_FIELD_STYLE : ACTIVE_FIELD_STYLE}
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <FormLabel htmlFor="vendor-2-file">Upload quotation</FormLabel>
+                    <input
+                      id="vendor-2-file"
+                      type="file"
+                      disabled={isVendor2Disabled}
+                      style={{ display: 'none' }}
+                      onChange={e => {
+                        const f = e.target.files?.[0];
+                        if (f) {
+                          changeVendor(2, 'file', f);
+                          changeVendor(2, 'fileName', f.name);
+                        }
+                      }}
+                    />
+                    <label
+                      htmlFor={isVendor2Disabled ? undefined : "vendor-2-file"}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        height: '42px',
+                        border: '1px dashed #CBD5E1',
+                        borderRadius: '8px',
+                        backgroundColor: isVendor2Disabled ? 'var(--input-bg)' : '#FFFFFF',
+                        color: vendors[2]?.fileName ? '#0F172A' : '#475569',
+                        fontSize: '0.85rem',
+                        fontWeight: 500,
+                        cursor: isVendor2Disabled ? 'not-allowed' : 'pointer',
+                        textAlign: 'center',
+                        padding: '0 1rem',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap'
+                      }}
+                    >
+                      {vendors[2]?.fileName ? vendors[2].fileName : 'Choose quotation file'}
+                    </label>
+                  </div>
+                </div>
+
+                {/* 4. Quote Exception Card */}
+                <div style={{
+                  padding: '1.5rem',
+                  borderRadius: '14px',
+                  border: '1px solid #E2E8F0',
+                  backgroundColor: '#FFFFFF',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '1rem',
+                  transition: 'all 0.2s ease',
+                  ...(isExceptionDisabled ? DISABLED_CARD_STYLE : {})
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <span style={{ fontSize: '0.95rem', fontWeight: 600, color: 'var(--text-primary)' }}>
+                      Quote Exception
+                    </span>
+                    {isExceptionDisabled && (
+                      <span style={{ fontSize: '0.75rem', color: '#94A3B8', fontWeight: 500 }}>
+                        Locked (Vendor 1 Added)
+                      </span>
+                    )}
+                  </div>
+
+                  <div>
+                    <FormLabel htmlFor="commercial-exception">If alternative quotes are unavailable</FormLabel>
+                    <select
+                      id="commercial-exception"
+                      disabled={isExceptionDisabled}
+                      value={commercial.exception}
+                      onChange={e => {
+                        const val = e.target.value;
+                        changeCommercial('exception', val);
+                        if (val && val !== 'Not applicable') {
+                          // Reset Alternative vendors 1 and 2
+                          setVendors(prev => [prev[0], emptyVendor(), emptyVendor()]);
+                        }
+                      }}
+                      style={isExceptionDisabled ? READONLY_FIELD_STYLE : ACTIVE_FIELD_STYLE}
+                    >
+                      {EXCEPTION_OPTIONS.map(opt => (
+                        <option key={opt} value={opt}>{opt}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+                    <FormLabel htmlFor="exception-justification">Exception justification</FormLabel>
+                    <textarea
+                      id="exception-justification"
+                      rows={3}
+                      disabled={isExceptionDisabled}
+                      value={commercial.exceptionReason}
+                      onChange={e => changeCommercial('exceptionReason', e.target.value)}
+                      placeholder={isExceptionDisabled ? 'Not required when alternative vendors are provided' : 'Explain why comparison quotes are not available'}
+                      style={{ ...(isExceptionDisabled ? READONLY_FIELD_STYLE : ACTIVE_FIELD_STYLE), flex: 1, minHeight: '74px', resize: 'vertical' }}
+                    />
+                  </div>
                 </div>
               </div>
-
-              <div>
-                <FormLabel required={!usePastVendor} htmlFor="vendor-0-file">Upload quotation</FormLabel>
-                <input
-                  id="vendor-0-file"
-                  type="file"
-                  style={{ display: 'none' }}
-                  onChange={e => {
-                    const f = e.target.files?.[0];
-                    if (f) {
-                      changeVendor(0, 'file', f);
-                      changeVendor(0, 'fileName', f.name);
-                    }
-                  }}
-                />
-                <label
-                  htmlFor="vendor-0-file"
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    height: '42px',
-                    border: '1px dashed #94A3B8',
-                    borderRadius: '8px',
-                    backgroundColor: '#F8FAFC',
-                    color: vendors[0]?.fileName ? '#0F172A' : '#475569',
-                    fontSize: '0.85rem',
-                    fontWeight: 500,
-                    cursor: 'pointer',
-                    textAlign: 'center',
-                    padding: '0 1rem',
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                    whiteSpace: 'nowrap'
-                  }}
-                >
-                  {vendors[0]?.fileName ? vendors[0].fileName : 'Choose PDF, image or email quotation'}
-                </label>
-              </div>
-            </div>
-
-            {/* 2. Alternative Vendor 1 */}
-            <div style={{
-              padding: '1.5rem',
-              borderRadius: '14px',
-              border: '1px solid #E2E8F0',
-              backgroundColor: '#FFFFFF',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '1rem'
-            }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <span style={{ fontSize: '0.95rem', fontWeight: 700, color: '#0F172A' }}>
-                  Alternative Vendor 1
-                </span>
-              </div>
-
-              <div>
-                <FormLabel htmlFor="vendor-1-name">Vendor name</FormLabel>
-                <input
-                  id="vendor-1-name"
-                  type="text"
-                  value={vendors[1]?.name || ''}
-                  onChange={e => changeVendor(1, 'name', e.target.value)}
-                  placeholder="Enter vendor"
-                  style={ACTIVE_FIELD_STYLE}
-                />
-              </div>
-
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
-                <div>
-                  <FormLabel htmlFor="vendor-1-amount">Quoted amount (₹)</FormLabel>
-                  <input
-                    id="vendor-1-amount"
-                    type="number"
-                    step="any"
-                    value={vendors[1]?.amount || ''}
-                    onChange={e => changeVendor(1, 'amount', e.target.value)}
-                    onWheel={e => e.target.blur()}
-                    placeholder="0"
-                    style={ACTIVE_FIELD_STYLE}
-                  />
-                </div>
-                <div>
-                  <FormLabel htmlFor="vendor-1-date">Quote date</FormLabel>
-                  <input
-                    id="vendor-1-date"
-                    type="date"
-                    value={vendors[1]?.date || ''}
-                    onChange={e => changeVendor(1, 'date', e.target.value)}
-                    style={ACTIVE_FIELD_STYLE}
-                  />
-                </div>
-              </div>
-
-              <div>
-                <FormLabel htmlFor="vendor-1-file">Upload quotation</FormLabel>
-                <input
-                  id="vendor-1-file"
-                  type="file"
-                  style={{ display: 'none' }}
-                  onChange={e => {
-                    const f = e.target.files?.[0];
-                    if (f) {
-                      changeVendor(1, 'file', f);
-                      changeVendor(1, 'fileName', f.name);
-                    }
-                  }}
-                />
-                <label
-                  htmlFor="vendor-1-file"
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    height: '42px',
-                    border: '1px dashed #CBD5E1',
-                    borderRadius: '8px',
-                    backgroundColor: '#FFFFFF',
-                    color: vendors[1]?.fileName ? '#0F172A' : '#475569',
-                    fontSize: '0.85rem',
-                    fontWeight: 500,
-                    cursor: 'pointer',
-                    textAlign: 'center',
-                    padding: '0 1rem',
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                    whiteSpace: 'nowrap'
-                  }}
-                >
-                  {vendors[1]?.fileName ? vendors[1].fileName : 'Choose quotation file'}
-                </label>
-              </div>
-            </div>
-
-            {/* 3. Alternative Vendor 2 */}
-            <div style={{
-              padding: '1.5rem',
-              borderRadius: '14px',
-              border: '1px solid #E2E8F0',
-              backgroundColor: '#FFFFFF',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '1rem'
-            }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <span style={{ fontSize: '0.95rem', fontWeight: 700, color: '#0F172A' }}>
-                  Alternative Vendor 2
-                </span>
-                <span style={{ fontSize: '0.75rem', color: '#64748B', fontWeight: 500 }}>
-                  Optional
-                </span>
-              </div>
-
-              <div>
-                <FormLabel htmlFor="vendor-2-name">Vendor name</FormLabel>
-                <input
-                  id="vendor-2-name"
-                  type="text"
-                  value={vendors[2]?.name || ''}
-                  onChange={e => changeVendor(2, 'name', e.target.value)}
-                  placeholder="Enter vendor"
-                  style={ACTIVE_FIELD_STYLE}
-                />
-              </div>
-
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
-                <div>
-                  <FormLabel htmlFor="vendor-2-amount">Quoted amount (₹)</FormLabel>
-                  <input
-                    id="vendor-2-amount"
-                    type="number"
-                    step="any"
-                    value={vendors[2]?.amount || ''}
-                    onChange={e => changeVendor(2, 'amount', e.target.value)}
-                    onWheel={e => e.target.blur()}
-                    placeholder="0"
-                    style={ACTIVE_FIELD_STYLE}
-                  />
-                </div>
-                <div>
-                  <FormLabel htmlFor="vendor-2-date">Quote date</FormLabel>
-                  <input
-                    id="vendor-2-date"
-                    type="date"
-                    value={vendors[2]?.date || ''}
-                    onChange={e => changeVendor(2, 'date', e.target.value)}
-                    style={ACTIVE_FIELD_STYLE}
-                  />
-                </div>
-              </div>
-
-              <div>
-                <FormLabel htmlFor="vendor-2-file">Upload quotation</FormLabel>
-                <input
-                  id="vendor-2-file"
-                  type="file"
-                  style={{ display: 'none' }}
-                  onChange={e => {
-                    const f = e.target.files?.[0];
-                    if (f) {
-                      changeVendor(2, 'file', f);
-                      changeVendor(2, 'fileName', f.name);
-                    }
-                  }}
-                />
-                <label
-                  htmlFor="vendor-2-file"
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    height: '42px',
-                    border: '1px dashed #CBD5E1',
-                    borderRadius: '8px',
-                    backgroundColor: '#FFFFFF',
-                    color: vendors[2]?.fileName ? '#0F172A' : '#475569',
-                    fontSize: '0.85rem',
-                    fontWeight: 500,
-                    cursor: 'pointer',
-                    textAlign: 'center',
-                    padding: '0 1rem',
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                    whiteSpace: 'nowrap'
-                  }}
-                >
-                  {vendors[2]?.fileName ? vendors[2].fileName : 'Choose quotation file'}
-                </label>
-              </div>
-            </div>
-
-            {/* 4. Quote Exception Card */}
-            <div style={{
-              padding: '1.5rem',
-              borderRadius: '14px',
-              border: '1px solid #E2E8F0',
-              backgroundColor: '#FFFFFF',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '1rem'
-            }}>
-              <div>
-                <span style={{ fontSize: '0.95rem', fontWeight: 700, color: '#0F172A' }}>
-                  Quote Exception
-                </span>
-              </div>
-
-              <div>
-                <FormLabel htmlFor="commercial-exception">If alternative quotes are unavailable</FormLabel>
-                <select
-                  id="commercial-exception"
-                  value={commercial.exception}
-                  onChange={e => changeCommercial('exception', e.target.value)}
-                  style={ACTIVE_FIELD_STYLE}
-                >
-                  {EXCEPTION_OPTIONS.map(opt => (
-                    <option key={opt} value={opt}>{opt}</option>
-                  ))}
-                </select>
-              </div>
-
-              <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-                <FormLabel htmlFor="exception-justification">Exception justification</FormLabel>
-                <textarea
-                  id="exception-justification"
-                  rows={3}
-                  value={commercial.exceptionReason}
-                  onChange={e => changeCommercial('exceptionReason', e.target.value)}
-                  placeholder="Explain why comparison quotes are not available"
-                  style={{ ...ACTIVE_FIELD_STYLE, flex: 1, minHeight: '74px', resize: 'vertical' }}
-                />
-              </div>
-            </div>
-          </div>
+            );
+          })()}
 
           {/* Selection Reason and Commercial Justification Fields */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
@@ -1174,67 +1535,59 @@ export default function PreSpendPage({ onNavigate, user, initialCostCentre = '',
         }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <div>
-              <h2 style={{ fontSize: '1.25rem', fontWeight: 700, color: '#0F172A', margin: 0 }}>
+              <h2 style={{ fontSize: '1.25rem', fontWeight: 600, color: 'var(--text-primary)', margin: 0 }}>
                 Review Pre-Spend Request
               </h2>
-              <p style={{ fontSize: '0.875rem', color: '#64748B', margin: '0.25rem 0 0 0' }}>
+              <p style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', margin: '0.25rem 0 0 0' }}>
                 Verify all spend information, vendor quotes, and attachments before submitting for approval
               </p>
             </div>
-            <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#64748B', backgroundColor: '#F1F5F9', padding: '0.3rem 0.65rem', borderRadius: '6px' }}>
+            <span style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-secondary)', backgroundColor: 'var(--input-bg)', padding: '0.3rem 0.65rem', borderRadius: '6px', border: '1px solid var(--border-color)' }}>
               Step 4 of 4
             </span>
           </div>
 
           {/* Section 1: Request Details */}
-          <div style={{ borderRadius: '12px', border: '1px solid #E2E8F0', overflow: 'hidden' }}>
-            <div style={{ padding: '0.75rem 1.25rem', backgroundColor: '#F8FAFC', borderBottom: '1px solid #E2E8F0', fontSize: '0.85rem', fontWeight: 700, color: '#0F172A' }}>
-              1. Request & Budget Details
+          <div style={{ borderRadius: '12px', border: '1px solid var(--border-color)', overflow: 'hidden' }}>
+            <div style={{ padding: '0.75rem 1.25rem', backgroundColor: 'var(--card-bg)', borderBottom: '1px solid var(--border-color)', fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-primary)' }}>
+              1. Request Details
             </div>
             <div style={{ padding: '1.25rem', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1rem', fontSize: '0.85rem' }}>
               <div>
-                <span style={{ color: '#64748B', display: 'block', fontSize: '0.75rem', fontWeight: 600, textTransform: 'uppercase' }}>Category / Subcategory</span>
-                <span style={{ color: '#0F172A', fontWeight: 600 }}>{category} — {subcategory}</span>
+                <span style={{ color: 'var(--text-secondary)', display: 'block', fontSize: '0.75rem', fontWeight: 600, textTransform: 'uppercase' }}>Category / Subcategory</span>
+                <span style={{ color: 'var(--text-primary)', fontWeight: 600 }}>{category} — {subcategory}</span>
               </div>
               <div>
-                <span style={{ color: '#64748B', display: 'block', fontSize: '0.75rem', fontWeight: 600, textTransform: 'uppercase' }}>Estimated Value</span>
-                <span style={{ color: '#2563EB', fontWeight: 700, fontFamily: 'var(--font-mono)', fontSize: '0.95rem' }}>{money(details.amount)}</span>
+                <span style={{ color: 'var(--text-secondary)', display: 'block', fontSize: '0.75rem', fontWeight: 600, textTransform: 'uppercase' }}>Location</span>
+                <span style={{ color: 'var(--text-primary)', fontWeight: 600 }}>{details.location || '—'}</span>
               </div>
               <div>
-                <span style={{ color: '#64748B', display: 'block', fontSize: '0.75rem', fontWeight: 600, textTransform: 'uppercase' }}>Request Date</span>
-                <span style={{ color: '#0F172A', fontWeight: 600 }}>{new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}</span>
+                <span style={{ color: 'var(--text-secondary)', display: 'block', fontSize: '0.75rem', fontWeight: 600, textTransform: 'uppercase' }}>Request Date</span>
+                <span style={{ color: 'var(--text-primary)', fontWeight: 600 }}>{new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}</span>
               </div>
               <div>
-                <span style={{ color: '#64748B', display: 'block', fontSize: '0.75rem', fontWeight: 600, textTransform: 'uppercase' }}>Needed By Date</span>
-                <span style={{ color: '#0F172A', fontWeight: 600 }}>{details.neededBy || '—'}</span>
-              </div>
-              <div>
-                <span style={{ color: '#64748B', display: 'block', fontSize: '0.75rem', fontWeight: 600, textTransform: 'uppercase' }}>Cost Centre</span>
-                <span style={{ color: '#0F172A', fontWeight: 600 }}>{details.costCentre || '—'}</span>
+                <span style={{ color: 'var(--text-secondary)', display: 'block', fontSize: '0.75rem', fontWeight: 600, textTransform: 'uppercase' }}>Needed By Date</span>
+                <span style={{ color: 'var(--text-primary)', fontWeight: 600 }}>{details.neededBy || '—'}</span>
               </div>
               <div style={{ gridColumn: '1 / -1' }}>
-                <span style={{ color: '#64748B', display: 'block', fontSize: '0.75rem', fontWeight: 600, textTransform: 'uppercase' }}>Budget Line</span>
-                <span style={{ color: '#0F172A', fontWeight: 600 }}>{budgetLines.find(b => b.value === details.budgetLine)?.label || details.budgetLine || '—'}</span>
+                <span style={{ color: 'var(--text-secondary)', display: 'block', fontSize: '0.75rem', fontWeight: 600, textTransform: 'uppercase' }}>What are you buying? (Scope & Spec)</span>
+                <p style={{ color: 'var(--text-primary)', margin: '0.25rem 0 0 0', lineHeight: 1.5, whiteSpace: 'pre-wrap' }}>{details.buying}</p>
               </div>
               <div style={{ gridColumn: '1 / -1' }}>
-                <span style={{ color: '#64748B', display: 'block', fontSize: '0.75rem', fontWeight: 600, textTransform: 'uppercase' }}>What are you buying? (Scope & Spec)</span>
-                <p style={{ color: '#0F172A', margin: '0.25rem 0 0 0', lineHeight: 1.5, whiteSpace: 'pre-wrap' }}>{details.buying}</p>
-              </div>
-              <div style={{ gridColumn: '1 / -1' }}>
-                <span style={{ color: '#64748B', display: 'block', fontSize: '0.75rem', fontWeight: 600, textTransform: 'uppercase' }}>Business Justification</span>
-                <p style={{ color: '#334155', margin: '0.25rem 0 0 0', lineHeight: 1.5, whiteSpace: 'pre-wrap' }}>{details.justification}</p>
+                <span style={{ color: 'var(--text-secondary)', display: 'block', fontSize: '0.75rem', fontWeight: 600, textTransform: 'uppercase' }}>Business Justification</span>
+                <p style={{ color: 'var(--text-secondary)', margin: '0.25rem 0 0 0', lineHeight: 1.5, whiteSpace: 'pre-wrap' }}>{details.justification}</p>
               </div>
               {details.urgent && (
                 <div style={{ gridColumn: '1 / -1', padding: '0.75rem 1rem', backgroundColor: '#FEF2F2', border: '1px solid #FCA5A5', borderRadius: '8px' }}>
-                  <span style={{ color: '#DC2626', fontWeight: 700, display: 'block', fontSize: '0.8rem' }}>URGENT REQUIREMENT</span>
+                  <span style={{ color: '#DC2626', fontWeight: 600, display: 'block', fontSize: '0.8rem' }}>URGENT REQUIREMENT</span>
                 </div>
               )}
             </div>
           </div>
 
           {/* Section 2: Vendors & Quotations Comparison */}
-          <div style={{ borderRadius: '12px', border: '1px solid #E2E8F0', overflow: 'hidden' }}>
-            <div style={{ padding: '0.75rem 1.25rem', backgroundColor: '#F8FAFC', borderBottom: '1px solid #E2E8F0', fontSize: '0.85rem', fontWeight: 700, color: '#0F172A' }}>
+          <div style={{ borderRadius: '12px', border: '1px solid var(--border-color)', overflow: 'hidden' }}>
+            <div style={{ padding: '0.75rem 1.25rem', backgroundColor: 'var(--card-bg)', borderBottom: '1px solid var(--border-color)', fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-primary)' }}>
               2. Vendor Quotations & Comparison
             </div>
             <div style={{ padding: '1.25rem', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1rem' }}>
@@ -1249,7 +1602,7 @@ export default function PreSpendPage({ onNavigate, user, initialCostCentre = '',
                   gap: '0.65rem'
                 }}>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                    <span style={{ fontSize: '0.875rem', fontWeight: 700, color: '#0F172A' }}>
+                    <span style={{ fontSize: '0.875rem', fontWeight: 600, color: 'var(--text-primary)' }}>
                       {i === 0 ? 'Preferred Vendor' : `Alternative Vendor ${i}`}
                     </span>
                     {i === 0 && (
@@ -1257,7 +1610,7 @@ export default function PreSpendPage({ onNavigate, user, initialCostCentre = '',
                         fontSize: '0.7rem',
                         backgroundColor: usePastVendor ? '#EFF6FF' : '#E6F4EA',
                         color: usePastVendor ? '#1D4ED8' : '#137333',
-                        fontWeight: 700,
+                        fontWeight: 600,
                         padding: '0.15rem 0.5rem',
                         borderRadius: '10px'
                       }}>
@@ -1330,32 +1683,32 @@ export default function PreSpendPage({ onNavigate, user, initialCostCentre = '',
           </div>
 
           {/* Section 3: Commercial Evaluation & Justification */}
-          <div style={{ borderRadius: '12px', border: '1px solid #E2E8F0', overflow: 'hidden' }}>
-            <div style={{ padding: '0.75rem 1.25rem', backgroundColor: '#F8FAFC', borderBottom: '1px solid #E2E8F0', fontSize: '0.85rem', fontWeight: 700, color: '#0F172A' }}>
+          <div style={{ borderRadius: '12px', border: '1px solid var(--border-color)', overflow: 'hidden' }}>
+            <div style={{ padding: '0.75rem 1.25rem', backgroundColor: 'var(--card-bg)', borderBottom: '1px solid var(--border-color)', fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-primary)' }}>
               3. Commercial Evaluation & Justification
             </div>
             <div style={{ padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '0.85rem', fontSize: '0.85rem' }}>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1rem' }}>
                 <div>
-                  <span style={{ color: '#64748B', display: 'block', fontSize: '0.75rem', fontWeight: 600, textTransform: 'uppercase' }}>Reason for Vendor Selection</span>
-                  <span style={{ color: '#0F172A', fontWeight: 600 }}>{commercial.reason || '—'}</span>
+                  <span style={{ color: 'var(--text-secondary)', display: 'block', fontSize: '0.75rem', fontWeight: 600, textTransform: 'uppercase' }}>Reason for Vendor Selection</span>
+                  <span style={{ color: 'var(--text-primary)', fontWeight: 600 }}>{commercial.reason || '—'}</span>
                 </div>
                 <div>
-                  <span style={{ color: '#64748B', display: 'block', fontSize: '0.75rem', fontWeight: 600, textTransform: 'uppercase' }}>Quote Exception Rule</span>
-                  <span style={{ color: '#0F172A', fontWeight: 600 }}>{commercial.exception || 'Not applicable'}</span>
+                  <span style={{ color: 'var(--text-secondary)', display: 'block', fontSize: '0.75rem', fontWeight: 600, textTransform: 'uppercase' }}>Quote Exception Rule</span>
+                  <span style={{ color: 'var(--text-primary)', fontWeight: 600 }}>{commercial.exception || 'Not applicable'}</span>
                 </div>
               </div>
 
               {commercial.exception && commercial.exception !== 'Not applicable' && commercial.exceptionReason && (
                 <div>
-                  <span style={{ color: '#64748B', display: 'block', fontSize: '0.75rem', fontWeight: 600, textTransform: 'uppercase' }}>Exception Justification</span>
-                  <p style={{ color: '#334155', margin: '0.2rem 0 0 0', lineHeight: 1.5 }}>{commercial.exceptionReason}</p>
+                  <span style={{ color: 'var(--text-secondary)', display: 'block', fontSize: '0.75rem', fontWeight: 600, textTransform: 'uppercase' }}>Exception Justification</span>
+                  <p style={{ color: 'var(--text-secondary)', margin: '0.2rem 0 0 0', lineHeight: 1.5 }}>{commercial.exceptionReason}</p>
                 </div>
               )}
 
               <div>
-                <span style={{ color: '#64748B', display: 'block', fontSize: '0.75rem', fontWeight: 600, textTransform: 'uppercase' }}>Vendor Selection Justification</span>
-                <p style={{ color: '#334155', margin: '0.2rem 0 0 0', lineHeight: 1.5, whiteSpace: 'pre-wrap' }}>{commercial.justification || '—'}</p>
+                <span style={{ color: 'var(--text-secondary)', display: 'block', fontSize: '0.75rem', fontWeight: 600, textTransform: 'uppercase' }}>Vendor Selection Justification</span>
+                <p style={{ color: 'var(--text-secondary)', margin: '0.2rem 0 0 0', lineHeight: 1.5, whiteSpace: 'pre-wrap' }}>{commercial.justification || '—'}</p>
               </div>
             </div>
           </div>

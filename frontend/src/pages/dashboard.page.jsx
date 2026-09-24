@@ -3,7 +3,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   FileText, Clock, RotateCw, XCircle, Layers, PieChart,
   TrendingUp, TrendingDown, Minus, Sunrise, Sun, Moon, Plus,
-  Download, FileSpreadsheet, Check, IndianRupee, Plane, Car, Building2, Train, Bus
+  Download, FileSpreadsheet, Check, IndianRupee, Plane, Car, Building2, Train, Bus, AlertTriangle
 } from 'lucide-react';
 import FilterBar, { initCustomDateRange } from '../components/ui/filterBar.component';
 import ChangeRequestModal from '../components/ui/changeRequestModal.component';
@@ -190,6 +190,34 @@ function DashboardPage({ onNavigate, user, isOrgDashboard = false, searchQuery =
     refetchInterval: 30000,
   });
 
+  // Fetch Pending Counts across modules for dot indicators
+  const { data: modulePendingCounts } = useQuery({
+    queryKey: ['dashboard-pending-dots', isOrgDashboard, user?.id],
+    queryFn: async () => {
+      const headers = user?.token ? { Authorization: `Bearer ${user.token}` } : {};
+      const params = isOrgDashboard ? 'scope=org' : 'scope=my';
+      try {
+        const [crRes, psRes, trRes] = await Promise.all([
+          apiFetch(`/my-requests?${params}&status=Pending`, { headers }),
+          apiFetch(`/pre-spend?${params}&status=Pending%20Approval`, { headers }),
+          apiFetch(`/travel-desk?${params}&status=Pending%20Approval`, { headers })
+        ]);
+        const crData = crRes.ok ? await crRes.json() : {};
+        const psData = psRes.ok ? await psRes.json() : {};
+        const trData = trRes.ok ? await trRes.json() : {};
+
+        return {
+          change_request: crData.statusCounts?.Pending ?? crData.metrics?.pending ?? (Array.isArray(crData.data) ? crData.data.length : 0),
+          prespend: psData.statusCounts?.Pending ?? psData.metrics?.pending ?? (Array.isArray(psData.data) ? psData.data.length : 0),
+          travel: trData.statusCounts?.Pending ?? trData.metrics?.pending ?? (Array.isArray(trData.data) ? trData.data.length : 0)
+        };
+      } catch {
+        return { change_request: 0, prespend: 0, travel: 0 };
+      }
+    },
+    refetchInterval: 30000
+  });
+
   const rawMetrics = dashboardResult?.metrics;
   const categoryData = dashboardResult?.categories || [];
   const statusBreakdown = dashboardResult?.statusBreakdown || [];
@@ -321,6 +349,7 @@ function DashboardPage({ onNavigate, user, isOrgDashboard = false, searchQuery =
         <ModuleSwitcher
           activeModule={activeModule}
           onModuleChange={setActiveModule}
+          pendingCounts={modulePendingCounts}
         />
 
         {/* Extreme Right Action Buttons */}
@@ -406,6 +435,27 @@ function DashboardPage({ onNavigate, user, isOrgDashboard = false, searchQuery =
           )}
         </div>
       </div>
+
+      {/* Single Unified Filter Bar (Above Metric Cards) */}
+      <FilterBar
+        tabs={filterTabs}
+        activeTab={activeFilter}
+        onTabChange={setActiveFilter}
+        dateValue={dateFilter}
+        onDateChange={(val) => {
+          setDateFilter(val);
+          if (val === 'custom') {
+            initCustomDateRange({ startDate, endDate, setStartDate, setEndDate });
+          } else {
+            setStartDate('');
+            setEndDate('');
+          }
+        }}
+        startDate={startDate}
+        endDate={endDate}
+        onStartDateChange={setStartDate}
+        onEndDateChange={setEndDate}
+      />
 
       {/* KPI Metric Cards Grid */}
       <div style={{
@@ -688,27 +738,6 @@ function DashboardPage({ onNavigate, user, isOrgDashboard = false, searchQuery =
         </div>
       </div>
 
-      {/* Single Unified Filter Bar */}
-      <FilterBar
-        tabs={filterTabs}
-        activeTab={activeFilter}
-        onTabChange={setActiveFilter}
-        dateValue={dateFilter}
-        onDateChange={(val) => {
-          setDateFilter(val);
-          if (val === 'custom') {
-            initCustomDateRange({ startDate, endDate, setStartDate, setEndDate });
-          } else {
-            setStartDate('');
-            setEndDate('');
-          }
-        }}
-        startDate={startDate}
-        endDate={endDate}
-        onStartDateChange={setStartDate}
-        onEndDateChange={setEndDate}
-      />
-
       {/* Bottom Section: Change Requests Table */}
       <div style={{
         backgroundColor: 'var(--card-bg)',
@@ -755,8 +784,13 @@ function DashboardPage({ onNavigate, user, isOrgDashboard = false, searchQuery =
                   <th style={{ padding: '0.85rem 1rem', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', fontSize: '0.725rem', letterSpacing: '0.05em', minWidth: '160px', width: '180px' }}>Requester Details</th>
                 )}
                 <th style={{ padding: '0.85rem 1rem', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', fontSize: '0.725rem', letterSpacing: '0.05em', width: '110px', minWidth: '110px', whiteSpace: 'nowrap' }}>
-                  {activeModule === 'travel' ? 'Travel Date' : 'Raised Date'}
+                  Requested On
                 </th>
+                {activeModule === 'travel' && (
+                  <th style={{ padding: '0.85rem 1rem', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', fontSize: '0.725rem', letterSpacing: '0.05em', width: '110px', minWidth: '110px', whiteSpace: 'nowrap' }}>
+                    Travel Date
+                  </th>
+                )}
                 <th style={{ padding: '0.85rem 1rem', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', fontSize: '0.725rem', letterSpacing: '0.05em', width: '110px', minWidth: '110px', whiteSpace: 'nowrap' }}>Closed Date</th>
                 {isOrgDashboard && (
                   <th style={{ padding: '0.85rem 1rem', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', fontSize: '0.725rem', letterSpacing: '0.05em', minWidth: '140px', width: '150px' }}>Approved By</th>
@@ -777,6 +811,9 @@ function DashboardPage({ onNavigate, user, isOrgDashboard = false, searchQuery =
                     ? (cr.rejectedBy || cr.decidedBy || cr.approvedBy || '')
                     : (cr.approvedBy || cr.decidedBy || (['Approved', 'Implemented'].includes(cr.status) ? (approverEmail ? approverEmail.split('@')[0].replace(/[\._]/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) : 'Approver') : ''));
 
+                  const isUrgentPreSpend = activeModule === 'prespend' && (cr.isUrgent || cr.urgent);
+                  const requestedOnDate = cr.raisedDate || (cr.submittedAt ? new Date(cr.submittedAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : (cr.createdAt ? new Date(cr.createdAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'));
+
                   return (
                     <tr key={cr.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
                       <td style={{ padding: '0.85rem 1rem', fontWeight: 500, color: 'var(--text-primary)', fontFamily: 'var(--font-mono)', whiteSpace: 'nowrap' }}>{cr.requestCode || cr.id}</td>
@@ -796,7 +833,12 @@ function DashboardPage({ onNavigate, user, isOrgDashboard = false, searchQuery =
                           </div>
                         </td>
                       )}
-                      <td style={{ padding: '0.85rem 1rem', color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>{cr.raisedDate || '—'}</td>
+                      <td style={{ padding: '0.85rem 1rem', color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>{requestedOnDate}</td>
+                      {activeModule === 'travel' && (
+                        <td style={{ padding: '0.85rem 1rem', color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>
+                          {cr.departureDate ? new Date(cr.departureDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'}
+                        </td>
+                      )}
                       <td style={{ padding: '0.85rem 1rem', color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>{cr.closedDate || '—'}</td>
                       {isOrgDashboard && (
                         <td style={{ padding: '0.85rem 1rem', minWidth: '140px' }}>
@@ -817,22 +859,42 @@ function DashboardPage({ onNavigate, user, isOrgDashboard = false, searchQuery =
                         </td>
                       )}
                       <td style={{ padding: '0.85rem 1rem', whiteSpace: 'nowrap' }}>
-                        <div style={{
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: '0.35rem',
-                          padding: '0.2rem 0.65rem',
-                          borderRadius: 'var(--radius-lg)',
-                          backgroundColor: cr.statusBg || '#FEF3C7',
-                          color: cr.statusColor || '#D97706',
-                          fontSize: '0.775rem',
-                          fontWeight: 500,
-                          whiteSpace: 'nowrap'
-                        }}>
-                          <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: cr.statusDot || '#D97706' }} />
-                          <span style={{ whiteSpace: 'nowrap' }}>
-                            {(cr.status || '').toLowerCase() === 'pending' ? 'Pending Approvals' : cr.status}
-                          </span>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem', alignItems: 'flex-start' }}>
+                          <div style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '0.35rem',
+                            padding: '0.2rem 0.65rem',
+                            borderRadius: 'var(--radius-lg)',
+                            backgroundColor: cr.statusBg || '#FEF3C7',
+                            color: cr.statusColor || '#D97706',
+                            fontSize: '0.775rem',
+                            fontWeight: 500,
+                            whiteSpace: 'nowrap'
+                          }}>
+                            <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: cr.statusDot || '#D97706' }} />
+                            <span style={{ whiteSpace: 'nowrap' }}>
+                              {(cr.status || '').toLowerCase() === 'pending' ? 'Pending Approvals' : cr.status}
+                            </span>
+                          </div>
+                          {isUrgentPreSpend && (
+                            <div style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '0.25rem',
+                              padding: '0.15rem 0.5rem',
+                              borderRadius: '4px',
+                              backgroundColor: '#FEF2F2',
+                              color: '#DC2626',
+                              border: '1px solid #FECACA',
+                              fontSize: '0.7rem',
+                              fontWeight: 700,
+                              whiteSpace: 'nowrap'
+                            }}>
+                              <AlertTriangle size={11} strokeWidth={2.5} />
+                              <span>Urgent</span>
+                            </div>
+                          )}
                         </div>
                       </td>
                       <td style={{ padding: '0.85rem 1rem', textAlign: 'right', whiteSpace: 'nowrap' }}>

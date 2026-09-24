@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Clock, Check, X, RotateCw, FileText, IndianRupee, Plane, MessageSquare } from 'lucide-react';
+import { Clock, Check, X, RotateCw, FileText, IndianRupee, Plane, MessageSquare, AlertTriangle } from 'lucide-react';
 import ChangeRequestModal from '../components/ui/changeRequestModal.component';
 import PreSpendDetailsModal from '../components/ui/PreSpendDetailsModal.component';
 import TravelDetailsModal from '../components/ui/TravelDetailsModal.component';
@@ -60,8 +60,8 @@ function MyWorklistPage({ onNavigate, searchQuery = '', user, isOrgWorklist = fa
   const [isActionSubmitting, setIsActionSubmitting] = useState(false);
   const [commentPopupData, setCommentPopupData] = useState(null);
 
-  // Initial Filter State
-  const [activeFilter, setActiveFilter] = useState(isImplementer ? 'Approved' : 'Pending');
+  // Initial Filter State (Default to 'All' everywhere)
+  const [activeFilter, setActiveFilter] = useState('All');
 
   // Reset pagination when filter/date/search/module changes
   useEffect(() => {
@@ -147,6 +147,34 @@ function MyWorklistPage({ onNavigate, searchQuery = '', user, isOrgWorklist = fa
       };
     },
     enabled: !isCustomDateIncomplete,
+  });
+
+  // Fetch Pending Counts across modules for dot indicators
+  const { data: modulePendingCounts } = useQuery({
+    queryKey: ['worklist-pending-dots', isOrgWorklist, user?.id],
+    queryFn: async () => {
+      const headers = user?.token ? { Authorization: `Bearer ${user.token}` } : {};
+      const params = isOrgWorklist ? 'scope=org' : 'scope=my';
+      try {
+        const [crRes, psRes, trRes] = await Promise.all([
+          apiFetch(`/worklist?${params}&status=Pending`, { headers }),
+          apiFetch(`/pre-spend?${params}&status=Pending%20Approval`, { headers }),
+          apiFetch(`/travel-desk?${params}&status=Pending%20Approval`, { headers })
+        ]);
+        const crData = crRes.ok ? await crRes.json() : {};
+        const psData = psRes.ok ? await psRes.json() : {};
+        const trData = trRes.ok ? await trRes.json() : {};
+
+        return {
+          change_request: crData.statusCounts?.Pending ?? crData.metrics?.pending ?? (Array.isArray(crData.data) ? crData.data.length : 0),
+          prespend: psData.statusCounts?.Pending ?? psData.metrics?.pending ?? (Array.isArray(psData.data) ? psData.data.length : 0),
+          travel: trData.statusCounts?.Pending ?? trData.metrics?.pending ?? (Array.isArray(trData.data) ? trData.data.length : 0)
+        };
+      } catch {
+        return { change_request: 0, prespend: 0, travel: 0 };
+      }
+    },
+    refetchInterval: 30000
   });
 
   const [localItems, setLocalItems] = useState(null);
@@ -257,17 +285,17 @@ function MyWorklistPage({ onNavigate, searchQuery = '', user, isOrgWorklist = fa
 
   const filterTabs = activeModule === 'change_request'
     ? [
-        { id: 'All', label: `All (${statusCounts.All || 0})` },
-        { id: 'Pending', label: `Pending (${statusCounts.Pending || 0})` },
-        { id: 'Approved', label: `Approved (${approvedCount})` },
-        { id: 'Implemented', label: `Implemented (${statusCounts.Implemented || 0})` },
-        { id: 'Rejected', label: `Rejected (${statusCounts.Rejected || 0})` }
+        { id: 'All', label: 'All', count: statusCounts.All || 0 },
+        { id: 'Pending', label: 'Pending', count: statusCounts.Pending || 0 },
+        { id: 'Approved', label: 'Approved', count: approvedCount },
+        { id: 'Implemented', label: 'Implemented', count: statusCounts.Implemented || 0 },
+        { id: 'Rejected', label: 'Rejected', count: statusCounts.Rejected || 0 }
       ]
     : [
-        { id: 'All', label: `All (${statusCounts.All || 0})` },
-        { id: 'Pending', label: `Pending (${statusCounts.Pending || 0})` },
-        { id: 'Approved', label: `${activeModule === 'travel' ? 'Ticketed & Confirmed' : 'Approved'} (${approvedCount})` },
-        { id: 'Rejected', label: `Rejected (${statusCounts.Rejected || 0})` }
+        { id: 'All', label: 'All', count: statusCounts.All || 0 },
+        { id: 'Pending', label: 'Pending', count: statusCounts.Pending || 0 },
+        { id: 'Approved', label: activeModule === 'travel' ? 'Ticketed & Confirmed' : 'Approved', count: approvedCount },
+        { id: 'Rejected', label: 'Rejected', count: statusCounts.Rejected || 0 }
       ];
 
   // 1. Change Request Worklist Cards
@@ -322,6 +350,7 @@ function MyWorklistPage({ onNavigate, searchQuery = '', user, isOrgWorklist = fa
         <ModuleSwitcher
           activeModule={activeModule}
           onModuleChange={setActiveModule}
+          pendingCounts={modulePendingCounts}
           allowedModules={allowedModules}
         />
 
@@ -394,9 +423,14 @@ function MyWorklistPage({ onNavigate, searchQuery = '', user, isOrgWorklist = fa
                 <th style={{ padding: '0.9rem 1.1rem', minWidth: '280px' }}>Title</th>
                 <th style={{ padding: '0.9rem 1.1rem', minWidth: '180px' }}>Category</th>
                 <th style={{ padding: '0.9rem 1.1rem', minWidth: '180px', whiteSpace: 'nowrap' }}>Requester Details</th>
-                <th style={{ padding: '0.9rem 1.1rem', minWidth: '120px', whiteSpace: 'nowrap' }}>
-                  {activeModule === 'travel' ? 'Travel Date' : 'Raised Date'}
+                <th style={{ padding: '0.9rem 1.1rem', minWidth: '130px', whiteSpace: 'nowrap' }}>
+                  Requested On
                 </th>
+                {activeModule === 'travel' && (
+                  <th style={{ padding: '0.9rem 1.1rem', minWidth: '120px', whiteSpace: 'nowrap' }}>
+                    Travel Date
+                  </th>
+                )}
                 <th style={{ padding: '0.9rem 1.1rem', minWidth: '120px', whiteSpace: 'nowrap' }}>Closed Date</th>
                 <th style={{ padding: '0.9rem 1.1rem', minWidth: '130px', whiteSpace: 'nowrap' }}>Approved By</th>
                 <th style={{ padding: '0.9rem 1.1rem', minWidth: '140px', whiteSpace: 'nowrap' }}>Status</th>
@@ -426,6 +460,7 @@ function MyWorklistPage({ onNavigate, searchQuery = '', user, isOrgWorklist = fa
                   const hasComment = Boolean(item.approvedComment || item.rejectedComment || item.rejectionReason || item.implementedComment);
 
                   const isShortNoticeFlight = activeModule === 'travel' && item.isShortNotice;
+                  const isUrgentPreSpend = activeModule === 'prespend' && (item.isUrgent || item.urgent);
 
                   const statusBadgeLabel = status === 'implemented'
                     ? 'Implemented'
@@ -442,6 +477,8 @@ function MyWorklistPage({ onNavigate, searchQuery = '', user, isOrgWorklist = fa
                   const statusColor = statusBadgeLabel === 'Approved' ? '#059669' : statusBadgeLabel === 'Rejected' ? '#DC2626' : statusBadgeLabel === 'Implemented' ? '#7C3AED' : isShortNoticeFlight ? '#DC2626' : '#D97706';
                   const statusBg = statusBadgeLabel === 'Approved' ? '#ECFDF5' : statusBadgeLabel === 'Rejected' ? '#FEF2F2' : statusBadgeLabel === 'Implemented' ? '#F5F3FF' : isShortNoticeFlight ? '#FEF2F2' : '#FFFBEB';
                   const statusDot = statusBadgeLabel === 'Approved' ? '#10B981' : statusBadgeLabel === 'Rejected' ? '#EF4444' : statusBadgeLabel === 'Implemented' ? '#8B5CF6' : isShortNoticeFlight ? '#EF4444' : '#F59E0B';
+
+                  const requestedOnDate = item.raisedDate || (item.submittedAt ? new Date(item.submittedAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : (item.createdAt ? new Date(item.createdAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'));
 
                   return (
                     <tr key={item.id} style={{ borderBottom: '1px solid var(--border-color)', transition: 'background-color 0.15s ease' }}>
@@ -466,8 +503,13 @@ function MyWorklistPage({ onNavigate, searchQuery = '', user, isOrgWorklist = fa
                         )}
                       </td>
                       <td style={{ padding: '1rem 1.1rem', color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)', whiteSpace: 'nowrap' }}>
-                        {item.raisedDate || (item.submittedAt ? new Date(item.submittedAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '—')}
+                        {requestedOnDate}
                       </td>
+                      {activeModule === 'travel' && (
+                        <td style={{ padding: '1rem 1.1rem', color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)', whiteSpace: 'nowrap' }}>
+                          {item.departureDate ? new Date(item.departureDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'}
+                        </td>
+                      )}
                       <td style={{ padding: '1rem 1.1rem', color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)', whiteSpace: 'nowrap' }}>
                         {item.closedDate || (item.closedAt ? new Date(item.closedAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '—')}
                       </td>
@@ -488,22 +530,42 @@ function MyWorklistPage({ onNavigate, searchQuery = '', user, isOrgWorklist = fa
                         )}
                       </td>
                       <td style={{ padding: '1rem 1.1rem', whiteSpace: 'nowrap' }}>
-                        <div style={{
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: '0.35rem',
-                          padding: '0.2rem 0.65rem',
-                          borderRadius: 'var(--radius-lg)',
-                          backgroundColor: statusBg,
-                          color: statusColor,
-                          fontSize: '0.775rem',
-                          fontWeight: 500,
-                          whiteSpace: 'nowrap'
-                        }}>
-                          <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: statusDot }} />
-                          <span style={{ whiteSpace: 'nowrap' }}>
-                            {statusBadgeLabel}
-                          </span>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem', alignItems: 'flex-start' }}>
+                          <div style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '0.35rem',
+                            padding: '0.2rem 0.65rem',
+                            borderRadius: 'var(--radius-lg)',
+                            backgroundColor: statusBg,
+                            color: statusColor,
+                            fontSize: '0.775rem',
+                            fontWeight: 500,
+                            whiteSpace: 'nowrap'
+                          }}>
+                            <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: statusDot }} />
+                            <span style={{ whiteSpace: 'nowrap' }}>
+                              {statusBadgeLabel}
+                            </span>
+                          </div>
+                          {isUrgentPreSpend && (
+                            <div style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '0.25rem',
+                              padding: '0.15rem 0.5rem',
+                              borderRadius: '4px',
+                              backgroundColor: '#FEF2F2',
+                              color: '#DC2626',
+                              border: '1px solid #FECACA',
+                              fontSize: '0.7rem',
+                              fontWeight: 700,
+                              whiteSpace: 'nowrap'
+                            }}>
+                              <AlertTriangle size={11} strokeWidth={2.5} />
+                              <span>Urgent</span>
+                            </div>
+                          )}
                         </div>
                       </td>
                       <td style={{ padding: '1rem 1.1rem', textAlign: 'left', whiteSpace: 'nowrap' }}>

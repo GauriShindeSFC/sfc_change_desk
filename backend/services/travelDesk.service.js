@@ -39,15 +39,41 @@ export const createTravelService = async (data, user) => {
   const departureDate = data.departureDate || data['Date of travel'] || data['Date of journey'] || data['Check-in date'] || null;
   const travelMode = data.travelMode || data.category || 'Flight';
   const isFlight = travelMode.toLowerCase() === 'flight' || travelMode.toLowerCase() === 'flights';
+  const isCab = travelMode.toLowerCase() === 'cab' || travelMode.toLowerCase() === 'cabs';
 
-  // Calculate short notice (< 7 days) ONLY for flights
-  let isShortNotice = isFlight && Boolean(data.isShortNotice);
-  if (isFlight && departureDate && !isShortNotice) {
-    const depTime = new Date(departureDate).getTime();
-    const nowTime = new Date().getTime();
-    const diffDays = (depTime - nowTime) / (1000 * 60 * 60 * 24);
-    if (diffDays < 7) {
+  // Determine if Board Approval is required:
+  // 1. Flight Rules: Premium Economy / Business class OR Short Notice (< 7 days)
+  let isShortNotice = Boolean(data.isShortNotice);
+  if (isFlight) {
+    const flightClass = String(data.travelClass || data['Travel class'] || data.bookingDetails?.['Travel class'] || 'Economy').toLowerCase();
+    if (flightClass.includes('premium') || flightClass.includes('business')) {
       isShortNotice = true;
+    } else if (departureDate && !isShortNotice) {
+      const depTime = new Date(departureDate).getTime();
+      const nowTime = new Date().getTime();
+      const diffDays = (depTime - nowTime) / (1000 * 60 * 60 * 24);
+      if (diffDays < 7) {
+        isShortNotice = true;
+      }
+    }
+  }
+
+  // 2. Cab Policy Rules (SUV < 3 passengers, Premium always, Sedan < 2 passengers)
+  if (isCab) {
+    const bookingDetails = data.bookingDetails || data.drafts || data || {};
+    const passengers = parseInt(bookingDetails['Number of passengers'] || data.passengers || data['Number of passengers'] || '1', 10) || 1;
+    const cabTypeStr = String(data.travelClass || bookingDetails['Cab type'] || data['Cab type'] || 'Hatchback').toLowerCase();
+
+    if (cabTypeStr.includes('premium') || cabTypeStr.includes('innova')) {
+      isShortNotice = true; // Premium cab always requires Board approval
+    } else if (cabTypeStr.includes('suv') || cabTypeStr.includes('ertiga')) {
+      if (passengers < 3) {
+        isShortNotice = true; // SUV for < 3 passengers requires Board approval
+      }
+    } else if (cabTypeStr.includes('sedan') || cabTypeStr.includes('dzire') || cabTypeStr.includes('aura')) {
+      if (passengers < 2) {
+        isShortNotice = true; // Sedan for < 2 passengers requires Board approval
+      }
     }
   }
 
@@ -88,13 +114,14 @@ export const createTravelService = async (data, user) => {
   return created;
 };
 
-export const getTravelRequestsService = async ({ user, userId, isWorklist = false, isOrgWorklist = false, status, searchQuery, page = 1, limit = 10 }) => {
+export const getTravelRequestsService = async ({ user, userId, isWorklist = false, isOrgWorklist = false, organizationScope = false, status, searchQuery, page = 1, limit = 10 }) => {
   const where = {};
   const currentUserId = user?.userKey || user?.id || userId || '';
   const currentUserEmail = (user?.email || '').toLowerCase().trim();
+  const isOrgView = isOrgWorklist || organizationScope;
 
-  // 1. My Dashboard View (not worklist): Only requests raised by the logged-in user
-  if (!isWorklist && currentUserId) {
+  // 1. My Dashboard View (not worklist and not organization scope): Only requests raised by the logged-in user
+  if (!isWorklist && !isOrgView && currentUserId) {
     if (currentUserEmail) {
       where[Op.or] = [
         { requesterId: currentUserId },

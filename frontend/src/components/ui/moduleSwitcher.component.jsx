@@ -11,6 +11,7 @@ export default function ModuleSwitcher({
   activeModule = 'change_request',
   onModuleChange,
   counts = {},
+  pendingCounts = {},
   allowedModules = null // array of module IDs, or null for all
 }) {
   const visibleModules = allowedModules
@@ -69,7 +70,22 @@ export default function ModuleSwitcher({
                 flexShrink: 0
               }}
             />
-            <span>{m.label}</span>
+            <span style={{ position: 'relative', display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}>
+              {m.label}
+              {Boolean(pendingCounts && pendingCounts[m.id] > 0) && (
+                <span
+                  title={`${pendingCounts[m.id]} pending request${pendingCounts[m.id] > 1 ? 's' : ''}`}
+                  style={{
+                    width: '6.5px',
+                    height: '6.5px',
+                    borderRadius: '50%',
+                    backgroundColor: '#D97706',
+                    display: 'inline-block',
+                    flexShrink: 0
+                  }}
+                />
+              )}
+            </span>
             {count !== undefined && count !== null && (
               <span
                 style={{

@@ -59,7 +59,8 @@ export const publicUser = (identity) => {
     ciCategories: u.ciCategories || [],
     categoryIds: u.categoryIds || u.ciCategories || u.cmCategories || [],
     initials: initials(u.displayName || u.name || u.email),
-    isInUserTable: Boolean(u.isInUserTable)
+    isInUserTable: Boolean(u.isInUserTable),
+    isSuperAdmin: Boolean(u.isSuperAdmin || u.roleId === 'role-1' || u.roleName === 'Super Admin' || u.role === 'Super Admin' || u.role === 'ChangeDesk Super Admin' || u.roleName === 'ChangeDesk Super Admin')
   };
 };
 

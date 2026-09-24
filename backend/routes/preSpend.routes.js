@@ -17,12 +17,14 @@ router.get('/past-vendor', asyncHandler(async (req, res) => {
 
 router.get('/', asyncHandler(async (req, res) => {
   const isWorklist = req.query.view === 'worklist';
-  const isOrgWorklist = req.query.scope === 'organization';
+  const isOrgWorklist = req.query.scope === 'organization' || req.query.scope === 'org';
+  const organizationScope = isOrgWorklist;
   const currentUser = req.user || (req.headers['x-user-id'] ? { id: req.headers['x-user-id'] } : null);
   const result = await getPreSpendRequestsService({
     user: currentUser,
     isWorklist,
     isOrgWorklist,
+    organizationScope,
     status: req.query.status,
     searchQuery: req.query.search,
     page: req.query.page || 1,

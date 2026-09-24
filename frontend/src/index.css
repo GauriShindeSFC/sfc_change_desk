@@ -256,15 +256,44 @@ input, button {
   font-family: inherit;
 }
 
-/* Native date/time pickers ship a black glyph that disappears on dark — invert it */
-.dark input[type="date"]::-webkit-calendar-picker-indicator,
-.dark input[type="time"]::-webkit-calendar-picker-indicator,
-.dark input[type="datetime-local"]::-webkit-calendar-picker-indicator,
-.dark input[type="month"]::-webkit-calendar-picker-indicator,
-.dark input[type="week"]::-webkit-calendar-picker-indicator {
-  filter: invert(1);
-  opacity: 0.85;
+/* Make the entire bounding box of all date and time inputs clickable */
+input[type="date"],
+input[type="time"],
+input[type="datetime-local"],
+input[type="month"],
+input[type="week"] {
+  position: relative;
   cursor: pointer;
+}
+
+input[type="date"]::-webkit-calendar-picker-indicator,
+input[type="time"]::-webkit-calendar-picker-indicator,
+input[type="datetime-local"]::-webkit-calendar-picker-indicator,
+input[type="month"]::-webkit-calendar-picker-indicator,
+input[type="week"]::-webkit-calendar-picker-indicator {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: pointer;
+}
+
+/* Fallback visible icon on the right side of the input box */
+input[type="date"],
+input[type="datetime-local"] {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect width='18' height='18' x='3' y='4' rx='2' ry='2'/%3E%3Cline x1='16' x2='16' y1='2' y2='6'/%3E%3Cline x1='8' x2='8' y1='2' y2='6'/%3E%3Cline x1='3' x2='21' y1='10' y2='10'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: calc(100% - 10px) center;
+  background-size: 16px 16px;
+}
+
+.dark input[type="date"],
+.dark input[type="datetime-local"] {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect width='18' height='18' x='3' y='4' rx='2' ry='2'/%3E%3Cline x1='16' x2='16' y1='2' y2='6'/%3E%3Cline x1='8' x2='8' y1='2' y2='6'/%3E%3Cline x1='3' x2='21' y1='10' y2='10'/%3E%3C/svg%3E");
 }
 
 /* Responsive Grid & Layout Utilities */
@@ -284,13 +313,27 @@ input, button {
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 1.25rem;
 }
+.cd-responsive-4col {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 1.1rem;
+}
+@media (max-width: 1200px) {
+  .cd-responsive-4col {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
 @media (max-width: 1080px) {
   .cd-responsive-3col {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
+  .cd-responsive-4col {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 @media (max-width: 680px) {
-  .cd-responsive-3col {
+  .cd-responsive-3col,
+  .cd-responsive-4col {
     grid-template-columns: 1fr;
   }
 }

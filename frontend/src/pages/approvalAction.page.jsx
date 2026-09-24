@@ -212,14 +212,14 @@ export default function ApprovalActionPage() {
       {/* Header Brand Bar */}
       <div style={{ marginBottom: '1.5rem', textAlign: 'center' }}>
         <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.65rem' }}>
-          <div style={{ width: '32px', height: '32px', borderRadius: '8px', backgroundColor: '#0F172A', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#FFFFFF' }}>
+          <div style={{ width: '32px', height: '32px', borderRadius: '8px', backgroundColor: 'var(--brand-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#FFFFFF' }}>
             <ShieldCheck size={18} />
           </div>
-          <span style={{ fontSize: '1.25rem', fontWeight: 800, color: '#0F172A', letterSpacing: '-0.02em' }}>
+          <span style={{ fontSize: '1.25rem', fontWeight: 600, color: 'var(--text-primary)', letterSpacing: '-0.02em' }}>
             ChangeDesk
           </span>
         </div>
-        <div style={{ fontSize: '0.75rem', fontWeight: 600, color: '#64748B', letterSpacing: '0.06em', textTransform: 'uppercase', marginTop: '0.25rem' }}>
+        <div style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)', letterSpacing: '0.06em', textTransform: 'uppercase', marginTop: '0.25rem' }}>
           {portalTitle}
         </div>
       </div>

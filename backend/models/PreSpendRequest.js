@@ -43,9 +43,14 @@ export const PreSpendRequest = sequelize.define(
       allowNull: false,
       field: 'item_description'
     },
+    location: {
+      type: DataTypes.STRING(150),
+      allowNull: true
+    },
     estimatedAmount: {
       type: DataTypes.DECIMAL(14, 2),
-      allowNull: false,
+      allowNull: true,
+      defaultValue: 0,
       field: 'estimated_amount'
     },
     neededByDate: {
@@ -55,7 +60,7 @@ export const PreSpendRequest = sequelize.define(
     },
     costCentre: {
       type: DataTypes.STRING(100),
-      allowNull: false,
+      allowNull: true,
       field: 'cost_centre'
     },
     budgetLine: {

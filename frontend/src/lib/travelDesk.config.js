@@ -9,22 +9,6 @@ export const TRAVEL_MODES = [
 export const TRAVEL_DESK_FIELDS = {
   Flight: [
     { name: 'Traveller', label: 'Traveller', type: 'input', required: true, full: false, placeholder: '', default: '' },
-    {
-      name: 'Department / Cost Centre',
-      label: 'Department / Cost Centre',
-      type: 'select',
-      required: true,
-      full: false,
-      placeholder: '',
-      default: 'Leadership / Corporate',
-      options: [
-        { value: 'Leadership / Corporate', label: 'Leadership / Corporate' },
-        { value: 'Technology', label: 'Technology' },
-        { value: 'Delivery', label: 'Delivery' },
-        { value: 'Sales & Marketing', label: 'Sales & Marketing' },
-        { value: 'Finance & HR', label: 'Finance & HR' }
-      ]
-    },
     { name: 'Purpose of visit', label: 'Purpose of visit', type: 'textarea', required: true, full: true, placeholder: 'Business reason, customer/project reference and expected outcome', default: '' },
     {
       name: 'Trip type',
@@ -100,39 +84,8 @@ export const TRAVEL_DESK_FIELDS = {
   ],
   Cab: [
     { name: 'Traveller', label: 'Traveller', type: 'input', required: true, full: false, placeholder: '', default: '' },
-    {
-      name: 'Department / Cost Centre',
-      label: 'Department / Cost Centre',
-      type: 'select',
-      required: true,
-      full: false,
-      placeholder: '',
-      default: 'Leadership / Corporate',
-      options: [
-        { value: 'Leadership / Corporate', label: 'Leadership / Corporate' },
-        { value: 'Technology', label: 'Technology' },
-        { value: 'Delivery', label: 'Delivery' },
-        { value: 'Sales & Marketing', label: 'Sales & Marketing' },
-        { value: 'Finance & HR', label: 'Finance & HR' }
-      ]
-    },
     { name: 'Purpose of visit', label: 'Purpose of visit', type: 'textarea', required: true, full: true, placeholder: 'Business reason, customer/project reference and expected outcome', default: '' },
     { name: 'Date of travel', label: 'Date of travel', type: 'date', required: true, full: false, placeholder: '', default: '' },
-    { name: 'Pickup time', label: 'Pickup time', type: 'time', required: true, full: false, placeholder: '', default: '' },
-    {
-      name: 'Cab type',
-      label: 'Cab type',
-      type: 'select',
-      required: true,
-      full: false,
-      placeholder: '',
-      default: 'Hatchback',
-      options: [
-        { value: 'Hatchback', label: 'Hatchback' },
-        { value: 'Sedan', label: 'Sedan' },
-        { value: 'SUV', label: 'SUV' }
-      ]
-    },
     {
       name: 'Journey type',
       label: 'Journey type',
@@ -148,8 +101,46 @@ export const TRAVEL_DESK_FIELDS = {
         { value: 'Airport Drop', label: 'Airport Drop' }
       ]
     },
+    {
+      name: 'Number of passengers',
+      label: 'Number of passengers',
+      type: 'select',
+      required: true,
+      full: false,
+      placeholder: '',
+      default: '1',
+      options: [
+        { value: '1', label: '1' },
+        { value: '2', label: '2' },
+        { value: '3', label: '3' },
+        { value: '4', label: '4' },
+        { value: '5', label: '5' },
+        { value: '6', label: '6' },
+        { value: '7', label: '7' },
+        { value: '8', label: '8' },
+        { value: '9', label: '9' },
+        { value: '10', label: '10' }
+      ]
+    },
+    {
+      name: 'Cab type',
+      label: 'Cab type',
+      type: 'select',
+      required: true,
+      full: false,
+      placeholder: '',
+      default: 'Hatchback (WagonR, Swift etc.)',
+      options: [
+        { value: 'Hatchback (WagonR, Swift etc.)', label: 'Hatchback (WagonR, Swift etc.)' },
+        { value: 'Sedan (Dzire, Aura, etc.)', label: 'Sedan (Dzire, Aura, etc.)' },
+        { value: 'SUV (Ertiga, etc.)', label: 'SUV (Ertiga, etc.)' },
+        { value: 'Premium (Innova, etc.)', label: 'Premium (Innova, etc.)' }
+      ]
+    },
     { name: 'Pickup location', label: 'Pickup location', type: 'input', required: true, full: false, placeholder: 'Full address or airport terminal', default: '' },
+    { name: 'Pickup time', label: 'Pickup time', type: 'time', required: true, full: false, placeholder: '', default: '' },
     { name: 'Final drop location', label: 'Final drop location', type: 'input', required: true, full: false, placeholder: 'Full address', default: '' },
+    { name: 'Estimated drop time', label: 'Estimated drop time', type: 'time', required: false, full: false, placeholder: '', default: '' },
     {
       name: 'Multi-pickup',
       label: 'Multi-pickup?',
@@ -177,27 +168,10 @@ export const TRAVEL_DESK_FIELDS = {
         { value: 'Yes', label: 'Yes' }
       ]
     },
-    { name: 'Contact number', label: 'Contact number', type: 'tel', required: true, full: false, placeholder: 'Mobile number', default: '' },
     { name: 'Special instructions', label: 'Special instructions', type: 'textarea', required: false, full: true, placeholder: 'Flight number, waiting requirement, luggage, accessibility or other instructions', default: '' }
   ],
   Bus: [
     { name: 'Traveller', label: 'Traveller', type: 'input', required: true, full: false, placeholder: '', default: '' },
-    {
-      name: 'Department / Cost Centre',
-      label: 'Department / Cost Centre',
-      type: 'select',
-      required: true,
-      full: false,
-      placeholder: '',
-      default: 'Leadership / Corporate',
-      options: [
-        { value: 'Leadership / Corporate', label: 'Leadership / Corporate' },
-        { value: 'Technology', label: 'Technology' },
-        { value: 'Delivery', label: 'Delivery' },
-        { value: 'Sales & Marketing', label: 'Sales & Marketing' },
-        { value: 'Finance & HR', label: 'Finance & HR' }
-      ]
-    },
     { name: 'Purpose of visit', label: 'Purpose of visit', type: 'textarea', required: true, full: true, placeholder: 'Business reason, customer/project reference and expected outcome', default: '' },
     { name: 'Date of travel', label: 'Date of travel', type: 'date', required: true, full: false, placeholder: '', default: '' },
     {
@@ -229,7 +203,6 @@ export const TRAVEL_DESK_FIELDS = {
       options: [
         { value: 'AC Sleeper', label: 'AC Sleeper' },
         { value: 'AC Seater', label: 'AC Seater' },
-        { value: 'Volvo / Premium', label: 'Volvo / Premium' },
         { value: 'No preference', label: 'No preference' }
       ]
     },
@@ -246,26 +219,27 @@ export const TRAVEL_DESK_FIELDS = {
         { value: 'Yes', label: 'Yes' }
       ]
     },
-    { name: 'Return date', label: 'Return date', type: 'date', required: false, full: false, placeholder: '', default: '' }
+    { name: 'Return date', label: 'Return date', type: 'date', required: true, full: false, placeholder: '', default: '', conditional: 'Return required' },
+    {
+      name: 'Return preferred time slot',
+      label: 'Preferred return time slot',
+      type: 'select',
+      required: false,
+      full: false,
+      placeholder: '',
+      default: 'Morning',
+      options: [
+        { value: 'Morning', label: 'Morning' },
+        { value: 'Afternoon', label: 'Afternoon' },
+        { value: 'Evening', label: 'Evening' },
+        { value: 'Night', label: 'Night' },
+        { value: 'Flexible', label: 'Flexible' }
+      ],
+      conditional: 'Return required'
+    }
   ],
   Train: [
     { name: 'Traveller', label: 'Traveller', type: 'input', required: true, full: false, placeholder: '', default: '' },
-    {
-      name: 'Department / Cost Centre',
-      label: 'Department / Cost Centre',
-      type: 'select',
-      required: true,
-      full: false,
-      placeholder: '',
-      default: 'Leadership / Corporate',
-      options: [
-        { value: 'Leadership / Corporate', label: 'Leadership / Corporate' },
-        { value: 'Technology', label: 'Technology' },
-        { value: 'Delivery', label: 'Delivery' },
-        { value: 'Sales & Marketing', label: 'Sales & Marketing' },
-        { value: 'Finance & HR', label: 'Finance & HR' }
-      ]
-    },
     { name: 'Purpose of visit', label: 'Purpose of visit', type: 'textarea', required: true, full: true, placeholder: 'Business reason, customer/project reference and expected outcome', default: '' },
     { name: 'Date of journey', label: 'Date of journey', type: 'date', required: true, full: false, placeholder: '', default: '' },
     {
@@ -331,27 +305,28 @@ export const TRAVEL_DESK_FIELDS = {
         { value: 'Yes', label: 'Yes' }
       ]
     },
-    { name: 'Return date', label: 'Return date', type: 'date', required: false, full: false, placeholder: '', default: '' },
+    { name: 'Return date', label: 'Return date', type: 'date', required: true, full: false, placeholder: '', default: '', conditional: 'Return required' },
+    {
+      name: 'Return preferred time slot',
+      label: 'Preferred return time slot',
+      type: 'select',
+      required: false,
+      full: false,
+      placeholder: '',
+      default: 'Morning',
+      options: [
+        { value: 'Morning', label: 'Morning' },
+        { value: 'Afternoon', label: 'Afternoon' },
+        { value: 'Evening', label: 'Evening' },
+        { value: 'Night', label: 'Night' },
+        { value: 'Flexible', label: 'Flexible' }
+      ],
+      conditional: 'Return required'
+    },
     { name: 'Train preference', label: 'Train preference', type: 'input', required: false, full: true, placeholder: 'Train number/name, if preferred', default: '' }
   ],
   Hotel: [
     { name: 'Traveller', label: 'Traveller', type: 'input', required: true, full: false, placeholder: '', default: '' },
-    {
-      name: 'Department / Cost Centre',
-      label: 'Department / Cost Centre',
-      type: 'select',
-      required: true,
-      full: false,
-      placeholder: '',
-      default: 'Leadership / Corporate',
-      options: [
-        { value: 'Leadership / Corporate', label: 'Leadership / Corporate' },
-        { value: 'Technology', label: 'Technology' },
-        { value: 'Delivery', label: 'Delivery' },
-        { value: 'Sales & Marketing', label: 'Sales & Marketing' },
-        { value: 'Finance & HR', label: 'Finance & HR' }
-      ]
-    },
     { name: 'Purpose of visit', label: 'Purpose of visit', type: 'textarea', required: true, full: true, placeholder: 'Business reason, customer/project reference and expected outcome', default: '' },
     { name: 'City / Location', label: 'City / Location', type: 'input', required: true, full: false, placeholder: 'City and preferred area', default: '' },
     { name: 'Number of rooms', label: 'Number of rooms', type: 'number', required: true, full: false, placeholder: '', default: '1', min: '1' },
@@ -369,9 +344,19 @@ export const TRAVEL_DESK_FIELDS = {
       default: 'Single occupancy',
       options: [
         { value: 'Single occupancy', label: 'Single occupancy' },
-        { value: 'Double occupancy', label: 'Double occupancy' },
         { value: 'Twin sharing', label: 'Twin sharing' }
       ]
+    },
+    {
+      name: 'Other traveller name',
+      label: 'Other traveller name (Sharing with)',
+      type: 'input',
+      required: true,
+      full: false,
+      placeholder: 'Full name of colleague sharing room',
+      default: '',
+      conditional: 'Room type',
+      conditionalValue: 'Twin sharing'
     },
     {
       name: 'Meal plan',
@@ -383,8 +368,7 @@ export const TRAVEL_DESK_FIELDS = {
       default: 'Breakfast included',
       options: [
         { value: 'Breakfast included', label: 'Breakfast included' },
-        { value: 'Room only', label: 'Room only' },
-        { value: 'Breakfast and dinner', label: 'Breakfast and dinner' }
+        { value: 'Room only', label: 'Room only' }
       ]
     },
     { name: 'Preferred hotel / locality', label: 'Preferred hotel / locality', type: 'input', required: false, full: true, placeholder: 'Hotel name, customer office proximity or locality', default: '' },

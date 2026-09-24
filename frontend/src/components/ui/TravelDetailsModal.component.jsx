@@ -13,7 +13,8 @@ import {
   User,
   ShieldCheck,
   CheckCircle2,
-  ArrowRight
+  ArrowRight,
+  Check
 } from 'lucide-react';
 
 const MODE_ICONS = {
@@ -38,12 +39,24 @@ const formatCleanDate = (d) => {
   }
 };
 
+const formatCleanTime = (d) => {
+  if (!d) return '';
+  try {
+    const dt = new Date(d);
+    if (isNaN(dt.getTime())) return '';
+    return dt.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+  } catch {
+    return '';
+  }
+};
+
 export default function TravelDetailsModal({ item, onClose, onApprove, onReject, user }) {
   if (!item) return null;
 
   const [actionPrompt, setActionPrompt] = useState(null); // 'approve' | 'reject'
   const [commentInput, setCommentInput] = useState('');
   const [isSubmittingAction, setIsSubmittingAction] = useState(false);
+  const [hoveredStepIdx, setHoveredStepIdx] = useState(null);
 
   const roleName = (user?.role || '').toLowerCase();
   const roleId = user?.roleId || '';
@@ -55,6 +68,56 @@ export default function TravelDetailsModal({ item, onClose, onApprove, onReject,
   const isApproved = status.toLowerCase().includes('approved') || status.toLowerCase().includes('booked') || status.toLowerCase().includes('ticketed');
   const isRejected = status.toLowerCase().includes('rejected');
   const isPending = !isApproved && !isRejected;
+
+  const steps = isRejected
+    ? ['Requested', 'Rejected']
+    : ['Requested', 'Approved'];
+
+  const currentStepIdx = (isApproved || isRejected) ? 1 : 0;
+
+  const getStepDate = (stepName) => {
+    const todayFormatted = new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+    if (stepName === 'Requested') return item.raisedDate || (item.submittedAt ? new Date(item.submittedAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : (item.createdAt ? new Date(item.createdAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : todayFormatted));
+    if (stepName === 'Approved') return isApproved ? (item.decidedAt ? new Date(item.decidedAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : (item.updatedAt ? new Date(item.updatedAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : todayFormatted)) : '';
+    if (stepName === 'Rejected') return isRejected ? (item.decidedAt ? new Date(item.decidedAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : (item.updatedAt ? new Date(item.updatedAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : todayFormatted)) : '';
+    return '';
+  };
+
+  const getStepTime = (stepName) => {
+    if (stepName === 'Requested') return formatCleanTime(item.submittedAt || item.createdAt);
+    if (stepName === 'Approved') return isApproved ? formatCleanTime(item.decidedAt || item.approvedAt || item.updatedAt) : '';
+    if (stepName === 'Rejected') return isRejected ? formatCleanTime(item.decidedAt || item.closedAt || item.updatedAt) : '';
+    return '';
+  };
+
+  const getStepTooltipInfo = (stepName) => {
+    const sDate = getStepDate(stepName);
+    if (stepName === 'Requested') {
+      return {
+        title: 'Submitted Travel Booking',
+        author: item.employeeName || item.travellerName || item.requesterName || 'Requester',
+        comment: item.purpose || item.tripReason || 'Travel reservation requested.',
+        date: sDate
+      };
+    }
+    if (stepName === 'Approved') {
+      return {
+        title: 'Travel Booking Approved',
+        author: item.decidedBy || item.approvedBy || 'Approver',
+        comment: item.approvedComment || item.approvalComment || item.comment || 'Travel booking approved.',
+        date: sDate
+      };
+    }
+    if (stepName === 'Rejected') {
+      return {
+        title: 'Travel Booking Rejected',
+        author: item.decidedBy || item.approvedBy || 'Approver',
+        comment: item.rejectedComment || item.rejectionReason || item.comment || 'Travel booking rejected.',
+        date: sDate
+      };
+    }
+    return null;
+  };
 
   // Short notice flight rule: strictly ONLY Board members can approve/reject short notice flights
   const isShortNoticeFlight = Boolean(item.isShortNotice);
@@ -258,6 +321,130 @@ export default function TravelDetailsModal({ item, onClose, onApprove, onReject,
             </div>
           </div>
 
+          {/* Lifecycle Visualizer (Requested -> Approved / Rejected) */}
+          <div style={{
+            padding: '1.25rem 1.5rem',
+            backgroundColor: 'var(--input-bg, #F8FAFC)',
+            borderRadius: '12px',
+            border: '1px solid var(--border-color, #E2E8F0)'
+          }}>
+            <div style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '1.25rem', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+              Lifecycle
+            </div>
+            <div style={{ display: 'flex', alignItems: 'flex-start', width: '100%', padding: '0 0.5rem' }}>
+              {steps.map((step, idx) => {
+                const isLast = idx === steps.length - 1;
+                const isStepCompleted = idx <= currentStepIdx;
+                const isStepRejected = isRejected && idx === currentStepIdx;
+
+                const stepColor = isStepRejected ? '#DC2626' : isStepCompleted ? '#10B981' : 'var(--border-color)';
+                const circleBg = isStepRejected ? '#DC2626' : isStepCompleted ? '#10B981' : 'var(--card-bg)';
+                const circleBorder = isStepRejected ? '2px solid #DC2626' : isStepCompleted ? '2px solid #10B981' : '2px solid var(--border-color)';
+                const textColor = isStepRejected ? '#DC2626' : isStepCompleted ? '#10B981' : 'var(--text-secondary)';
+
+                const nextStepCompleted = (idx + 1) <= currentStepIdx;
+                const nextStepRejected = isRejected && (idx + 1) === currentStepIdx;
+                const connectorColor = nextStepRejected ? '#DC2626' : nextStepCompleted ? '#10B981' : 'var(--border-color)';
+
+                const stepDate = getStepDate(step);
+                const stepTime = getStepTime(step);
+                const tooltipInfo = getStepTooltipInfo(step);
+
+                return (
+                  <React.Fragment key={step}>
+                    <div
+                      onMouseEnter={() => setHoveredStepIdx(idx)}
+                      onMouseLeave={() => setHoveredStepIdx(null)}
+                      style={{
+                        position: 'relative',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        minWidth: '100px',
+                        zIndex: 3,
+                        cursor: isStepCompleted ? 'pointer' : 'default'
+                      }}
+                    >
+                      <div style={{
+                        width: '32px',
+                        height: '32px',
+                        borderRadius: '50%',
+                        backgroundColor: circleBg,
+                        border: circleBorder,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        transition: 'transform 0.15s ease',
+                        transform: hoveredStepIdx === idx ? 'scale(1.15)' : 'scale(1)',
+                        boxShadow: isStepCompleted && !isStepRejected ? '0 0 12px rgba(16, 185, 129, 0.25)' : 'none'
+                      }}>
+                        {isStepRejected ? (
+                          <X size={18} color="#FFFFFF" strokeWidth={3} />
+                        ) : isStepCompleted ? (
+                          <Check size={18} color="#FFFFFF" strokeWidth={3} />
+                        ) : null}
+                      </div>
+
+                      <span style={{ fontSize: '0.825rem', fontWeight: 800, color: textColor, textAlign: 'center', marginTop: '0.5rem' }}>
+                        {step}
+                      </span>
+
+                      {stepDate && (
+                        <span style={{ fontSize: '0.725rem', color: isStepCompleted ? '#10B981' : 'var(--text-secondary)', fontFamily: 'var(--font-mono)', textAlign: 'center', marginTop: '0.2rem', fontWeight: 600 }}>
+                          {stepDate}
+                        </span>
+                      )}
+                      {stepTime && (
+                        <span style={{ fontSize: '0.7rem', color: isStepCompleted ? '#059669' : 'var(--text-secondary)', fontFamily: 'var(--font-mono)', textAlign: 'center', marginTop: '0.1rem', fontWeight: 500 }}>
+                          {stepTime}
+                        </span>
+                      )}
+
+                      {hoveredStepIdx === idx && tooltipInfo && isStepCompleted && (
+                        <div style={{
+                          position: 'absolute',
+                          bottom: '115%',
+                          backgroundColor: 'var(--card-bg)',
+                          border: '1px solid var(--border-color)',
+                          borderRadius: '10px',
+                          padding: '0.65rem 0.85rem',
+                          boxShadow: '0 10px 25px rgba(0, 0, 0, 0.25)',
+                          zIndex: 300,
+                          width: '220px',
+                          pointerEvents: 'none',
+                          ...(idx === 0
+                            ? { left: '0px', transform: 'none' }
+                            : isLast
+                            ? { right: '0px', left: 'auto', transform: 'none' }
+                            : { left: '50%', transform: 'translateX(-50%)' })
+                        }}>
+                          <div style={{ paddingBottom: '0.25rem', marginBottom: '0.3rem', borderBottom: '1px solid var(--border-color)' }}>
+                            <span style={{ fontSize: '0.725rem', fontWeight: 800, color: stepColor, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                              {tooltipInfo.title}
+                            </span>
+                          </div>
+                          <p style={{ fontSize: '0.8rem', color: 'var(--text-primary)', fontWeight: 500, margin: 0, lineHeight: 1.45, wordBreak: 'break-word', overflowWrap: 'anywhere' }}>
+                            "{tooltipInfo.comment}"
+                          </p>
+                        </div>
+                      )}
+                    </div>
+
+                    {!isLast && (
+                      <div style={{
+                        flex: 1,
+                        height: '2.5px',
+                        backgroundColor: connectorColor,
+                        marginTop: '15px',
+                        transition: 'background-color 0.3s ease'
+                      }} />
+                    )}
+                  </React.Fragment>
+                );
+              })}
+            </div>
+          </div>
+
           {/* Section 2: Traveller & Schedule Details */}
           <div>
             <h4 style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-primary)', textTransform: 'uppercase', letterSpacing: '0.04em', margin: '0 0 0.85rem 0' }}>
@@ -288,6 +475,13 @@ export default function TravelDetailsModal({ item, onClose, onApprove, onReject,
                     {item.decidedByEmail || item.approvedByEmail}
                   </div>
                 )}
+              </div>
+
+              <div>
+                <div style={{ fontSize: '0.775rem', color: 'var(--text-secondary)' }}>Requested On</div>
+                <div style={{ fontSize: '0.875rem', fontWeight: 600, color: 'var(--text-primary)', marginTop: '0.15rem', fontFamily: 'var(--font-mono)' }}>
+                  {item.raisedDate || (item.submittedAt ? new Date(item.submittedAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : (item.createdAt ? new Date(item.createdAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'))}
+                </div>
               </div>
 
               <div>

@@ -693,9 +693,15 @@ export const createChangeRequestService = async (payload = {}) => {
 
   const actionValue = payload.customFieldValues?.actionRequired || payload.actionRequired || '';
   if (isRestrictedAction(actionValue, payload.subcategoryId)) {
-    const inTable = await checkUserInUserTable(requesterEmail, payload.employeeId || requesterUser?.employeeId);
+    const isSuperAdmin = Boolean(
+      requesterUser?.isSuperAdmin ||
+      requesterUser?.roleId === 'role-1' ||
+      requesterUser?.role === 'Super Admin' ||
+      requesterUser?.role === 'ChangeDesk Super Admin'
+    );
+    const inTable = isSuperAdmin || (await checkUserInUserTable(requesterEmail, payload.employeeId || requesterUser?.employeeId));
     if (!inTable) {
-      const err = new Error(`Action "${actionValue}" is restricted to accounts present in the user table.`);
+      const err = new Error(`Action "${actionValue}" is restricted to accounts present in the user table or Super Admin.`);
       err.statusCode = 403;
       throw err;
     }
