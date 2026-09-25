@@ -524,15 +524,117 @@ export default function TravelDetailsModal({ item, onClose, onApprove, onReject,
             </div>
           </div>
 
-          {/* Section 3: Extra Booking Specifications */}
-          {Object.keys(booking).length > 0 && (
+          {/* Section 3: Multi-City Flight Legs or Extra Booking Specifications */}
+          {Array.isArray(booking?.legs) && booking.legs.length > 0 ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
+              <h4 style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-primary)', textTransform: 'uppercase', letterSpacing: '0.04em', margin: 0 }}>
+                Multi-City Flight Itinerary ({booking.legs.length} Legs)
+              </h4>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                {booking.legs.map((leg, idx) => (
+                  <div
+                    key={leg.id || idx}
+                    style={{
+                      padding: '0.75rem 1rem',
+                      backgroundColor: 'var(--input-bg, #F8FAFC)',
+                      borderRadius: '8px',
+                      border: '1px solid var(--border-color)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      flexWrap: 'wrap',
+                      gap: '0.75rem'
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
+                      <span style={{
+                        fontSize: '0.75rem',
+                        fontWeight: 700,
+                        backgroundColor: 'var(--brand-primary, #2563EB)',
+                        color: '#FFFFFF',
+                        width: '20px',
+                        height: '20px',
+                        borderRadius: '50%',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        justifyContent: 'center'
+                      }}>
+                        {idx + 1}
+                      </span>
+                      <span style={{ fontSize: '0.875rem', fontWeight: 700, color: 'var(--text-primary)' }}>
+                        {leg.from} → {leg.to}
+                      </span>
+                    </div>
+
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '1.25rem', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                        <Calendar size={13} />
+                        <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{formatCleanDate(leg.travelDate)}</span>
+                      </div>
+                      {leg.preferredTime && (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                          <Clock size={13} />
+                          <span>{leg.preferredTime}</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ))}
+
+                {Boolean(booking.returnFlightRequired) && (booking.returnLeg || booking.returnDate) && (
+                  <div
+                    style={{
+                      padding: '0.75rem 1rem',
+                      backgroundColor: '#EFF6FF',
+                      borderRadius: '8px',
+                      border: '1px solid #BFDBFE',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      flexWrap: 'wrap',
+                      gap: '0.75rem'
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
+                      <span style={{
+                        fontSize: '0.75rem',
+                        fontWeight: 700,
+                        backgroundColor: '#2563EB',
+                        color: '#FFFFFF',
+                        padding: '0.15rem 0.5rem',
+                        borderRadius: '6px'
+                      }}>
+                        Return Flight
+                      </span>
+                      <span style={{ fontSize: '0.875rem', fontWeight: 700, color: '#1E3A8A' }}>
+                        {booking.returnLeg?.from || booking.returnFrom || item.toLocation || ''} → {booking.returnLeg?.to || booking.returnTo || item.fromLocation || ''}
+                      </span>
+                    </div>
+
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '1.25rem', fontSize: '0.8rem', color: '#1E40AF' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                        <Calendar size={13} />
+                        <span style={{ fontWeight: 600 }}>{formatCleanDate(booking.returnLeg?.travelDate || booking.returnDate || item.returnDate)}</span>
+                      </div>
+                      {(booking.returnLeg?.preferredTime || booking.returnPreferredTime) && (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                          <Clock size={13} />
+                          <span>{booking.returnLeg?.preferredTime || booking.returnPreferredTime}</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          ) : Object.keys(booking).length > 0 ? (
             <div>
               <h4 style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-primary)', textTransform: 'uppercase', letterSpacing: '0.04em', margin: '0 0 0.75rem 0' }}>
                 Booking Specifications
               </h4>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '0.75rem', backgroundColor: 'var(--input-bg)', padding: '0.85rem 1rem', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
                 {Object.entries(booking).map(([key, val]) => {
-                  if (!val || typeof val === 'object' || ['Traveller', 'Department / Cost Centre', 'Purpose of visit', 'Date of travel', 'Date of journey', 'Check-in date', 'From', 'To', 'From station', 'To station', 'Trip type'].includes(key)) return null;
+                  if (!val || typeof val === 'object' || ['Traveller', 'Department / Cost Centre', 'Purpose of visit', 'Date of travel', 'Date of journey', 'Check-in date', 'From', 'To', 'From station', 'To station', 'Trip type', 'legs', 'returnFlightRequired'].includes(key)) return null;
                   return (
                     <div key={key}>
                       <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>{key}</div>
@@ -542,7 +644,7 @@ export default function TravelDetailsModal({ item, onClose, onApprove, onReject,
                 })}
               </div>
             </div>
-          )}
+          ) : null}
 
           {/* Decision / Approval History Section */}
           {(isApproved || isRejected || item.approvedComment || item.rejectedComment || item.rejectionReason || (Array.isArray(item.comments) && item.comments.length > 0) || (Array.isArray(item.approvalHistory) && item.approvalHistory.length > 0)) && (

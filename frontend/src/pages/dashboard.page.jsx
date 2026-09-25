@@ -139,7 +139,7 @@ function DashboardPage({ onNavigate, user, isOrgDashboard = false, searchQuery =
           categories: Array.isArray(psData.categories) && psData.categories.length > 0 ? psData.categories : PRESPEND_CANONICAL_CATEGORIES,
           statusBreakdown: Array.isArray(psData.statusBreakdown) && psData.statusBreakdown.length > 0 ? psData.statusBreakdown : [],
           requests: psData.data && Array.isArray(psData.data) ? psData.data : [],
-          statusCounts: psData.statusCounts || { All: 0, Pending: 0, Approved: 0, Rejected: 0 }
+          statusCounts: psData.statusCounts || { All: 0, Pending: 0, Approved: 0, Implemented: 0, Rejected: 0 }
         };
       }
 
@@ -157,7 +157,7 @@ function DashboardPage({ onNavigate, user, isOrgDashboard = false, searchQuery =
           categories: Array.isArray(trData.categories) && trData.categories.length > 0 ? trData.categories : TRAVEL_CANONICAL_CATEGORIES,
           statusBreakdown: Array.isArray(trData.statusBreakdown) && trData.statusBreakdown.length > 0 ? trData.statusBreakdown : [],
           requests: trData.data && Array.isArray(trData.data) ? trData.data : [],
-          statusCounts: trData.statusCounts || { All: 0, Pending: 0, Approved: 0, Rejected: 0 }
+          statusCounts: trData.statusCounts || { All: 0, Pending: 0, Approved: 0, Implemented: 0, Rejected: 0 }
         };
       }
 

@@ -222,6 +222,100 @@ export const getImplementerEmails = async (categoryNameOrId = null) => {
   return Array.from(new Set(implementers.map(i => (i.email || '').trim().toLowerCase()).filter(Boolean)));
 };
 
+export const getBoardMemberEmails = async () => {
+  const users = await ChangeUser.findAll({
+    where: { status: 'Active' },
+    raw: true
+  });
+
+  const boardEmails = [];
+  for (const u of users) {
+    const rawRoles = u.metadata?.roles || [];
+    const roleIds = [
+      u.roleId,
+      ...(Array.isArray(rawRoles) ? rawRoles.map(r => (typeof r === 'string' ? r : r.roleId || r.role)) : [])
+    ].filter(Boolean);
+
+    const isBoard = roleIds.some(r => r === 'role-6' || r === 'role-board' || String(r).toLowerCase().includes('board'));
+    if (isBoard && u.email) {
+      boardEmails.push(u.email.trim().toLowerCase());
+    }
+  }
+
+  return Array.from(new Set(boardEmails.filter(Boolean)));
+};
+
+export const getTravelDeskApproverEmails = async (isShortNotice = false) => {
+  const users = await ChangeUser.findAll({
+    where: { status: 'Active' },
+    raw: true
+  });
+
+  const approverEmails = [];
+  for (const u of users) {
+    const rawRoles = u.metadata?.roles || [];
+    const roleIds = [
+      u.roleId,
+      ...(Array.isArray(rawRoles) ? rawRoles.map(r => (typeof r === 'string' ? r : r.roleId || r.role)) : [])
+    ].filter(Boolean);
+
+    const isTravelAdmin = roleIds.some(r => r === 'role-2-travel' || String(r).toLowerCase().includes('travel'));
+    const isBoard = roleIds.some(r => r === 'role-6' || r === 'role-board' || String(r).toLowerCase().includes('board'));
+
+    // If short notice or requires board approval, notify Board members + Travel Admins
+    if (isShortNotice) {
+      if ((isBoard || isTravelAdmin) && u.email) {
+        approverEmails.push(u.email.trim().toLowerCase());
+      }
+    } else {
+      // Normal booking: notify Travel Desk Admins (and fallback to Board if no Travel Admin configured)
+      if (isTravelAdmin && u.email) {
+        approverEmails.push(u.email.trim().toLowerCase());
+      }
+    }
+  }
+
+  const unique = Array.from(new Set(approverEmails.filter(Boolean)));
+  if (unique.length > 0) return unique;
+
+  // Fallback to board members if no travel admin found
+  return getBoardMemberEmails();
+};
+
+export const getPreSpendApproverEmails = async (isBoardRequired = false) => {
+  const users = await ChangeUser.findAll({
+    where: { status: 'Active' },
+    raw: true
+  });
+
+  const approverEmails = [];
+  for (const u of users) {
+    const rawRoles = u.metadata?.roles || [];
+    const roleIds = [
+      u.roleId,
+      ...(Array.isArray(rawRoles) ? rawRoles.map(r => (typeof r === 'string' ? r : r.roleId || r.role)) : [])
+    ].filter(Boolean);
+
+    const isPreSpendAdmin = roleIds.some(r => r === 'role-2-prespend' || String(r).toLowerCase().includes('prespend') || String(r).toLowerCase().includes('spend'));
+    const isBoard = roleIds.some(r => r === 'role-6' || r === 'role-board' || String(r).toLowerCase().includes('board'));
+
+    if (isBoardRequired) {
+      if ((isBoard || isPreSpendAdmin) && u.email) {
+        approverEmails.push(u.email.trim().toLowerCase());
+      }
+    } else {
+      if (isPreSpendAdmin && u.email) {
+        approverEmails.push(u.email.trim().toLowerCase());
+      }
+    }
+  }
+
+  const unique = Array.from(new Set(approverEmails.filter(Boolean)));
+  if (unique.length > 0) return unique;
+
+  return getBoardMemberEmails();
+};
+
 // ---------- Settings Users & Roles ----------
 
 export const getSettingsUsersService = async () => {

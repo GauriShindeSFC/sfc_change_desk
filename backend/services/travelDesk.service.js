@@ -1,33 +1,31 @@
 import { Op } from 'sequelize';
 import { TravelRequest } from '../models/TravelRequest.js';
-import { UserAppRole } from '../models/UserAppRole.js';
-import { IdentityResolver } from './identityResolver.service.js';
+import { getTravelDeskApproverEmails } from './userManagement.service.js';
 import { sendTravelCreatedEmail, sendTravelDecisionEmail } from './mail.service.js';
+import { buildDateFilterClause } from '../utils/dateFilterUtils.js';
 
-const getTravelApproverEmails = async () => {
-  const emails = [];
-  // Find Travel Desk Admins (role-2-travel, role-1) and Board members (role-6, role-board)
-  const approverRoles = await UserAppRole.findAll({
-    where: { roleId: { [Op.in]: ['role-1', 'role-2-travel', 'role-6', 'role-board'] } },
+const generateTravelCode = async () => {
+  const year = new Date().getFullYear();
+  const records = await TravelRequest.findAll({
+    where: {
+      requestCode: { [Op.like]: `TR-${year}-%` }
+    },
+    attributes: ['requestCode'],
     raw: true
   });
 
-  for (const r of approverRoles) {
-    const key = r.userKey || r.user_key;
-    if (key) {
-      const res = await IdentityResolver.resolveByKey(key);
-      if (res?.status === 'SUCCESS' && res?.identity?.email) {
-        emails.push(res.identity.email.trim());
+  let maxNum = 0;
+  for (const r of records) {
+    if (r.requestCode) {
+      const parts = r.requestCode.split('-');
+      const num = parseInt(parts[2], 10);
+      if (!isNaN(num) && num > maxNum) {
+        maxNum = num;
       }
     }
   }
-  return Array.from(new Set(emails.filter(Boolean)));
-};
 
-const generateTravelCode = async () => {
-  const count = await TravelRequest.count();
-  const year = new Date().getFullYear();
-  const nextNum = String(count + 1).padStart(4, '0');
+  const nextNum = String(maxNum + 1).padStart(4, '0');
   return `TR-${year}-${nextNum}`;
 };
 
@@ -99,7 +97,7 @@ export const createTravelService = async (data, user) => {
   });
 
   // Asynchronously notify Travel Admin & Board (with special notice if short-notice booking)
-  getTravelApproverEmails()
+  getTravelDeskApproverEmails(isShortNotice)
     .then((approverEmails) =>
       sendTravelCreatedEmail({
         travelReq: created.toJSON ? created.toJSON() : created,
@@ -114,7 +112,7 @@ export const createTravelService = async (data, user) => {
   return created;
 };
 
-export const getTravelRequestsService = async ({ user, userId, isWorklist = false, isOrgWorklist = false, organizationScope = false, status, searchQuery, page = 1, limit = 10 }) => {
+export const getTravelRequestsService = async ({ user, userId, isWorklist = false, isOrgWorklist = false, organizationScope = false, status, searchQuery, dateFilter, startDate, endDate, page = 1, limit = 10 }) => {
   const where = {};
   const currentUserId = user?.userKey || user?.id || userId || '';
   const currentUserEmail = (user?.email || '').toLowerCase().trim();
@@ -147,7 +145,17 @@ export const getTravelRequestsService = async ({ user, userId, isWorklist = fals
   }
 
   if (status && status !== 'All') {
-    where.status = { [Op.iLike]: `%${status}%` };
+    if (status.toLowerCase() === 'pending') {
+      where.status = { [Op.iLike]: '%Pending%' };
+    } else if (status.toLowerCase() === 'approved') {
+      where.status = { [Op.or]: [{ [Op.iLike]: '%Approved%' }, { [Op.iLike]: '%Booked%' }, { [Op.iLike]: '%Ticketed%' }] };
+    } else if (status.toLowerCase() === 'rejected') {
+      where.status = { [Op.iLike]: '%Rejected%' };
+    } else if (status.toLowerCase() === 'implemented' || status.toLowerCase() === 'completed') {
+      where.status = { [Op.or]: [{ [Op.iLike]: '%Completed%' }, { [Op.iLike]: '%Booked%' }, { [Op.iLike]: '%Ticketed%' }] };
+    } else {
+      where.status = { [Op.iLike]: `%${status}%` };
+    }
   }
 
   if (searchQuery) {
@@ -161,6 +169,15 @@ export const getTravelRequestsService = async ({ user, userId, isWorklist = fals
     ];
   }
 
+  const dateClause = buildDateFilterClause(dateFilter, startDate, endDate);
+  if (dateClause) {
+    if (where[Op.and]) {
+      where[Op.and].push(dateClause);
+    } else {
+      where[Op.and] = [dateClause];
+    }
+  }
+
   const offset = (Number(page) - 1) * Number(limit);
   const { rows, count } = await TravelRequest.findAndCountAll({
     where,
@@ -169,11 +186,27 @@ export const getTravelRequestsService = async ({ user, userId, isWorklist = fals
     offset
   });
 
-  // Calculate high-level summary counts strictly within the scoped where (excluding self requests in personal worklist)
+  // Calculate high-level summary counts strictly within the scoped where (excluding self requests in personal worklist, respecting dateClause without restricting by status filter)
   const scopedWhere = {};
-  if (where[Op.and]) scopedWhere[Op.and] = where[Op.and];
-  if (where[Op.or] && !searchQuery) scopedWhere[Op.or] = where[Op.or];
-  if (where.requesterId) scopedWhere.requesterId = where.requesterId;
+  if (isWorklist && !isOrgWorklist && (currentUserId || currentUserEmail)) {
+    const andConditions = [];
+    if (currentUserId) andConditions.push({ requesterId: { [Op.ne]: currentUserId } });
+    if (currentUserEmail) andConditions.push({ travellerEmail: { [Op.notILike]: currentUserEmail } });
+    if (dateClause) andConditions.push(dateClause);
+    if (andConditions.length > 0) scopedWhere[Op.and] = andConditions;
+  } else if (dateClause) {
+    scopedWhere[Op.and] = [dateClause];
+  }
+  if (!isWorklist && !isOrgView && currentUserId) {
+    if (currentUserEmail) {
+      scopedWhere[Op.or] = [
+        { requesterId: currentUserId },
+        { travellerEmail: { [Op.iLike]: currentUserEmail } }
+      ];
+    } else {
+      scopedWhere.requesterId = currentUserId;
+    }
+  }
 
   const allItems = await TravelRequest.findAll({ where: scopedWhere, attributes: ['status', 'travelMode'] });
 
@@ -288,11 +321,29 @@ export const handleTravelActionService = async ({ id, action, comment, actor }) 
   }
 
   // Authorization Check
-  const actorRole = (actor?.role || '').toLowerCase();
+  const actorRole = (actor?.role || actor?.roleName || '').toLowerCase();
   const actorRoleId = actor?.roleId || '';
-  const isBoardUser = actorRoleId === 'role-board' || actorRole.includes('board');
-  const isSuperAdmin = actorRoleId === 'role-1' || actorRole.includes('super');
-  const isTravelAdmin = actorRoleId === 'role-2-travel' || (actorRole.includes('admin') && actorRole.includes('travel'));
+  const actorRolesList = Array.isArray(actor?.roles)
+    ? actor.roles.map(r => typeof r === 'string' ? r.toLowerCase() : (r.roleId || r.roleName || '').toLowerCase())
+    : Array.isArray(actor?.rolesList)
+    ? actor.rolesList.map(r => String(r).toLowerCase())
+    : [];
+
+  const isBoardUser =
+    actorRoleId === 'role-6' ||
+    actorRoleId === 'role-board' ||
+    actorRole.includes('board') ||
+    actorRolesList.some(r => r === 'role-6' || r === 'role-board' || r.includes('board'));
+
+  const isSuperAdmin =
+    actorRoleId === 'role-1' ||
+    actorRole.includes('super') ||
+    actorRolesList.some(r => r === 'role-1' || r.includes('super'));
+
+  const isTravelAdmin =
+    actorRoleId === 'role-2-travel' ||
+    (actorRole.includes('admin') && actorRole.includes('travel')) ||
+    actorRolesList.some(r => r === 'role-2-travel' || (r.includes('admin') && r.includes('travel')));
 
   // Integrity Rule: Users cannot approve/reject their own requests
   const actorId = actor?.userKey || actor?.id || actor?.email || '';
@@ -309,10 +360,10 @@ export const handleTravelActionService = async ({ id, action, comment, actor }) 
     throw err;
   }
 
-  // Rule: If short-notice flight (< 7 days), ONLY Board Member has authorization
+  // Rule: If Board approval is required (short-notice, premium/business flight, cab rules), ONLY Board Member or Super Admin has authorization
   if (req.isShortNotice) {
-    if (!isBoardUser) {
-      const err = new Error('Short-notice flight bookings (< 7 days) require Board authorization.');
+    if (!isBoardUser && !isSuperAdmin) {
+      const err = new Error('This booking requires Board authorization (Premium/Business class or short-notice booking).');
       err.statusCode = 403;
       throw err;
     }

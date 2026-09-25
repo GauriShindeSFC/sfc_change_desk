@@ -20,6 +20,9 @@ router.get('/', asyncHandler(async (req, res) => {
     organizationScope,
     status: req.query.status,
     searchQuery: req.query.search,
+    dateFilter: req.query.dateFilter,
+    startDate: req.query.startDate,
+    endDate: req.query.endDate,
     page: req.query.page || 1,
     limit: req.query.limit || 10
   });

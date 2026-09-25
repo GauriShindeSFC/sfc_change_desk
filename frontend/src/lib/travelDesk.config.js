@@ -79,7 +79,6 @@ export const TRAVEL_DESK_FIELDS = {
       ],
       group: 'Return / Onward Flight'
     },
-    { name: 'Onward destination', label: 'Onward destination', type: 'input', required: false, full: false, placeholder: 'Required for multi-city travel', default: '', group: 'Return / Onward Flight' },
     { name: 'Airline preference', label: 'Airline preference', type: 'input', required: false, full: false, placeholder: 'Optional', default: '', group: 'Return / Onward Flight' }
   ],
   Cab: [

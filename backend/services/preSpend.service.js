@@ -1,33 +1,31 @@
 import { Op, fn, col } from 'sequelize';
 import { PreSpendRequest } from '../models/PreSpendRequest.js';
-import { UserAppRole } from '../models/UserAppRole.js';
-import { IdentityResolver } from './identityResolver.service.js';
+import { getPreSpendApproverEmails } from './userManagement.service.js';
 import { sendPreSpendCreatedEmail, sendPreSpendDecisionEmail } from './mail.service.js';
+import { buildDateFilterClause } from '../utils/dateFilterUtils.js';
 
-const getPreSpendApproverEmails = async () => {
-  const emails = [];
-  // Find Pre-Spend Admins (role-2-prespend, role-1) and Board members (role-6, role-board)
-  const approverRoles = await UserAppRole.findAll({
-    where: { roleId: { [Op.in]: ['role-1', 'role-2-prespend', 'role-6', 'role-board'] } },
+const generatePreSpendCode = async () => {
+  const year = new Date().getFullYear();
+  const records = await PreSpendRequest.findAll({
+    where: {
+      requestCode: { [Op.like]: `PS-${year}-%` }
+    },
+    attributes: ['requestCode'],
     raw: true
   });
 
-  for (const r of approverRoles) {
-    const key = r.userKey || r.user_key;
-    if (key) {
-      const res = await IdentityResolver.resolveByKey(key);
-      if (res?.status === 'SUCCESS' && res?.identity?.email) {
-        emails.push(res.identity.email.trim());
+  let maxNum = 0;
+  for (const r of records) {
+    if (r.requestCode) {
+      const parts = r.requestCode.split('-');
+      const num = parseInt(parts[2], 10);
+      if (!isNaN(num) && num > maxNum) {
+        maxNum = num;
       }
     }
   }
-  return Array.from(new Set(emails.filter(Boolean)));
-};
 
-const generatePreSpendCode = async () => {
-  const count = await PreSpendRequest.count();
-  const year = new Date().getFullYear();
-  const nextNum = String(count + 1).padStart(4, '0');
+  const nextNum = String(maxNum + 1).padStart(4, '0');
   return `PS-${year}-${nextNum}`;
 };
 
@@ -77,7 +75,7 @@ export const createPreSpendService = async (data, user) => {
   return created;
 };
 
-export const getPreSpendRequestsService = async ({ user, userId, isWorklist = false, isOrgWorklist = false, organizationScope = false, status, searchQuery, page = 1, limit = 10 }) => {
+export const getPreSpendRequestsService = async ({ user, userId, isWorklist = false, isOrgWorklist = false, organizationScope = false, status, searchQuery, dateFilter, startDate, endDate, page = 1, limit = 10 }) => {
   const where = {};
   const currentUserId = user?.userKey || user?.id || userId || '';
   const currentUserEmail = (user?.email || '').toLowerCase().trim();
@@ -110,7 +108,17 @@ export const getPreSpendRequestsService = async ({ user, userId, isWorklist = fa
   }
 
   if (status && status !== 'All') {
-    where.status = { [Op.iLike]: `%${status}%` };
+    if (status.toLowerCase() === 'pending') {
+      where.status = { [Op.iLike]: '%Pending%' };
+    } else if (status.toLowerCase() === 'approved') {
+      where.status = { [Op.iLike]: '%Approved%' };
+    } else if (status.toLowerCase() === 'rejected') {
+      where.status = { [Op.iLike]: '%Rejected%' };
+    } else if (status.toLowerCase() === 'implemented' || status.toLowerCase() === 'processed') {
+      where.status = { [Op.iLike]: '%Processed%' };
+    } else {
+      where.status = { [Op.iLike]: `%${status}%` };
+    }
   }
 
   if (searchQuery) {
@@ -122,6 +130,15 @@ export const getPreSpendRequestsService = async ({ user, userId, isWorklist = fa
     ];
   }
 
+  const dateClause = buildDateFilterClause(dateFilter, startDate, endDate);
+  if (dateClause) {
+    if (where[Op.and]) {
+      where[Op.and].push(dateClause);
+    } else {
+      where[Op.and] = [dateClause];
+    }
+  }
+
   const offset = (Number(page) - 1) * Number(limit);
   const { rows, count } = await PreSpendRequest.findAndCountAll({
     where,
@@ -130,11 +147,27 @@ export const getPreSpendRequestsService = async ({ user, userId, isWorklist = fa
     offset
   });
 
-  // Calculate summary metrics & category distributions using direct SQL aggregations (GROUP BY)
+  // Calculate summary metrics & category distributions within the scoped where (excluding self in worklist and respecting dateClause, but without the status filter constraint so metric cards and tabs show overall counts)
   const scopedWhere = {};
-  if (where[Op.and]) scopedWhere[Op.and] = where[Op.and];
-  if (where[Op.or] && !searchQuery) scopedWhere[Op.or] = where[Op.or];
-  if (where.requesterId) scopedWhere.requesterId = where.requesterId;
+  if (isWorklist && !isOrgWorklist && (currentUserId || currentUserEmail)) {
+    const andConditions = [];
+    if (currentUserId) andConditions.push({ requesterId: { [Op.ne]: currentUserId } });
+    if (currentUserEmail) andConditions.push({ requesterEmail: { [Op.notILike]: currentUserEmail } });
+    if (dateClause) andConditions.push(dateClause);
+    if (andConditions.length > 0) scopedWhere[Op.and] = andConditions;
+  } else if (dateClause) {
+    scopedWhere[Op.and] = [dateClause];
+  }
+  if (!isWorklist && !isOrgView && currentUserId) {
+    if (currentUserEmail) {
+      scopedWhere[Op.or] = [
+        { requesterId: currentUserId },
+        { requesterEmail: { [Op.iLike]: currentUserEmail } }
+      ];
+    } else {
+      scopedWhere.requesterId = currentUserId;
+    }
+  }
 
   const [statusAggregates, categoryAggregates] = await Promise.all([
     PreSpendRequest.findAll({
@@ -292,11 +325,29 @@ export const handlePreSpendActionService = async ({ id, action, comment, actor }
   }
 
   // Authorization Check
-  const actorRole = (actor?.role || '').toLowerCase();
+  const actorRole = (actor?.role || actor?.roleName || '').toLowerCase();
   const actorRoleId = actor?.roleId || '';
-  const isBoardUser = actorRoleId === 'role-board' || actorRole.includes('board');
-  const isSuperAdmin = actorRoleId === 'role-1' || actorRole.includes('super');
-  const isPreSpendAdmin = actorRoleId === 'role-2-prespend' || (actorRole.includes('admin') && (actorRole.includes('spend') || actorRole.includes('prespend')));
+  const actorRolesList = Array.isArray(actor?.roles)
+    ? actor.roles.map(r => typeof r === 'string' ? r.toLowerCase() : (r.roleId || r.roleName || '').toLowerCase())
+    : Array.isArray(actor?.rolesList)
+    ? actor.rolesList.map(r => String(r).toLowerCase())
+    : [];
+
+  const isBoardUser =
+    actorRoleId === 'role-6' ||
+    actorRoleId === 'role-board' ||
+    actorRole.includes('board') ||
+    actorRolesList.some(r => r === 'role-6' || r === 'role-board' || r.includes('board'));
+
+  const isSuperAdmin =
+    actorRoleId === 'role-1' ||
+    actorRole.includes('super') ||
+    actorRolesList.some(r => r === 'role-1' || r.includes('super'));
+
+  const isPreSpendAdmin =
+    actorRoleId === 'role-2-prespend' ||
+    (actorRole.includes('admin') && (actorRole.includes('spend') || actorRole.includes('prespend'))) ||
+    actorRolesList.some(r => r === 'role-2-prespend' || (r.includes('admin') && (r.includes('spend') || r.includes('prespend'))));
 
   // Integrity Rule: Users cannot approve/reject their own requests
   const actorId = actor?.userKey || actor?.id || actor?.email || '';

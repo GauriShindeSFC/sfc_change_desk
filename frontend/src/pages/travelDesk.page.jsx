@@ -13,7 +13,12 @@ import {
   Luggage,
   ChevronDown,
   Search,
-  AlertTriangle
+  AlertTriangle,
+  Plus,
+  Trash2,
+  Calendar,
+  Clock,
+  MapPin
 } from 'lucide-react';
 import { TRAVEL_MODES, TRAVEL_DESK_FIELDS } from '../lib/travelDesk.config.js';
 import { FormLabel } from '../components/ui/primitives.component';
@@ -53,6 +58,16 @@ const READONLY_FIELD_STYLE = {
   boxSizing: 'border-box'
 };
 
+const PREFERRED_TIME_OPTIONS = [
+  { value: '', label: 'Select time' },
+  { value: 'Early morning (05:00–08:00)', label: 'Early morning (05:00–08:00)' },
+  { value: 'Morning (08:00–12:00)', label: 'Morning (08:00–12:00)' },
+  { value: 'Afternoon (12:00–17:00)', label: 'Afternoon (12:00–17:00)' },
+  { value: 'Evening (17:00–21:00)', label: 'Evening (17:00–21:00)' },
+  { value: 'Night (after 21:00)', label: 'Night (after 21:00)' },
+  { value: 'Flexible', label: 'Flexible' }
+];
+
 const resolveEmpBusinessId = (u, initialVal) => {
   if (initialVal && typeof initialVal === 'string' && !initialVal.startsWith('S8-') && !initialVal.startsWith('EMP-')) return initialVal;
   if (u?.employee?.empId) return u.employee.empId;
@@ -82,6 +97,44 @@ const formatDateDisplay = (dateStr) => {
   return dateStr;
 };
 
+// Builds a clean route string across legs e.g. "Mumbai → Delhi → Bengaluru" or disconnected legs "Mumbai → Delhi | Goa → Bengaluru"
+const buildJourneySummary = (legs) => {
+  if (!Array.isArray(legs) || legs.length === 0) return '';
+  const validLegs = legs.filter(l => (l.from && l.from.trim()) || (l.to && l.to.trim()));
+  if (validLegs.length === 0) return '';
+
+  const segments = [];
+  let currentChain = [];
+
+  validLegs.forEach((leg, idx) => {
+    const from = (leg.from || '').trim();
+    const to = (leg.to || '').trim();
+
+    if (idx === 0) {
+      if (from) currentChain.push(from);
+      if (to) currentChain.push(to);
+    } else {
+      const prevTo = (validLegs[idx - 1].to || '').trim();
+      if (from && prevTo && from.toLowerCase() === prevTo.toLowerCase()) {
+        if (to) currentChain.push(to);
+      } else {
+        if (currentChain.length > 0) {
+          segments.push(currentChain.join(' → '));
+        }
+        currentChain = [];
+        if (from) currentChain.push(from);
+        if (to) currentChain.push(to);
+      }
+    }
+  });
+
+  if (currentChain.length > 0) {
+    segments.push(currentChain.join(' → '));
+  }
+
+  return segments.join(' | ');
+};
+
 export default function TravelDeskPage({ onNavigate, user, travellerName = '', department = '' }) {
   const uid = useId();
   const [category, setCategory] = useState('');
@@ -91,6 +144,12 @@ export default function TravelDeskPage({ onNavigate, user, travellerName = '', d
   const [certified, setCertified] = useState(false);
   const [message, setMessage] = useState('');
   const [submitted, setSubmitted] = useState(false);
+  const [stepErrors, setStepErrors] = useState({});
+
+  // Multi-city state
+  const [multiCityLegs, setMultiCityLegs] = useState([
+    { id: 'leg-1', travelDate: '', preferredTime: '', from: '', to: '' }
+  ]);
 
   // Synchronize internal steps with browser history for touchpad / back gesture support
   const setStep = (nextStep, replace = false) => {
@@ -197,9 +256,7 @@ export default function TravelDeskPage({ onNavigate, user, travellerName = '', d
 
   const values = drafts[category] || {};
   const effectiveTraveller = travellerName || user?.name || '';
-  const effectiveDept = department || user?.department || user?.dept || '';
-
-  const valueOf = field => values[field.name] ?? (field.name === 'Traveller' ? effectiveTraveller : field.name === 'Department / Cost Centre' && effectiveDept ? effectiveDept : field.default);
+  const valueOf = field => values[field.name] ?? (field.name === 'Traveller' ? effectiveTraveller : field.default);
 
   const update = (field, value) => {
     setDrafts(previous => ({
@@ -208,9 +265,27 @@ export default function TravelDeskPage({ onNavigate, user, travellerName = '', d
     }));
     setCertified(false);
     setMessage('');
+    setStepErrors(prev => ({ ...prev, [field.name]: undefined, general: undefined }));
   };
 
+  const isFlight = category?.toLowerCase() === 'flight' || category?.toLowerCase() === 'flights';
+  const isCab = category?.toLowerCase() === 'cab' || category?.toLowerCase() === 'cabs';
+  const isMultiCityFlight = isFlight && values['Trip type'] === 'Multi-city / Onward';
+
+  const multiCityExcludedFieldNames = new Set([
+    'Date of travel',
+    'Preferred departure time',
+    'From',
+    'To',
+    'Return / onward date',
+    'Return / onward time',
+    'Onward destination'
+  ]);
+
   const visibleFields = (TRAVEL_DESK_FIELDS[category] || []).filter(field => {
+    if (isMultiCityFlight && multiCityExcludedFieldNames.has(field.name)) {
+      return false;
+    }
     if (field.conditional) {
       const expectedVal = field.conditionalValue || 'Yes';
       if (values[field.conditional] !== expectedVal) return false;
@@ -229,8 +304,107 @@ export default function TravelDeskPage({ onNavigate, user, travellerName = '', d
     return `${year}-${month}-${day}`;
   })();
 
-  const isFlight = category?.toLowerCase() === 'flight' || category?.toLowerCase() === 'flights';
-  const isCab = category?.toLowerCase() === 'cab' || category?.toLowerCase() === 'cabs';
+  // Multi-city Leg Handlers
+  const handleAddLeg = () => {
+    const prevLeg = multiCityLegs[multiCityLegs.length - 1];
+    const defaultFrom = prevLeg ? (prevLeg.to || '') : '';
+    const newLeg = {
+      id: `leg-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`,
+      travelDate: '',
+      preferredTime: '',
+      from: defaultFrom,
+      to: ''
+    };
+    setMultiCityLegs(prev => [...prev, newLeg]);
+    setStepErrors({});
+    setMessage('');
+  };
+
+  const handleRemoveLeg = (idToRemove) => {
+    if (multiCityLegs.length <= 1) return;
+    setMultiCityLegs(prev => prev.filter(leg => leg.id !== idToRemove));
+    setStepErrors({});
+    setMessage('');
+  };
+
+  const handleUpdateLeg = (id, key, val) => {
+    setMultiCityLegs(prev => prev.map(leg => {
+      if (leg.id === id) {
+        return { ...leg, [key]: val };
+      }
+      return leg;
+    }));
+    setStepErrors({});
+    setMessage('');
+    setCertified(false);
+  };
+
+  const validateMultiCityForm = () => {
+    const errors = {};
+    let firstLegDate = '';
+    let lastLegDate = '';
+
+    multiCityLegs.forEach((leg, index) => {
+      const legNum = index + 1;
+      const legErrors = {};
+
+      if (!leg.travelDate) {
+        legErrors.travelDate = 'Travel date is required';
+      }
+      if (!leg.preferredTime) {
+        legErrors.preferredTime = 'Preferred time slot is required';
+      }
+      if (!leg.from || !leg.from.trim()) {
+        legErrors.from = 'From location is required';
+      }
+      if (!leg.to || !leg.to.trim()) {
+        legErrors.to = 'To location is required';
+      }
+
+      if (leg.from && leg.to && leg.from.trim().toLowerCase() === leg.to.trim().toLowerCase()) {
+        legErrors.to = 'Departure and arrival destinations cannot be identical';
+      }
+
+      if (leg.travelDate) {
+        if (index === 0) {
+          firstLegDate = leg.travelDate;
+        } else {
+          const prevLeg = multiCityLegs[index - 1];
+          if (prevLeg.travelDate && leg.travelDate < prevLeg.travelDate) {
+            legErrors.travelDate = `Flight ${legNum} date cannot be earlier than Flight ${index} date (${formatDateDisplay(prevLeg.travelDate)})`;
+          }
+        }
+        lastLegDate = leg.travelDate;
+      }
+
+      if (Object.keys(legErrors).length > 0) {
+        errors[leg.id] = legErrors;
+      }
+    });
+
+    return { isValid: Object.keys(errors).length === 0, errors };
+  };
+
+  const handleProceedToReview = (e) => {
+    e.preventDefault();
+    if (!requesterDetails.managerName || !requesterDetails.managerEmail) {
+      setMessage('Please select a reporting manager from the list.');
+      return;
+    }
+
+    if (isMultiCityFlight) {
+      const { isValid, errors } = validateMultiCityForm();
+      if (!isValid) {
+        setStepErrors(errors);
+        setMessage('Please correct the highlighted errors in your multi-city flight itinerary.');
+        return;
+      }
+    }
+
+    setStepErrors({});
+    setMessage('');
+    setStep(3);
+  };
 
   const checkBoardApprovalRequired = () => {
     // 1. Flight Board Approval Rules: Premium Economy / Business OR < 7 days notice
@@ -243,7 +417,10 @@ export default function TravelDeskPage({ onNavigate, user, travellerName = '', d
         };
       }
 
-      const travelDateStr = values['Date of travel'] || values['Date of journey'] || values['Check-in date'];
+      const travelDateStr = isMultiCityFlight
+        ? (multiCityLegs[0]?.travelDate || '')
+        : (values['Date of travel'] || values['Date of journey'] || values['Check-in date']);
+
       if (!travelDateStr) return { required: false, reason: '' };
 
       const parts = travelDateStr.split('-');
@@ -316,6 +493,48 @@ export default function TravelDeskPage({ onNavigate, user, travellerName = '', d
     setIsSubmitting(true);
     setMessage('');
     try {
+      const departureDate = isMultiCityFlight
+        ? (multiCityLegs[0]?.travelDate || '')
+        : (values['Date of travel'] || values['Date of journey'] || values['Check-in date'] || '');
+
+      const returnDate = isMultiCityFlight
+        ? null
+        : (values['Return / onward date'] || values['Return date'] || values['Check-out date'] || null);
+
+      const fromLocation = isMultiCityFlight
+        ? (multiCityLegs[0]?.from || '')
+        : (valueOf({ name: 'From' }) || valueOf({ name: 'From station' }) || valueOf({ name: 'Pickup location' }) || '');
+
+      const toLocation = isMultiCityFlight
+        ? (multiCityLegs[multiCityLegs.length - 1]?.to || '')
+        : (valueOf({ name: 'To' }) || valueOf({ name: 'To station' }) || valueOf({ name: 'Final drop location' }) || valueOf({ name: 'City / Location' }) || '');
+
+      const preferredTimeSlot = isMultiCityFlight
+        ? (multiCityLegs[0]?.preferredTime || '')
+        : (values['Preferred departure time'] || values['Preferred time slot'] || values['Pickup time'] || '');
+
+      // Build consolidated bookingDetails
+      const finalBookingDetails = {
+        ...values
+      };
+
+      if (isMultiCityFlight) {
+        finalBookingDetails.legs = multiCityLegs;
+        delete finalBookingDetails.returnFlightRequired;
+        delete finalBookingDetails.returnLeg;
+        delete finalBookingDetails.returnDate;
+        delete finalBookingDetails.returnPreferredTime;
+        delete finalBookingDetails.returnFrom;
+        delete finalBookingDetails.returnTo;
+        delete finalBookingDetails['Date of travel'];
+        delete finalBookingDetails['Preferred departure time'];
+        delete finalBookingDetails['From'];
+        delete finalBookingDetails['To'];
+        delete finalBookingDetails['Return / onward date'];
+        delete finalBookingDetails['Return / onward time'];
+        delete finalBookingDetails['Onward destination'];
+      }
+
       const payload = {
         category,
         travelMode: category,
@@ -325,19 +544,20 @@ export default function TravelDeskPage({ onNavigate, user, travellerName = '', d
         location: requesterDetails.location || '',
         managerName: requesterDetails.managerName || '',
         managerEmail: requesterDetails.managerEmail || '',
-        department: valueOf({ name: 'Department / Cost Centre' }),
+        department: department || user?.department || '',
         purpose: valueOf({ name: 'Purpose of visit' }),
         tripType: valueOf({ name: 'Trip type' }) || valueOf({ name: 'Journey type' }) || '',
         travelClass: valueOf({ name: 'Travel class' }) || valueOf({ name: 'Bus type' }) || valueOf({ name: 'Room type' }) || '',
-        fromLocation: valueOf({ name: 'From' }) || valueOf({ name: 'From station' }) || valueOf({ name: 'Pickup location' }) || '',
-        toLocation: valueOf({ name: 'To' }) || valueOf({ name: 'To station' }) || valueOf({ name: 'Final drop location' }) || valueOf({ name: 'City / Location' }) || '',
-        departureDate: values['Date of travel'] || values['Date of journey'] || values['Check-in date'] || '',
-        returnDate: values['Return / onward date'] || values['Return date'] || values['Check-out date'] || '',
-        preferredTimeSlot: values['Preferred departure time'] || values['Preferred time slot'] || values['Pickup time'] || '',
+        fromLocation,
+        toLocation,
+        departureDate,
+        returnDate,
+        preferredTimeSlot,
         isShortNotice,
-        bookingDetails: values,
+        bookingDetails: finalBookingDetails,
         certified
       };
+
       const res = await apiFetch('/travel-desk', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -357,6 +577,7 @@ export default function TravelDeskPage({ onNavigate, user, travellerName = '', d
   };
 
   const stepsList = ['Travel Mode', 'Travel Details', 'Review & Submit'];
+  const journeySummary = isMultiCityFlight ? buildJourneySummary(multiCityLegs) : '';
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', width: '100%', maxWidth: '1040px', margin: '0 auto', paddingBottom: '3rem' }}>
@@ -455,6 +676,7 @@ export default function TravelDeskPage({ onNavigate, user, travellerName = '', d
                 setSubmitted(false);
                 setStep(1);
                 setCategory('');
+                setMultiCityLegs([{ id: 'leg-1', travelDate: '', preferredTime: '', from: '', to: '' }]);
               }}
               style={{
                 padding: '0.65rem 1.35rem',
@@ -605,7 +827,7 @@ export default function TravelDeskPage({ onNavigate, user, travellerName = '', d
 
       {/* STEP 2: Travel Details Form */}
       {!submitted && step === 2 && (
-        <form onSubmit={(e) => { e.preventDefault(); setStep(3); }} style={{
+        <form onSubmit={handleProceedToReview} style={{
           backgroundColor: 'var(--card-bg)',
           border: '1px solid var(--border-color)',
           borderRadius: '12px',
@@ -864,36 +1086,301 @@ export default function TravelDeskPage({ onNavigate, user, travellerName = '', d
                 </div>
               );
             })}
+          </div>
 
-            {isShortNotice && (
-              <div
-                role="alert"
-                style={{
-                  gridColumn: '1 / -1',
-                  borderRadius: '10px',
-                  padding: '1rem 1.25rem',
-                  display: 'flex',
-                  alignItems: 'flex-start',
-                  gap: '0.75rem',
-                  backgroundColor: '#FEFCE8',
-                  border: '1px solid #FDE047',
-                  borderLeft: '5px solid #CA8A04'
-                }}
-              >
-                <div style={{ color: '#854D0E', flexShrink: 0, marginTop: '2px' }}>
-                  <AlertTriangle size={18} />
-                </div>
-                <div>
-                  <div style={{ color: '#854D0E', fontWeight: 700, fontSize: '0.85rem', lineHeight: 1.3 }}>
-                    Board approval will be required
+          {/* MULTI-CITY FLIGHT SECTION (Stacked Flight Cards & Journey Summary) */}
+          {isMultiCityFlight && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', marginTop: '0.25rem' }}>
+              
+              {/* 1. Journey Summary Banner */}
+              <div style={{
+                padding: '0.85rem 1.25rem',
+                backgroundColor: 'var(--input-bg, #F8FAFC)',
+                border: '1px solid var(--border-color)',
+                borderRadius: '10px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                flexWrap: 'wrap',
+                gap: '0.75rem'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
+                  <div style={{
+                    width: '32px',
+                    height: '32px',
+                    borderRadius: '8px',
+                    backgroundColor: 'rgba(23, 60, 78, 0.08)',
+                    color: 'var(--brand-primary)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center'
+                  }}>
+                    <Plane size={17} />
                   </div>
-                  <p style={{ color: '#713F12', fontSize: '0.8rem', marginTop: '0.2rem', lineHeight: 1.45, margin: 0 }}>
-                    {boardApprovalInfo.reason || 'This booking requires additional Board member sign-off per corporate travel policy.'}
-                  </p>
+                  <div>
+                    <div style={{ fontSize: '0.725rem', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                      Multi-City Journey Route
+                    </div>
+                    <div style={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--text-primary)', marginTop: '0.1rem' }}>
+                      {journeySummary || 'Enter your flight origins and destinations below'}
+                    </div>
+                  </div>
+                </div>
+
+                <div style={{
+                  fontSize: '0.75rem',
+                  fontWeight: 600,
+                  color: 'var(--brand-primary)',
+                  backgroundColor: '#FFFFFF',
+                  padding: '0.25rem 0.65rem',
+                  borderRadius: '6px',
+                  border: '1px solid var(--border-color)'
+                }}>
+                  {multiCityLegs.length} {multiCityLegs.length === 1 ? 'Flight Leg' : 'Flight Legs'}
                 </div>
               </div>
-            )}
-          </div>
+
+              {/* 2. Stacked Flight Cards */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                {multiCityLegs.map((leg, index) => {
+                  const legNum = index + 1;
+                  const prevLeg = index > 0 ? multiCityLegs[index - 1] : null;
+                  const minDateForLeg = (prevLeg && prevLeg.travelDate) ? prevLeg.travelDate : todayStr;
+                  const legError = stepErrors[leg.id] || {};
+
+                  return (
+                    <div
+                      key={leg.id}
+                      style={{
+                        backgroundColor: 'var(--card-bg, #FFFFFF)',
+                        border: '1px solid var(--border-color)',
+                        borderRadius: '12px',
+                        padding: '1.25rem 1.5rem',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '1rem',
+                        boxShadow: '0 1px 2px rgba(16, 21, 30, 0.03)',
+                        position: 'relative'
+                      }}
+                    >
+                      {/* Card Top Bar */}
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                          <span style={{
+                            fontSize: '0.75rem',
+                            fontWeight: 700,
+                            backgroundColor: 'var(--brand-primary)',
+                            color: '#FFFFFF',
+                            width: '22px',
+                            height: '22px',
+                            borderRadius: '50%',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            justifyContent: 'center'
+                          }}>
+                            {legNum}
+                          </span>
+                          <h4 style={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--text-primary)', margin: 0 }}>
+                            Flight {legNum}
+                          </h4>
+                        </div>
+
+                        {multiCityLegs.length > 1 && (
+                          <button
+                            type="button"
+                            aria-label={`Remove Flight ${legNum}`}
+                            onClick={() => handleRemoveLeg(leg.id)}
+                            style={{
+                              background: 'none',
+                              border: '1px solid #FECACA',
+                              backgroundColor: '#FEF2F2',
+                              color: '#DC2626',
+                              borderRadius: '6px',
+                              padding: '0.35rem 0.65rem',
+                              fontSize: '0.775rem',
+                              fontWeight: 600,
+                              cursor: 'pointer',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '0.35rem'
+                            }}
+                          >
+                            <Trash2 size={13} />
+                            <span>Remove</span>
+                          </button>
+                        )}
+                      </div>
+
+                      {/* 2-Column Desktop / 1-Column Mobile Layout */}
+                      <div className="cd-responsive-form-grid" style={{ gap: '0.85rem' }}>
+                        
+                        {/* Travel Date */}
+                        <div>
+                          <FormLabel required htmlFor={`leg-date-${leg.id}`}>Travel date</FormLabel>
+                          <input
+                            id={`leg-date-${leg.id}`}
+                            type="date"
+                            min={minDateForLeg}
+                            required
+                            value={leg.travelDate}
+                            onChange={(e) => handleUpdateLeg(leg.id, 'travelDate', e.target.value)}
+                            style={{
+                              ...ACTIVE_FIELD_STYLE,
+                              borderColor: legError.travelDate ? '#DC2626' : 'var(--border-color)'
+                            }}
+                          />
+                          {legError.travelDate && (
+                            <div style={{ fontSize: '0.725rem', color: '#DC2626', marginTop: '0.25rem', fontWeight: 500 }}>
+                              {legError.travelDate}
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Preferred Time Slot */}
+                        <div>
+                          <FormLabel required htmlFor={`leg-time-${leg.id}`}>Preferred time slot</FormLabel>
+                          <select
+                            id={`leg-time-${leg.id}`}
+                            required
+                            value={leg.preferredTime}
+                            onChange={(e) => handleUpdateLeg(leg.id, 'preferredTime', e.target.value)}
+                            style={{
+                              ...ACTIVE_FIELD_STYLE,
+                              borderColor: legError.preferredTime ? '#DC2626' : 'var(--border-color)'
+                            }}
+                          >
+                            {PREFERRED_TIME_OPTIONS.map(opt => (
+                              <option key={opt.value} value={opt.value}>{opt.label}</option>
+                            ))}
+                          </select>
+                          {legError.preferredTime && (
+                            <div style={{ fontSize: '0.725rem', color: '#DC2626', marginTop: '0.25rem', fontWeight: 500 }}>
+                              {legError.preferredTime}
+                            </div>
+                          )}
+                        </div>
+
+                        {/* From */}
+                        <div>
+                          <FormLabel required htmlFor={`leg-from-${leg.id}`}>From</FormLabel>
+                          <input
+                            id={`leg-from-${leg.id}`}
+                            type="text"
+                            required
+                            placeholder="City or airport"
+                            value={leg.from}
+                            onChange={(e) => handleUpdateLeg(leg.id, 'from', e.target.value)}
+                            style={{
+                              ...ACTIVE_FIELD_STYLE,
+                              borderColor: legError.from ? '#DC2626' : 'var(--border-color)'
+                            }}
+                          />
+                          {legError.from && (
+                            <div style={{ fontSize: '0.725rem', color: '#DC2626', marginTop: '0.25rem', fontWeight: 500 }}>
+                              {legError.from}
+                            </div>
+                          )}
+                        </div>
+
+                        {/* To */}
+                        <div>
+                          <FormLabel required htmlFor={`leg-to-${leg.id}`}>To</FormLabel>
+                          <input
+                            id={`leg-to-${leg.id}`}
+                            type="text"
+                            required
+                            placeholder="City or airport"
+                            value={leg.to}
+                            onChange={(e) => handleUpdateLeg(leg.id, 'to', e.target.value)}
+                            style={{
+                              ...ACTIVE_FIELD_STYLE,
+                              borderColor: legError.to ? '#DC2626' : 'var(--border-color)'
+                            }}
+                          />
+                          {legError.to && (
+                            <div style={{ fontSize: '0.725rem', color: '#DC2626', marginTop: '0.25rem', fontWeight: 500 }}>
+                              {legError.to}
+                            </div>
+                          )}
+                        </div>
+
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* 3. "+ Add destination" Button */}
+              <div>
+                <button
+                  type="button"
+                  onClick={handleAddLeg}
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '0.45rem',
+                    padding: '0.6rem 1.1rem',
+                    backgroundColor: '#FFFFFF',
+                    border: '1.5px dashed var(--brand-primary)',
+                    borderRadius: '8px',
+                    color: 'var(--brand-primary)',
+                    fontSize: '0.85rem',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    transition: 'background-color 0.15s ease'
+                  }}
+                  onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'rgba(23, 60, 78, 0.04)'}
+                  onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#FFFFFF'}
+                >
+                  <Plus size={16} />
+                  <span>Add destination</span>
+                </button>
+              </div>
+
+            </div>
+          )}
+
+          {isShortNotice && (
+            <div
+              role="alert"
+              style={{
+                borderRadius: '10px',
+                padding: '1rem 1.25rem',
+                display: 'flex',
+                alignItems: 'flex-start',
+                gap: '0.75rem',
+                backgroundColor: '#FEFCE8',
+                border: '1px solid #FDE047',
+                borderLeft: '5px solid #CA8A04'
+              }}
+            >
+              <div style={{ color: '#854D0E', flexShrink: 0, marginTop: '2px' }}>
+                <AlertTriangle size={18} />
+              </div>
+              <div>
+                <div style={{ color: '#854D0E', fontWeight: 700, fontSize: '0.85rem', lineHeight: 1.3 }}>
+                  Board approval will be required
+                </div>
+                <p style={{ color: '#713F12', fontSize: '0.8rem', marginTop: '0.2rem', lineHeight: 1.45, margin: 0 }}>
+                  {boardApprovalInfo.reason || 'This booking requires additional Board member sign-off per corporate travel policy.'}
+                </p>
+              </div>
+            </div>
+          )}
+
+          {message && (
+            <div style={{
+              padding: '0.75rem 1rem',
+              backgroundColor: '#FEF2F2',
+              border: '1px solid #FECACA',
+              borderRadius: '8px',
+              fontSize: '0.825rem',
+              color: '#DC2626',
+              fontWeight: 600
+            }}>
+              {message}
+            </div>
+          )}
 
           <div style={{ display: 'flex', justifyContent: 'space-between', paddingTop: '1rem', borderTop: '1px solid var(--border-color)' }}>
             <button
@@ -1001,7 +1488,7 @@ export default function TravelDeskPage({ onNavigate, user, travellerName = '', d
                   Board approval will be required
                 </div>
                 <p style={{ color: '#713F12', fontSize: '0.8rem', marginTop: '0.2rem', lineHeight: 1.45, margin: 0 }}>
-                  This travel date is less than 7 days from today. The request will be routed for additional Board approval.
+                  {boardApprovalInfo.reason || 'This booking requires additional Board member sign-off per corporate travel policy.'}
                 </p>
               </div>
             </div>
@@ -1021,7 +1508,7 @@ export default function TravelDeskPage({ onNavigate, user, travellerName = '', d
               Travel request summary
             </h3>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
               {/* Category */}
               <div style={{ display: 'grid', gridTemplateColumns: 'minmax(180px, 240px) 1fr', alignItems: 'baseline', gap: '1rem' }}>
                 <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', fontWeight: 500 }}>Category</span>
@@ -1036,33 +1523,112 @@ export default function TravelDeskPage({ onNavigate, user, travellerName = '', d
                 </span>
               </div>
 
-              {/* Department */}
+              {/* Purpose */}
+              {valueOf({ name: 'Purpose of visit' }) && (
+                <div style={{ display: 'grid', gridTemplateColumns: 'minmax(180px, 240px) 1fr', alignItems: 'baseline', gap: '1rem' }}>
+                  <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', fontWeight: 500 }}>Purpose of visit</span>
+                  <span style={{ fontSize: '0.85rem', color: 'var(--text-primary)', fontWeight: 600, wordBreak: 'break-word' }}>
+                    {valueOf({ name: 'Purpose of visit' })}
+                  </span>
+                </div>
+              )}
+
+              {/* Trip Type */}
               <div style={{ display: 'grid', gridTemplateColumns: 'minmax(180px, 240px) 1fr', alignItems: 'baseline', gap: '1rem' }}>
-                <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', fontWeight: 500 }}>Department / Cost Centre</span>
+                <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', fontWeight: 500 }}>Trip type</span>
                 <span style={{ fontSize: '0.85rem', color: 'var(--text-primary)', fontWeight: 600 }}>
-                  {valueOf({ name: 'Department / Cost Centre' }) || effectiveDept || '—'}
+                  {valueOf({ name: 'Trip type' }) || '—'}
                 </span>
               </div>
 
-              {/* Dynamic Visible Fields */}
-              {visibleFields
-                .filter(f => f.name !== 'Traveller' && f.name !== 'Department / Cost Centre')
-                .map(field => {
-                  const val = valueOf(field);
-                  if (val === undefined || val === null || val === '') return null;
-                  const displayVal = field.type === 'date' ? formatDateDisplay(val) : String(val);
+              {/* Travel Class */}
+              {valueOf({ name: 'Travel class' }) && (
+                <div style={{ display: 'grid', gridTemplateColumns: 'minmax(180px, 240px) 1fr', alignItems: 'baseline', gap: '1rem' }}>
+                  <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', fontWeight: 500 }}>Travel class</span>
+                  <span style={{ fontSize: '0.85rem', color: 'var(--text-primary)', fontWeight: 600 }}>
+                    {valueOf({ name: 'Travel class' })}
+                  </span>
+                </div>
+              )}
 
-                  return (
-                    <div key={field.name} style={{ display: 'grid', gridTemplateColumns: 'minmax(180px, 240px) 1fr', alignItems: 'baseline', gap: '1rem' }}>
-                      <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', fontWeight: 500 }}>
-                        {field.name || field.label}
-                      </span>
-                      <span style={{ fontSize: '0.85rem', color: 'var(--text-primary)', fontWeight: 600, wordBreak: 'break-word' }}>
-                        {displayVal}
-                      </span>
-                    </div>
-                  );
-                })}
+              {/* Multi-City Itinerary Leg List */}
+              {isMultiCityFlight ? (
+                <div style={{ marginTop: '0.5rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                  <div style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-primary)', textTransform: 'uppercase', letterSpacing: '0.03em' }}>
+                    Multi-City Flight Itinerary ({journeySummary})
+                  </div>
+
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                    {multiCityLegs.map((leg, idx) => (
+                      <div
+                        key={leg.id}
+                        style={{
+                          padding: '0.75rem 1rem',
+                          backgroundColor: 'var(--input-bg, #F8FAFC)',
+                          borderRadius: '8px',
+                          border: '1px solid var(--border-color)',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          flexWrap: 'wrap',
+                          gap: '0.75rem'
+                        }}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
+                          <span style={{
+                            fontSize: '0.75rem',
+                            fontWeight: 700,
+                            backgroundColor: 'var(--brand-primary)',
+                            color: '#FFFFFF',
+                            width: '20px',
+                            height: '20px',
+                            borderRadius: '50%',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            justifyContent: 'center'
+                          }}>
+                            {idx + 1}
+                          </span>
+                          <span style={{ fontSize: '0.875rem', fontWeight: 700, color: 'var(--text-primary)' }}>
+                            {leg.from} → {leg.to}
+                          </span>
+                        </div>
+
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '1.25rem', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                            <Calendar size={13} />
+                            <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{formatDateDisplay(leg.travelDate)}</span>
+                          </div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                            <Clock size={13} />
+                            <span>{leg.preferredTime}</span>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                /* Non-multi-city Dynamic Fields */
+                visibleFields
+                  .filter(f => f.name !== 'Traveller' && f.name !== 'Purpose of visit' && f.name !== 'Trip type' && f.name !== 'Travel class')
+                  .map(field => {
+                    const val = valueOf(field);
+                    if (val === undefined || val === null || val === '') return null;
+                    const displayVal = field.type === 'date' ? formatDateDisplay(val) : String(val);
+
+                    return (
+                      <div key={field.name} style={{ display: 'grid', gridTemplateColumns: 'minmax(180px, 240px) 1fr', alignItems: 'baseline', gap: '1rem' }}>
+                        <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', fontWeight: 500 }}>
+                          {field.name || field.label}
+                        </span>
+                        <span style={{ fontSize: '0.85rem', color: 'var(--text-primary)', fontWeight: 600, wordBreak: 'break-word' }}>
+                          {displayVal}
+                        </span>
+                      </div>
+                    );
+                  })
+              )}
             </div>
           </div>
 
@@ -1111,7 +1677,7 @@ export default function TravelDeskPage({ onNavigate, user, travellerName = '', d
             </button>
             <button
               type="submit"
-              disabled={!certified}
+              disabled={!certified || isSubmitting}
               style={{
                 display: 'inline-flex',
                 alignItems: 'center',
@@ -1123,12 +1689,12 @@ export default function TravelDeskPage({ onNavigate, user, travellerName = '', d
                 borderRadius: '8px',
                 fontSize: '0.85rem',
                 fontWeight: 600,
-                cursor: !certified ? 'not-allowed' : 'pointer',
-                opacity: !certified ? 0.5 : 1
+                cursor: (!certified || isSubmitting) ? 'not-allowed' : 'pointer',
+                opacity: (!certified || isSubmitting) ? 0.5 : 1
               }}
             >
               <Send size={14} />
-              <span>Submit Travel Booking Request</span>
+              <span>{isSubmitting ? 'Submitting...' : 'Submit Travel Booking Request'}</span>
             </button>
           </div>
         </form>
@@ -1136,3 +1702,4 @@ export default function TravelDeskPage({ onNavigate, user, travellerName = '', d
     </div>
   );
 }
+

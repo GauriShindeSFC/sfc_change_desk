@@ -156,7 +156,7 @@ export function computeDateBoundaries(dateFilter, startDate, endDate, referenceD
  * - inclusive lower bound: timestamp >= start
  * - exclusive upper bound: timestamp < end
  */
-export function buildDateFilterClause(dateFilter, startDate, endDate, referenceDate = new Date(), timeZone = BUSINESS_TIMEZONE) {
+export function buildDateFilterClause(dateFilter, startDate, endDate, referenceDate = new Date(), timeZone = BUSINESS_TIMEZONE, fieldName = 'createdAt') {
   const boundaries = computeDateBoundaries(dateFilter, startDate, endDate, referenceDate, timeZone);
   if (!boundaries) return null;
 
@@ -166,12 +166,16 @@ export function buildDateFilterClause(dateFilter, startDate, endDate, referenceD
     [Op.lt]: end
   };
 
+  if (fieldName === 'createdAt') {
+    return { createdAt: dateCond };
+  }
+
   return {
     [Op.or]: [
-      { submittedAt: dateCond },
+      { [fieldName]: dateCond },
       {
         [Op.and]: [
-          { submittedAt: null },
+          { [fieldName]: null },
           { createdAt: dateCond }
         ]
       }
