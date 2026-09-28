@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Search, Menu } from 'lucide-react';
+import { Search, Menu, Sun, Moon } from 'lucide-react';
+import { useTheme } from '../../context/ThemeContext';
 
 function Header({
   activeRoute = 'Dashboard',
@@ -13,16 +14,7 @@ function Header({
 }) {
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const profileRef = useRef(null);
-
-  // Ensure light mode is strictly applied
-  useEffect(() => {
-    document.documentElement.classList.remove('dark');
-    try {
-      localStorage.setItem('changedesk.theme', 'light');
-    } catch {
-      /* ignore */
-    }
-  }, []);
+  const { theme, toggle: toggleTheme } = useTheme();
 
   // Click outside to close profile dropdown
   useEffect(() => {
@@ -147,28 +139,59 @@ function Header({
           </div>
         )}
 
+        <button
+          type="button"
+          onClick={toggleTheme}
+          aria-label="Toggle theme"
+          title={theme === 'dark' ? 'Switch to light' : 'Switch to dark'}
+          style={squareBtn}
+        >
+          {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
+        </button>
+
         {/* Profile Menu */}
         <div ref={profileRef} style={{ position: 'relative' }}>
           <button
             type="button"
             onClick={() => setShowProfileMenu((v) => !v)}
             style={{
-              width: '36px',
-              height: '36px',
-              borderRadius: '8px',
-              backgroundColor: 'var(--primary, #173C4E)',
-              color: '#FFFFFF',
-              border: 'none',
               display: 'flex',
               alignItems: 'center',
-              justifyContent: 'center',
-              fontSize: '0.85rem',
-              fontWeight: 600,
-              cursor: 'pointer',
-              flexShrink: 0
+              gap: '0.6rem',
+              padding: '0.2rem 0.3rem 0.2rem 0.6rem',
+              borderRadius: '8px',
+              border: 'none',
+              backgroundColor: 'transparent',
+              cursor: 'pointer'
             }}
           >
-            {initials}
+            {!isMobile && (
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', lineHeight: 1.25 }}>
+                <span style={{ fontSize: '0.825rem', fontWeight: 600, color: 'var(--text-primary)', whiteSpace: 'nowrap' }}>
+                  {user?.name || user?.displayName || 'User'}
+                </span>
+                <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>
+                  {user?.email || ''}
+                </span>
+              </div>
+            )}
+            <div
+              style={{
+                width: '36px',
+                height: '36px',
+                borderRadius: '8px',
+                backgroundColor: 'var(--primary)',
+                color: 'var(--primary-foreground)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: '0.85rem',
+                fontWeight: 600,
+                flexShrink: 0
+              }}
+            >
+              {initials}
+            </div>
           </button>
 
           {showProfileMenu && (

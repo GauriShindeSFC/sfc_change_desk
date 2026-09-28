@@ -1,20 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { login, MICROSOFT_LOGIN_URL, fetchMe, saveSession } from '../lib/auth.lib';
+import { useTheme } from '../context/ThemeContext';
 
 export default function LoginPage({ onLogin, onLoginSuccess }) {
   const [email, setEmail] = useState('');
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-
-  // Enforce light mode across the entire application
-  useEffect(() => {
-    document.documentElement.classList.remove('dark');
-    try {
-      localStorage.setItem('changedesk.theme', 'light');
-    } catch {
-      /* ignore */
-    }
-  }, []);
+  const { theme } = useTheme();
+  const logoSrc = theme === 'dark' ? '/images/white-stfox-logo.png' : '/images/black-stfox-logo.png';
+  const faviconSrc = theme === 'dark' ? '/images/white-favicon.png' : '/images/black-favicon.png';
 
   // Capture Microsoft SSO callback token or error from URL
   useEffect(() => {
@@ -97,11 +91,11 @@ export default function LoginPage({ onLogin, onLoginSuccess }) {
         {/* Company logo */}
         <div style={{ marginBottom: '0.75rem', display: 'flex', justifyContent: 'center' }}>
           <img
-            src="/images/black-stfox-logo.png"
+            src={logoSrc}
             alt="ST FOX"
             onError={(e) => {
               e.target.onerror = null;
-              e.target.src = '/images/black-favicon.png';
+              e.target.src = faviconSrc;
             }}
             style={{ height: '52px', width: 'auto', maxWidth: '100%', objectFit: 'contain', display: 'block' }}
           />

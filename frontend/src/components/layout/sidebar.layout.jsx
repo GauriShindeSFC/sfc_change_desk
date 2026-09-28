@@ -11,6 +11,7 @@ import {
   Users,
   ExternalLink
 } from 'lucide-react';
+import { useTheme } from '../../context/ThemeContext';
 
 function Sidebar({
   activeItem,
@@ -19,11 +20,11 @@ function Sidebar({
   isMobile = false,
   mobileOpen = false,
   onCloseMobile,
-  myRequestsCount = 6,
-  worklistCount = 4,
   onHoverChange
 }) {
   const [isHovered, setIsHovered] = useState(false);
+  const { theme } = useTheme();
+  const faviconSrc = theme === 'dark' ? '/images/white-favicon.png' : '/images/black-favicon.png';
 
   const handleMouseEnter = () => {
     if (!isMobile) {
@@ -84,6 +85,7 @@ function Sidebar({
         key={item.id}
         onClick={() => handleSelect(item)}
         title={mini ? item.label : undefined}
+        className={`cd-nav-item${isActive ? ' cd-nav-item--active' : ''}`}
         style={{
           display: 'flex',
           alignItems: 'center',
@@ -91,25 +93,26 @@ function Sidebar({
           width: '100%',
           padding: mini ? '0.65rem' : '0.65rem 0.85rem',
           justifyContent: mini ? 'center' : 'flex-start',
-          borderRadius: '8px',
+          borderRadius: 'var(--radius-lg)',
           border: 'none',
-          backgroundColor: isActive ? 'var(--primary, #173C4E)' : 'transparent',
-          color: isActive ? '#FFFFFF' : '#94A3B8',
+          color: isActive ? 'var(--primary-foreground)' : 'var(--sidebar-text)',
           fontWeight: isActive ? 600 : 500,
           fontSize: '0.85rem',
           cursor: 'pointer',
-          transition: 'background-color 0.15s ease, color 0.15s ease',
-          position: 'relative'
+          position: 'relative',
+          ...(isActive
+            ? { backgroundColor: 'var(--primary)', boxShadow: 'var(--shadow-card)' }
+            : {})
         }}
       >
-        <Icon size={18} style={{ color: isActive ? '#FFFFFF' : '#64748B', flexShrink: 0, strokeWidth: isActive ? 2.25 : 2 }} />
+        <Icon size={18} style={{ color: isActive ? 'var(--primary-foreground)' : 'var(--text-secondary)', flexShrink: 0, strokeWidth: isActive ? 2.25 : 2 }} />
         {!mini && (
           <span style={{ flex: 1, textAlign: 'left', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
             {item.label}
           </span>
         )}
         {!mini && item.externalUrl && (
-          <ExternalLink size={13} style={{ color: '#64748B', flexShrink: 0, marginLeft: 'auto' }} />
+          <ExternalLink size={13} style={{ color: 'var(--text-secondary)', flexShrink: 0, marginLeft: 'auto' }} />
         )}
         {!mini && item.comingSoon && (
           <span
@@ -118,29 +121,15 @@ function Sidebar({
               borderRadius: '4px',
               fontSize: '0.625rem',
               fontWeight: 600,
-              backgroundColor: '#1E293B',
-              color: '#94A3B8',
-              border: '1px solid #334155',
+              backgroundColor: 'var(--sidebar-border)',
+              color: 'var(--text-secondary)',
+              border: '1px solid var(--sidebar-border)',
               whiteSpace: 'nowrap',
               letterSpacing: '0.02em',
               lineHeight: 1.2
             }}
           >
             Coming Soon
-          </span>
-        )}
-        {!mini && !isActive && Boolean(item.badge) && item.badge > 0 && (
-          <span
-            style={{
-              padding: '0.1rem 0.45rem',
-              borderRadius: 'var(--radius-lg)',
-              fontSize: '0.7rem',
-              fontWeight: 500,
-              backgroundColor: 'var(--primary, #173C4E)',
-              color: '#FFFFFF'
-            }}
-          >
-            {item.badge}
           </span>
         )}
       </button>
@@ -153,8 +142,8 @@ function Sidebar({
       onMouseLeave={handleMouseLeave}
       style={{
         width: `${width}px`,
-        backgroundColor: '#0B1018',
-        color: '#A0AEC0',
+        backgroundColor: 'var(--sidebar-bg)',
+        color: 'var(--sidebar-text)',
         display: 'flex',
         flexDirection: 'column',
         minHeight: '100vh',
@@ -165,13 +154,13 @@ function Sidebar({
         zIndex: isMobile ? 120 : 100,
         transform: isMobile ? `translateX(${mobileOpen ? '0' : '-110%'})` : 'none',
         transition: 'transform 0.22s ease, width 0.2s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.2s ease',
-        boxShadow: !isMobile && isHovered ? '4px 0 24px rgba(0, 0, 0, 0.45)' : 'none',
+        boxShadow: !isMobile && isHovered ? 'var(--shadow-pop)' : 'none',
         overflowX: 'hidden',
         overflowY: 'auto',
         padding: mini ? '1.25rem 0' : '1.25rem 0.85rem',
         flexShrink: 0,
         userSelect: 'none',
-        borderRight: '1px solid #1E293B'
+        borderRight: '1px solid var(--sidebar-border)'
       }}
     >
       {/* Brand Header */}
@@ -187,7 +176,7 @@ function Sidebar({
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: mini ? 0 : '0.85rem', justifyContent: mini ? 'center' : 'flex-start', width: mini ? '100%' : 'auto', flex: mini ? 'none' : 1, minWidth: 0 }}>
           <img
-            src="/images/white-favicon.png"
+            src={faviconSrc}
             alt="Logo"
             onError={(e) => {
               e.target.onerror = null;
@@ -201,7 +190,7 @@ function Sidebar({
                 style={{
                   fontSize: '1.05rem',
                   fontWeight: 700,
-                  color: '#FFFFFF',
+                  color: 'var(--sidebar-text)',
                   lineHeight: 1.15,
                   letterSpacing: '-0.01em',
                   whiteSpace: 'nowrap',
@@ -215,7 +204,7 @@ function Sidebar({
                 style={{
                   fontSize: '0.6rem',
                   fontWeight: 500,
-                  color: '#64748B',
+                  color: 'var(--text-secondary)',
                   letterSpacing: '0.08em',
                   marginTop: '0.15rem',
                   whiteSpace: 'nowrap'
@@ -240,7 +229,7 @@ function Sidebar({
       </div>
 
       {/* Main nav */}
-      <nav style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+      <nav className={`cd-sidebar-nav${mini ? ' cd-sidebar-nav--mini' : ''}`}>
         {topNavItems.map((item) => (
           <NavButton key={item.id} item={item} />
         ))}
@@ -270,7 +259,7 @@ function Sidebar({
               style={{
                 fontSize: '0.6875rem',
                 fontWeight: 500,
-                color: '#475569',
+                color: 'var(--text-secondary)',
                 letterSpacing: '0.08em',
                 textTransform: 'uppercase',
                 margin: mini ? '1.25rem 0 0.5rem 0' : '1.5rem 0 0.5rem 0.85rem',
@@ -280,7 +269,7 @@ function Sidebar({
               {mini ? '•••' : 'MANAGEMENT'}
             </div>
 
-            <nav style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', flex: 1 }}>
+            <nav className={`cd-sidebar-nav cd-sidebar-nav--fill${mini ? ' cd-sidebar-nav--mini' : ''}`}>
               {visibleMgmtItems.map((item) => (
                 <NavButton key={item.id} item={item} />
               ))}
@@ -310,9 +299,9 @@ const iconBtnStyle = {
   width: '30px',
   height: '30px',
   borderRadius: '7px',
-  border: '1px solid #1E293B',
-  backgroundColor: '#0B1018',
-  color: '#94A3B8',
+  border: '1px solid var(--sidebar-border)',
+  backgroundColor: 'var(--sidebar-bg)',
+  color: 'var(--text-secondary)',
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'center',

@@ -29,7 +29,7 @@ const money = value => Number(value || 0).toLocaleString('en-IN', { style: 'curr
 const ACTIVE_FIELD_STYLE = {
   width: '100%',
   padding: '0.65rem 0.85rem',
-  backgroundColor: '#FFFFFF',
+  backgroundColor: 'var(--input-bg)',
   border: '1px solid var(--border-color)',
   borderRadius: '8px',
   fontSize: '0.85rem',
@@ -298,11 +298,11 @@ export default function PreSpendPage({ onNavigate, user, initialCostCentre = '',
   const stepsList = ['Spend Category', 'Request Details', 'Vendors & Quotes', 'Review & Submit'];
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', width: '100%', maxWidth: '1040px', margin: '0 auto', paddingBottom: '3rem' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', width: '100%', paddingBottom: '3rem' }}>
       
       {/* Top Header */}
       <div>
-        <h1 style={{ fontSize: '1.45rem', fontWeight: 600, color: 'var(--text-primary)', lineHeight: 1.2, margin: 0 }}>
+        <h1 style={{ fontSize: '1.45rem', fontWeight: 700, color: 'var(--text-primary)', lineHeight: 1.2, margin: 0 }}>
           New Pre-Spend Request
         </h1>
         <p style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', marginTop: '0.25rem', margin: 0 }}>
@@ -332,33 +332,45 @@ export default function PreSpendPage({ onNavigate, user, initialCostCentre = '',
               style={{
                 display: 'flex',
                 alignItems: 'center',
-                gap: '0.6rem',
-                fontSize: '0.825rem',
-                fontWeight: isActive || isDone ? 600 : 500,
-                color: isActive ? 'var(--brand-primary)' : isDone ? '#059669' : 'var(--text-secondary)',
-                whiteSpace: 'nowrap'
+                gap: '0.6rem'
               }}
             >
               <div
                 style={{
-                  width: '24px',
-                  height: '24px',
-                  borderRadius: '50%',
                   display: 'flex',
                   alignItems: 'center',
-                  justifyContent: 'center',
-                  fontSize: '0.75rem',
-                  fontWeight: 700,
-                  backgroundColor: isActive ? 'var(--brand-primary)' : isDone ? '#059669' : 'var(--input-bg)',
-                  color: isActive || isDone ? '#FFFFFF' : 'var(--text-secondary)',
-                  border: isActive || isDone ? 'none' : '1px solid var(--border-color)'
+                  gap: '0.5rem',
+                  fontSize: '0.825rem',
+                  fontWeight: isActive || isDone ? 600 : 500,
+                  color: isActive ? '#FFFFFF' : isDone ? '#059669' : 'var(--text-secondary)',
+                  whiteSpace: 'nowrap',
+                  padding: isActive ? '0.3rem 0.85rem 0.3rem 0.3rem' : 0,
+                  borderRadius: isActive ? 'var(--radius-full)' : 0,
+                  backgroundColor: isActive ? 'var(--brand-primary)' : 'transparent'
                 }}
               >
-                {isDone ? <Check size={13} strokeWidth={3} /> : stepNum}
+                <div
+                  style={{
+                    width: '24px',
+                    height: '24px',
+                    borderRadius: '50%',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: '0.75rem',
+                    fontWeight: 700,
+                    flexShrink: 0,
+                    backgroundColor: isActive ? 'rgba(255, 255, 255, 0.2)' : isDone ? '#059669' : 'var(--input-bg)',
+                    color: isActive || isDone ? '#FFFFFF' : 'var(--text-secondary)',
+                    border: isActive || isDone ? 'none' : '1px solid var(--border-color)'
+                  }}
+                >
+                  {isDone ? <Check size={13} strokeWidth={3} /> : stepNum}
+                </div>
+                <span>{label}</span>
               </div>
-              <span>{label}</span>
               {index < stepsList.length - 1 && (
-                <span style={{ color: 'var(--border-color)', marginLeft: '0.5rem' }}>/</span>
+                <span style={{ color: 'var(--border-color)' }}>/</span>
               )}
             </div>
           );
@@ -653,7 +665,6 @@ export default function PreSpendPage({ onNavigate, user, initialCostCentre = '',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'space-between',
-                    backgroundColor: '#FFFFFF',
                     userSelect: 'none'
                   }}
                 >
@@ -671,7 +682,7 @@ export default function PreSpendPage({ onNavigate, user, initialCostCentre = '',
                     right: 0,
                     zIndex: 50,
                     marginTop: '0.35rem',
-                    backgroundColor: '#FFFFFF',
+                    backgroundColor: 'var(--card-bg)',
                     border: '1px solid var(--border-color)',
                     borderRadius: '10px',
                     boxShadow: '0 8px 24px rgba(15, 23, 42, 0.12)',
@@ -679,9 +690,9 @@ export default function PreSpendPage({ onNavigate, user, initialCostCentre = '',
                     flexDirection: 'column',
                     overflow: 'hidden'
                   }}>
-                    <div style={{ padding: '0.65rem', borderBottom: '1px solid var(--border-color)', backgroundColor: '#F8FAFC' }}>
+                    <div style={{ padding: '0.65rem', borderBottom: '1px solid var(--border-color)', backgroundColor: 'var(--input-bg)' }}>
                       <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
-                        <Search size={14} style={{ position: 'absolute', left: '0.65rem', color: '#94A3B8' }} />
+                        <Search size={14} style={{ position: 'absolute', left: '0.65rem', color: 'var(--text-secondary)' }} />
                         <input
                           type="text"
                           autoFocus
@@ -692,10 +703,11 @@ export default function PreSpendPage({ onNavigate, user, initialCostCentre = '',
                             width: '100%',
                             padding: '0.45rem 0.65rem 0.45rem 2rem',
                             fontSize: '0.8rem',
-                            border: '1px solid #CBD5E1',
+                            border: '1px solid var(--border-color)',
                             borderRadius: '6px',
                             outline: 'none',
-                            backgroundColor: '#FFFFFF',
+                            backgroundColor: 'var(--card-bg)',
+                            color: 'var(--text-primary)',
                             boxSizing: 'border-box'
                           }}
                         />
@@ -728,11 +740,11 @@ export default function PreSpendPage({ onNavigate, user, initialCostCentre = '',
                               flexDirection: 'column',
                               gap: '0.15rem',
                               borderBottom: '1px solid var(--border-color)',
-                              backgroundColor: requesterDetails.managerEmail === u.email ? '#EFF6FF' : 'transparent',
+                              backgroundColor: requesterDetails.managerEmail === u.email ? 'var(--input-bg)' : 'transparent',
                               transition: 'background-color 0.15s'
                             }}
                             onMouseEnter={(e) => {
-                              if (requesterDetails.managerEmail !== u.email) e.currentTarget.style.backgroundColor = '#F8FAFC';
+                              if (requesterDetails.managerEmail !== u.email) e.currentTarget.style.backgroundColor = 'var(--input-bg)';
                             }}
                             onMouseLeave={(e) => {
                               if (requesterDetails.managerEmail !== u.email) e.currentTarget.style.backgroundColor = 'transparent';
@@ -890,8 +902,8 @@ export default function PreSpendPage({ onNavigate, user, initialCostCentre = '',
       {/* STEP 3: Vendors & Quotes */}
       {!submitted && step === 3 && (
         <form onSubmit={(e) => { e.preventDefault(); setStep(4); }} style={{
-          backgroundColor: '#FFFFFF',
-          border: '1px solid #E2E8F0',
+          backgroundColor: 'var(--card-bg)',
+          border: '1px solid var(--border-color)',
           borderRadius: '16px',
           padding: '2rem',
           display: 'flex',
@@ -935,9 +947,9 @@ export default function PreSpendPage({ onNavigate, user, initialCostCentre = '',
                     <History size={15} />
                   </div>
                   <div>
-                    <span style={{ fontSize: '0.825rem', fontWeight: 600, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                    <span style={{ fontSize: '0.825rem', fontWeight: 600, color: '#0F172A', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
                       Previously Selected Vendor for <span style={{ color: 'var(--brand-primary)' }}>{pastVendor.subcategory || subcategory}</span>
-                      <span style={{ fontSize: '0.65rem', backgroundColor: 'var(--input-bg)', color: 'var(--brand-primary)', padding: '0.1rem 0.4rem', borderRadius: '4px', fontWeight: 600, border: '1px solid var(--border-color)' }}>History</span>
+                      <span style={{ fontSize: '0.65rem', backgroundColor: '#FFFFFF', color: 'var(--brand-primary)', padding: '0.1rem 0.4rem', borderRadius: '4px', fontWeight: 600, border: '1px solid #CBD5E1' }}>History</span>
                     </span>
                   </div>
                 </div>
@@ -994,20 +1006,20 @@ export default function PreSpendPage({ onNavigate, user, initialCostCentre = '',
                 fontSize: '0.8rem'
               }}>
                 <div>
-                  <span style={{ color: 'var(--text-secondary)', display: 'block', fontSize: '0.7rem', fontWeight: 600, textTransform: 'uppercase' }}>Vendor Name</span>
-                  <span style={{ fontWeight: 600, color: 'var(--text-primary)', fontSize: '0.875rem' }}>{pastVendor.vendorName}</span>
+                  <span style={{ color: '#64748B', display: 'block', fontSize: '0.7rem', fontWeight: 600, textTransform: 'uppercase' }}>Vendor Name</span>
+                  <span style={{ fontWeight: 600, color: '#0F172A', fontSize: '0.875rem' }}>{pastVendor.vendorName}</span>
                 </div>
                 <div>
-                  <span style={{ color: 'var(--text-secondary)', display: 'block', fontSize: '0.7rem', fontWeight: 600, textTransform: 'uppercase' }}>Subcategory</span>
-                  <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{pastVendor.subcategory || subcategory}</span>
+                  <span style={{ color: '#64748B', display: 'block', fontSize: '0.7rem', fontWeight: 600, textTransform: 'uppercase' }}>Subcategory</span>
+                  <span style={{ fontWeight: 600, color: '#0F172A' }}>{pastVendor.subcategory || subcategory}</span>
                 </div>
                 <div>
-                  <span style={{ color: 'var(--text-secondary)', display: 'block', fontSize: '0.7rem', fontWeight: 600, textTransform: 'uppercase' }}>Historical Cost</span>
+                  <span style={{ color: '#64748B', display: 'block', fontSize: '0.7rem', fontWeight: 600, textTransform: 'uppercase' }}>Historical Cost</span>
                   <span style={{ fontWeight: 600, color: '#059669', fontFamily: 'var(--font-mono)' }}>{pastVendor.vendorAmount ? money(pastVendor.vendorAmount) : '—'}</span>
                 </div>
                 <div>
-                  <span style={{ color: 'var(--text-secondary)', display: 'block', fontSize: '0.7rem', fontWeight: 600, textTransform: 'uppercase' }}>Quote Date</span>
-                  <span style={{ fontWeight: 600, color: 'var(--text-primary)', fontFamily: 'var(--font-mono)' }}>{pastVendor.quoteDate || '—'}</span>
+                  <span style={{ color: '#64748B', display: 'block', fontSize: '0.7rem', fontWeight: 600, textTransform: 'uppercase' }}>Quote Date</span>
+                  <span style={{ fontWeight: 600, color: '#0F172A', fontFamily: 'var(--font-mono)' }}>{pastVendor.quoteDate || '—'}</span>
                 </div>
               </div>
             </div>
@@ -1035,8 +1047,8 @@ export default function PreSpendPage({ onNavigate, user, initialCostCentre = '',
 
             const DISABLED_CARD_STYLE = {
               opacity: 0.55,
-              backgroundColor: '#F8FAFC',
-              borderColor: '#E2E8F0',
+              backgroundColor: 'var(--input-bg)',
+              borderColor: 'var(--border-color)',
               pointerEvents: 'none',
               filter: 'grayscale(0.6)'
             };
@@ -1052,7 +1064,7 @@ export default function PreSpendPage({ onNavigate, user, initialCostCentre = '',
                   padding: '1.5rem',
                   borderRadius: '14px',
                   border: '1.5px solid #10B981',
-                  backgroundColor: '#FFFFFF',
+                  backgroundColor: 'var(--card-bg)',
                   display: 'flex',
                   flexDirection: 'column',
                   gap: '1rem'
@@ -1135,10 +1147,10 @@ export default function PreSpendPage({ onNavigate, user, initialCostCentre = '',
                         alignItems: 'center',
                         justifyContent: 'center',
                         height: '42px',
-                        border: '1px dashed #94A3B8',
+                        border: '1px dashed var(--border-color)',
                         borderRadius: '8px',
-                        backgroundColor: '#F8FAFC',
-                        color: vendors[0]?.fileName ? '#0F172A' : '#475569',
+                        backgroundColor: 'var(--card-bg)',
+                        color: vendors[0]?.fileName ? 'var(--text-primary)' : 'var(--text-secondary)',
                         fontSize: '0.85rem',
                         fontWeight: 500,
                         cursor: 'pointer',
@@ -1158,8 +1170,8 @@ export default function PreSpendPage({ onNavigate, user, initialCostCentre = '',
                 <div style={{
                   padding: '1.5rem',
                   borderRadius: '14px',
-                  border: '1px solid #E2E8F0',
-                  backgroundColor: '#FFFFFF',
+                  border: '1px solid var(--border-color)',
+                  backgroundColor: 'var(--card-bg)',
                   display: 'flex',
                   flexDirection: 'column',
                   gap: '1rem',
@@ -1262,10 +1274,10 @@ export default function PreSpendPage({ onNavigate, user, initialCostCentre = '',
                         alignItems: 'center',
                         justifyContent: 'center',
                         height: '42px',
-                        border: '1px dashed #CBD5E1',
+                        border: '1px dashed var(--border-color)',
                         borderRadius: '8px',
-                        backgroundColor: isVendor1Disabled ? 'var(--input-bg)' : '#FFFFFF',
-                        color: vendors[1]?.fileName ? '#0F172A' : '#475569',
+                        backgroundColor: isVendor1Disabled ? 'var(--input-bg)' : 'var(--card-bg)',
+                        color: vendors[1]?.fileName ? 'var(--text-primary)' : 'var(--text-secondary)',
                         fontSize: '0.85rem',
                         fontWeight: 500,
                         cursor: isVendor1Disabled ? 'not-allowed' : 'pointer',
@@ -1285,8 +1297,8 @@ export default function PreSpendPage({ onNavigate, user, initialCostCentre = '',
                 <div style={{
                   padding: '1.5rem',
                   borderRadius: '14px',
-                  border: '1px solid #E2E8F0',
-                  backgroundColor: '#FFFFFF',
+                  border: '1px solid var(--border-color)',
+                  backgroundColor: 'var(--card-bg)',
                   display: 'flex',
                   flexDirection: 'column',
                   gap: '1rem',
@@ -1365,10 +1377,10 @@ export default function PreSpendPage({ onNavigate, user, initialCostCentre = '',
                         alignItems: 'center',
                         justifyContent: 'center',
                         height: '42px',
-                        border: '1px dashed #CBD5E1',
+                        border: '1px dashed var(--border-color)',
                         borderRadius: '8px',
-                        backgroundColor: isVendor2Disabled ? 'var(--input-bg)' : '#FFFFFF',
-                        color: vendors[2]?.fileName ? '#0F172A' : '#475569',
+                        backgroundColor: isVendor2Disabled ? 'var(--input-bg)' : 'var(--card-bg)',
+                        color: vendors[2]?.fileName ? 'var(--text-primary)' : 'var(--text-secondary)',
                         fontSize: '0.85rem',
                         fontWeight: 500,
                         cursor: isVendor2Disabled ? 'not-allowed' : 'pointer',
@@ -1388,8 +1400,8 @@ export default function PreSpendPage({ onNavigate, user, initialCostCentre = '',
                 <div style={{
                   padding: '1.5rem',
                   borderRadius: '14px',
-                  border: '1px solid #E2E8F0',
-                  backgroundColor: '#FFFFFF',
+                  border: '1px solid var(--border-color)',
+                  backgroundColor: 'var(--card-bg)',
                   display: 'flex',
                   flexDirection: 'column',
                   gap: '1rem',
@@ -1479,7 +1491,7 @@ export default function PreSpendPage({ onNavigate, user, initialCostCentre = '',
           </div>
 
           {/* Navigation Buttons */}
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '1rem', borderTop: '1px solid #E2E8F0' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '1rem', borderTop: '1px solid var(--border-color)' }}>
             <button
               type="button"
               onClick={() => setStep(2)}
@@ -1488,9 +1500,9 @@ export default function PreSpendPage({ onNavigate, user, initialCostCentre = '',
                 alignItems: 'center',
                 gap: '0.45rem',
                 padding: '0.65rem 1.35rem',
-                backgroundColor: '#FFFFFF',
-                color: '#0F172A',
-                border: '1px solid #CBD5E1',
+                backgroundColor: 'var(--card-bg)',
+                color: 'var(--text-primary)',
+                border: '1px solid var(--border-color)',
                 borderRadius: '8px',
                 fontSize: '0.875rem',
                 fontWeight: 600,
@@ -1524,8 +1536,8 @@ export default function PreSpendPage({ onNavigate, user, initialCostCentre = '',
       {/* STEP 4: Review & Submit */}
       {!submitted && step === 4 && (
         <form onSubmit={handleSubmit} style={{
-          backgroundColor: '#FFFFFF',
-          border: '1px solid #E2E8F0',
+          backgroundColor: 'var(--card-bg)',
+          border: '1px solid var(--border-color)',
           borderRadius: '16px',
           padding: '2rem',
           display: 'flex',
@@ -1714,7 +1726,7 @@ export default function PreSpendPage({ onNavigate, user, initialCostCentre = '',
           </div>
 
           {/* Section 4: Confirmation Checkbox */}
-          <div style={{ padding: '1rem 0', borderTop: '1px solid #E2E8F0', borderBottom: '1px solid #E2E8F0', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+          <div style={{ padding: '1rem 0', borderTop: '1px solid var(--border-color)', borderBottom: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
               <input
                 id="certify"
@@ -1727,7 +1739,7 @@ export default function PreSpendPage({ onNavigate, user, initialCostCentre = '',
                 }}
                 style={{ cursor: 'pointer', width: '18px', height: '18px', accentColor: '#2563EB' }}
               />
-              <label htmlFor="certify" style={{ fontSize: '0.9rem', color: '#0F172A', fontWeight: 500, cursor: 'pointer', lineHeight: 1.45 }}>
+              <label htmlFor="certify" style={{ fontSize: '0.9rem', color: 'var(--text-primary)', fontWeight: 500, cursor: 'pointer', lineHeight: 1.45 }}>
                 I confirm that no order, payment or vendor commitment has been made and the information provided is correct.
               </label>
             </div>
@@ -1744,9 +1756,9 @@ export default function PreSpendPage({ onNavigate, user, initialCostCentre = '',
                 alignItems: 'center',
                 gap: '0.45rem',
                 padding: '0.65rem 1.35rem',
-                backgroundColor: '#FFFFFF',
-                color: '#0F172A',
-                border: '1px solid #CBD5E1',
+                backgroundColor: 'var(--card-bg)',
+                color: 'var(--text-primary)',
+                border: '1px solid var(--border-color)',
                 borderRadius: '8px',
                 fontSize: '0.875rem',
                 fontWeight: 600,

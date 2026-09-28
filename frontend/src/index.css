@@ -235,6 +235,41 @@ svg {
   border-color: var(--text-secondary);
 }
 
+/* Sidebar nav item — inactive items get real hover feedback; active items
+   get a soft lift + a left accent bar instead of a flat color block. */
+.cd-nav-item {
+  transition: background-color 0.15s ease, color 0.15s ease, box-shadow 0.15s ease;
+}
+.cd-nav-item:not(.cd-nav-item--active):hover {
+  background-color: color-mix(in srgb, var(--sidebar-text) 8%, transparent);
+}
+.cd-nav-item--active::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 3px;
+  height: 60%;
+  border-radius: var(--radius-full);
+  background-color: var(--primary-foreground);
+  opacity: 0.55;
+}
+
+/* Sidebar nav list — shared layout for the primary and management nav groups */
+.cd-sidebar-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  padding: 0 0.4rem;
+}
+.cd-sidebar-nav--mini {
+  padding: 0 0.35rem;
+}
+.cd-sidebar-nav--fill {
+  flex: 1;
+}
+
 /* Custom Scrollbar */
 ::-webkit-scrollbar {
   width: 9px;

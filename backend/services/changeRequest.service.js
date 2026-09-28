@@ -272,6 +272,7 @@ export const getFilteredChangeRequests = async ({
   let isChangeManager = false;
   let isChangeImplementer = false;
   let assignedCategoryIds = new Set();
+  let actingUserEmail = '';
   let categoryNameToIdMap = new Map();
 
   const pageRequestIds = rows.map((row) => row.id);
@@ -326,6 +327,7 @@ export const getFilteredChangeRequests = async ({
       ? (identityRes.identity.ciCategories || identityRes.identity.categoryIds || [])
       : (identityRes.identity.cmCategories || identityRes.identity.categoryIds || []);
     assignedCategoryIds = new Set(identityRes.status === 'SUCCESS' ? activeCatIds : []);
+    actingUserEmail = ((identityRes.status === 'SUCCESS' ? identityRes.identity?.email : '') || '').toLowerCase().trim();
 
     const allCategories = await CatalogCategory.findAll({ attributes: ['id', 'name'] });
     for (const c of allCategories) {
@@ -387,7 +389,6 @@ export const getFilteredChangeRequests = async ({
       const isStage1 = cr.approvalStage === 'manager_review';
       const isStage2 = cr.approvalStage === 'stage_2_review' || (!cr.approvalStage && cr.status === 'Pending');
 
-      const actingUserEmail = (identityRes?.status === 'SUCCESS' ? identityRes.identity?.email : '')?.toLowerCase().trim();
       const crManagerEmail = (cr.managerEmail || '').toLowerCase().trim();
       const isAssignedReportingManager = Boolean(actingUserEmail && crManagerEmail && actingUserEmail === crManagerEmail);
 
