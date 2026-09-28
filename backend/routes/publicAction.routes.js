@@ -44,8 +44,18 @@ router.get('/change-request-action', async (req, res) => {
       if (tokenCycle && ps.approvalCycle && ps.approvalCycle !== tokenCycle) {
         return res.status(409).json({ success: false, message: 'This action link has expired due to a new review cycle.' });
       }
+      const isStage1Token = tokenStage === 'manager_review';
+      const isPending = ps.status === 'Pending Approval' || ps.status === 'Pending';
+      const isAlreadyProcessed = isStage1Token
+        ? (ps.approvalStage !== 'manager_review' || !isPending)
+        : !isPending;
+
+      const lastAction = Array.isArray(ps.approvalHistory) && ps.approvalHistory.length > 0
+        ? ps.approvalHistory[ps.approvalHistory.length - 1]
+        : null;
+
       const isStage1 = ps.approvalStage === 'manager_review';
-      const isPending = ps.status === 'Pending Approval';
+
       return res.json({
         success: true,
         data: {
@@ -54,9 +64,19 @@ router.get('/change-request-action', async (req, res) => {
           action: defaultAction || 'approve',
           approverEmail,
           stage: ps.approvalStage || 'manager_review',
-          stageLabel: isStage1 ? 'Waiting for manager review' : ps.status === 'Approved' ? 'Approved' : 'Pending Stage 2 Review',
+          stageLabel: isStage1 ? 'Waiting for manager review' : ps.status === 'Approved' ? 'Approved' : ps.status === 'Rejected' ? 'Rejected' : 'Pending Stage 2 Review',
           isPending,
-          isApproved: ps.status === 'Approved'
+          isApproved: ps.status === 'Approved',
+          isAlreadyProcessed,
+          alreadyProcessedDetails: isAlreadyProcessed ? {
+            status: ps.status,
+            action: lastAction?.action || (ps.status === 'Approved' ? 'approve' : ps.status === 'Rejected' ? 'reject' : 'processed'),
+            decision: lastAction?.decision || ps.status,
+            decidedBy: lastAction?.actorName || ps.managerName || 'Approver',
+            decidedByEmail: lastAction?.actorEmail || null,
+            comment: lastAction?.comment || null,
+            timestamp: lastAction?.timestamp || ps.updatedAt
+          } : null
         }
       });
     }
@@ -71,8 +91,18 @@ router.get('/change-request-action', async (req, res) => {
       if (tokenCycle && tr.approvalCycle && tr.approvalCycle !== tokenCycle) {
         return res.status(409).json({ success: false, message: 'This action link has expired due to a new review cycle.' });
       }
+      const isStage1Token = tokenStage === 'manager_review';
+      const isPending = tr.status === 'Pending Approval' || tr.status === 'Pending';
+      const isAlreadyProcessed = isStage1Token
+        ? (tr.approvalStage !== 'manager_review' || !isPending)
+        : !isPending;
+
+      const lastAction = Array.isArray(tr.approvalHistory) && tr.approvalHistory.length > 0
+        ? tr.approvalHistory[tr.approvalHistory.length - 1]
+        : null;
+
       const isStage1 = tr.approvalStage === 'manager_review';
-      const isPending = tr.status === 'Pending Approval';
+
       return res.json({
         success: true,
         data: {
@@ -81,9 +111,19 @@ router.get('/change-request-action', async (req, res) => {
           action: defaultAction || 'approve',
           approverEmail,
           stage: tr.approvalStage || 'manager_review',
-          stageLabel: isStage1 ? 'Waiting for manager review' : tr.status === 'Approved' ? 'Approved' : 'Pending Stage 2 Review',
+          stageLabel: isStage1 ? 'Waiting for manager review' : tr.status === 'Approved' ? 'Approved' : tr.status === 'Rejected' ? 'Rejected' : 'Pending Stage 2 Review',
           isPending,
-          isApproved: tr.status === 'Approved'
+          isApproved: tr.status === 'Approved',
+          isAlreadyProcessed,
+          alreadyProcessedDetails: isAlreadyProcessed ? {
+            status: tr.status,
+            action: lastAction?.action || (tr.status === 'Approved' ? 'approve' : tr.status === 'Rejected' ? 'reject' : 'processed'),
+            decision: lastAction?.decision || tr.status,
+            decidedBy: lastAction?.actorName || tr.managerName || 'Approver',
+            decidedByEmail: lastAction?.actorEmail || null,
+            comment: lastAction?.comment || null,
+            timestamp: lastAction?.timestamp || tr.updatedAt
+          } : null
         }
       });
     }
@@ -98,7 +138,23 @@ router.get('/change-request-action', async (req, res) => {
     }
 
     const serialized = serializeChangeRequest(cr);
+    const isStage1Token = tokenStage === 'manager_review';
+    const isImplementToken = defaultAction === 'implement';
     const isStage1 = cr.approvalStage === 'manager_review';
+
+    const isAlreadyProcessed = isStage1Token
+      ? (cr.approvalStage !== 'manager_review' || cr.status !== 'Pending')
+      : isImplementToken
+        ? (cr.status === 'Implemented' || cr.status === 'Rejected')
+        : (cr.status !== 'Pending');
+
+    const customVals = (cr.customFieldValues && typeof cr.customFieldValues === 'object') ? cr.customFieldValues : {};
+    const lastComment = Array.isArray(cr.comments) && cr.comments.length > 0
+      ? cr.comments[cr.comments.length - 1]
+      : null;
+
+    const decidedBy = customVals.approvedBy || customVals.rejectedBy || customVals.managerApprovedBy || customVals.implementedBy || lastComment?.authorName || serialized.decidedBy || 'Approver';
+    const decidedComment = customVals.approvedComment || customVals.rejectedComment || customVals.rejectionReason || customVals.managerApprovedComment || customVals.implementedComment || lastComment?.text || null;
 
     return res.json({
       success: true,
@@ -109,9 +165,19 @@ router.get('/change-request-action', async (req, res) => {
         action: defaultAction || 'approve',
         approverEmail,
         stage: cr.approvalStage || 'manager_review',
-        stageLabel: isStage1 ? 'Waiting for manager review' : cr.status === 'Approved' ? 'Manager approved' : 'Pending Stage 2 Review',
+        stageLabel: isStage1 ? 'Waiting for manager review' : cr.status === 'Approved' ? 'Manager approved' : cr.status === 'Rejected' ? 'Rejected' : cr.status === 'Implemented' ? 'Implemented' : 'Pending Stage 2 Review',
         isPending: serialized.status === 'Pending',
-        isApproved: serialized.status === 'Approved'
+        isApproved: serialized.status === 'Approved',
+        isAlreadyProcessed,
+        alreadyProcessedDetails: isAlreadyProcessed ? {
+          status: cr.status,
+          action: cr.status === 'Approved' ? 'approve' : cr.status === 'Implemented' ? 'implement' : cr.status === 'Rejected' ? 'reject' : 'processed',
+          decision: cr.status,
+          decidedBy,
+          decidedByEmail: customVals.approvedByEmail || customVals.implementedByEmail || null,
+          comment: decidedComment,
+          timestamp: cr.closedAt || customVals.managerApprovedAt || cr.updatedAt
+        } : null
       }
     });
   } catch (err) {
@@ -140,7 +206,7 @@ router.post('/change-request-action', async (req, res) => {
 
   try {
     const decoded = jwt.verify(token, JWT_SECRET);
-    const { crId, preSpendId, travelId, approverEmail, approvalCycle: tokenCycle } = decoded;
+    const { crId, preSpendId, travelId, approverEmail, stage: tokenStage, approvalCycle: tokenCycle } = decoded;
     const targetModule = modBody || (preSpendId ? 'prespend' : travelId ? 'travel' : 'cr');
 
     // Resolve approver's actor identity from email
@@ -169,6 +235,22 @@ router.post('/change-request-action', async (req, res) => {
       if (tokenCycle && ps.approvalCycle && ps.approvalCycle !== tokenCycle) {
         return res.status(409).json({ success: false, message: 'This action link has expired due to a new review cycle.' });
       }
+      if (tokenStage === 'manager_review' && ps.approvalStage !== 'manager_review') {
+        return res.json({
+          success: true,
+          alreadyProcessed: true,
+          message: `This Pre-Spend request has already been reviewed by the manager (Current Status: ${ps.status}).`,
+          data: ps
+        });
+      }
+      if (ps.status !== 'Pending Approval' && ps.status !== 'Pending') {
+        return res.json({
+          success: true,
+          alreadyProcessed: true,
+          message: `This Pre-Spend request has already been marked as ${ps.status}.`,
+          data: ps
+        });
+      }
       const result = await handlePreSpendActionService({
         id: psId,
         action,
@@ -193,6 +275,22 @@ router.post('/change-request-action', async (req, res) => {
       if (tokenCycle && tr.approvalCycle && tr.approvalCycle !== tokenCycle) {
         return res.status(409).json({ success: false, message: 'This action link has expired due to a new review cycle.' });
       }
+      if (tokenStage === 'manager_review' && tr.approvalStage !== 'manager_review') {
+        return res.json({
+          success: true,
+          alreadyProcessed: true,
+          message: `This Travel request has already been reviewed by the manager (Current Status: ${tr.status}).`,
+          data: tr
+        });
+      }
+      if (tr.status !== 'Pending Approval' && tr.status !== 'Pending') {
+        return res.json({
+          success: true,
+          alreadyProcessed: true,
+          message: `This Travel request has already been marked as ${tr.status}.`,
+          data: tr
+        });
+      }
       const result = await handleTravelActionService({
         id: trId,
         action,
@@ -216,11 +314,22 @@ router.post('/change-request-action', async (req, res) => {
       return res.status(409).json({ success: false, message: 'This action link has expired due to a new review cycle.' });
     }
 
+    if (tokenStage === 'manager_review' && cr.approvalStage !== 'manager_review') {
+      return res.json({
+        success: true,
+        alreadyProcessed: true,
+        message: `This Change Request has already been reviewed by the manager (Current Status: ${cr.status}).`,
+        data: cr
+      });
+    }
+
     if (action === 'implement') {
       if (cr.status === 'Implemented') {
-        return res.status(400).json({
-          success: false,
-          message: `Change Request ${crId} has already been marked as Implemented.`
+        return res.json({
+          success: true,
+          alreadyProcessed: true,
+          message: `Change Request ${crId} has already been marked as Implemented.`,
+          data: cr
         });
       }
       if (cr.status !== 'Approved') {
@@ -231,9 +340,11 @@ router.post('/change-request-action', async (req, res) => {
       }
     } else {
       if (cr.status !== 'Pending') {
-        return res.status(400).json({
-          success: false,
-          message: `This Change Request has already been marked as ${cr.status}.`
+        return res.json({
+          success: true,
+          alreadyProcessed: true,
+          message: `This Change Request has already been marked as ${cr.status}.`,
+          data: cr
         });
       }
     }

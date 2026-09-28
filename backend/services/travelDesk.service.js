@@ -283,6 +283,9 @@ export const getTravelRequestsService = async ({ user, userId, isWorklist = fals
     isShortNotice: r.isShortNotice,
     bookingDetails: r.bookingDetails || {},
     status: r.status,
+    approvalStage: r.approvalStage || 'manager_review',
+    managerName: r.managerName || null,
+    managerEmail: r.managerEmail || null,
     policyCertified: r.policyCertified,
     approvalHistory: r.approvalHistory || [],
     comments: Array.isArray(r.approvalHistory) ? r.approvalHistory.map((h, idx) => ({

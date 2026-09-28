@@ -384,12 +384,21 @@ export const getFilteredChangeRequests = async ({
         (cr.employeeId && (typeof actingUserKeys !== 'undefined' && actingUserKeys.has(cr.employeeId)))
       ) : false;
 
+      const isStage1 = cr.approvalStage === 'manager_review';
+      const isStage2 = cr.approvalStage === 'stage_2_review' || (!cr.approvalStage && cr.status === 'Pending');
+
+      const actingUserEmail = (identityRes?.status === 'SUCCESS' ? identityRes.identity?.email : '')?.toLowerCase().trim();
+      const crManagerEmail = (cr.managerEmail || '').toLowerCase().trim();
+      const isAssignedReportingManager = Boolean(actingUserEmail && crManagerEmail && actingUserEmail === crManagerEmail);
+
       const canAct = !isSelfRequest && (
         isSuperOrAdmin
-          ? (myDecision === 'Pending' && cr.status === 'Pending')
-          : isChangeImplementer
-            ? (isCategoryAssigned && cr.status === 'Approved')
-            : (isCategoryAssigned && myDecision === 'Pending' && cr.status === 'Pending')
+          ? (cr.status === 'Pending' || cr.status === 'Approved')
+          : isStage1
+            ? (isAssignedReportingManager && cr.status === 'Pending')
+            : isStage2
+              ? (isChangeManager && isCategoryAssigned && cr.status === 'Pending' && myDecision === 'Pending')
+              : (isChangeImplementer && isCategoryAssigned && cr.status === 'Approved')
       );
 
       const decidedBy = persisted.approvedBy || persisted.rejectedBy || deciderInfo.name || decidedByMap.get(cr.id) || serialized.decidedBy || '—';

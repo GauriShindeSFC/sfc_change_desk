@@ -54,7 +54,7 @@ function Sidebar({
 
   const topNavItems = [
     { id: 'Dashboard', path: '/dashboard', label: 'My Dashboard', icon: LayoutGrid },
-    { id: 'Change Catalog', path: '/catalog', label: 'Change Request', icon: FileText },
+    { id: 'Change Request', path: '/change-requests/new', label: 'Change Request', icon: FileText },
     { id: 'Pre-Spend Request', path: '/pre-spend', label: 'Pre-Spend Request', icon: IndianRupee },
     { id: 'Travel Desk', path: '/travel-desk', label: 'Travel Desk', icon: Plane },
     { id: 'Tribe CRM', label: 'Tribe CRM', icon: Users, externalUrl: 'https://tribe.stfox.com/jsp/iamlogin.jsp' }

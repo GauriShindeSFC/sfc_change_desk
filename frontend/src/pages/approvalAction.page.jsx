@@ -96,6 +96,10 @@ export default function ApprovalActionPage() {
   const [error, setError] = useState('');
   const [crData, setCrData] = useState(null);
 
+  // Already Processed State
+  const [isProcessed, setIsProcessed] = useState(false);
+  const [processedDetails, setProcessedDetails] = useState(null);
+
   // Form states
   const [comment, setComment] = useState('');
   const [formError, setFormError] = useState('');
@@ -136,6 +140,10 @@ export default function ApprovalActionPage() {
         if (body.data?.action && !urlAction) {
           setAction(body.data.action);
         }
+        if (body.data?.isAlreadyProcessed) {
+          setIsProcessed(true);
+          setProcessedDetails(body.data.alreadyProcessedDetails || {});
+        }
       } catch (err) {
         setError(err.message || 'Unable to load request details.');
       } finally {
@@ -168,8 +176,18 @@ export default function ApprovalActionPage() {
       });
 
       const body = await res.json();
-      if (!res.ok || !body.success) {
+      if (!res.ok) {
         throw new Error(body.message || 'Failed to record your decision.');
+      }
+
+      if (body.alreadyProcessed) {
+        setIsProcessed(true);
+        setProcessedDetails({
+          status: crData?.status || 'Processed',
+          decision: crData?.status || 'Processed',
+          comment: body.message
+        });
+        return;
       }
 
       setSuccessResult({
@@ -321,8 +339,113 @@ export default function ApprovalActionPage() {
           </div>
         )}
 
+        {/* Already Processed State */}
+        {!loading && !error && !successResult && isProcessed && (
+          <div style={{ padding: '3.5rem 2rem', textAlign: 'center' }}>
+            <div style={{
+              width: '64px',
+              height: '64px',
+              borderRadius: '50%',
+              backgroundColor: (processedDetails?.status === 'Approved' || crData?.status === 'Approved') ? '#D1FAE5' : (processedDetails?.status === 'Implemented' || crData?.status === 'Implemented') ? '#CCFBF1' : (processedDetails?.status === 'Rejected' || crData?.status === 'Rejected') ? '#FEE2E2' : '#FEF3C7',
+              color: (processedDetails?.status === 'Approved' || crData?.status === 'Approved') ? '#059669' : (processedDetails?.status === 'Implemented' || crData?.status === 'Implemented') ? '#0D9488' : (processedDetails?.status === 'Rejected' || crData?.status === 'Rejected') ? '#DC2626' : '#D97706',
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              marginBottom: '1.25rem'
+            }}>
+              {(processedDetails?.status === 'Rejected' || crData?.status === 'Rejected') ? <XCircle size={36} /> : <CheckCircle2 size={36} />}
+            </div>
+            <h2 style={{ fontSize: '1.35rem', fontWeight: 800, color: '#0F172A', margin: '0 0 0.5rem' }}>
+              {(processedDetails?.status === 'Approved' || crData?.status === 'Approved')
+                ? 'Request Already Approved'
+                : (processedDetails?.status === 'Implemented' || crData?.status === 'Implemented')
+                  ? 'Request Already Implemented & Closed'
+                  : (processedDetails?.status === 'Rejected' || crData?.status === 'Rejected')
+                    ? 'Request Already Rejected'
+                    : 'Request Already Processed'}
+            </h2>
+            <p style={{ fontSize: '0.9rem', color: '#475569', maxWidth: '460px', margin: '0 auto 1.5rem', lineHeight: 1.55 }}>
+              This request (<strong>{crData?.requestCode || crData?.id}</strong>) is currently in <strong>{crData?.status || processedDetails?.status || 'Finalized'}</strong> status. The action link in your email has already been executed.
+            </p>
+
+            {/* Decision Details Card */}
+            {(processedDetails?.decidedBy || processedDetails?.comment || crData?.approvedComment || crData?.rejectedComment || crData?.rejectionReason) && (
+              <div style={{
+                backgroundColor: '#F8FAFC',
+                border: '1px solid #E2E8F0',
+                borderRadius: '10px',
+                padding: '1.25rem',
+                maxWidth: '480px',
+                margin: '0 auto 1.75rem',
+                textAlign: 'left'
+              }}>
+                <div style={{ fontSize: '0.75rem', fontWeight: 800, color: '#0F172A', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '0.5rem' }}>
+                  Recorded Decision Information
+                </div>
+                {processedDetails?.decidedBy && (
+                  <div style={{ fontSize: '0.825rem', color: '#334155', marginBottom: '0.35rem' }}>
+                    <span style={{ fontWeight: 600, color: '#64748B' }}>Processed By: </span>
+                    <span style={{ fontWeight: 700 }}>{processedDetails.decidedBy}</span>
+                    {processedDetails.decidedByEmail && <span style={{ color: '#64748B' }}> ({processedDetails.decidedByEmail})</span>}
+                  </div>
+                )}
+                {processedDetails?.timestamp && (
+                  <div style={{ fontSize: '0.825rem', color: '#334155', marginBottom: '0.35rem' }}>
+                    <span style={{ fontWeight: 600, color: '#64748B' }}>Timestamp: </span>
+                    <span>{formatLongDate(processedDetails.timestamp)} at {formatCleanTime(processedDetails.timestamp)}</span>
+                  </div>
+                )}
+                {(processedDetails?.comment || crData?.approvedComment || crData?.rejectedComment || crData?.rejectionReason) && (
+                  <div style={{ fontSize: '0.825rem', color: '#334155', marginTop: '0.5rem', paddingTop: '0.5rem', borderTop: '1px dashed #CBD5E1' }}>
+                    <span style={{ fontWeight: 600, color: '#64748B' }}>Note / Comment: </span>
+                    <span style={{ fontStyle: 'italic', color: '#0F172A' }}>"{processedDetails?.comment || crData?.approvedComment || crData?.rejectedComment || crData?.rejectionReason}"</span>
+                  </div>
+                )}
+              </div>
+            )}
+
+            <div style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '0.45rem',
+              backgroundColor: '#EFF6FF',
+              border: '1px solid #BFDBFE',
+              borderRadius: '8px',
+              padding: '0.6rem 1rem',
+              color: '#1E40AF',
+              fontSize: '0.8rem',
+              fontWeight: 600,
+              marginBottom: '1.75rem'
+            }}>
+              <span>ℹ Form submission is disabled as no further action is required.</span>
+            </div>
+
+            <div>
+              <a
+                href="/"
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '0.5rem',
+                  padding: '0.7rem 1.5rem',
+                  backgroundColor: '#0F172A',
+                  color: '#FFFFFF',
+                  borderRadius: '8px',
+                  fontSize: '0.875rem',
+                  fontWeight: 600,
+                  textDecoration: 'none',
+                  boxShadow: '0 2px 5px rgba(0,0,0,0.15)'
+                }}
+              >
+                <span>Go to ChangeDesk Dashboard</span>
+                <ArrowRight size={16} />
+              </a>
+            </div>
+          </div>
+        )}
+
         {/* Action Decision Form */}
-        {!loading && !error && !successResult && crData && (
+        {!loading && !error && !successResult && !isProcessed && crData && (
           <div>
             {/* Top Banner indicating current action */}
             <div style={{

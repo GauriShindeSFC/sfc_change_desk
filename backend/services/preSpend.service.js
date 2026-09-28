@@ -284,6 +284,9 @@ export const getPreSpendRequestsService = async ({ user, userId, isWorklist = fa
       justification: r.commercialJustification
     },
     status: r.status,
+    approvalStage: r.approvalStage || 'manager_review',
+    managerName: r.managerName || null,
+    managerEmail: r.managerEmail || null,
     policyCertified: r.policyCertified,
     approvalHistory: r.approvalHistory || [],
     comments: Array.isArray(r.approvalHistory) ? r.approvalHistory.map((h, idx) => ({

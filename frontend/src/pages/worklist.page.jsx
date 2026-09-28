@@ -89,16 +89,28 @@ function MyWorklistPage({ onNavigate, searchQuery = '', user, isOrgWorklist = fa
         const res = await apiFetch(`/pre-spend?${params}`, { headers });
         if (!res.ok) throw new Error('Failed to fetch pre-spend worklist');
         const body = await res.json();
-        const canUserActOnPreSpend = isPreSpendAdmin || isBoardUser || isSuperAdmin;
+        const userEmailLower = (user?.email || '').trim().toLowerCase();
         return {
           items: body.data && Array.isArray(body.data) ? body.data.map(i => {
             const isSelf = Boolean(
               (i.requesterId && (String(i.requesterId) === String(user?.id) || String(i.requesterId) === String(user?.userKey))) ||
-              (i.requesterEmail && user?.email && i.requesterEmail.trim().toLowerCase() === user.email.trim().toLowerCase())
+              (i.requesterEmail && user?.email && i.requesterEmail.trim().toLowerCase() === userEmailLower)
             );
+            const isPending = i.status === 'Pending Approval' || (i.status || '').toLowerCase().includes('pending');
+            const isStage1 = i.approvalStage === 'manager_review';
+            const isManager = Boolean(i.managerEmail && userEmailLower && i.managerEmail.trim().toLowerCase() === userEmailLower);
+
+            let canAct = false;
+            if (isPending && !isSelf) {
+              if (isStage1) {
+                canAct = isManager || isSuperAdmin;
+              } else {
+                canAct = isBoardUser || isSuperAdmin;
+              }
+            }
             return {
               ...i,
-              canAct: !isSelf && canUserActOnPreSpend && (i.status === 'Pending Approval' || (i.status || '').toLowerCase().includes('pending'))
+              canAct
             };
           }) : [],
           statusCounts: body.statusCounts || { All: 0, Pending: 0, Approved: 0, Rejected: 0 },
@@ -110,21 +122,28 @@ function MyWorklistPage({ onNavigate, searchQuery = '', user, isOrgWorklist = fa
         const res = await apiFetch(`/travel-desk?${params}`, { headers });
         if (!res.ok) throw new Error('Failed to fetch travel worklist');
         const body = await res.json();
+        const userEmailLower = (user?.email || '').trim().toLowerCase();
         return {
           items: body.data && Array.isArray(body.data) ? body.data.map(i => {
             const isPending = i.status === 'Pending Approval' || (i.status || '').toLowerCase().includes('pending');
             const isSelf = Boolean(
               (i.requesterId && (String(i.requesterId) === String(user?.id) || String(i.requesterId) === String(user?.userKey))) ||
-              (i.travellerEmail && user?.email && i.travellerEmail.trim().toLowerCase() === user.email.trim().toLowerCase()) ||
-              (i.employeeEmail && user?.email && i.employeeEmail.trim().toLowerCase() === user.email.trim().toLowerCase())
+              (i.travellerEmail && user?.email && i.travellerEmail.trim().toLowerCase() === userEmailLower) ||
+              (i.employeeEmail && user?.email && i.employeeEmail.trim().toLowerCase() === userEmailLower)
             );
-            // Rule: For short-notice flight (< 7 days), ONLY Board Member has the right to Approve / Reject
+            const isStage1 = i.approvalStage === 'manager_review';
+            const isManager = Boolean(i.managerEmail && userEmailLower && i.managerEmail.trim().toLowerCase() === userEmailLower);
+
             let canAct = false;
             if (isPending && !isSelf) {
-              if (i.isShortNotice) {
-                canAct = isBoardUser; // strictly Board user only (disabled for Super Admin & Travel Admin)
+              if (isStage1) {
+                canAct = isManager || isSuperAdmin;
               } else {
-                canAct = isTravelAdmin || isBoardUser || isSuperAdmin;
+                if (i.isShortNotice) {
+                  canAct = isBoardUser; // strictly Board user only for Stage 2 short-notice flight
+                } else {
+                  canAct = isTravelAdmin || isBoardUser || isSuperAdmin;
+                }
               }
             }
             return {

@@ -258,63 +258,28 @@ function ChangeCatalogPage({ onNavigate, searchQuery = '', initialData }) {
               onMouseLeave={() => setHoveredCardId(null)}
               style={{
                 backgroundColor: 'var(--card-bg)',
-                border: isHovered ? '1.5px solid #2563EB' : '1px solid var(--border-color)',
+                border: isHovered ? '1.5px solid var(--brand-primary, #173C4E)' : '1px solid var(--border-color)',
                 borderRadius: '12px',
-                padding: '1.1rem 1rem',
+                padding: '1.25rem',
                 display: 'flex',
                 flexDirection: 'column',
                 justifyContent: 'space-between',
                 boxShadow: isHovered
-                  ? '0 12px 24px -4px rgba(37, 99, 235, 0.16), 0 4px 12px -2px rgba(0, 0, 0, 0.08)'
+                  ? '0 12px 24px -4px rgba(23, 60, 78, 0.14), 0 4px 12px -2px rgba(0, 0, 0, 0.06)'
                   : '0 1px 3px rgba(16, 21, 30, 0.04)',
-                minHeight: '160px',
+                minHeight: '130px',
                 cursor: 'pointer',
                 transform: isHovered ? 'translateY(-5px)' : 'translateY(0)',
-                transition: 'transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease'
+                transition: 'transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease'
               }}
             >
               <div>
-                {/* Light Blue Icon Square Box with Plus Sign (Clickable Button) */}
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleCardClick();
-                  }}
-                  title={`Start request for ${item.title}`}
-                  style={{
-                    width: '36px',
-                    height: '36px',
-                    borderRadius: '10px',
-                    backgroundColor: item.iconBg || '#EBF5FF',
-                    border: 'none',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    marginBottom: '0.8rem',
-                    cursor: 'pointer',
-                    transition: 'transform 0.15s ease, opacity 0.15s ease, box-shadow 0.15s ease',
-                    outline: 'none',
-                    boxShadow: '0 2px 5px rgba(0, 0, 0, 0.08)'
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.transform = 'scale(1.1)';
-                    e.currentTarget.style.boxShadow = '0 4px 10px rgba(0, 0, 0, 0.15)';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.transform = 'scale(1)';
-                    e.currentTarget.style.boxShadow = '0 2px 5px rgba(0, 0, 0, 0.08)';
-                  }}
-                >
-                  <Plus size={18} color={item.iconColor || '#2563EB'} strokeWidth={2.5} />
-                </button>
-
-                <h3 style={{ fontSize: '1.05rem', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '0.45rem', lineHeight: 1.3 }}>
+                <div style={{ fontSize: '0.95rem', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '0.35rem', lineHeight: 1.35 }}>
                   {item.title}
-                </h3>
-                <p style={{ fontSize: '0.825rem', color: 'var(--text-secondary)', lineHeight: 1.45, margin: 0 }}>
+                </div>
+                <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', lineHeight: 1.45, margin: 0 }}>
                   {item.description}
-                </p>
+                </div>
               </div>
             </div>
           );
