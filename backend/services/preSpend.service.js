@@ -328,6 +328,22 @@ export const getPreSpendRequestsService = async ({ user, userId, isWorklist = fa
 
   const totalCount = count || (pending + approved + rejected);
 
+  // Calculate actionable count for worklist mode
+  let actionableCount = 0;
+  if (isWorklist) {
+    const isSuperAdmin = user?.isSuperAdmin || user?.roleId === 'role-1' || (user?.role || '').toLowerCase().includes('super');
+    const isBoardUser = user?.isBoardUser || user?.roleId === 'role-board' || (user?.role || '').toLowerCase().includes('board');
+    
+    // View-only pre-spend admin has no direct approval action rights unless super admin or board member
+    if (isSuperAdmin || isBoardUser) {
+      actionableCount = formattedItems.filter(i => {
+        const isPending = (i.status || '').toLowerCase().includes('pending');
+        const isSelf = (i.requesterId && (String(i.requesterId) === String(currentUserId))) || (i.requesterEmail && currentUserEmail && i.requesterEmail.toLowerCase() === currentUserEmail);
+        return isPending && !isSelf;
+      }).length;
+    }
+  }
+
   return {
     data: formattedItems,
     items: formattedItems,
@@ -357,7 +373,8 @@ export const getPreSpendRequestsService = async ({ user, userId, isWorklist = fa
       Pending: pending,
       Approved: approved,
       Rejected: rejected
-    }
+    },
+    actionableCount
   };
 };
 

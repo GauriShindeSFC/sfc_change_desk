@@ -887,7 +887,7 @@ export default function TravelDeskPage({ onNavigate, user, travellerName = '', d
                   type="text"
                   readOnly
                   disabled
-                  placeholder="e.g. Mumbai DC, Ahmedabad HQ, Remote"
+                  placeholder="Enter Location"
                   value={requesterDetails.location || resolveEmpLocation(activeSessionUser) || ''}
                   style={READONLY_FIELD_STYLE}
                 />

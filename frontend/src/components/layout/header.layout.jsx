@@ -105,9 +105,31 @@ function Header({
               <span style={{ color: 'var(--text-secondary)', fontSize: '0.75rem' }}>/</span>
             </>
           )}
-          <span style={{ color: 'var(--text-primary)', fontWeight: 500 }}>
-            {activeRoute === 'Dashboard' ? 'My Dashboard' : activeRoute}
-          </span>
+          {(() => {
+            if (activeRoute === 'My Worklist' || activeRoute === 'Worklist') {
+              const urlParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : new URLSearchParams();
+              const mod = urlParams.get('module');
+              const moduleLabel = mod === 'prespend'
+                ? 'Pre-Spend Request'
+                : mod === 'travel'
+                ? 'Travel Desk'
+                : 'Change Request';
+
+              return (
+                <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}>
+                  <span style={{ color: 'var(--text-secondary)', fontWeight: 500 }}>My Worklist</span>
+                  <span style={{ color: 'var(--text-secondary)', fontSize: '0.75rem' }}>/</span>
+                  <span style={{ color: 'var(--text-primary)', fontWeight: 600 }}>{moduleLabel}</span>
+                </div>
+              );
+            }
+
+            return (
+              <span style={{ color: 'var(--text-primary)', fontWeight: 500 }}>
+                {activeRoute === 'Dashboard' ? 'My Dashboard' : activeRoute}
+              </span>
+            );
+          })()}
         </div>
       </div>
 

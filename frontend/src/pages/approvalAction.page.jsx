@@ -92,6 +92,8 @@ export default function ApprovalActionPage() {
   const [token, setToken] = useState('');
   const [action, setAction] = useState('approve'); // 'approve' | 'reject' | 'implement'
   const [reqModule, setReqModule] = useState('cr'); // 'cr' | 'prespend' | 'travel'
+  const [stage, setStage] = useState('');
+  const [isManagerReview, setIsManagerReview] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [crData, setCrData] = useState(null);
@@ -134,6 +136,14 @@ export default function ApprovalActionPage() {
           throw new Error(body.message || 'Failed to verify action token.');
         }
         setCrData(body.data?.request || body.data?.cr || null);
+        if (body.data?.isManagerReview !== undefined) {
+          setIsManagerReview(Boolean(body.data.isManagerReview));
+        } else if (body.data?.stage || body.data?.tokenStage) {
+          setIsManagerReview(body.data?.tokenStage === 'manager_review' || body.data?.stage === 'manager_review');
+        }
+        if (body.data?.stage || body.data?.tokenStage) {
+          setStage(body.data?.tokenStage || body.data?.stage);
+        }
         if (body.data?.module) {
           setReqModule(body.data.module);
         }
@@ -317,25 +327,27 @@ export default function ApprovalActionPage() {
             <p style={{ fontSize: '0.9rem', color: '#475569', maxWidth: '440px', margin: '0 auto 1.75rem', lineHeight: 1.55 }}>
               Request <strong>{successResult.crId}</strong> has been marked as <strong>{successResult.action === 'implement' ? 'Implemented' : successResult.action === 'approve' ? 'Approved' : 'Rejected'}</strong>. The database, audit records, and notification emails have been dispatched.
             </p>
-            <a
-              href="/"
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '0.5rem',
-                padding: '0.7rem 1.5rem',
-                backgroundColor: '#0F172A',
-                color: '#FFFFFF',
-                borderRadius: '8px',
-                fontSize: '0.875rem',
-                fontWeight: 600,
-                textDecoration: 'none',
-                boxShadow: '0 2px 5px rgba(0,0,0,0.15)'
-              }}
-            >
-              <span>Go to ChangeDesk Dashboard</span>
-              <ArrowRight size={16} />
-            </a>
+            {!isManagerReview && (
+              <a
+                href="/"
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '0.5rem',
+                  padding: '0.7rem 1.5rem',
+                  backgroundColor: '#0F172A',
+                  color: '#FFFFFF',
+                  borderRadius: '8px',
+                  fontSize: '0.875rem',
+                  fontWeight: 600,
+                  textDecoration: 'none',
+                  boxShadow: '0 2px 5px rgba(0,0,0,0.15)'
+                }}
+              >
+                <span>Go to ChangeDesk Dashboard</span>
+                <ArrowRight size={16} />
+              </a>
+            )}
           </div>
         )}
 
@@ -420,27 +432,29 @@ export default function ApprovalActionPage() {
               <span>ℹ Form submission is disabled as no further action is required.</span>
             </div>
 
-            <div>
-              <a
-                href="/"
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '0.5rem',
-                  padding: '0.7rem 1.5rem',
-                  backgroundColor: '#0F172A',
-                  color: '#FFFFFF',
-                  borderRadius: '8px',
-                  fontSize: '0.875rem',
-                  fontWeight: 600,
-                  textDecoration: 'none',
-                  boxShadow: '0 2px 5px rgba(0,0,0,0.15)'
-                }}
-              >
-                <span>Go to ChangeDesk Dashboard</span>
-                <ArrowRight size={16} />
-              </a>
-            </div>
+            {!isManagerReview && (
+              <div>
+                <a
+                  href="/"
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '0.5rem',
+                    padding: '0.7rem 1.5rem',
+                    backgroundColor: '#0F172A',
+                    color: '#FFFFFF',
+                    borderRadius: '8px',
+                    fontSize: '0.875rem',
+                    fontWeight: 600,
+                    textDecoration: 'none',
+                    boxShadow: '0 2px 5px rgba(0,0,0,0.15)'
+                  }}
+                >
+                  <span>Go to ChangeDesk Dashboard</span>
+                  <ArrowRight size={16} />
+                </a>
+              </div>
+            )}
           </div>
         )}
 

@@ -349,7 +349,18 @@ export const getTravelRequestsService = async ({ user, userId, isWorklist = fals
       Pending: pending,
       Approved: approved,
       Rejected: rejected
-    }
+    },
+    actionableCount: isWorklist ? formattedItems.filter(i => {
+      const isPending = (i.status || '').toLowerCase().includes('pending');
+      const isSelf = (i.requesterId && String(i.requesterId) === String(currentUserId)) || (i.travellerEmail && currentUserEmail && i.travellerEmail.toLowerCase() === currentUserEmail);
+      const isSuperAdmin = user?.isSuperAdmin || user?.roleId === 'role-1' || (user?.role || '').toLowerCase().includes('super');
+      const isBoardUser = user?.isBoardUser || user?.roleId === 'role-board' || (user?.role || '').toLowerCase().includes('board');
+      const isTravelAdmin = user?.isTravelAdmin || user?.roleId === 'role-2-travel' || ((user?.role || '').toLowerCase().includes('admin') && (user?.role || '').toLowerCase().includes('travel'));
+
+      if (!isPending || isSelf) return false;
+      if (i.isShortNotice) return isBoardUser;
+      return isSuperAdmin || isBoardUser || isTravelAdmin;
+    }).length : 0
   };
 };
 

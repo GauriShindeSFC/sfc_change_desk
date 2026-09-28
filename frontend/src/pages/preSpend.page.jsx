@@ -629,7 +629,7 @@ export default function PreSpendPage({ onNavigate, user, initialCostCentre = '',
                   type="text"
                   readOnly
                   disabled
-                  placeholder="e.g. Mumbai DC, Ahmedabad HQ, Remote"
+                  placeholder="Enter Location"
                   value={requesterDetails.location || resolveEmpLocation(activeSessionUser) || ''}
                   style={READONLY_FIELD_STYLE}
                 />
@@ -798,7 +798,7 @@ export default function PreSpendPage({ onNavigate, user, initialCostCentre = '',
                   const val = e.target.value.replace(/\b\w/g, c => c.toUpperCase());
                   changeDetails('location', val);
                 }}
-                placeholder="e.g. Mumbai DC, Pune HQ"
+                placeholder="Enter Location"
                 style={ACTIVE_FIELD_STYLE}
               />
             </div>

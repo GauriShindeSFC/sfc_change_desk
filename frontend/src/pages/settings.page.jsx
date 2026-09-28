@@ -745,29 +745,6 @@ function SettingsPage({ user }) {
                 </div>
               </div>
 
-              {/* Employee ID Input */}
-              <div style={{ marginBottom: '1.25rem' }}>
-                <label style={{ display: 'block', fontSize: '0.825rem', fontWeight: 500, color: 'var(--text-primary)', marginBottom: '0.4rem' }}>
-                  Employee ID
-                </label>
-                <input
-                  type="text"
-                  placeholder="e.g. EMP-10550"
-                  value={newUser.empId}
-                  onChange={(e) => setNewUser(prev => ({ ...prev, empId: e.target.value }))}
-                  style={{
-                    width: '100%',
-                    padding: '0.65rem 0.85rem',
-                    backgroundColor: 'var(--input-bg)',
-                    border: '1px solid var(--border-color)',
-                    borderRadius: '8px',
-                    fontSize: '0.85rem',
-                    color: 'var(--text-primary)',
-                    outline: 'none'
-                  }}
-                />
-              </div>
-
               {/* Multi-Role Tag Builder */}
               <div>
                 <label style={{ display: 'block', fontSize: '0.825rem', fontWeight: 500, color: 'var(--text-primary)', marginBottom: '0.4rem' }}>

@@ -900,7 +900,7 @@ function ChangeRequestFormPage({ onNavigate, user, initialData, searchQuery = ''
                   type="text"
                   readOnly
                   disabled
-                  placeholder="e.g. Mumbai DC, Ahmedabad HQ, Remote"
+                  placeholder="Enter Location"
                   value={formData.location || resolveEmpLocation(activeSessionUser) || ''}
                   style={READONLY_FIELD_STYLE}
                 />

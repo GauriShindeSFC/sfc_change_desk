@@ -210,9 +210,9 @@ export default function ChangeRequestModal({ cr, onClose, onApprove, onReject, o
             ? 'Manager approved'
             : (cr.status || 'Pending');
 
-  const statusBg = isImplemented ? '#F3E8FF' : isRejected ? '#FEE2E2' : isApproved ? '#ECFDF5' : '#FEF3C7';
-  const statusColor = isImplemented ? '#7C3AED' : isRejected ? '#DC2626' : isApproved ? '#059669' : '#D97706';
-  const statusDot = isImplemented ? '#7C3AED' : isRejected ? '#DC2626' : isApproved ? '#059669' : '#D97706';
+  const statusBg = isImplemented ? '#ECFDF5' : isRejected ? '#FEE2E2' : isApproved ? '#F5F3FF' : '#FEF3C7';
+  const statusColor = isImplemented ? '#059669' : isRejected ? '#DC2626' : isApproved ? '#7C3AED' : '#D97706';
+  const statusDot = isImplemented ? '#10B981' : isRejected ? '#DC2626' : isApproved ? '#8B5CF6' : '#D97706';
 
   const steps = isRejected
     ? ['Requested', 'Rejected']
@@ -226,7 +226,7 @@ export default function ChangeRequestModal({ cr, onClose, onApprove, onReject, o
 
   const progressPercent = Math.min(100, Math.max(0, (currentStepIdx / (steps.length - 1)) * 100));
 
-  const activeColor = isRejected ? '#DC2626' : isImplemented ? '#7C3AED' : isApproved ? '#059669' : 'var(--brand-primary)';
+  const activeColor = isRejected ? '#DC2626' : isImplemented ? '#10B981' : isApproved ? '#8B5CF6' : '#F59E0B';
 
   const canAct = cr.canAct !== false && !isApproved && !isRejected && !isImplemented && !isSelfRequest;
 
@@ -426,21 +426,45 @@ export default function ChangeRequestModal({ cr, onClose, onApprove, onReject, o
           <div style={{ display: 'flex', alignItems: 'flex-start', width: '100%', padding: '0 0.5rem' }}>
             {steps.map((step, idx) => {
               const isLast = idx === steps.length - 1;
-              const isStepCompleted = idx <= currentStepIdx;
               const isStepRejected = isRejected && idx === currentStepIdx;
 
-              const stepColor = isStepRejected ? '#DC2626' : isStepCompleted ? '#10B981' : 'var(--border-color)';
-              const circleBg = isStepRejected ? '#DC2626' : isStepCompleted ? '#10B981' : 'var(--card-bg)';
-              const circleBorder = isStepRejected ? '2px solid #DC2626' : isStepCompleted ? '2px solid #10B981' : '2px solid var(--border-color)';
-              const textColor = isStepRejected ? '#DC2626' : isStepCompleted ? '#10B981' : 'var(--text-secondary)';
+              // Step completion checks:
+              // Step 0: 'Requested' is always completed once submitted
+              // Step 1: 'Manager Review' is completed only if manager approved or stage progressed beyond
+              // Step 2: 'Approved' is completed only if approved or implemented
+              // Step 3: 'Implemented' is completed only if implemented
+              let isFinished = false;
+              let isCurrentPending = false;
+
+              if (step === 'Requested') {
+                isFinished = true;
+              } else if (step === 'Manager Review') {
+                isFinished = hasManagerApproved || isApproved || isImplemented;
+                isCurrentPending = !isFinished && !isRejected && (isStage1Pending || currentStepIdx === 1);
+              } else if (step === 'Approved') {
+                isFinished = isApproved || isImplemented;
+                isCurrentPending = !isFinished && !isRejected && hasManagerApproved && !isStage1Pending;
+              } else if (step === 'Implemented') {
+                isFinished = isImplemented;
+                isCurrentPending = !isFinished && !isRejected && isApproved;
+              }
+
+              const circleBg = isStepRejected ? '#DC2626' : isFinished ? '#10B981' : isCurrentPending ? '#FFFBEB' : 'var(--card-bg)';
+              const circleBorder = isStepRejected ? '2px solid #DC2626' : isFinished ? '2px solid #10B981' : isCurrentPending ? '2px solid #F59E0B' : '2px solid var(--border-color)';
+              const textColor = isStepRejected ? '#DC2626' : isFinished ? '#10B981' : isCurrentPending ? '#D97706' : 'var(--text-secondary)';
 
               // Connector line color to next step
-              const nextStepCompleted = (idx + 1) <= currentStepIdx;
+              const nextStepFinished = (idx + 1 < steps.length) && (
+                steps[idx + 1] === 'Manager Review' ? (hasManagerApproved || isApproved || isImplemented)
+                : steps[idx + 1] === 'Approved' ? (isApproved || isImplemented)
+                : steps[idx + 1] === 'Implemented' ? isImplemented
+                : false
+              );
               const nextStepRejected = isRejected && (idx + 1) === currentStepIdx;
-              const connectorColor = nextStepRejected ? '#DC2626' : nextStepCompleted ? '#10B981' : 'var(--border-color)';
+              const connectorColor = nextStepRejected ? '#DC2626' : nextStepFinished ? '#10B981' : 'var(--border-color)';
 
-              const stepDate = getStepDate(step);
-              const stepTime = getStepTime(step);
+              const stepDate = isFinished ? getStepDate(step) : '';
+              const stepTime = isFinished ? getStepTime(step) : '';
               const tooltipInfo = getStepTooltipInfo(step);
 
               return (
@@ -456,7 +480,7 @@ export default function ChangeRequestModal({ cr, onClose, onApprove, onReject, o
                       alignItems: 'center',
                       minWidth: '100px',
                       zIndex: 3,
-                      cursor: isStepCompleted ? 'pointer' : 'default'
+                      cursor: isFinished ? 'pointer' : 'default'
                     }}
                   >
                     {/* Circle Node */}
@@ -471,12 +495,14 @@ export default function ChangeRequestModal({ cr, onClose, onApprove, onReject, o
                       justifyContent: 'center',
                       transition: 'transform 0.15s ease',
                       transform: hoveredStepIdx === idx ? 'scale(1.15)' : 'scale(1)',
-                      boxShadow: isStepCompleted && !isStepRejected ? '0 0 12px rgba(16, 185, 129, 0.25)' : 'none'
+                      boxShadow: isFinished ? '0 0 12px rgba(16, 185, 129, 0.25)' : isCurrentPending ? '0 0 10px rgba(245, 158, 11, 0.2)' : 'none'
                     }}>
                       {isStepRejected ? (
                         <X size={18} color="#FFFFFF" strokeWidth={3} />
-                      ) : isStepCompleted ? (
+                      ) : isFinished ? (
                         <Check size={18} color="#FFFFFF" strokeWidth={3} />
+                      ) : isCurrentPending ? (
+                        <span style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#F59E0B' }} />
                       ) : null}
                     </div>
 
@@ -487,18 +513,18 @@ export default function ChangeRequestModal({ cr, onClose, onApprove, onReject, o
 
                     {/* Step Date & Time */}
                     {stepDate && (
-                      <span style={{ fontSize: '0.725rem', color: isStepCompleted ? '#10B981' : 'var(--text-secondary)', fontFamily: 'var(--font-mono)', textAlign: 'center', marginTop: '0.2rem', fontWeight: 600 }}>
+                      <span style={{ fontSize: '0.725rem', color: isFinished ? '#10B981' : 'var(--text-secondary)', fontFamily: 'var(--font-mono)', textAlign: 'center', marginTop: '0.2rem', fontWeight: 600 }}>
                         {stepDate}
                       </span>
                     )}
                     {stepTime && (
-                      <span style={{ fontSize: '0.7rem', color: isStepCompleted ? '#059669' : 'var(--text-secondary)', fontFamily: 'var(--font-mono)', textAlign: 'center', marginTop: '0.1rem', fontWeight: 500 }}>
+                      <span style={{ fontSize: '0.7rem', color: isFinished ? '#059669' : 'var(--text-secondary)', fontFamily: 'var(--font-mono)', textAlign: 'center', marginTop: '0.1rem', fontWeight: 500 }}>
                         {stepTime}
                       </span>
                     )}
 
                     {/* Hover Tooltip Popover (Only comment shown) */}
-                    {hoveredStepIdx === idx && tooltipInfo && isStepCompleted && (
+                    {hoveredStepIdx === idx && tooltipInfo && isFinished && (
                       <div style={{
                         position: 'absolute',
                         bottom: '115%',

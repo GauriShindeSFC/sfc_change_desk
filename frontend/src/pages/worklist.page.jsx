@@ -8,27 +8,32 @@ import FilterBar, { initCustomDateRange } from '../components/ui/filterBar.compo
 import ModuleSwitcher from '../components/ui/moduleSwitcher.component';
 import { Pagination, LoadingSpinner, CommentPopupModal } from '../components/ui/primitives.component';
 import { apiFetch } from '../lib/apiFetch.lib';
+import { useWorklistActionableDots } from '../queries/worklist.queries';
 
 function MyWorklistPage({ onNavigate, searchQuery = '', user, isOrgWorklist = false }) {
   const queryClient = useQueryClient();
   const roleName = (user?.role || '').toLowerCase();
   const roleId = user?.roleId || '';
-  const isSuperAdmin = roleId === 'role-1' || roleName.includes('super');
-  const isBoardUser = roleId === 'role-board' || roleName.includes('board');
-  const isTravelAdmin = roleId === 'role-2-travel' || (roleName.includes('admin') && roleName.includes('travel'));
-  const isPreSpendAdmin = roleId === 'role-2-prespend' || (roleName.includes('admin') && (roleName.includes('spend') || roleName.includes('prespend')));
-  const isChangeAdmin = roleId === 'role-2-change' || (roleName.includes('admin') && !isTravelAdmin && !isPreSpendAdmin && !isSuperAdmin);
-  const isAdmin = isSuperAdmin || isTravelAdmin || isPreSpendAdmin || isChangeAdmin || roleId === 'role-2' || roleName.includes('admin');
-  const isChangeManager = roleId === 'role-3' || roleName.includes('manager');
-  const isImplementer = roleId === 'role-5' || roleName.includes('implementer');
+  const userRolesList = Array.isArray(user?.roles)
+    ? user.roles.map(r => (typeof r === 'string' ? r : r.roleName || r.name || r.roleId || '').toLowerCase())
+    : [roleName];
+
+  const isSuperAdmin = roleId === 'role-1' || roleName.includes('super') || userRolesList.some(r => r.includes('super'));
+  const isBoardUser = roleId === 'role-board' || roleName.includes('board') || userRolesList.some(r => r.includes('board'));
+  const isTravelAdmin = roleId === 'role-2-travel' || (roleName.includes('admin') && roleName.includes('travel')) || userRolesList.some(r => r.includes('travel admin'));
+  const isPreSpendAdmin = roleId === 'role-2-prespend' || (roleName.includes('admin') && (roleName.includes('spend') || roleName.includes('prespend'))) || userRolesList.some(r => r.includes('pre-spend') || r.includes('prespend'));
+  const isChangeAdmin = roleId === 'role-2-change' || (roleName.includes('admin') && !isTravelAdmin && !isPreSpendAdmin && !isSuperAdmin) || userRolesList.some(r => r.includes('change desk admin') || r.includes('change admin'));
+  const isAdmin = isSuperAdmin || isTravelAdmin || isPreSpendAdmin || isChangeAdmin || roleId === 'role-2' || roleName.includes('admin') || userRolesList.some(r => r.includes('admin'));
+  const isChangeManager = roleId === 'role-3' || roleName.includes('manager') || userRolesList.some(r => r.includes('manager'));
+  const isImplementer = roleId === 'role-5' || roleName.includes('implementer') || userRolesList.some(r => r.includes('implementer'));
   const isApprover = isSuperAdmin || isBoardUser || isAdmin || isChangeManager || isImplementer;
   const isRequester = !isApprover;
 
-  // Determine allowed modules for switcher
+  // Determine allowed modules for worklist
   const allowedModules = isSuperAdmin
     ? ['change_request', 'prespend', 'travel']
     : isBoardUser
-    ? ['prespend', 'travel']
+    ? ['change_request', 'prespend', 'travel']
     : isTravelAdmin
     ? ['travel']
     : isPreSpendAdmin
@@ -39,11 +44,39 @@ function MyWorklistPage({ onNavigate, searchQuery = '', user, isOrgWorklist = fa
     ? 'travel'
     : isPreSpendAdmin
     ? 'prespend'
-    : isBoardUser
-    ? 'prespend'
     : 'change_request';
 
-  const [activeModule, setActiveModule] = useState(defaultModule);
+  // Read module from URL query parameter
+  const getModuleFromUrl = () => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const mod = params.get('module');
+      if (mod && allowedModules.includes(mod)) return mod;
+    }
+    return defaultModule;
+  };
+
+  const [activeModule, setActiveModule] = useState(getModuleFromUrl);
+
+  // Keep activeModule in sync when URL changes
+  useEffect(() => {
+    const handleUrlChange = () => {
+      const mod = getModuleFromUrl();
+      if (mod !== activeModule) {
+        setActiveModule(mod);
+      }
+    };
+    window.addEventListener('popstate', handleUrlChange);
+    return () => window.removeEventListener('popstate', handleUrlChange);
+  }, [allowedModules, activeModule]);
+
+  // Also sync when location.search updates via internal navigation
+  useEffect(() => {
+    const mod = getModuleFromUrl();
+    if (mod !== activeModule) {
+      setActiveModule(mod);
+    }
+  }, [typeof window !== 'undefined' ? window.location.search : '']);
 
   const [selectedCr, setSelectedCr] = useState(null);
   const [dateFilter, setDateFilter] = useState('last_7_days');
@@ -168,41 +201,62 @@ function MyWorklistPage({ onNavigate, searchQuery = '', user, isOrgWorklist = fa
     enabled: !isCustomDateIncomplete,
   });
 
-  // Fetch Pending Counts across modules for dot indicators
-  const { data: modulePendingCounts } = useQuery({
-    queryKey: ['worklist-pending-dots', isOrgWorklist, user?.id],
+  // Dedicated query for status summary counts and metrics (unfiltered by active tab status)
+  const { data: summaryData } = useQuery({
+    queryKey: ['worklist-summary', { activeModule, dateFilter, startDate, endDate, searchQuery, isOrgWorklist, userId: user?.id }],
     queryFn: async () => {
-      const headers = {
-        ...(user?.token ? { Authorization: `Bearer ${user.token}` } : {}),
-        ...(user?.id ? { 'x-user-id': user.id } : {})
-      };
-      const params = isOrgWorklist ? 'scope=org' : 'scope=my';
-      try {
-        const [crRes, psRes, trRes] = await Promise.all([
-          apiFetch(`/worklist?${params}&status=Pending`, { headers }),
-          apiFetch(`/pre-spend?${params}&status=Pending%20Approval`, { headers }),
-          apiFetch(`/travel-desk?${params}&status=Pending%20Approval`, { headers })
-        ]);
-        const crData = crRes.ok ? await crRes.json() : {};
-        const psData = psRes.ok ? await psRes.json() : {};
-        const trData = trRes.ok ? await trRes.json() : {};
+      const params = new URLSearchParams({
+        view: 'worklist',
+        ...(dateFilter !== 'overall' && { dateFilter }),
+        ...(dateFilter === 'custom' && startDate && { startDate }),
+        ...(dateFilter === 'custom' && endDate && { endDate }),
+        ...(searchQuery && { search: searchQuery }),
+        ...(isOrgWorklist && { scope: 'organization' })
+      });
 
+      const headers = user?.id ? { 'x-user-id': user.id } : {};
+
+      if (activeModule === 'prespend') {
+        const res = await apiFetch(`/pre-spend?${params}`, { headers });
+        if (!res.ok) return { statusCounts: { All: 0, Pending: 0, Approved: 0, Rejected: 0 }, metrics: { pending: 0, approved: 0, rejected: 0 } };
+        const body = await res.json();
         return {
-          change_request: crData.statusCounts?.Pending ?? crData.metrics?.pending ?? (Array.isArray(crData.data) ? crData.data.length : 0),
-          prespend: psData.statusCounts?.Pending ?? psData.metrics?.pending ?? (Array.isArray(psData.data) ? psData.data.length : 0),
-          travel: trData.statusCounts?.Pending ?? trData.metrics?.pending ?? (Array.isArray(trData.data) ? trData.data.length : 0)
+          statusCounts: body.statusCounts || { All: 0, Pending: 0, Approved: 0, Rejected: 0 },
+          metrics: body.metrics || { pending: 0, approved: 0, rejected: 0 }
         };
-      } catch {
-        return { change_request: 0, prespend: 0, travel: 0 };
       }
+
+      if (activeModule === 'travel') {
+        const res = await apiFetch(`/travel-desk?${params}`, { headers });
+        if (!res.ok) return { statusCounts: { All: 0, Pending: 0, Approved: 0, Rejected: 0 }, metrics: { pending: 0, approved: 0, rejected: 0 } };
+        const body = await res.json();
+        return {
+          statusCounts: body.statusCounts || { All: 0, Pending: 0, Approved: 0, Rejected: 0 },
+          metrics: body.metrics || { pending: 0, approved: 0, rejected: 0 }
+        };
+      }
+
+      const res = await apiFetch(`/worklist?${params}`, { headers });
+      if (!res.ok) return { statusCounts: { All: 0, Pending: 0, Approved: 0, InProcess: 0, Implemented: 0, Rejected: 0 }, metrics: { pending: 0, approved: 0, inProcess: 0, rejected: 0, implemented: 0 } };
+      const body = await res.json();
+      return {
+        statusCounts: body.statusCounts || { All: 0, Pending: 0, Approved: 0, InProcess: 0, Implemented: 0, Rejected: 0 },
+        metrics: body.metrics || { pending: 0, approved: 0, inProcess: 0, rejected: 0, implemented: 0 }
+      };
     },
-    refetchInterval: 30000
+    enabled: !isCustomDateIncomplete
+  });
+
+  // Fetch Pending Actionable Counts across modules for dot indicators using shared hook
+  const { data: modulePendingCounts } = useWorklistActionableDots({
+    user,
+    allowedModuleIds: allowedModules
   });
 
   const [localItems, setLocalItems] = useState(null);
   const items = localItems !== null ? localItems : (worklistData?.items || []);
-  const statusCounts = worklistData?.statusCounts || { All: 0, Pending: 0, Approved: 0, InProcess: 0, Implemented: 0, Rejected: 0 };
-  const metrics = worklistData?.metrics || { pending: 0, approved: 0, inProcess: 0, rejected: 0, implemented: 0 };
+  const statusCounts = summaryData?.statusCounts || worklistData?.statusCounts || { All: 0, Pending: 0, Approved: 0, InProcess: 0, Implemented: 0, Rejected: 0 };
+  const metrics = summaryData?.metrics || worklistData?.metrics || { pending: 0, approved: 0, inProcess: 0, rejected: 0, implemented: 0 };
 
   useEffect(() => {
     setLocalItems(null);
@@ -357,24 +411,16 @@ function MyWorklistPage({ onNavigate, searchQuery = '', user, isOrgWorklist = fa
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', width: '100%' }}>
 
-      {/* Header Row: Title on Top */}
-      <div style={{ width: '100%' }}>
-        <h1 style={{ fontSize: '1.45rem', fontWeight: 700, color: 'var(--text-primary)', lineHeight: 1.2, margin: 0 }}>
-          {isOrgWorklist ? 'Organization Worklist' : 'My Worklist'}
-        </h1>
-        <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginTop: '0.2rem' }}>
-          {moduleSubtitles[activeModule]}
-        </p>
-      </div>
-
-      {/* Module Switcher Row: Scoped Options on Left, Total Count at Extreme Right */}
+      {/* Header Row: Title & Subtitle with Total Count */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '1rem', width: '100%' }}>
-        <ModuleSwitcher
-          activeModule={activeModule}
-          onModuleChange={setActiveModule}
-          pendingCounts={modulePendingCounts}
-          allowedModules={allowedModules}
-        />
+        <div>
+          <h1 style={{ fontSize: '1.45rem', fontWeight: 700, color: 'var(--text-primary)', lineHeight: 1.2, margin: 0 }}>
+            {activeModule === 'prespend' ? 'Pre-Spend Request' : activeModule === 'travel' ? 'Travel Desk' : 'Change Request'}
+          </h1>
+          <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginTop: '0.2rem', marginBottom: 0 }}>
+            {moduleSubtitles[activeModule]}
+          </p>
+        </div>
 
         <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
           <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-secondary)' }}>
@@ -496,9 +542,9 @@ function MyWorklistPage({ onNavigate, searchQuery = '', user, isOrgWorklist = fa
                     ? 'Awaiting Board Approval'
                     : 'Pending';
 
-                  const statusColor = statusBadgeLabel === 'Approved' ? '#059669' : statusBadgeLabel === 'Rejected' ? '#DC2626' : statusBadgeLabel === 'Implemented' ? '#7C3AED' : isShortNoticeFlight ? '#DC2626' : '#D97706';
-                  const statusBg = statusBadgeLabel === 'Approved' ? '#ECFDF5' : statusBadgeLabel === 'Rejected' ? '#FEF2F2' : statusBadgeLabel === 'Implemented' ? '#F5F3FF' : isShortNoticeFlight ? '#FEF2F2' : '#FFFBEB';
-                  const statusDot = statusBadgeLabel === 'Approved' ? '#10B981' : statusBadgeLabel === 'Rejected' ? '#EF4444' : statusBadgeLabel === 'Implemented' ? '#8B5CF6' : isShortNoticeFlight ? '#EF4444' : '#F59E0B';
+                  const statusColor = statusBadgeLabel === 'Implemented' ? '#059669' : statusBadgeLabel === 'Approved' ? '#7C3AED' : statusBadgeLabel === 'Rejected' ? '#DC2626' : isShortNoticeFlight ? '#DC2626' : '#D97706';
+                  const statusBg = statusBadgeLabel === 'Implemented' ? '#ECFDF5' : statusBadgeLabel === 'Approved' ? '#F5F3FF' : statusBadgeLabel === 'Rejected' ? '#FEF2F2' : isShortNoticeFlight ? '#FEF2F2' : '#FFFBEB';
+                  const statusDot = statusBadgeLabel === 'Implemented' ? '#10B981' : statusBadgeLabel === 'Approved' ? '#8B5CF6' : statusBadgeLabel === 'Rejected' ? '#EF4444' : isShortNoticeFlight ? '#EF4444' : '#F59E0B';
 
                   const requestedOnDate = item.raisedDate || (item.submittedAt ? new Date(item.submittedAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : (item.createdAt ? new Date(item.createdAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'));
 
@@ -637,7 +683,7 @@ function MyWorklistPage({ onNavigate, searchQuery = '', user, isOrgWorklist = fa
                             </button>
                           )}
 
-                          {!isRequester && !isSelfRequest && item.canAct !== false && (status === 'pending' || status === 'pending approval') && item.myDecision !== 'Approved' && item.myDecision !== 'Rejected' ? (
+                          {!isRequester && !isSelfRequest && item.canAct !== false && (status === 'pending' || status === 'pending approval') && item.myDecision !== 'Approved' && item.myDecision !== 'Rejected' && (activeModule !== 'change_request' || (isChangeManager || isAdmin || isSuperAdmin)) ? (
                             <>
                               <button
                                 type="button"
@@ -674,7 +720,7 @@ function MyWorklistPage({ onNavigate, searchQuery = '', user, isOrgWorklist = fa
                             }}>
                               Awaiting Board Approval
                             </span>
-                          ) : activeModule === 'change_request' && isItemApproved && status !== 'implemented' && (isAdmin || isImplementer) && !isSelfRequest ? (
+                          ) : activeModule === 'change_request' && isItemApproved && status !== 'implemented' && (isAdmin || isImplementer || item.canAct) && !isSelfRequest ? (
                             <button
                               type="button"
                               onClick={() => {

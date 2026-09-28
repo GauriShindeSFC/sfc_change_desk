@@ -68,6 +68,7 @@ export const getChangeRequestsService = async () => {
 
 export const getFilteredChangeRequests = async ({
   userId = null,
+  currentUser = null,
   isWorklist = false,
   actingUserId = null,
   status = null,
@@ -85,8 +86,18 @@ export const getFilteredChangeRequests = async ({
 
   const andClauses = [];
 
-  if (userId) {
-    andClauses.push({ requesterId: userId });
+  if (userId && !isWorklist && !organizationScope) {
+    const userEmail = (currentUser?.email || '').trim().toLowerCase();
+    if (userEmail) {
+      andClauses.push({
+        [Op.or]: [
+          { requesterId: userId },
+          sequelize.where(sequelize.fn('LOWER', sequelize.col('employee_email')), userEmail)
+        ]
+      });
+    } else {
+      andClauses.push({ requesterId: userId });
+    }
   }
 
   if (isWorklist) {
@@ -94,7 +105,7 @@ export const getFilteredChangeRequests = async ({
     if (actingUserId) {
       const identityRes = await IdentityResolver.resolveByKey(actingUserId);
       const identity = identityRes.status === 'SUCCESS' ? identityRes.identity : null;
-      const rolesList = identity?.rolesList || [roleId].filter(Boolean);
+      const rolesList = identity?.rolesList || (identity?.roleId ? [identity.roleId] : []);
       const isSuperOrAdmin = rolesList.includes('role-1') || rolesList.includes('role-2') || rolesList.includes('role-2-change') || identity?.isSuperAdmin || identity?.isChangeAdmin;
       const isChangeManager = rolesList.includes('role-3') || Boolean(identity?.isChangeManager) || (identity?.cmCategories && identity.cmCategories.length > 0);
       const isChangeImplementer = rolesList.includes('role-5') || Boolean(identity?.isChangeImplementer) || (identity?.ciCategories && identity.ciCategories.length > 0);
@@ -117,38 +128,43 @@ export const getFilteredChangeRequests = async ({
       }
 
       // Rule: In My Worklist, users with assigned categories see requests belonging to their categories
-      if (!organizationScope) {
-        let assignedCategoryIds = isChangeImplementer ? (identity?.ciCategories || []) : (identity?.cmCategories || []);
-        if (!assignedCategoryIds || assignedCategoryIds.length === 0) {
-          const userAliases = Array.from(new Set([
-            actingUserId,
-            ...(identity?.userKey ? [identity.userKey] : []),
-            ...(identity?.employeeBusinessId ? [identity.employeeBusinessId] : []),
-            ...(identity?.sourceId ? [`EMP-${identity.sourceId}`, `S8-${identity.sourceId}`, String(identity.sourceId)] : []),
-            ...(Array.isArray(identity?.aliases) ? identity.aliases : []),
-            ...(typeof actingUserId === 'string' && actingUserId.includes('-') ? [actingUserId.split('-')[1]] : [])
-          ])).filter(Boolean);
+      // Super Admin and Change Admin have organization-wide visibility across all categories
+      if (!organizationScope && !isSuperOrAdmin) {
+        const userAliases = Array.from(new Set([
+          actingUserId,
+          ...(identity?.userKey ? [identity.userKey] : []),
+          ...(identity?.id ? [String(identity.id)] : []),
+          ...(identity?.email ? [identity.email.trim().toLowerCase()] : []),
+          ...(identity?.employeeBusinessId ? [identity.employeeBusinessId] : []),
+          ...(identity?.sourceId ? [`EMP-${identity.sourceId}`, `S8-${identity.sourceId}`, `usr-${identity.sourceId}`, String(identity.sourceId)] : []),
+          ...(Array.isArray(identity?.aliases) ? identity.aliases : []),
+          ...(typeof actingUserId === 'string' && actingUserId.includes('-') ? [actingUserId.split('-')[1]] : [])
+        ])).filter(Boolean);
 
-          const ModelToQuery = isChangeImplementer ? ChangeImplementerCategory : ChangeManagerCategory;
-          let assignments = await ModelToQuery.findAll({
-            where: { userId: { [Op.in]: userAliases } }
-          });
-          if (assignments.length === 0 && isChangeImplementer) {
-            assignments = await ChangeManagerCategory.findAll({
-              where: { userId: { [Op.in]: userAliases } }
-            });
-          }
-          assignedCategoryIds = assignments.map(a => a.categoryId);
-        }
+        const [cmAssignments, ciAssignments] = await Promise.all([
+          ChangeManagerCategory.findAll({
+            where: { userId: { [Op.in]: userAliases } },
+            raw: true
+          }),
+          ChangeImplementerCategory.findAll({
+            where: { userId: { [Op.in]: userAliases } },
+            raw: true
+          })
+        ]);
 
-        if (assignedCategoryIds && assignedCategoryIds.length > 0) {
+        const cmCatIds = cmAssignments.map(a => a.categoryId);
+        const ciCatIds = ciAssignments.map(a => a.categoryId);
+        const assignedCategoryIds = Array.from(new Set([...cmCatIds, ...ciCatIds])).filter(Boolean);
+
+        if (assignedCategoryIds.length > 0) {
           const assignedCategories = await CatalogCategory.findAll({
             where: {
               [Op.or]: [
                 { id: { [Op.in]: assignedCategoryIds } },
                 { name: { [Op.in]: assignedCategoryIds } }
               ]
-            }
+            },
+            raw: true
           });
 
           const categoryConditions = [];
@@ -167,7 +183,7 @@ export const getFilteredChangeRequests = async ({
           } else {
             andClauses.push({ id: 'NONE' });
           }
-        } else if (!isSuperOrAdmin) {
+        } else {
           andClauses.push({ id: 'NONE' });
         }
       }
@@ -273,6 +289,8 @@ export const getFilteredChangeRequests = async ({
   let isChangeImplementer = false;
   let assignedCategoryIds = new Set();
   let categoryNameToIdMap = new Map();
+  let actingUserKeys = new Set();
+  let identityRes = null;
 
   const pageRequestIds = rows.map((row) => row.id);
   const allDecidedApprovals = await ChangeRequestApproval.findAll({
@@ -300,14 +318,17 @@ export const getFilteredChangeRequests = async ({
     }
   }
 
+  let cmCatIds = new Set();
+  let ciCatIds = new Set();
+
   if (isWorklist && actingUserId) {
     const userApprovals = await ChangeRequestApproval.findAll({
       where: { approverId: actingUserId, changeRequestId: { [Op.in]: pageRequestIds } }
     });
     userApprovalMap = new Map(userApprovals.map((a) => [a.changeRequestId, a.decision]));
 
-    let actingUserKeys = new Set([actingUserId]);
-    const identityRes = await IdentityResolver.resolveByKey(actingUserId);
+    actingUserKeys = new Set([actingUserId]);
+    identityRes = await IdentityResolver.resolveByKey(actingUserId);
     if (identityRes.status === 'SUCCESS' && identityRes.identity) {
       const iden = identityRes.identity;
       if (iden.userKey) actingUserKeys.add(iden.userKey);
@@ -322,10 +343,8 @@ export const getFilteredChangeRequests = async ({
     isSuperOrAdmin = roleId === 'role-1' || roleId === 'role-2' || roleId === 'role-2-change' || roleName.includes('super') || roleName.includes('change desk admin') || roleName.includes('change admin') || (roleName.includes('admin') && !roleName.includes('travel') && !roleName.includes('spend'));
     isChangeManager = roleId === 'role-3' || roleName.includes('manager') || (identityRes.identity?.cmCategories && identityRes.identity.cmCategories.length > 0);
     isChangeImplementer = roleId === 'role-5' || roleName.includes('implementer') || (identityRes.identity?.ciCategories && identityRes.identity.ciCategories.length > 0);
-    const activeCatIds = isChangeImplementer
-      ? (identityRes.identity.ciCategories || identityRes.identity.categoryIds || [])
-      : (identityRes.identity.cmCategories || identityRes.identity.categoryIds || []);
-    assignedCategoryIds = new Set(identityRes.status === 'SUCCESS' ? activeCatIds : []);
+    cmCatIds = new Set(identityRes.status === 'SUCCESS' ? (identityRes.identity.cmCategories || []) : []);
+    ciCatIds = new Set(identityRes.status === 'SUCCESS' ? (identityRes.identity.ciCategories || []) : []);
 
     const allCategories = await CatalogCategory.findAll({ attributes: ['id', 'name'] });
     for (const c of allCategories) {
@@ -373,11 +392,9 @@ export const getFilteredChangeRequests = async ({
     if (isWorklist) {
       const myDecision = userApprovalMap.get(cr.id) || 'Pending';
 
-      let isCategoryAssigned = true;
-      if (!isSuperOrAdmin) {
-        const resolvedCategoryId = cr.categoryId || categoryNameToIdMap.get((cr.category || '').toLowerCase().trim());
-        isCategoryAssigned = resolvedCategoryId ? assignedCategoryIds.has(resolvedCategoryId) : false;
-      }
+      const resolvedCategoryId = cr.categoryId || categoryNameToIdMap.get((cr.category || '').toLowerCase().trim());
+      const isCmCategoryAssigned = isSuperOrAdmin || (resolvedCategoryId ? cmCatIds.has(resolvedCategoryId) : false);
+      const isCiCategoryAssigned = isSuperOrAdmin || (resolvedCategoryId ? ciCatIds.has(resolvedCategoryId) : false);
 
       const isSelfRequest = actingUserId ? (
         (cr.requesterId && (cr.requesterId === actingUserId || (typeof actingUserKeys !== 'undefined' && actingUserKeys.has(cr.requesterId)))) ||
@@ -397,8 +414,8 @@ export const getFilteredChangeRequests = async ({
           : isStage1
             ? (isAssignedReportingManager && cr.status === 'Pending')
             : isStage2
-              ? (isChangeManager && isCategoryAssigned && cr.status === 'Pending' && myDecision === 'Pending')
-              : (isChangeImplementer && isCategoryAssigned && cr.status === 'Approved')
+              ? (isChangeManager && isCmCategoryAssigned && cr.status === 'Pending' && myDecision === 'Pending')
+              : (isChangeImplementer && isCiCategoryAssigned && cr.status === 'Approved')
       );
 
       const decidedBy = persisted.approvedBy || persisted.rejectedBy || deciderInfo.name || decidedByMap.get(cr.id) || serialized.decidedBy || '—';
@@ -440,6 +457,11 @@ export const getFilteredChangeRequests = async ({
     implemented: statusCounts.Implemented || statusCounts['In progress'] || statusCounts['In Progress'] || 0
   };
 
+  let actionableCount = 0;
+  if (isWorklist && actingUserId) {
+    actionableCount = data.filter(item => item.canAct === true).length;
+  }
+
   return {
     data,
     total,
@@ -447,7 +469,8 @@ export const getFilteredChangeRequests = async ({
     limit: l,
     totalPages: Math.max(1, Math.ceil(total / l)),
     statusCounts,
-    metrics
+    metrics,
+    actionableCount
   };
 };
 

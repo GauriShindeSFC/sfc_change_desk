@@ -25,6 +25,7 @@ export const getMyRequests = asyncHandler(async (req, res) => {
 
   const result = await getFilteredChangeRequests({
     userId,
+    currentUser: req.user,
     isWorklist: false,
     status,
     dateFilter,

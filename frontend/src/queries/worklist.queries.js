@@ -56,3 +56,39 @@ export function useWorklistAction() {
     },
   });
 }
+
+export function useWorklistActionableDots({ user, allowedModuleIds = [] }) {
+  return useQuery({
+    queryKey: ['worklist-actionable-dots', user?.id, allowedModuleIds.join(',')],
+    queryFn: async () => {
+      const headers = {
+        ...(user?.token ? { Authorization: `Bearer ${user.token}` } : {}),
+        ...(user?.id ? { 'x-user-id': user.id } : {})
+      };
+
+      const fetchCr = allowedModuleIds.includes('change_request')
+        ? apiFetch('/worklist?view=worklist', { headers })
+        : Promise.resolve(null);
+      const fetchPs = allowedModuleIds.includes('prespend')
+        ? apiFetch('/pre-spend?view=worklist', { headers })
+        : Promise.resolve(null);
+      const fetchTr = allowedModuleIds.includes('travel')
+        ? apiFetch('/travel-desk?view=worklist', { headers })
+        : Promise.resolve(null);
+
+      const [crRes, psRes, trRes] = await Promise.all([fetchCr, fetchPs, fetchTr]);
+
+      const crData = crRes && crRes.ok ? await crRes.json() : null;
+      const psData = psRes && psRes.ok ? await psRes.json() : null;
+      const trData = trRes && trRes.ok ? await trRes.json() : null;
+
+      return {
+        change_request: Number(crData?.actionableCount ?? (Array.isArray(crData?.data) ? crData.data.filter(d => d.canAct === true).length : (crData?.statusCounts?.Pending ?? 0))),
+        prespend: Number(psData?.actionableCount ?? 0),
+        travel: Number(trData?.actionableCount ?? 0)
+      };
+    },
+    enabled: Boolean(user?.id) && allowedModuleIds.length > 0,
+    refetchInterval: 30000
+  });
+}

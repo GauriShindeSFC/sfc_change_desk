@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import {
   LayoutGrid,
   Menu,
@@ -9,8 +10,12 @@ import {
   IndianRupee,
   Plane,
   Users,
-  ExternalLink
+  ExternalLink,
+  ChevronDown,
+  ChevronRight
 } from 'lucide-react';
+import { apiFetch } from '../../lib/apiFetch.lib';
+import { useWorklistActionableDots } from '../../queries/worklist.queries';
 
 function Sidebar({
   activeItem,
@@ -24,6 +29,34 @@ function Sidebar({
   onHoverChange
 }) {
   const [isHovered, setIsHovered] = useState(false);
+  const [worklistExpanded, setWorklistExpanded] = useState(true);
+
+  const roleName = (user?.role || '').toLowerCase();
+  const roleId = user?.roleId || '';
+  
+  const isSuperAdmin = roleId === 'role-1' || roleName.includes('super');
+  const isBoardUser = roleId === 'role-board' || roleName.includes('board');
+  const isTravelAdmin = roleId === 'role-2-travel' || (roleName.includes('admin') && roleName.includes('travel'));
+  const isPreSpendAdmin = roleId === 'role-2-prespend' || (roleName.includes('admin') && (roleName.includes('spend') || roleName.includes('prespend')));
+  const isChangeAdmin = roleId === 'role-2-change' || (roleName.includes('admin') && !isTravelAdmin && !isPreSpendAdmin && !isSuperAdmin);
+  const isAdmin = isSuperAdmin || isTravelAdmin || isPreSpendAdmin || isChangeAdmin || roleId === 'role-2' || roleName.includes('admin');
+  const isChangeManager = roleId === 'role-3' || roleName.includes('manager');
+  const isChangeImplementer = roleId === 'role-5' || roleName.includes('implementer');
+  const isApprover = isSuperAdmin || isBoardUser || isAdmin || isChangeManager || isChangeImplementer;
+
+  const allowedWorklistModuleIds = isSuperAdmin || isBoardUser
+    ? ['change_request', 'prespend', 'travel']
+    : isTravelAdmin
+    ? ['travel']
+    : isPreSpendAdmin
+    ? ['prespend']
+    : ['change_request'];
+
+  // Fetch pending actionable module counts strictly for the user's allowed modules
+  const { data: pendingDots } = useWorklistActionableDots({
+    user,
+    allowedModuleIds: allowedWorklistModuleIds
+  });
 
   const handleMouseEnter = () => {
     if (!isMobile) {
@@ -38,19 +71,6 @@ function Sidebar({
       onHoverChange?.(false);
     }
   };
-
-  const roleName = (user?.role || '').toLowerCase();
-  const roleId = user?.roleId || '';
-  
-  const isSuperAdmin = roleId === 'role-1' || roleName.includes('super');
-  const isBoardUser = roleId === 'role-board' || roleName.includes('board');
-  const isTravelAdmin = roleId === 'role-2-travel' || (roleName.includes('admin') && roleName.includes('travel'));
-  const isPreSpendAdmin = roleId === 'role-2-prespend' || (roleName.includes('admin') && (roleName.includes('spend') || roleName.includes('prespend')));
-  const isChangeAdmin = roleId === 'role-2-change' || (roleName.includes('admin') && !isTravelAdmin && !isPreSpendAdmin && !isSuperAdmin);
-  const isAdmin = isSuperAdmin || isTravelAdmin || isPreSpendAdmin || isChangeAdmin || roleId === 'role-2' || roleName.includes('admin');
-  const isChangeManager = roleId === 'role-3' || roleName.includes('manager');
-  const isChangeImplementer = roleId === 'role-5' || roleName.includes('implementer');
-  const isApprover = isSuperAdmin || isBoardUser || isAdmin || isChangeManager || isChangeImplementer;
 
   const topNavItems = [
     { id: 'Dashboard', path: '/dashboard', label: 'My Dashboard', icon: LayoutGrid },
@@ -250,11 +270,27 @@ function Sidebar({
       {(() => {
         if (!isApprover) return null;
 
-        const visibleMgmtItems = [];
+        const allowedWorklistModules = isSuperAdmin
+          ? [
+              { id: 'change_request', path: '/worklist?module=change_request', label: 'Change Request', icon: FileText },
+              { id: 'prespend', path: '/worklist?module=prespend', label: 'Pre-Spend Request', icon: IndianRupee },
+              { id: 'travel', path: '/worklist?module=travel', label: 'Travel Desk', icon: Plane }
+            ]
+          : isBoardUser
+          ? [
+              { id: 'change_request', path: '/worklist?module=change_request', label: 'Change Request', icon: FileText },
+              { id: 'prespend', path: '/worklist?module=prespend', label: 'Pre-Spend Request', icon: IndianRupee },
+              { id: 'travel', path: '/worklist?module=travel', label: 'Travel Desk', icon: Plane }
+            ]
+          : isTravelAdmin
+          ? [{ id: 'travel', path: '/worklist?module=travel', label: 'Travel Desk', icon: Plane }]
+          : isPreSpendAdmin
+          ? [{ id: 'prespend', path: '/worklist?module=prespend', label: 'Pre-Spend Request', icon: IndianRupee }]
+          : [{ id: 'change_request', path: '/worklist?module=change_request', label: 'Change Request', icon: FileText }];
 
-        if (isApprover) {
-          visibleMgmtItems.push({ id: 'My Worklist', path: '/worklist', label: 'My Worklist', icon: CheckCircle2 });
-        }
+        const hasMultipleWorklistSub = allowedWorklistModules.length > 1;
+
+        const visibleMgmtItems = [];
 
         if (isSuperAdmin) {
           visibleMgmtItems.push({ id: 'Organization Dashboard', path: '/org-dashboard', label: 'Organization Dashboard', icon: LayoutGrid });
@@ -263,6 +299,8 @@ function Sidebar({
         if (isSuperAdmin) {
           visibleMgmtItems.push({ id: 'Settings', path: '/settings', label: 'Settings', icon: Settings });
         }
+
+        const isWorklistActive = activeItem === 'My Worklist' || activeItem === 'Worklist';
 
         return (
           <>
@@ -281,6 +319,107 @@ function Sidebar({
             </div>
 
             <nav style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', flex: 1 }}>
+              {!hasMultipleWorklistSub ? (
+                <NavButton item={{ id: 'My Worklist', path: allowedWorklistModules[0]?.path || '/worklist', label: 'My Worklist', icon: CheckCircle2 }} />
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (mini) {
+                        handleSelect({ path: '/worklist' });
+                      } else {
+                        setWorklistExpanded(prev => !prev);
+                      }
+                    }}
+                    title={mini ? 'My Worklist' : undefined}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.75rem',
+                      width: '100%',
+                      padding: mini ? '0.65rem' : '0.65rem 0.85rem',
+                      justifyContent: mini ? 'center' : 'flex-start',
+                      borderRadius: '8px',
+                      border: 'none',
+                      backgroundColor: isWorklistActive ? 'var(--primary, #173C4E)' : 'transparent',
+                      color: isWorklistActive ? '#FFFFFF' : '#94A3B8',
+                      fontWeight: isWorklistActive ? 600 : 500,
+                      fontSize: '0.85rem',
+                      cursor: 'pointer',
+                      transition: 'background-color 0.15s ease, color 0.15s ease',
+                      position: 'relative'
+                    }}
+                  >
+                    <CheckCircle2 size={18} style={{ color: isWorklistActive ? '#FFFFFF' : '#64748B', flexShrink: 0, strokeWidth: isWorklistActive ? 2.25 : 2 }} />
+                    {!mini && (
+                      <>
+                        <span style={{ flex: 1, textAlign: 'left', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          My Worklist
+                        </span>
+                        {worklistExpanded ? <ChevronDown size={14} style={{ color: '#94A3B8' }} /> : <ChevronRight size={14} style={{ color: '#94A3B8' }} />}
+                      </>
+                    )}
+                  </button>
+
+                  {!mini && worklistExpanded && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.15rem', paddingLeft: '1.4rem', borderLeft: '1px solid #1E293B', marginLeft: '1.25rem', marginTop: '0.2rem' }}>
+                      {allowedWorklistModules.map(subItem => {
+                        const SubIcon = subItem.icon;
+                        const isSubActive = typeof window !== 'undefined' && window.location.pathname.startsWith('/worklist') && (
+                          (subItem.id === 'change_request' && (!window.location.search || window.location.search.includes('module=change_request'))) ||
+                          (window.location.search.includes(`module=${subItem.id}`))
+                        );
+
+                        const hasPending = Boolean(pendingDots && pendingDots[subItem.id] > 0);
+
+                        return (
+                          <button
+                            key={subItem.id}
+                            type="button"
+                            onClick={() => handleSelect(subItem)}
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '0.6rem',
+                              width: '100%',
+                              padding: '0.45rem 0.65rem',
+                              borderRadius: '6px',
+                              border: 'none',
+                              backgroundColor: isSubActive ? 'rgba(23, 60, 78, 0.4)' : 'transparent',
+                              color: isSubActive ? '#38BDF8' : '#94A3B8',
+                              fontWeight: isSubActive ? 600 : 500,
+                              fontSize: '0.785rem',
+                              cursor: 'pointer',
+                              transition: 'all 0.15s ease',
+                              textAlign: 'left'
+                            }}
+                          >
+                            <SubIcon size={14} style={{ color: isSubActive ? '#38BDF8' : '#64748B', flexShrink: 0 }} />
+                            <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}>
+                              {subItem.label}
+                              {hasPending && (
+                                <span
+                                  title={`${pendingDots[subItem.id]} pending request${pendingDots[subItem.id] > 1 ? 's' : ''}`}
+                                  style={{
+                                    width: '6px',
+                                    height: '6px',
+                                    borderRadius: '50%',
+                                    backgroundColor: '#D97706',
+                                    display: 'inline-block',
+                                    flexShrink: 0
+                                  }}
+                                />
+                              )}
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              )}
+
               {visibleMgmtItems.map((item) => (
                 <NavButton key={item.id} item={item} />
               ))}
