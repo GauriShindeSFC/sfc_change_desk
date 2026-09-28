@@ -148,8 +148,8 @@ export default function ApprovalActionPage() {
 
   const handleSubmitDecision = async (e) => {
     e?.preventDefault();
-    if (action === 'reject' && !comment.trim()) {
-      setFormError('Please provide a reason for rejecting this request.');
+    if (!comment.trim()) {
+      setFormError(`Please provide a comment to ${action} this request.`);
       return;
     }
     setFormError('');
@@ -569,21 +569,21 @@ export default function ApprovalActionPage() {
               <div style={{ marginBottom: '1.25rem' }}>
                 <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: '#0F172A', marginBottom: '0.5rem' }}>
                   {isImplement
-                    ? 'Implementation Remarks / Execution Notes (Optional)'
+                    ? 'Implementation Remarks / Execution Notes *'
                     : isApprove
-                      ? 'Approval Comments / Instructions (Optional)'
+                      ? 'Approval Comments / Instructions (Required) *'
                       : 'Rejection Reason (Required) *'}
                 </label>
                 <textarea
                   rows={4}
-                  required={isReject}
+                  required
                   value={comment}
                   onChange={(e) => setComment(e.target.value)}
                   placeholder={
                     isImplement
                       ? 'Add any execution notes, deployment logs, or verification comments...'
                       : isApprove
-                        ? 'Add any comments, conditions, or instructions for the requester...'
+                        ? 'Add comments, review notes, or instructions for the next stage...'
                         : 'Please explain why this request cannot be approved...'
                   }
                   style={{

@@ -191,33 +191,49 @@ export default function ChangeRequestModal({ cr, onClose, onApprove, onReject, o
   const statusLower = (cr.status || '').toLowerCase();
   const decisionLower = (cr.myDecision || '').toLowerCase();
 
+  const isStage1Pending = cr.approvalStage === 'manager_review' && statusLower === 'pending';
+  const hasManagerApproved = cr.approvalStage === 'stage_2_review' || Boolean(cr.customFieldValues?.managerApprovedBy || cr.customFieldValues?.managerApprovedAt);
+
   const isImplemented = statusLower === 'implemented';
   const isRejected = statusLower === 'rejected' || decisionLower === 'rejected';
   const isApproved = (statusLower === 'approved' || decisionLower === 'approved') && !isImplemented;
 
-  const statusLabel = isImplemented ? 'Implemented' : isRejected ? 'Rejected' : isApproved ? 'Approved' : (cr.status || 'Pending');
-  const statusBg = isImplemented ? '#F3E8FF' : isRejected ? '#FEE2E2' : '#FEF3C7';
-  const statusColor = isImplemented ? '#7C3AED' : isRejected ? '#DC2626' : '#D97706';
-  const statusDot = isImplemented ? '#7C3AED' : isRejected ? '#DC2626' : '#D97706';
+  const statusLabel = isImplemented
+    ? 'Implemented'
+    : isRejected
+      ? (cr.rejectionReason?.includes('Manager') ? 'Rejected by Manager' : 'Rejected')
+      : isApproved
+        ? 'Approved'
+        : isStage1Pending
+          ? 'Waiting for manager review'
+          : hasManagerApproved
+            ? 'Manager approved'
+            : (cr.status || 'Pending');
+
+  const statusBg = isImplemented ? '#F3E8FF' : isRejected ? '#FEE2E2' : isApproved ? '#ECFDF5' : '#FEF3C7';
+  const statusColor = isImplemented ? '#7C3AED' : isRejected ? '#DC2626' : isApproved ? '#059669' : '#D97706';
+  const statusDot = isImplemented ? '#7C3AED' : isRejected ? '#DC2626' : isApproved ? '#059669' : '#D97706';
 
   const steps = isRejected
     ? ['Requested', 'Rejected']
-    : ['Requested', 'Approved', 'Implemented'];
+    : ['Requested', 'Manager Review', 'Approved', 'Implemented'];
 
   const currentStepIdx = isRejected ? 1
-    : isImplemented ? 2
-    : isApproved ? 1
-    : 0;
+    : isImplemented ? 3
+    : isApproved ? 2
+    : hasManagerApproved ? 2
+    : 1;
 
   const progressPercent = Math.min(100, Math.max(0, (currentStepIdx / (steps.length - 1)) * 100));
 
-  const activeColor = isRejected ? '#DC2626' : isImplemented ? '#7C3AED' : isApproved ? '#D97706' : 'var(--brand-primary)';
+  const activeColor = isRejected ? '#DC2626' : isImplemented ? '#7C3AED' : isApproved ? '#059669' : 'var(--brand-primary)';
 
   const canAct = cr.canAct !== false && !isApproved && !isRejected && !isImplemented && !isSelfRequest;
 
   const getStepDate = (stepName) => {
     const todayFormatted = new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
     if (stepName === 'Requested') return cr.raisedDate || (cr.submittedAt ? new Date(cr.submittedAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : todayFormatted);
+    if (stepName === 'Manager Review') return hasManagerApproved ? (cr.customFieldValues?.managerApprovedAt ? new Date(cr.customFieldValues.managerApprovedAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : todayFormatted) : '';
     if (stepName === 'Approved') return (isApproved || isImplemented) ? (cr.approvedDate || (cr.decidedAt ? new Date(cr.decidedAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : (cr.updatedAt ? new Date(cr.updatedAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : cr.raisedDate || todayFormatted))) : '';
     if (stepName === 'Rejected') return isRejected ? (cr.closedDate || cr.rejectedDate || (cr.closedAt ? new Date(cr.closedAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : (cr.updatedAt ? new Date(cr.updatedAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : cr.raisedDate || todayFormatted))) : '';
     if (stepName === 'Implemented') return isImplemented ? (cr.closedDate || cr.implementedDate || (cr.closedAt ? new Date(cr.closedAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : (cr.updatedAt ? new Date(cr.updatedAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : cr.raisedDate || todayFormatted))) : '';
@@ -226,6 +242,7 @@ export default function ChangeRequestModal({ cr, onClose, onApprove, onReject, o
 
   const getStepTime = (stepName) => {
     if (stepName === 'Requested') return formatCleanTime(cr.submittedAt || cr.createdAt);
+    if (stepName === 'Manager Review') return hasManagerApproved ? formatCleanTime(cr.customFieldValues?.managerApprovedAt) : '';
     if (stepName === 'Approved') return (isApproved || isImplemented) ? (formatCleanTime(cr.decidedAt || cr.approvedAt || cr.updatedAt)) : '';
     if (stepName === 'Rejected') return isRejected ? (formatCleanTime(cr.closedAt || cr.decidedAt || cr.updatedAt)) : '';
     if (stepName === 'Implemented') return isImplemented ? (formatCleanTime(cr.closedAt || cr.implementedAt || cr.updatedAt)) : '';
@@ -240,6 +257,14 @@ export default function ChangeRequestModal({ cr, onClose, onApprove, onReject, o
         title: 'Submitted Request',
         author: cr.employeeName || cr.requester || 'Requester',
         comment: cr.justification || 'Change request submitted for review.',
+        date: sDate
+      };
+    }
+    if (stepName === 'Manager Review') {
+      return {
+        title: 'Reporting Manager Review',
+        author: cr.customFieldValues?.managerApprovedBy || cr.managerName || 'Manager',
+        comment: cr.customFieldValues?.managerApprovedComment || (hasManagerApproved ? 'Manager approved and endorsed change.' : 'Awaiting reporting manager review.'),
         date: sDate
       };
     }

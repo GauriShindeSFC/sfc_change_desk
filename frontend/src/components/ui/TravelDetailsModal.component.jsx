@@ -69,15 +69,32 @@ export default function TravelDetailsModal({ item, onClose, onApprove, onReject,
   const isRejected = status.toLowerCase().includes('rejected');
   const isPending = !isApproved && !isRejected;
 
+  const isStage1Pending = item.approvalStage === 'manager_review' && isPending;
+  const hasManagerApproved = item.approvalStage === 'stage_2_review' || (Array.isArray(item.approvalHistory) && item.approvalHistory.some(h => (h.decision || '').toLowerCase().includes('manager approved') || (h.action || '').toLowerCase().includes('manager approved')));
+
+  const statusLabel = isRejected
+    ? (item.rejectionReason?.includes('Manager') ? 'Rejected by Manager' : 'Rejected')
+    : isApproved
+      ? 'Approved'
+      : isStage1Pending
+        ? 'Waiting for manager review'
+        : hasManagerApproved
+          ? 'Manager approved'
+          : status;
+
   const steps = isRejected
     ? ['Requested', 'Rejected']
-    : ['Requested', 'Approved'];
+    : ['Requested', 'Manager Review', 'Approved'];
 
-  const currentStepIdx = (isApproved || isRejected) ? 1 : 0;
+  const currentStepIdx = isRejected ? 1 : isApproved ? 2 : hasManagerApproved ? 2 : 1;
 
   const getStepDate = (stepName) => {
     const todayFormatted = new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
     if (stepName === 'Requested') return item.raisedDate || (item.submittedAt ? new Date(item.submittedAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : (item.createdAt ? new Date(item.createdAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : todayFormatted));
+    if (stepName === 'Manager Review') {
+      const mgrEvt = Array.isArray(item.approvalHistory) ? item.approvalHistory.find(h => (h.decision || '').toLowerCase().includes('manager approved') || (h.action || '').toLowerCase().includes('manager approved')) : null;
+      return mgrEvt ? new Date(mgrEvt.timestamp).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : (hasManagerApproved ? todayFormatted : '');
+    }
     if (stepName === 'Approved') return isApproved ? (item.decidedAt ? new Date(item.decidedAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : (item.updatedAt ? new Date(item.updatedAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : todayFormatted)) : '';
     if (stepName === 'Rejected') return isRejected ? (item.decidedAt ? new Date(item.decidedAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : (item.updatedAt ? new Date(item.updatedAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : todayFormatted)) : '';
     return '';
@@ -85,6 +102,10 @@ export default function TravelDetailsModal({ item, onClose, onApprove, onReject,
 
   const getStepTime = (stepName) => {
     if (stepName === 'Requested') return formatCleanTime(item.submittedAt || item.createdAt);
+    if (stepName === 'Manager Review') {
+      const mgrEvt = Array.isArray(item.approvalHistory) ? item.approvalHistory.find(h => (h.decision || '').toLowerCase().includes('manager approved') || (h.action || '').toLowerCase().includes('manager approved')) : null;
+      return mgrEvt ? formatCleanTime(mgrEvt.timestamp) : '';
+    }
     if (stepName === 'Approved') return isApproved ? formatCleanTime(item.decidedAt || item.approvedAt || item.updatedAt) : '';
     if (stepName === 'Rejected') return isRejected ? formatCleanTime(item.decidedAt || item.closedAt || item.updatedAt) : '';
     return '';
@@ -100,11 +121,20 @@ export default function TravelDetailsModal({ item, onClose, onApprove, onReject,
         date: sDate
       };
     }
+    if (stepName === 'Manager Review') {
+      const mgrEvt = Array.isArray(item.approvalHistory) ? item.approvalHistory.find(h => (h.decision || '').toLowerCase().includes('manager approved') || (h.action || '').toLowerCase().includes('manager approved')) : null;
+      return {
+        title: 'Reporting Manager Review',
+        author: mgrEvt?.actorName || item.managerName || 'Manager',
+        comment: mgrEvt?.comment || (hasManagerApproved ? 'Manager approved and endorsed booking.' : 'Awaiting reporting manager review.'),
+        date: sDate
+      };
+    }
     if (stepName === 'Approved') {
       return {
         title: 'Travel Booking Approved',
         author: item.decidedBy || item.approvedBy || 'Approver',
-        comment: item.approvedComment || item.approvalComment || item.comment || 'Travel booking approved.',
+        comment: item.approvedComment || item.approvalComment || item.comment || 'Travel booking authorized.',
         date: sDate
       };
     }
@@ -121,7 +151,7 @@ export default function TravelDetailsModal({ item, onClose, onApprove, onReject,
 
   // Short notice flight rule: strictly ONLY Board members can approve/reject short notice flights
   const isShortNoticeFlight = Boolean(item.isShortNotice);
-  const canActOnModal = isPending && (
+  const canActOnModal = isPending && !isStage1Pending && (
     isShortNoticeFlight
       ? isBoardUser // Strictly Board only (disabled for Super Admin & Travel Admin)
       : (isTravelAdmin || isBoardUser || isSuperAdmin)

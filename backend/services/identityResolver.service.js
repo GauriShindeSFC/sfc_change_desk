@@ -81,19 +81,36 @@ export class IdentityResolver {
       return await this._buildIdentityDTO(changeUser, employee);
     }
 
-    // 3. If employee exists and active, but not yet explicitly invited to change_user, create default Requester record
-    const displayName = employee.name || email.split('@')[0];
-    changeUser = await ChangeUser.create({
-      id: String(employee.id),
-      name: displayName,
-      email,
-      roleId: 'role-4',
-      roleName: 'Requester',
-      status: 'Active',
-      metadata: { source: 'Employee_directory', empId: employee.empId }
-    });
-
-    return await this._buildIdentityDTO(changeUser, employee);
+    // 3. If employee exists and active, return pure Employee identity without mutating ChangeUser
+    return {
+      status: 'SUCCESS',
+      identity: {
+        identityType: 'EMPLOYEE_DIRECTORY',
+        sourceId: employee.id,
+        userKey: `EMP-${employee.id}`,
+        id: `EMP-${employee.id}`,
+        email: employee.email,
+        displayName: employee.name || email.split('@')[0],
+        name: employee.name || email.split('@')[0],
+        designation: '',
+        applicationRole: 'EMPLOYEE',
+        roleId: 'role-employee',
+        roleName: 'Employee',
+        role: 'Employee',
+        isSuperAdmin: false,
+        isChangeAdmin: false,
+        isTravelAdmin: false,
+        isPreSpendAdmin: false,
+        isBoardUser: false,
+        roles: [{ roleId: 'role-employee', roleName: 'Employee' }],
+        rolesList: ['role-employee'],
+        cmCategories: [],
+        ciCategories: [],
+        employeeBusinessId: employee.empId || `EMP-${employee.id}`,
+        location: employee.location || null,
+        aliases: [String(employee.id), `EMP-${employee.id}`, `S8-${employee.id}`, email]
+      }
+    };
   }
 
   /**
@@ -134,6 +151,17 @@ export class IdentityResolver {
 
     if (changeUser) {
       return await this._buildIdentityDTO(changeUser);
+    }
+
+    // Fallback: check Employee table if key is EMP-id or numeric
+    const rawId = userKey.replace(/^(S8-|EMP-|usr-)/, '');
+    const numId = parseInt(rawId, 10);
+    if (!isNaN(numId)) {
+      const { Employee } = await import('../models/Employee.js');
+      const emp = await Employee.findByPk(numId);
+      if (emp && !emp.leftAt && !emp.leftReason && !emp.leftBy) {
+        return this.resolveByEmail(emp.email);
+      }
     }
 
     return { status: 'NOT_FOUND', message: `User not found: ${userKey}` };

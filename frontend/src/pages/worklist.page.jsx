@@ -153,7 +153,10 @@ function MyWorklistPage({ onNavigate, searchQuery = '', user, isOrgWorklist = fa
   const { data: modulePendingCounts } = useQuery({
     queryKey: ['worklist-pending-dots', isOrgWorklist, user?.id],
     queryFn: async () => {
-      const headers = user?.token ? { Authorization: `Bearer ${user.token}` } : {};
+      const headers = {
+        ...(user?.token ? { Authorization: `Bearer ${user.token}` } : {}),
+        ...(user?.id ? { 'x-user-id': user.id } : {})
+      };
       const params = isOrgWorklist ? 'scope=org' : 'scope=my';
       try {
         const [crRes, psRes, trRes] = await Promise.all([

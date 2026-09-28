@@ -282,6 +282,46 @@ export const getTravelDeskApproverEmails = async (isShortNotice = false) => {
   return getBoardMemberEmails();
 };
 
+export const getPreSpendAdminEmails = async () => {
+  const users = await ChangeUser.findAll({
+    where: { status: 'Active' },
+    raw: true
+  });
+  const adminEmails = [];
+  for (const u of users) {
+    const rawRoles = u.metadata?.roles || [];
+    const roleIds = [
+      u.roleId,
+      ...(Array.isArray(rawRoles) ? rawRoles.map(r => (typeof r === 'string' ? r : r.roleId || r.role)) : [])
+    ].filter(Boolean);
+    const isPreSpendAdmin = roleIds.some(r => r === 'role-2-prespend' || String(r).toLowerCase().includes('prespend') || String(r).toLowerCase().includes('spend'));
+    if (isPreSpendAdmin && u.email) {
+      adminEmails.push(u.email.trim().toLowerCase());
+    }
+  }
+  return Array.from(new Set(adminEmails.filter(Boolean)));
+};
+
+export const getTravelAdminEmails = async () => {
+  const users = await ChangeUser.findAll({
+    where: { status: 'Active' },
+    raw: true
+  });
+  const adminEmails = [];
+  for (const u of users) {
+    const rawRoles = u.metadata?.roles || [];
+    const roleIds = [
+      u.roleId,
+      ...(Array.isArray(rawRoles) ? rawRoles.map(r => (typeof r === 'string' ? r : r.roleId || r.role)) : [])
+    ].filter(Boolean);
+    const isTravelAdmin = roleIds.some(r => r === 'role-2-travel' || String(r).toLowerCase().includes('travel'));
+    if (isTravelAdmin && u.email) {
+      adminEmails.push(u.email.trim().toLowerCase());
+    }
+  }
+  return Array.from(new Set(adminEmails.filter(Boolean)));
+};
+
 export const getPreSpendApproverEmails = async (isBoardRequired = false) => {
   const users = await ChangeUser.findAll({
     where: { status: 'Active' },
@@ -378,6 +418,8 @@ export const getSettingsUsersService = async () => {
     }
 
     const authoritativeEmpId = u.metadata?.empId || u.id;
+    const userCmCats = cmMap.get(userKey) || cmMap.get(`S8-${u.id}`) || cmMap.get(email) || [];
+    const userCiCats = ciMap.get(userKey) || ciMap.get(`S8-${u.id}`) || ciMap.get(email) || [];
 
     results.push({
       id: userKey,
@@ -396,7 +438,9 @@ export const getSettingsUsersService = async () => {
       roles: rolesList,
       rolesList: rolesList.map(r => r.roleId),
       status: u.status || 'Active',
-      categoryIds: assignedCats,
+      categoryIds: Array.from(new Set([...userCmCats, ...userCiCats])),
+      cmCategoryIds: userCmCats,
+      ciCategoryIds: userCiCats,
       isInUserTable
     });
   }
@@ -457,13 +501,18 @@ export const updateSettingsUserService = async (userKey, payload = {}, meta = {}
   const hasCM = activeRoleIds.includes('role-3') || user.roleId === 'role-3';
   const hasCI = activeRoleIds.includes('role-5') || user.roleId === 'role-5';
 
-  if (payload.categoryIds && Array.isArray(payload.categoryIds)) {
-    if (hasCM) {
-      await updateChangeManagerCategoriesService(user.id, payload.categoryIds);
-    }
-    if (hasCI) {
-      await updateChangeImplementerCategoriesService(user.id, payload.categoryIds);
-    }
+  if (hasCM) {
+    const cmCats = payload.cmCategoryIds || payload.cmCategories || payload.categoryIds || [];
+    await updateChangeManagerCategoriesService(user.id, cmCats);
+  } else {
+    await updateChangeManagerCategoriesService(user.id, []);
+  }
+
+  if (hasCI) {
+    const ciCats = payload.ciCategoryIds || payload.ciCategories || payload.categoryIds || [];
+    await updateChangeImplementerCategoriesService(user.id, ciCats);
+  } else {
+    await updateChangeImplementerCategoriesService(user.id, []);
   }
 
   const actorStr = meta.actorId ? String(meta.actorId) : 'SYSTEM';
@@ -535,12 +584,16 @@ export const createSettingsUserService = async (payload = {}, meta = {}) => {
   const hasCM = activeRoleIds.includes('role-3');
   const hasCI = activeRoleIds.includes('role-5');
 
-  if (payload.categoryIds && Array.isArray(payload.categoryIds) && payload.categoryIds.length > 0) {
-    if (hasCM) {
-      await updateChangeManagerCategoriesService(changeUser.id, payload.categoryIds);
+  if (hasCM) {
+    const cmCats = payload.cmCategoryIds || payload.cmCategories || payload.categoryIds || [];
+    if (cmCats.length > 0) {
+      await updateChangeManagerCategoriesService(changeUser.id, cmCats);
     }
-    if (hasCI) {
-      await updateChangeImplementerCategoriesService(changeUser.id, payload.categoryIds);
+  }
+  if (hasCI) {
+    const ciCats = payload.ciCategoryIds || payload.ciCategories || payload.categoryIds || [];
+    if (ciCats.length > 0) {
+      await updateChangeImplementerCategoriesService(changeUser.id, ciCats);
     }
   }
 
@@ -552,15 +605,8 @@ export const createSettingsUserService = async (payload = {}, meta = {}) => {
     detail: `Invited ${displayName} (${email}) with role(s): ${normalizedRoles.map(r => r.roleName).join(', ')}.`
   }).catch((logErr) => console.warn('[auditLog] Notice:', logErr.message));
 
-  sendUserInviteEmail({
-    user: {
-      name: displayName,
-      email,
-      role: normalizedRoles.map(r => r.roleName).join(', ') || primaryRole.roleName
-    },
-    tempPassword: payload.tempPassword || payload.password || null,
-    invitedByName: meta.invitedByName || 'An Administrator'
-  }).catch((err) => console.error('[mail] User invite email failed:', err.message));
+  // User invitation emails disabled per configuration
+  // sendUserInviteEmail({ ... });
 
   IdentityResolver.clearCache();
   const resolved = await IdentityResolver.resolveByKey(changeUser.id);

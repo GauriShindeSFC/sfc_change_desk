@@ -14,17 +14,6 @@ export const Role = sequelize.define(
   { tableName: 'roles', timestamps: false }
 );
 
-// ---------- Workflows ------------------------------------
-export const Workflow = sequelize.define(
-  'Workflow',
-  {
-    id: { type: DataTypes.STRING, primaryKey: true },
-    name: { type: DataTypes.STRING, allowNull: false },
-    steps: { type: DataTypes.TEXT }
-  },
-  { tableName: 'workflows', timestamps: false }
-);
-
 // ---------- Change requests -----------------------------
 export const ChangeRequest = sequelize.define(
   'ChangeRequest',
@@ -34,20 +23,33 @@ export const ChangeRequest = sequelize.define(
     category: { type: DataTypes.STRING, allowNull: false },
     subCategory: { type: DataTypes.STRING, defaultValue: '' },
     employeeId: { type: DataTypes.STRING, defaultValue: '' },
+    managerName: { type: DataTypes.STRING, allowNull: true, field: 'manager_name' },
     managerEmail: { type: DataTypes.STRING, defaultValue: '' },
     location: { type: DataTypes.STRING, allowNull: true, defaultValue: null },
     justification: { type: DataTypes.TEXT, defaultValue: '' },
     startDate: { type: DataTypes.STRING, allowNull: true },
     endDate: { type: DataTypes.STRING, allowNull: true },
-    risk: { type: DataTypes.STRING, defaultValue: 'Medium' },
     activeStep: { type: DataTypes.INTEGER, defaultValue: 1 },
     status: { type: DataTypes.STRING, defaultValue: 'Pending' },
-    isDraft: { type: DataTypes.BOOLEAN, defaultValue: false },
+    approvalStage: {
+      type: DataTypes.STRING(32),
+      defaultValue: 'manager_review',
+      field: 'approval_stage'
+    },
+    approvalCycle: {
+      type: DataTypes.INTEGER,
+      defaultValue: 1,
+      field: 'approval_cycle'
+    },
+    managerReviewEnteredAt: {
+      type: DataTypes.DATE,
+      allowNull: true,
+      field: 'manager_review_entered_at'
+    },
     submittedAt: { type: DataTypes.DATE, defaultValue: DataTypes.NOW },
     closedAt: { type: DataTypes.DATE, allowNull: true },
     requesterId: { type: DataTypes.STRING, allowNull: false },
     approverId: { type: DataTypes.STRING, allowNull: true },
-    workflowId: { type: DataTypes.STRING, allowNull: false },
     subcategoryId: { type: DataTypes.STRING, allowNull: true },
     employeeName: { type: DataTypes.STRING, allowNull: true },
     employeeEmail: { type: DataTypes.STRING, allowNull: true },
@@ -97,9 +99,6 @@ export const AppConfig = sequelize.define(
 );
 
 // ---------- Associations ------------------------------
-Workflow.hasMany(ChangeRequest, { as: 'changeRequests', foreignKey: 'workflowId' });
-ChangeRequest.belongsTo(Workflow, { as: 'workflow', foreignKey: 'workflowId', onDelete: 'SET NULL', onUpdate: 'CASCADE' });
-
 import { ChangeRequestApproval } from './ChangeRequestApproval.js';
 import { CatalogCategory } from './CatalogCategory.js';
 import { CatalogSubcategory } from './CatalogSubcategory.js';
@@ -121,7 +120,6 @@ CatalogCategory.hasMany(CatalogSubcategory, { as: 'subcategories', foreignKey: '
 CatalogSubcategory.belongsTo(CatalogCategory, { as: 'category', foreignKey: 'categoryId' });
 CatalogSubcategory.hasMany(CatalogSubcategoryField, { as: 'fields', foreignKey: 'subcategoryId' });
 CatalogSubcategoryField.belongsTo(CatalogSubcategory, { as: 'subcategory', foreignKey: 'subcategoryId' });
-CatalogSubcategory.belongsTo(Workflow, { as: 'workflow', foreignKey: 'workflowId' });
 
 export const ChangeManagerCategory = sequelize.define(
   'ChangeManagerCategory',
@@ -153,11 +151,11 @@ ChangeImplementerCategory.belongsTo(CatalogCategory, { foreignKey: 'categoryId' 
 
 import { PreSpendRequest } from './PreSpendRequest.js';
 import { TravelRequest } from './TravelRequest.js';
-export { PreSpendRequest, TravelRequest };
+import { NotificationJob } from './NotificationJob.js';
+export { PreSpendRequest, TravelRequest, NotificationJob };
 
 export const models = {
   Role,
-  Workflow,
   CatalogCategory,
   CatalogSubcategory,
   CatalogSubcategoryField,
@@ -172,7 +170,8 @@ export const models = {
   UserS8,
   UserAppRole,
   PreSpendRequest,
-  TravelRequest
+  TravelRequest,
+  NotificationJob
 };
 
 export { sequelize };

@@ -182,7 +182,6 @@ export const serializeWorklistEntry = (row) => {
     category: cr.category,
     subCategory: cr.subCategory,
     status: cr.status || 'Pending',
-    isDraft: cr.isDraft || false,
     justification: cr.justification,
     hostname: cr.customFieldValues?.hostname || '',
     location: cr.location || '',

@@ -111,6 +111,31 @@ export const PreSpendRequest = sequelize.define(
       type: DataTypes.STRING(50),
       defaultValue: 'Pending Approval'
     },
+    approvalStage: {
+      type: DataTypes.STRING(32),
+      defaultValue: 'manager_review',
+      field: 'approval_stage'
+    },
+    approvalCycle: {
+      type: DataTypes.INTEGER,
+      defaultValue: 1,
+      field: 'approval_cycle'
+    },
+    managerName: {
+      type: DataTypes.STRING(255),
+      allowNull: true,
+      field: 'manager_name'
+    },
+    managerEmail: {
+      type: DataTypes.STRING(255),
+      allowNull: true,
+      field: 'manager_email'
+    },
+    managerReviewEnteredAt: {
+      type: DataTypes.DATE,
+      allowNull: true,
+      field: 'manager_review_entered_at'
+    },
     policyCertified: {
       type: DataTypes.BOOLEAN,
       defaultValue: false,

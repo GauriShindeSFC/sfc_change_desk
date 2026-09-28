@@ -8,6 +8,7 @@ import { Op } from 'sequelize';
 import { sequelize, Role } from './models/index.js';
 import { roles } from './data/seed.js';
 import { verifyMailTransport } from './services/mail.service.js';
+import { startNotificationWorker } from './services/notificationQueue.service.js';
 
 import publicActionRoutes from './routes/publicAction.routes.js';
 
@@ -60,6 +61,7 @@ const start = async () => {
   }
 
   await verifyMailTransport();
+  startNotificationWorker(15000);
 
   app.listen(PORT, () => {
     console.log(`[ChangeDesk Backend] Server running at http://localhost:${PORT} (env: ${NODE_ENV})`);

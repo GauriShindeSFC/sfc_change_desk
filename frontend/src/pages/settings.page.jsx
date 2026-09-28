@@ -73,14 +73,18 @@ function SettingsPage({ user }) {
   }, [auditFilter, activeTab]);
 
   const defaultCategoriesList = [
-    { id: 'cat-srv', name: 'Server & Infra' },
-    { id: 'cat-net', name: 'Network & Connectivity' },
+    { id: 'cat-asset', name: 'IT Asset' },
+    { id: 'cat-o365', name: 'Office 365 & Collaboration' },
     { id: 'cat-acc', name: 'Access & Security' },
-    { id: 'cat-asset', name: 'IT Asset' }
+    { id: 'cat-net', name: 'Network & Connectivity' },
+    { id: 'cat-sec', name: 'Security Tools & Policies' },
+    { id: 'cat-srv', name: 'Server & Infra' }
   ];
 
-  const [newUserCategories, setNewUserCategories] = useState([]);
-  const [editingUserCategories, setEditingUserCategories] = useState([]);
+  const [newUserCmCategories, setNewUserCmCategories] = useState([]);
+  const [newUserCiCategories, setNewUserCiCategories] = useState([]);
+  const [editingUserCmCategories, setEditingUserCmCategories] = useState([]);
+  const [editingUserCiCategories, setEditingUserCiCategories] = useState([]);
 
   const { data: categoriesData } = useQuery({
     queryKey: ['settings-categories'],
@@ -140,7 +144,6 @@ function SettingsPage({ user }) {
 
   const handleOpenManageUser = async (targetUser) => {
     if (isRequester) return;
-    const initialCats = targetUser.categoryIds || [];
     
     // Extract existing roles
     const existingRoles = Array.isArray(targetUser.roles) && targetUser.roles.length > 0
@@ -154,18 +157,26 @@ function SettingsPage({ user }) {
       roles: existingRoles,
       selectedRoleToAdd: ''
     });
-    setEditingUserCategories(initialCats);
+    setEditingUserCmCategories([]);
+    setEditingUserCiCategories([]);
     setIsLoadingCategories(true);
     try {
-      const hasCI = existingRoles.includes('Change Implementer');
-      const endpoint = hasCI
-        ? `/settings/change-implementer-categories/${targetUser.id}`
-        : `/settings/change-manager-categories/${targetUser.id}`;
-      const res = await apiFetch(endpoint);
-      if (res.ok) {
-        const body = await res.json();
-        if (body.data && Array.isArray(body.data) && body.data.length > 0) {
-          setEditingUserCategories(body.data.map(d => d.categoryId));
+      const [cmRes, ciRes] = await Promise.all([
+        apiFetch(`/settings/change-manager-categories/${targetUser.id}`).catch(() => null),
+        apiFetch(`/settings/change-implementer-categories/${targetUser.id}`).catch(() => null)
+      ]);
+
+      if (cmRes && cmRes.ok) {
+        const body = await cmRes.json();
+        if (body.data && Array.isArray(body.data)) {
+          setEditingUserCmCategories(body.data.map(d => d.categoryId));
+        }
+      }
+
+      if (ciRes && ciRes.ok) {
+        const body = await ciRes.json();
+        if (body.data && Array.isArray(body.data)) {
+          setEditingUserCiCategories(body.data.map(d => d.categoryId));
         }
       }
     } catch (err) {
@@ -189,7 +200,6 @@ function SettingsPage({ user }) {
     const roleId = ROLE_TO_ID[primaryRoleName] || 'role-2-change';
     const hasCM = assignedRoles.includes('Change Manager');
     const hasCI = assignedRoles.includes('Change Implementer');
-    const categoryIds = (hasCM || hasCI) ? editingUserCategories : [];
 
     const updatedUserObj = {
       name: editingUser.name,
@@ -197,7 +207,9 @@ function SettingsPage({ user }) {
       role: primaryRoleName,
       roleId,
       roles: assignedRoles,
-      categoryIds
+      categoryIds: Array.from(new Set([...editingUserCmCategories, ...editingUserCiCategories])),
+      cmCategoryIds: hasCM ? editingUserCmCategories : [],
+      ciCategoryIds: hasCI ? editingUserCiCategories : []
     };
 
     try {
@@ -214,14 +226,25 @@ function SettingsPage({ user }) {
       if (hasCM) {
         await apiFetch(`/settings/change-manager-categories/${editingUser.id}`, {
           method: 'PUT',
-          body: JSON.stringify({ categoryIds: editingUserCategories })
+          body: JSON.stringify({ categoryIds: editingUserCmCategories })
         }).catch(err => console.warn('Failed to update CM categories:', err));
+      } else {
+        await apiFetch(`/settings/change-manager-categories/${editingUser.id}`, {
+          method: 'PUT',
+          body: JSON.stringify({ categoryIds: [] })
+        }).catch(() => {});
       }
+
       if (hasCI) {
         await apiFetch(`/settings/change-implementer-categories/${editingUser.id}`, {
           method: 'PUT',
-          body: JSON.stringify({ categoryIds: editingUserCategories })
+          body: JSON.stringify({ categoryIds: editingUserCiCategories })
         }).catch(err => console.warn('Failed to update CI categories:', err));
+      } else {
+        await apiFetch(`/settings/change-implementer-categories/${editingUser.id}`, {
+          method: 'PUT',
+          body: JSON.stringify({ categoryIds: [] })
+        }).catch(() => {});
       }
 
       queryClient.invalidateQueries({ queryKey: ['settings-users'] });
@@ -248,18 +271,13 @@ function SettingsPage({ user }) {
     e.preventDefault();
     if (!newUser.name || !newUser.email) return;
 
-    if (!newUser.roles || newUser.roles.length === 0) {
-      toast.error('Please assign at least one role to this user.');
-      return;
-    }
+    const assignedRoles = (newUser.roles && newUser.roles.length > 0) ? newUser.roles : [];
 
-    const assignedRoles = newUser.roles;
-
-    const primaryRoleName = assignedRoles[0];
-    const roleId = ROLE_TO_ID[primaryRoleName] || 'role-2-change';
-    const hasCM = assignedRoles.includes('Change Manager');
-    const hasCI = assignedRoles.includes('Change Implementer');
-    const categoryIds = (hasCM || hasCI) ? newUserCategories : [];
+    const primaryRoleName = assignedRoles.length > 0 ? assignedRoles[0] : 'Requester';
+    const roleId = ROLE_TO_ID[primaryRoleName] || 'role-4';
+    const hasCM = assignedRoles.includes('Change Manager') || newUser.selectedRoleToAdd === 'Change Manager';
+    const hasCI = assignedRoles.includes('Change Implementer') || newUser.selectedRoleToAdd === 'Change Implementer';
+    const allCategoryIds = Array.from(new Set([...(hasCM ? newUserCmCategories : []), ...(hasCI ? newUserCiCategories : [])]));
 
     const invitePayload = {
       name: newUser.name,
@@ -269,7 +287,9 @@ function SettingsPage({ user }) {
       role: primaryRoleName,
       roleId,
       roles: assignedRoles,
-      categoryIds,
+      categoryIds: allCategoryIds,
+      cmCategoryIds: hasCM ? newUserCmCategories : [],
+      ciCategoryIds: hasCI ? newUserCiCategories : [],
       status: newUser.status
     };
 
@@ -288,16 +308,16 @@ function SettingsPage({ user }) {
       const savedUser = body.data;
       const savedUserId = savedUser?.id || savedUser?.userKey;
 
-      if (hasCM && savedUserId && newUserCategories.length > 0) {
+      if (hasCM && savedUserId && newUserCmCategories.length > 0) {
         await apiFetch(`/settings/change-manager-categories/${savedUserId}`, {
           method: 'PUT',
-          body: JSON.stringify({ categoryIds: newUserCategories })
+          body: JSON.stringify({ categoryIds: newUserCmCategories })
         }).catch(() => {});
       }
-      if (hasCI && savedUserId && newUserCategories.length > 0) {
+      if (hasCI && savedUserId && newUserCiCategories.length > 0) {
         await apiFetch(`/settings/change-implementer-categories/${savedUserId}`, {
           method: 'PUT',
-          body: JSON.stringify({ categoryIds: newUserCategories })
+          body: JSON.stringify({ categoryIds: newUserCiCategories })
         }).catch(() => {});
       }
 
@@ -308,10 +328,11 @@ function SettingsPage({ user }) {
         name: '',
         email: '',
         empId: '',
-        roles: ['Change Desk Admin'],
-        selectedRoleToAdd: ALL_ASSIGNABLE_ROLES[0]
+        roles: [],
+        selectedRoleToAdd: ''
       });
-      setNewUserCategories([]);
+      setNewUserCmCategories([]);
+      setNewUserCiCategories([]);
     } catch (err) {
       console.error('Failed to invite user via API:', err);
       toast.error(`Error inviting user: ${err.message}`);
@@ -749,12 +770,9 @@ function SettingsPage({ user }) {
 
               {/* Multi-Role Tag Builder */}
               <div>
-                <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.35rem', marginBottom: '0.4rem' }}>
-                  <label style={{ fontSize: '0.825rem', fontWeight: 500, color: 'var(--text-primary)' }}>
-                    Assigned Roles *
-                  </label>
-                  <span style={{ fontSize: '0.725rem', color: 'var(--text-secondary)' }}>(Add one or more roles)</span>
-                </div>
+                <label style={{ display: 'block', fontSize: '0.825rem', fontWeight: 500, color: 'var(--text-primary)', marginBottom: '0.4rem' }}>
+                  Assigned Roles
+                </label>
 
                 {/* Role Selector + Add Role Button */}
                 <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.6rem' }}>
@@ -835,10 +853,6 @@ function SettingsPage({ user }) {
                         <button
                           type="button"
                           onClick={() => {
-                            if (newUser.roles.length <= 1) {
-                              toast.error('User must have at least one assigned role.');
-                              return;
-                            }
                             setNewUser(prev => ({
                               ...prev,
                               roles: prev.roles.filter(r => r !== rName)
@@ -862,21 +876,21 @@ function SettingsPage({ user }) {
                     ))
                   ) : (
                     <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', alignSelf: 'center', padding: '0.2rem' }}>
-                      No roles added yet. Please select a role above and click "+ Add Role".
+                      No extra roles assigned. User will be created as standard Requester.
                     </span>
                   )}
                 </div>
               </div>
 
-              {/* Dynamic Category Assignment Dropdown for Change Manager or Change Implementer */}
-              {(newUser.roles?.includes('Change Manager') || newUser.roles?.includes('Change Implementer')) && (
+              {/* Category Assignment Box for Change Manager */}
+              {(newUser.roles?.includes('Change Manager') || newUser.selectedRoleToAdd === 'Change Manager') && (
                 <div style={{ marginBottom: '0.5rem' }}>
-                  <label style={{ display: 'block', fontSize: '0.825rem', fontWeight: 500, color: 'var(--text-primary)', marginBottom: '0.4rem' }}>
-                    Appointed Categories (Change Manager / Implementer) *
+                  <label style={{ display: 'block', fontSize: '0.825rem', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '0.4rem' }}>
+                    Appointed Change Manager Categories
                   </label>
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem', backgroundColor: 'var(--input-bg)', padding: '0.75rem', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
                     {categories.map((cat) => {
-                      const isChecked = newUserCategories.includes(cat.id);
+                      const isChecked = newUserCmCategories.includes(cat.id);
                       return (
                         <label key={cat.id} style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.825rem', color: 'var(--text-primary)', cursor: 'pointer' }}>
                           <input
@@ -884,9 +898,39 @@ function SettingsPage({ user }) {
                             checked={isChecked}
                             onChange={(e) => {
                               if (e.target.checked) {
-                                setNewUserCategories(prev => [...prev, cat.id]);
+                                setNewUserCmCategories(prev => [...prev, cat.id]);
                               } else {
-                                setNewUserCategories(prev => prev.filter(c => c !== cat.id));
+                                setNewUserCmCategories(prev => prev.filter(c => c !== cat.id));
+                              }
+                            }}
+                          />
+                          <span>{cat.name}</span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* Category Assignment Box for Change Implementer */}
+              {(newUser.roles?.includes('Change Implementer') || newUser.selectedRoleToAdd === 'Change Implementer') && (
+                <div style={{ marginBottom: '0.5rem' }}>
+                  <label style={{ display: 'block', fontSize: '0.825rem', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '0.4rem' }}>
+                    Appointed Change Implementer Categories
+                  </label>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem', backgroundColor: 'var(--input-bg)', padding: '0.75rem', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
+                    {categories.map((cat) => {
+                      const isChecked = newUserCiCategories.includes(cat.id);
+                      return (
+                        <label key={cat.id} style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.825rem', color: 'var(--text-primary)', cursor: 'pointer' }}>
+                          <input
+                            type="checkbox"
+                            checked={isChecked}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setNewUserCiCategories(prev => [...prev, cat.id]);
+                              } else {
+                                setNewUserCiCategories(prev => prev.filter(c => c !== cat.id));
                               }
                             }}
                           />
@@ -919,16 +963,17 @@ function SettingsPage({ user }) {
 
                 <button
                   type="submit"
+                  disabled={!newUser.roles || newUser.roles.length === 0 || Boolean(newUser.selectedRoleToAdd)}
                   style={{
                     padding: '0.65rem 1.35rem',
-                    backgroundColor: 'var(--brand-primary)',
-                    color: '#FFFFFF',
+                    backgroundColor: (!newUser.roles || newUser.roles.length === 0 || Boolean(newUser.selectedRoleToAdd)) ? 'var(--input-bg)' : 'var(--brand-primary)',
+                    color: (!newUser.roles || newUser.roles.length === 0 || Boolean(newUser.selectedRoleToAdd)) ? 'var(--text-secondary)' : '#FFFFFF',
                     border: 'none',
                     borderRadius: '8px',
                     fontSize: '0.85rem',
                     fontWeight: 500,
-                    cursor: 'pointer',
-                    boxShadow: '0 1px 3px rgba(0, 0, 0, 0.2)'
+                    cursor: (!newUser.roles || newUser.roles.length === 0 || Boolean(newUser.selectedRoleToAdd)) ? 'not-allowed' : 'pointer',
+                    boxShadow: (!newUser.roles || newUser.roles.length === 0 || Boolean(newUser.selectedRoleToAdd)) ? 'none' : '0 1px 3px rgba(0, 0, 0, 0.2)'
                   }}
                 >
                   Save user
@@ -1153,11 +1198,11 @@ function SettingsPage({ user }) {
                 </div>
               </div>
 
-              {/* Dynamic Category Assignment Dropdown for Change Manager or Change Implementer */}
-              {(editingUser.roles?.includes('Change Manager') || editingUser.roles?.includes('Change Implementer')) && (
+              {/* Category Assignment Box for Change Manager */}
+              {(editingUser.roles?.includes('Change Manager') || editingUser.selectedRoleToAdd === 'Change Manager') && (
                 <div style={{ marginBottom: '0.5rem' }}>
-                  <label style={{ display: 'block', fontSize: '0.825rem', fontWeight: 500, color: 'var(--text-primary)', marginBottom: '0.4rem' }}>
-                    Appointed Categories (Change Manager / Implementer) *
+                  <label style={{ display: 'block', fontSize: '0.825rem', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '0.4rem' }}>
+                    Appointed Change Manager Categories
                   </label>
                   {isLoadingCategories ? (
                     <div style={{ padding: '1rem', display: 'flex', justifyContent: 'center', backgroundColor: 'var(--input-bg)', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
@@ -1166,7 +1211,7 @@ function SettingsPage({ user }) {
                   ) : (
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem', backgroundColor: 'var(--input-bg)', padding: '0.75rem', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
                       {categories.map((cat) => {
-                        const isChecked = editingUserCategories.includes(cat.id);
+                        const isChecked = editingUserCmCategories.includes(cat.id);
                         return (
                           <label key={cat.id} style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.825rem', color: 'var(--text-primary)', cursor: 'pointer' }}>
                             <input
@@ -1175,9 +1220,46 @@ function SettingsPage({ user }) {
                               disabled={isSavingUser}
                               onChange={(e) => {
                                 if (e.target.checked) {
-                                  setEditingUserCategories(prev => [...prev, cat.id]);
+                                  setEditingUserCmCategories(prev => [...prev, cat.id]);
                                 } else {
-                                  setEditingUserCategories(prev => prev.filter(c => c !== cat.id));
+                                  setEditingUserCmCategories(prev => prev.filter(c => c !== cat.id));
+                                }
+                              }}
+                            />
+                            <span>{cat.name}</span>
+                          </label>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Category Assignment Box for Change Implementer */}
+              {(editingUser.roles?.includes('Change Implementer') || editingUser.selectedRoleToAdd === 'Change Implementer') && (
+                <div style={{ marginBottom: '0.5rem' }}>
+                  <label style={{ display: 'block', fontSize: '0.825rem', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '0.4rem' }}>
+                    Appointed Change Implementer Categories
+                  </label>
+                  {isLoadingCategories ? (
+                    <div style={{ padding: '1rem', display: 'flex', justifyContent: 'center', backgroundColor: 'var(--input-bg)', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
+                      <LoadingSpinner size="xs" message="Loading categories..." />
+                    </div>
+                  ) : (
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem', backgroundColor: 'var(--input-bg)', padding: '0.75rem', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
+                      {categories.map((cat) => {
+                        const isChecked = editingUserCiCategories.includes(cat.id);
+                        return (
+                          <label key={cat.id} style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.825rem', color: 'var(--text-primary)', cursor: 'pointer' }}>
+                            <input
+                              type="checkbox"
+                              checked={isChecked}
+                              disabled={isSavingUser}
+                              onChange={(e) => {
+                                if (e.target.checked) {
+                                  setEditingUserCiCategories(prev => [...prev, cat.id]);
+                                } else {
+                                  setEditingUserCiCategories(prev => prev.filter(c => c !== cat.id));
                                 }
                               }}
                             />
@@ -1212,16 +1294,16 @@ function SettingsPage({ user }) {
                 </button>
                 <button
                   type="submit"
-                  disabled={isSavingUser}
+                  disabled={isSavingUser || !editingUser.roles || editingUser.roles.length === 0 || Boolean(editingUser.selectedRoleToAdd)}
                   style={{
                     padding: '0.6rem 1.25rem',
-                    backgroundColor: 'var(--brand-primary)',
-                    color: '#FFFFFF',
+                    backgroundColor: (isSavingUser || !editingUser.roles || editingUser.roles.length === 0 || Boolean(editingUser.selectedRoleToAdd)) ? 'var(--input-bg)' : 'var(--brand-primary)',
+                    color: (isSavingUser || !editingUser.roles || editingUser.roles.length === 0 || Boolean(editingUser.selectedRoleToAdd)) ? 'var(--text-secondary)' : '#FFFFFF',
                     border: 'none',
                     borderRadius: '8px',
                     fontSize: '0.85rem',
                     fontWeight: 500,
-                    cursor: isSavingUser ? 'not-allowed' : 'pointer',
+                    cursor: (isSavingUser || !editingUser.roles || editingUser.roles.length === 0 || Boolean(editingUser.selectedRoleToAdd)) ? 'not-allowed' : 'pointer',
                     opacity: isSavingUser ? 0.8 : 1,
                     display: 'inline-flex',
                     alignItems: 'center',

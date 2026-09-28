@@ -194,7 +194,10 @@ function DashboardPage({ onNavigate, user, isOrgDashboard = false, searchQuery =
   const { data: modulePendingCounts } = useQuery({
     queryKey: ['dashboard-pending-dots', isOrgDashboard, user?.id],
     queryFn: async () => {
-      const headers = user?.token ? { Authorization: `Bearer ${user.token}` } : {};
+      const headers = {
+        ...(user?.token ? { Authorization: `Bearer ${user.token}` } : {}),
+        ...(user?.id ? { 'x-user-id': user.id } : {})
+      };
       const params = isOrgDashboard ? 'scope=org' : 'scope=my';
       try {
         const [crRes, psRes, trRes] = await Promise.all([

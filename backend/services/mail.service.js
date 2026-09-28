@@ -1867,3 +1867,606 @@ export const sendTravelDecisionEmail = async ({ travelReq, action, comment, deci
   });
 };
 
+// ============================================================================
+// MANAGER REVIEW & 24H REMINDER BUILDERS
+// ============================================================================
+
+export const buildChangeRequestManagerInvitationEmail = async (cr) => {
+  const secret = process.env.JWT_SECRET || 'sfc-change-desk-secure-jwt-secret-key-2026';
+  const token = jwt.sign(
+    {
+      crId: cr.id,
+      stage: 'manager_review',
+      approvalCycle: cr.approvalCycle || 1,
+      approverEmail: cr.managerEmail
+    },
+    secret,
+    { expiresIn: '7d' }
+  );
+
+  const approveUrl = `${appUrl()}/approval-action?token=${encodeURIComponent(token)}&module=cr&action=approve`;
+  const rejectUrl = `${appUrl()}/approval-action?token=${encodeURIComponent(token)}&module=cr&action=reject`;
+  const reqName = cr.employeeName || cr.requester || 'Requester';
+
+  const customEntries = extractCustomFields(cr);
+  const submittedTime = formatCleanTime(cr.submittedAt || cr.createdAt);
+  const startDate = formatCleanDate(cr.startDate);
+  const raisedDate = formatLongDate(cr.submittedAt || cr.createdAt) || cr.raisedDate || 'Today';
+
+  const subject = `Action Required: Team Member Change Request Review — ${cr.title} (${cr.id})`;
+  const bodyHtml = `
+    <!-- Manager Banner -->
+    <div style="background:#F8FAFC;border:1px solid ${C.border};border-radius:10px;padding:16px 18px;margin-bottom:18px">
+      <div style="font:700 14px Arial,sans-serif;color:${C.ink};margin-bottom:8px">Manager First Review Required</div>
+      <div style="font:400 13px/1.5 Arial,sans-serif;color:#334155">
+        Your team member <strong>${esc(reqName)}</strong> (${esc(cr.employeeEmail || '')}) has submitted Change Request <strong>${esc(cr.id)}: ${esc(cr.title)}</strong>.
+        As their reporting manager, your approval is required to advance this request to Change Desk Admin review.
+      </div>
+    </div>
+
+    <!-- Form Submitted Time Bar -->
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#F8FAFC;border-bottom:1px solid ${C.border};padding:10px 14px;margin-bottom:18px;border-radius:6px">
+      <tr>
+        <td style="font:600 12px Arial,sans-serif;color:${C.muted}">Form Submitted Time:</td>
+        <td align="right" style="font:700 12px monospace;color:${C.ink}">${esc(submittedTime)}</td>
+      </tr>
+    </table>
+
+    <!-- Header & Status -->
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:14px">
+      <tr>
+        <td>
+          <span style="font:700 12px monospace;color:#2563EB">${esc(cr.id)}</span>
+          <h2 style="font:700 17px Arial,sans-serif;color:${C.ink};margin:3px 0 2px">${esc(cr.title)}</h2>
+          <span style="font:400 12px Arial,sans-serif;color:${C.muted}">${esc(cr.category)} · ${esc(cr.subCategory || 'Standard')}</span>
+        </td>
+        <td align="right" valign="top">
+          <span style="display:inline-block;padding:4px 12px;border-radius:99px;font:700 11px Arial,sans-serif;background:#FEF3C7;color:#D97706">
+            ● Pending Manager Review
+          </span>
+        </td>
+      </tr>
+    </table>
+
+    <!-- Section 1: Requester Details -->
+    <div style="border-top:1px solid ${C.border};padding-top:14px;margin-top:14px">
+      <div style="font:700 13px Arial,sans-serif;color:${C.ink};margin-bottom:10px">Section 1: Requester Details</div>
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;margin-bottom:14px">
+        <tr>
+          <td width="33%" style="padding:6px 10px 6px 0;vertical-align:top">
+            <div style="font:500 11px Arial,sans-serif;color:${C.muted};margin-bottom:2px">Requester / Employee</div>
+            <div style="font:600 13px Arial,sans-serif;color:${C.ink}">${esc(reqName)}</div>
+          </td>
+          <td width="33%" style="padding:6px 10px 6px 0;vertical-align:top">
+            <div style="font:500 11px Arial,sans-serif;color:${C.muted};margin-bottom:2px">Employee ID</div>
+            <div style="font:600 13px monospace;color:${C.ink}">${esc(cr.employeeId || cr.empId || 'N/A')}</div>
+          </td>
+          <td width="34%" style="padding:6px 0 6px 0;vertical-align:top">
+            <div style="font:500 11px Arial,sans-serif;color:${C.muted};margin-bottom:2px">Location</div>
+            <div style="font:600 13px Arial,sans-serif;color:${C.ink}">${esc(cr.location || 'Not specified')}</div>
+          </td>
+        </tr>
+        <tr>
+          <td width="33%" style="padding:6px 10px 6px 0;vertical-align:top">
+            <div style="font:500 11px Arial,sans-serif;color:${C.muted};margin-bottom:2px">Employee Email</div>
+            <div style="font:600 12px Arial,sans-serif;color:${C.ink}">${esc(cr.employeeEmail || cr.requesterEmail || '—')}</div>
+          </td>
+          <td width="33%" style="padding:6px 10px 6px 0;vertical-align:top">
+            <div style="font:500 11px Arial,sans-serif;color:${C.muted};margin-bottom:2px">Reporting Manager</div>
+            <div style="font:600 12px Arial,sans-serif;color:${C.ink}">${esc(cr.managerName || '—')}</div>
+          </td>
+          <td width="34%" style="padding:6px 0 6px 0;vertical-align:top">
+            <div style="font:500 11px Arial,sans-serif;color:${C.muted};margin-bottom:2px">Manager Email</div>
+            <div style="font:600 12px Arial,sans-serif;color:${C.ink}">${esc(cr.managerEmail || '—')}</div>
+          </td>
+        </tr>
+      </table>
+    </div>
+
+    <!-- Section 2: Change Details -->
+    <div style="border-top:1px solid ${C.border};padding-top:14px;margin-top:14px">
+      <div style="font:700 13px Arial,sans-serif;color:${C.ink};margin-bottom:10px">Section 2: Change Details</div>
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;margin-bottom:14px">
+        <tr>
+          <td colspan="2" style="padding:6px 0;vertical-align:top">
+            <div style="font:500 11px Arial,sans-serif;color:${C.muted};margin-bottom:2px">Change Title</div>
+            <div style="font:700 13px Arial,sans-serif;color:${C.ink}">${esc(cr.title || 'Untitled Request')}</div>
+          </td>
+        </tr>
+        <tr>
+          <td width="50%" style="padding:6px 10px 6px 0;vertical-align:top">
+            <div style="font:500 11px Arial,sans-serif;color:${C.muted};margin-bottom:2px">Category</div>
+            <div style="font:600 13px Arial,sans-serif;color:${C.ink}">${esc(cr.category || '—')}</div>
+          </td>
+          <td width="50%" style="padding:6px 0;vertical-align:top">
+            <div style="font:500 11px Arial,sans-serif;color:${C.muted};margin-bottom:2px">Sub-category</div>
+            <div style="font:600 13px Arial,sans-serif;color:${C.ink}">${esc(cr.subCategory || 'Standard')}</div>
+          </td>
+        </tr>
+        <tr>
+          <td width="50%" style="padding:6px 10px 6px 0;vertical-align:top">
+            <div style="font:500 11px Arial,sans-serif;color:${C.muted};margin-bottom:2px">Start Date</div>
+            <div style="font:600 13px monospace;color:${C.ink}">${esc(startDate)}</div>
+          </td>
+          <td width="50%" style="padding:6px 0;vertical-align:top">
+            <div style="font:500 11px Arial,sans-serif;color:${C.muted};margin-bottom:2px">Workflow</div>
+            <div style="font:600 13px Arial,sans-serif;color:${C.ink}">${esc(cr.workflow || 'Standard')}</div>
+          </td>
+        </tr>
+      </table>
+    </div>
+
+    <!-- Dynamic Action & Specification Details Box -->
+    ${customEntries.length > 0 ? `
+      <div style="background:#F8FAFC;border:1px solid ${C.border};border-radius:8px;padding:14px 16px;margin:16px 0">
+        <div style="font:700 11px Arial,sans-serif;color:${C.ink};text-transform:uppercase;letter-spacing:0.04em;margin-bottom:10px">
+          ACTION &amp; SPECIFICATION DETAILS
+        </div>
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse">
+          ${(() => {
+            const rows = [];
+            for (let i = 0; i < customEntries.length; i += 2) {
+              const [k1, v1] = customEntries[i];
+              const second = customEntries[i + 1];
+              rows.push(`
+                <tr>
+                  <td width="50%" style="padding:6px 10px 6px 0;vertical-align:top">
+                    <div style="font:500 11px Arial,sans-serif;color:${C.muted};margin-bottom:2px">${esc(formatFieldLabel(k1))}</div>
+                    <div style="font:700 13px Arial,sans-serif;color:${C.ink};word-break:break-word">${esc(v1)}</div>
+                  </td>
+                  ${second ? `
+                    <td width="50%" style="padding:6px 0;vertical-align:top">
+                      <div style="font:500 11px Arial,sans-serif;color:${C.muted};margin-bottom:2px">${esc(formatFieldLabel(second[0]))}</div>
+                      <div style="font:700 13px Arial,sans-serif;color:${C.ink};word-break:break-word">${esc(second[1])}</div>
+                    </td>
+                  ` : `<td width="50%"></td>`}
+                </tr>
+              `);
+            }
+            return rows.join('');
+          })()}
+        </table>
+      </div>
+    ` : ''}
+
+    <!-- Raised Date & Business Justification -->
+    <div style="margin:14px 0 18px">
+      <div style="font:700 11px Arial,sans-serif;color:${C.ink};margin-bottom:2px">Raised Date</div>
+      <div style="font:500 13px Arial,sans-serif;color:${C.muted};margin-bottom:12px">${esc(raisedDate)}</div>
+
+      <div style="font:700 11px Arial,sans-serif;color:${C.ink};margin-bottom:4px">Business Justification</div>
+      <div style="background:#F8FAFC;border:1px solid ${C.border};border-radius:6px;padding:10px 12px;font:400 13px/1.5 Arial,sans-serif;color:${C.ink}">
+        ${esc(cr.justification || 'No justification entered.')}
+      </div>
+    </div>
+
+    <!-- Manager Decision Action Buttons -->
+    <div style="margin:22px 0 8px;padding:16px;background:#F1F5F9;border-radius:10px;border:1px solid #CBD5E1">
+      <div style="font:700 12px Arial,sans-serif;color:#334155;margin-bottom:12px;text-align:center;letter-spacing:0.04em">
+        STAGE 1: REPORTING MANAGER ACTION REQUIRED
+      </div>
+      <table role="presentation" cellpadding="0" cellspacing="0" width="100%">
+        <tr>
+          <td align="center" style="padding:6px">
+            <a href="${approveUrl}" style="display:inline-block;padding:11px 24px;background-color:#059669;color:#ffffff;font:700 13px Arial,sans-serif;text-decoration:none;border-radius:7px;box-shadow:0 2px 4px rgba(5,150,105,0.25)">
+              ✓ Approve Request
+            </a>
+          </td>
+          <td align="center" style="padding:6px">
+            <a href="${rejectUrl}" style="display:inline-block;padding:11px 24px;background-color:#DC2626;color:#ffffff;font:700 13px Arial,sans-serif;text-decoration:none;border-radius:7px;box-shadow:0 2px 4px rgba(220,38,38,0.25)">
+              ✕ Reject Request
+            </a>
+          </td>
+        </tr>
+      </table>
+      <div style="font:400 11px Arial,sans-serif;color:#64748B;text-align:center;margin-top:12px">
+        Approval and Rejection both require mandatory review comments on the decision page.
+      </div>
+    </div>
+  `;
+
+  const html = renderEmail({
+    preheader: `Manager review required for ${cr.id} submitted by ${reqName}`,
+    heading: `Manager Review: ${cr.title} (${cr.id})`,
+    intro: `Please review and record your decision for the change request submitted by <strong>${esc(reqName)}</strong>.`,
+    bodyHtml
+  });
+
+  const text =
+    `Action Required: Team Member Change Request Review — ${cr.title} (${cr.id})\n\n` +
+    `${reqName} submitted ${cr.id} and is awaiting your Stage 1 Manager Approval.\n\n` +
+    `Section 1: Requester Details\n` +
+    `Requester / Employee: ${reqName}\n` +
+    `Employee ID: ${cr.employeeId || cr.empId || 'N/A'}\n` +
+    `Employee Email: ${cr.employeeEmail || cr.requesterEmail || '—'}\n` +
+    `Location: ${cr.location || 'Not specified'}\n` +
+    `Manager Email: ${cr.managerEmail || '—'}\n\n` +
+    `Section 2: Change Details\n` +
+    `Change Title: ${cr.title}\n` +
+    `Category: ${cr.category}\n` +
+    `Sub-category: ${cr.subCategory || 'Standard'}\n` +
+    `Start Date: ${startDate}\n\n` +
+    (customEntries.length > 0 ? `Action & Specification Details:\n` + customEntries.map(([k, v]) => `${formatFieldLabel(k)}: ${v}`).join('\n') + `\n\n` : '') +
+    (cr.justification ? `Business Justification:\n${cr.justification}\n\n` : '') +
+    `Approve Request: ${approveUrl}\nReject Request: ${rejectUrl}\n`;
+
+  const reportHtml = generateChangeRequestReportHtml({ cr, requesterName: reqName, approveUrl, rejectUrl });
+
+  return {
+    subject,
+    text,
+    html,
+    attachments: [
+      ...mailAttachments(),
+      {
+        filename: `${cr.id}_Details.html`,
+        content: reportHtml,
+        contentType: 'text/html'
+      }
+    ]
+  };
+};
+
+export const buildPreSpendManagerInvitationEmail = async (ps) => {
+  const secret = process.env.JWT_SECRET || 'sfc-change-desk-secure-jwt-secret-key-2026';
+  const token = jwt.sign(
+    {
+      preSpendId: ps.id,
+      stage: 'manager_review',
+      approvalCycle: ps.approvalCycle || 1,
+      approverEmail: ps.managerEmail
+    },
+    secret,
+    { expiresIn: '7d' }
+  );
+
+  const approveUrl = `${appUrl()}/approval-action?token=${encodeURIComponent(token)}&module=prespend&action=approve`;
+  const rejectUrl = `${appUrl()}/approval-action?token=${encodeURIComponent(token)}&module=prespend&action=reject`;
+  const amountFormatted = Number(ps.estimatedAmount || 0).toLocaleString('en-IN', { style: 'currency', currency: 'INR' });
+  const submittedTime = formatCleanTime(ps.submittedAt || ps.createdAt);
+  const neededByDate = formatCleanDate(ps.neededByDate);
+  const raisedDate = formatLongDate(ps.submittedAt || ps.createdAt) || 'Today';
+  const reqName = ps.requesterName || ps.employeeName || 'Requester';
+  const reqEmail = ps.requesterEmail || ps.employeeEmail || '';
+
+  const vendors = Array.isArray(ps.vendors) ? ps.vendors.filter(v => v && (v.name || v.amount)) : [];
+
+  const subject = `Action Required: Team Member Pre-Spend Requisition Review — ${ps.requestCode} (${amountFormatted})`;
+  const bodyHtml = `
+    <!-- Manager Banner -->
+    <div style="background:#F8FAFC;border:1px solid ${C.border};border-radius:10px;padding:16px 18px;margin-bottom:18px">
+      <div style="font:700 14px Arial,sans-serif;color:${C.ink};margin-bottom:8px">Manager First Review Required</div>
+      <div style="font:400 13px/1.5 Arial,sans-serif;color:#334155">
+        Your team member <strong>${esc(reqName)}</strong> (${esc(reqEmail)}) has submitted Pre-Spend Requisition <strong>${esc(ps.requestCode)}</strong> for <strong>${esc(amountFormatted)}</strong>.
+        As their reporting manager, your approval is required to advance this requisition to Board review.
+      </div>
+    </div>
+
+    <!-- Time Bar -->
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#F8FAFC;border-bottom:1px solid ${C.border};padding:10px 14px;margin-bottom:18px;border-radius:6px">
+      <tr>
+        <td style="font:600 12px Arial,sans-serif;color:${C.muted}">Requisition Submitted:</td>
+        <td align="right" style="font:700 12px monospace;color:${C.ink}">${esc(submittedTime)} · ${esc(raisedDate)}</td>
+      </tr>
+    </table>
+
+    <!-- Header & Status -->
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:14px">
+      <tr>
+        <td>
+          <span style="font:700 12px monospace;color:#2563EB">${esc(ps.requestCode)}</span>
+          <h2 style="font:700 17px Arial,sans-serif;color:${C.ink};margin:3px 0 2px">${esc(ps.itemDescription || ps.category)}</h2>
+          <span style="font:400 12px Arial,sans-serif;color:${C.muted}">${esc(ps.category)} · ${esc(ps.subcategory || 'General')}</span>
+        </td>
+        <td align="right" valign="top">
+          <span style="display:inline-block;padding:4px 12px;border-radius:99px;font:700 11px Arial,sans-serif;background:#FEF3C7;color:#D97706">
+            ● Pending Manager Review
+          </span>
+        </td>
+      </tr>
+    </table>
+
+    <!-- Section 1: Financial & Requester Details -->
+    <div style="border-top:1px solid ${C.border};padding-top:14px;margin-top:14px">
+      <div style="font:700 13px Arial,sans-serif;color:${C.ink};margin-bottom:10px">Section 1: Requisition Overview</div>
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;margin-bottom:14px">
+        <tr>
+          <td width="33%" style="padding:6px 10px 6px 0;vertical-align:top">
+            <div style="font:500 11px Arial,sans-serif;color:${C.muted};margin-bottom:2px">Requester</div>
+            <div style="font:600 13px Arial,sans-serif;color:${C.ink}">${esc(reqName)}</div>
+          </td>
+          <td width="33%" style="padding:6px 10px 6px 0;vertical-align:top">
+            <div style="font:500 11px Arial,sans-serif;color:${C.muted};margin-bottom:2px">Estimated Amount</div>
+            <div style="font:700 14px Arial,sans-serif;color:#2563EB">${esc(amountFormatted)}</div>
+          </td>
+          <td width="34%" style="padding:6px 0 6px 0;vertical-align:top">
+            <div style="font:500 11px Arial,sans-serif;color:${C.muted};margin-bottom:2px">Cost Centre</div>
+            <div style="font:600 13px Arial,sans-serif;color:${C.ink}">${esc(ps.costCentre || 'Corporate')}</div>
+          </td>
+        </tr>
+        <tr>
+          <td width="33%" style="padding:6px 10px 6px 0;vertical-align:top">
+            <div style="font:500 11px Arial,sans-serif;color:${C.muted};margin-bottom:2px">Requester Email</div>
+            <div style="font:600 12px Arial,sans-serif;color:${C.ink}">${esc(reqEmail || '—')}</div>
+          </td>
+          <td width="33%" style="padding:6px 10px 6px 0;vertical-align:top">
+            <div style="font:500 11px Arial,sans-serif;color:${C.muted};margin-bottom:2px">Needed By Date</div>
+            <div style="font:600 13px Arial,sans-serif;color:${C.ink}">${esc(neededByDate)}</div>
+          </td>
+          <td width="34%" style="padding:6px 0 6px 0;vertical-align:top">
+            <div style="font:500 11px Arial,sans-serif;color:${C.muted};margin-bottom:2px">Reporting Manager</div>
+            <div style="font:600 12px Arial,sans-serif;color:${C.ink}">${esc(ps.managerName || '—')} (${esc(ps.managerEmail || '—')})</div>
+          </td>
+        </tr>
+      </table>
+    </div>
+
+    <!-- Section 2: Vendors & Comparison -->
+    ${vendors.length > 0 ? `
+      <div style="border-top:1px solid ${C.border};padding-top:14px;margin-top:14px">
+        <div style="font:700 13px Arial,sans-serif;color:${C.ink};margin-bottom:10px">Section 2: Vendor Comparison (${vendors.length} Quotes)</div>
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;margin-bottom:14px;background:#F8FAFC;border:1px solid ${C.border};border-radius:8px;overflow:hidden">
+          <thead>
+            <tr style="background:#F1F5F9">
+              <th style="padding:8px 12px;font:700 11px Arial,sans-serif;color:#334155;text-align:left">Vendor Name</th>
+              <th style="padding:8px 12px;font:700 11px Arial,sans-serif;color:#334155;text-align:left">Quoted Amount</th>
+              <th style="padding:8px 12px;font:700 11px Arial,sans-serif;color:#334155;text-align:left">Quote Date</th>
+              <th style="padding:8px 12px;font:700 11px Arial,sans-serif;color:#334155;text-align:left">Attached File</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${vendors.map((v, i) => `
+              <tr style="border-top:1px solid ${C.border}">
+                <td style="padding:8px 12px;font:600 12px Arial,sans-serif;color:${C.ink}">
+                  ${esc(v.name || `Vendor ${i + 1}`)} ${i === 0 ? '<span style="font-size:10px;background:#E6F4EA;color:#137333;font-weight:700;padding:1px 5px;border-radius:4px;margin-left:4px">Primary</span>' : ''}
+                </td>
+                <td style="padding:8px 12px;font:700 12px Arial,sans-serif;color:#059669">${v.amount ? Number(v.amount).toLocaleString('en-IN', { style: 'currency', currency: 'INR' }) : '—'}</td>
+                <td style="padding:8px 12px;font:400 12px monospace;color:${C.muted}">${formatCleanDate(v.date)}</td>
+                <td style="padding:8px 12px;font:600 11px Arial,sans-serif;color:#2563EB">${v.fileName ? `📎 ${esc(v.fileName)}` : 'None'}</td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      </div>
+    ` : ''}
+
+    <!-- Section 3: Commercial Justification & Reason -->
+    <div style="border-top:1px solid ${C.border};padding-top:14px;margin-top:14px">
+      <div style="font:700 11px Arial,sans-serif;color:${C.ink};margin-bottom:4px">Reason for Vendor Selection</div>
+      <div style="font:600 13px Arial,sans-serif;color:${C.ink};margin-bottom:12px">${esc(ps.commercialReason || ps.commercial?.reason || 'Lowest total cost')}</div>
+
+      <div style="font:700 11px Arial,sans-serif;color:${C.ink};margin-bottom:4px">Business & Justification Note</div>
+      <div style="background:#F8FAFC;border:1px solid ${C.border};border-radius:6px;padding:10px 12px;font:400 13px/1.5 Arial,sans-serif;color:${C.ink}">
+        ${esc(ps.businessJustification || ps.commercialJustification || ps.commercial?.justification || 'No justification specified.')}
+      </div>
+    </div>
+
+    <!-- Manager Decision Action Buttons -->
+    <div style="margin:22px 0 8px;padding:16px;background:#F1F5F9;border-radius:10px;border:1px solid #CBD5E1">
+      <div style="font:700 12px Arial,sans-serif;color:#334155;margin-bottom:12px;text-align:center;letter-spacing:0.04em">
+        STAGE 1: REPORTING MANAGER ACTION REQUIRED
+      </div>
+      <table role="presentation" cellpadding="0" cellspacing="0" width="100%">
+        <tr>
+          <td align="center" style="padding:6px">
+            <a href="${approveUrl}" style="display:inline-block;padding:11px 24px;background-color:#059669;color:#ffffff;font:700 13px Arial,sans-serif;text-decoration:none;border-radius:7px;box-shadow:0 2px 4px rgba(5,150,105,0.25)">
+              ✓ Approve Requisition
+            </a>
+          </td>
+          <td align="center" style="padding:6px">
+            <a href="${rejectUrl}" style="display:inline-block;padding:11px 24px;background-color:#DC2626;color:#ffffff;font:700 13px Arial,sans-serif;text-decoration:none;border-radius:7px;box-shadow:0 2px 4px rgba(220,38,38,0.25)">
+              ✕ Reject Requisition
+            </a>
+          </td>
+        </tr>
+      </table>
+      <div style="font:400 11px Arial,sans-serif;color:#64748B;text-align:center;margin-top:12px">
+        Vendor quotations and PDFs are attached directly to this email for review.
+      </div>
+    </div>
+  `;
+
+  const html = renderEmail({
+    preheader: `Manager action required for Pre-Spend ${ps.requestCode}`,
+    heading: `Manager Review: ${ps.requestCode} (${amountFormatted})`,
+    intro: `Please review and record your decision for the pre-spend requisition submitted by <strong>${esc(reqName)}</strong>.`,
+    bodyHtml
+  });
+
+  const vendorAttachments = extractVendorAttachments(ps.vendors);
+  return {
+    subject,
+    text: `Manager Review Required: ${ps.requestCode}\nRequester: ${reqName}\nAmount: ${amountFormatted}\nApprove: ${approveUrl}\nReject: ${rejectUrl}`,
+    html,
+    attachments: [...mailAttachments(), ...vendorAttachments]
+  };
+};
+
+export const buildTravelManagerInvitationEmail = async (tr) => {
+  const secret = process.env.JWT_SECRET || 'sfc-change-desk-secure-jwt-secret-key-2026';
+  const token = jwt.sign(
+    {
+      travelId: tr.id,
+      stage: 'manager_review',
+      approvalCycle: tr.approvalCycle || 1,
+      approverEmail: tr.managerEmail
+    },
+    secret,
+    { expiresIn: '7d' }
+  );
+
+  const approveUrl = `${appUrl()}/approval-action?token=${encodeURIComponent(token)}&module=travel&action=approve`;
+  const rejectUrl = `${appUrl()}/approval-action?token=${encodeURIComponent(token)}&module=travel&action=reject`;
+
+  const submittedTime = formatCleanTime(tr.createdAt || tr.submittedAt);
+  const departureDate = formatCleanDate(tr.departureDate);
+  const returnDate = formatCleanDate(tr.returnDate);
+  const raisedDate = formatLongDate(tr.createdAt || tr.submittedAt) || 'Today';
+  const travellerName = tr.travellerName || tr.employeeName || 'Traveller';
+  const travellerEmail = tr.travellerEmail || tr.employeeEmail || '';
+  const isShortNotice = Boolean(tr.isShortNotice);
+
+  const subject = `Action Required: Team Member Travel Booking Review — ${tr.requestCode} (${tr.fromLocation} → ${tr.toLocation})`;
+  const bodyHtml = `
+    <!-- Manager Banner -->
+    <div style="background:#F8FAFC;border:1px solid ${C.border};border-radius:10px;padding:16px 18px;margin-bottom:18px">
+      <div style="font:700 14px Arial,sans-serif;color:${C.ink};margin-bottom:8px">Manager First Review Required</div>
+      <div style="font:400 13px/1.5 Arial,sans-serif;color:#334155">
+        Your team member <strong>${esc(travellerName)}</strong> has submitted Travel Booking Request <strong>${esc(tr.requestCode)}</strong> for <strong>${esc(tr.fromLocation)} → ${esc(tr.toLocation)}</strong>.
+        As their reporting manager, your approval is required to advance this request to ${isShortNotice ? 'Board' : 'Travel Desk'} review.
+      </div>
+    </div>
+
+    <!-- Time Bar -->
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#F8FAFC;border-bottom:1px solid ${C.border};padding:10px 14px;margin-bottom:18px;border-radius:6px">
+      <tr>
+        <td style="font:600 12px Arial,sans-serif;color:${C.muted}">Request Submitted:</td>
+        <td align="right" style="font:700 12px monospace;color:${C.ink}">${esc(submittedTime)} · ${esc(raisedDate)}</td>
+      </tr>
+    </table>
+
+    ${isShortNotice ? `
+      <!-- Urgent Notice Warning Banner -->
+      <div style="background:#FEF2F2;border:1.5px solid #FCA5A5;border-radius:8px;padding:12px 16px;margin-bottom:16px">
+        <div style="font:700 13px Arial,sans-serif;color:#DC2626;margin-bottom:2px">SHORT-NOTICE FLIGHT / TRAVEL BOOKING (&lt; 7 DAYS)</div>
+        <div style="font:400 12px Arial,sans-serif;color:#991B1B">
+          This itinerary departs within 7 days. After your manager endorsement, it will proceed directly to <strong>Board Member review</strong>.
+        </div>
+      </div>
+    ` : ''}
+
+    <!-- Header & Status -->
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:14px">
+      <tr>
+        <td>
+          <span style="font:700 12px monospace;color:#2563EB">${esc(tr.requestCode)}</span>
+          <h2 style="font:700 17px Arial,sans-serif;color:${C.ink};margin:3px 0 2px">${esc(tr.travelMode)}: ${esc(tr.fromLocation)} → ${esc(tr.toLocation)}</h2>
+          <span style="font:400 12px Arial,sans-serif;color:${C.muted}">${esc(tr.tripType || 'One-Way')} · ${esc(tr.travelClass || 'Economy')}</span>
+        </td>
+        <td align="right" valign="top">
+          <span style="display:inline-block;padding:4px 12px;border-radius:99px;font:700 11px Arial,sans-serif;background:#FEF3C7;color:#D97706">
+            ● Pending Manager Review
+          </span>
+        </td>
+      </tr>
+    </table>
+
+    <!-- Section 1: Travel Details -->
+    <div style="border-top:1px solid ${C.border};padding-top:14px;margin-top:14px">
+      <div style="font:700 13px Arial,sans-serif;color:${C.ink};margin-bottom:10px">Section 1: Traveller & Itinerary Details</div>
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;margin-bottom:14px">
+        <tr>
+          <td width="33%" style="padding:6px 10px 6px 0;vertical-align:top">
+            <div style="font:500 11px Arial,sans-serif;color:${C.muted};margin-bottom:2px">Traveller Name</div>
+            <div style="font:600 13px Arial,sans-serif;color:${C.ink}">${esc(travellerName)}</div>
+          </td>
+          <td width="33%" style="padding:6px 10px 6px 0;vertical-align:top">
+            <div style="font:500 11px Arial,sans-serif;color:${C.muted};margin-bottom:2px">Departure Date</div>
+            <div style="font:700 13px Arial,sans-serif;color:#2563EB">${esc(departureDate)}</div>
+          </td>
+          <td width="34%" style="padding:6px 0 6px 0;vertical-align:top">
+            <div style="font:500 11px Arial,sans-serif;color:${C.muted};margin-bottom:2px">Return Date</div>
+            <div style="font:600 13px Arial,sans-serif;color:${C.ink}">${esc(returnDate || 'N/A')}</div>
+          </td>
+        </tr>
+        <tr>
+          <td width="33%" style="padding:6px 10px 6px 0;vertical-align:top">
+            <div style="font:500 11px Arial,sans-serif;color:${C.muted};margin-bottom:2px">Department</div>
+            <div style="font:600 12px Arial,sans-serif;color:${C.ink}">${esc(tr.department || 'Corporate')}</div>
+          </td>
+          <td width="33%" style="padding:6px 10px 6px 0;vertical-align:top">
+            <div style="font:500 11px Arial,sans-serif;color:${C.muted};margin-bottom:2px">Preferred Time Slot</div>
+            <div style="font:600 13px Arial,sans-serif;color:${C.ink}">${esc(tr.preferredTimeSlot || 'Anytime')}</div>
+          </td>
+          <td width="34%" style="padding:6px 0 6px 0;vertical-align:top">
+            <div style="font:500 11px Arial,sans-serif;color:${C.muted};margin-bottom:2px">Reporting Manager</div>
+            <div style="font:600 12px Arial,sans-serif;color:${C.ink}">${esc(tr.managerName || '—')} (${esc(tr.managerEmail || '—')})</div>
+          </td>
+        </tr>
+      </table>
+    </div>
+
+    <!-- Section 2: Purpose -->
+    <div style="border-top:1px solid ${C.border};padding-top:14px;margin-top:14px">
+      <div style="font:700 11px Arial,sans-serif;color:${C.ink};margin-bottom:4px">Purpose of Travel</div>
+      <div style="background:#F8FAFC;border:1px solid ${C.border};border-radius:6px;padding:10px 12px;font:400 13px/1.5 Arial,sans-serif;color:${C.ink}">
+        ${esc(tr.purpose || 'Business meeting / operational visit')}
+      </div>
+    </div>
+
+    <!-- Manager Decision Action Buttons -->
+    <div style="margin:22px 0 8px;padding:16px;background:#F1F5F9;border-radius:10px;border:1px solid #CBD5E1">
+      <div style="font:700 12px Arial,sans-serif;color:#334155;margin-bottom:12px;text-align:center;letter-spacing:0.04em">
+        STAGE 1: REPORTING MANAGER ACTION REQUIRED
+      </div>
+      <table role="presentation" cellpadding="0" cellspacing="0" width="100%">
+        <tr>
+          <td align="center" style="padding:6px">
+            <a href="${approveUrl}" style="display:inline-block;padding:11px 24px;background-color:#059669;color:#ffffff;font:700 13px Arial,sans-serif;text-decoration:none;border-radius:7px;box-shadow:0 2px 4px rgba(5,150,105,0.25)">
+              ✓ Approve Booking
+            </a>
+          </td>
+          <td align="center" style="padding:6px">
+            <a href="${rejectUrl}" style="display:inline-block;padding:11px 24px;background-color:#DC2626;color:#ffffff;font:700 13px Arial,sans-serif;text-decoration:none;border-radius:7px;box-shadow:0 2px 4px rgba(220,38,38,0.25)">
+              ✕ Reject Booking
+            </a>
+          </td>
+        </tr>
+      </table>
+      <div style="font:400 11px Arial,sans-serif;color:#64748B;text-align:center;margin-top:12px">
+        Review notes and reasons are required when recording your approval or rejection decision.
+      </div>
+    </div>
+  `;
+
+  const html = renderEmail({
+    preheader: `Manager action required for Travel ${tr.requestCode}`,
+    heading: `Manager Review: Travel Booking ${tr.requestCode}`,
+    intro: `Please review and record your decision for the travel request submitted by <strong>${esc(travellerName)}</strong>.`,
+    bodyHtml
+  });
+
+  return {
+    subject,
+    text: `Manager Review Required: ${tr.requestCode}\nTraveller: ${travellerName}\nRoute: ${tr.fromLocation} to ${tr.toLocation}\nApprove: ${approveUrl}\nReject: ${rejectUrl}`,
+    html,
+    attachments: mailAttachments()
+  };
+};
+
+export const sendManagerRejectionEmail = async ({ module, requestCode, title, requesterEmail, requesterName, managerName, managerEmail, comment }) => {
+  if (!requesterEmail) return { skipped: 'no-requester-email' };
+  const subject = `Rejected by Manager: ${requestCode || title}`;
+  const bodyHtml = `
+    <div style="background:#FEF2F2;border:1.5px solid #FECACA;border-radius:10px;padding:16px 18px;margin-bottom:18px">
+      <div style="font:700 15px Arial,sans-serif;color:#DC2626;margin-bottom:4px">
+        Rejected by Manager
+      </div>
+      <div style="font:400 13px Arial,sans-serif;color:#334155;line-height:1.5">
+        Your request was rejected by your reporting manager <strong>${esc(managerName || 'Manager')}</strong> (${esc(managerEmail || '—')}).
+      </div>
+      <div style="margin-top:10px;padding-top:10px;border-top:1px dashed #FECACA;font:400 13px/1.5 Arial,sans-serif;color:#991B1B">
+        <strong>Manager Comments / Reason:</strong><br>
+        ${esc(comment || 'No explanation provided.')}
+      </div>
+    </div>
+  `;
+
+  const html = renderEmail({
+    preheader: `Your request ${requestCode || title} was rejected by your manager`,
+    heading: `Rejected by Manager: ${requestCode || title}`,
+    intro: `Your request <strong>${esc(requestCode || title)}</strong> has been terminated following manager review.`,
+    bodyHtml
+  });
+
+  return sendMail({
+    to: requesterEmail,
+    cc: managerEmail ? [managerEmail] : undefined,
+    subject,
+    text: `Your request ${requestCode || title} was rejected by ${managerName} (${managerEmail}). Comment: ${comment}`,
+    html,
+    attachments: mailAttachments()
+  });
+};
+
+

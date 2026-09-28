@@ -1,4 +1,4 @@
-import { CatalogCategory, CatalogSubcategory, CatalogSubcategoryField, Workflow } from '../models/index.js';
+import { CatalogCategory, CatalogSubcategory, CatalogSubcategoryField } from '../models/index.js';
 import { addAuditLog } from './auditLog.service.js';
 import { resolveEmailForUser, IdentityResolver } from './identityResolver.service.js';
 
@@ -53,7 +53,7 @@ export const getCatalogCategoriesService = async () => {
         as: 'subcategories',
         where: { status: 'Active' },
         required: false,
-        attributes: ['id', 'categoryId', 'name', 'sla', 'status']
+        attributes: ['id', 'categoryId', 'name', 'status']
       }
     ]
   });
@@ -318,21 +318,11 @@ export const createCatalogSubcategoryService = async (payload = {}) => {
   const cleanCatSlug = categoryId.replace(/^cat-/, '');
   const subcatId = `subcat-${cleanCatSlug}-${existingCount + 1}`;
 
-  let resolvedWfId = workflowId;
-  if (!resolvedWfId && payload.workflow) {
-    const wf = await Workflow.findOne({ where: { name: payload.workflow } });
-    resolvedWfId = wf ? wf.id : 'wf-1';
-  }
-  if (!resolvedWfId) resolvedWfId = 'wf-1';
-
   const subcategory = await CatalogSubcategory.create({
     id: subcatId,
     categoryId,
     name,
     description: description || `${name} change request.`,
-    sla: sla || '3 business days',
-    risk: risk || 'Medium',
-    workflowId: resolvedWfId,
     status: 'Active'
   });
 

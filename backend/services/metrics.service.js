@@ -15,7 +15,6 @@ export const getMetricsService = async (userId = null, { dateFilter = null, star
     const dateClause = buildDateFilterClause(dateFilter, startDate, endDate);
     const andClauses = [
       {
-        isDraft: false,
         status: { [Op.notIn]: ['Draft', 'draft', 'Deleted', 'deleted', 'Cancelled', 'cancelled'] }
       }
     ];
@@ -92,7 +91,6 @@ export const getCategoryMetricsService = async (userId = null, { dateFilter = nu
 
   const andClauses = [
     {
-      isDraft: false,
       status: { [Op.notIn]: ['Draft', 'draft', 'Deleted', 'deleted', 'Cancelled', 'cancelled'] }
     }
   ];

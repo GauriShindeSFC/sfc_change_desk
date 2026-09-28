@@ -16,18 +16,6 @@ export const CatalogSubcategory = sequelize.define(
       type: DataTypes.STRING,
       allowNull: false
     },
-    sla: {
-      type: DataTypes.STRING,
-      defaultValue: '3 business days'
-    },
-    risk: {
-      type: DataTypes.ENUM('Low', 'Medium', 'High'),
-      defaultValue: 'Medium'
-    },
-    workflowId: {
-      type: DataTypes.STRING,
-      allowNull: true
-    },
     status: {
       type: DataTypes.ENUM('Active', 'Inactive'),
       defaultValue: 'Active'

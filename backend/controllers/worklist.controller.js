@@ -37,8 +37,8 @@ export const handleWorklistAction = asyncHandler(async (req, res) => {
   if (!id || !action) {
     return res.status(400).json({ success: false, message: 'Both "id" and "action" are required' });
   }
-  const actionComment = comment || rationale || rejectionReason || '';
-  const result = await applyWorklistActionService({ id, action, rejectionReason: actionComment, comment: actionComment, actorId: req.user?.id });
+  const actorId = req.user?.userKey || req.user?.id || req.headers['x-user-id'];
+  const result = await applyWorklistActionService({ id, action, rejectionReason: actionComment, comment: actionComment, actorId });
   res.json({ success: true, message: `Action "${action}" processed for ${id}`, data: result });
 });
 

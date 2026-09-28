@@ -1,32 +1,46 @@
 import { Op } from 'sequelize';
 import { TravelRequest } from '../models/TravelRequest.js';
-import { getTravelDeskApproverEmails } from './userManagement.service.js';
-import { sendTravelCreatedEmail, sendTravelDecisionEmail } from './mail.service.js';
+import { Employee } from '../models/Employee.js';
+import { sequelize } from '../config/database.js';
+import { getTravelDeskApproverEmails, getTravelAdminEmails, getBoardMemberEmails } from './userManagement.service.js';
+import {
+  sendTravelCreatedEmail,
+  sendTravelDecisionEmail,
+  sendManagerRejectionEmail,
+  buildTravelManagerInvitationEmail
+} from './mail.service.js';
+import { enqueueNotification } from './notificationQueue.service.js';
 import { buildDateFilterClause } from '../utils/dateFilterUtils.js';
 
-const generateTravelCode = async () => {
-  const year = new Date().getFullYear();
-  const records = await TravelRequest.findAll({
-    where: {
-      requestCode: { [Op.like]: `TR-${year}-%` }
-    },
-    attributes: ['requestCode'],
-    raw: true
-  });
+export const generateTravelCode = async (_tx = null, year = new Date().getFullYear()) => {
+  const seqName = `travel_code_seq_${year}`;
 
-  let maxNum = 0;
-  for (const r of records) {
-    if (r.requestCode) {
-      const parts = r.requestCode.split('-');
-      const num = parseInt(parts[2], 10);
-      if (!isNaN(num) && num > maxNum) {
-        maxNum = num;
+  const ensureSeq = async () => {
+    const lockKey = 60000 + (parseInt(year, 10) % 10000);
+    try {
+      await sequelize.query(`SELECT pg_advisory_lock(${lockKey});`);
+      const [seqCheck] = await sequelize.query(`SELECT to_regclass('${seqName}') AS regclass;`);
+      if (!seqCheck[0]?.regclass) {
+        const [maxRes] = await sequelize.query(
+          `SELECT MAX(CAST(SUBSTRING(request_code FROM 'TR-[0-9]+-([0-9]+)') AS INTEGER)) AS max_num FROM travel_requests WHERE request_code LIKE 'TR-${year}-%';`
+        );
+        const maxNum = (maxRes && maxRes[0] && maxRes[0].max_num) ? parseInt(maxRes[0].max_num, 10) : 0;
+        const startNum = maxNum + 1;
+        await sequelize.query(`CREATE SEQUENCE IF NOT EXISTS ${seqName} START WITH ${startNum};`);
       }
+    } finally {
+      await sequelize.query(`SELECT pg_advisory_unlock(${lockKey});`).catch(() => {});
     }
+  };
+
+  const [initialCheck] = await sequelize.query(`SELECT to_regclass('${seqName}') AS regclass;`);
+  if (!initialCheck[0]?.regclass) {
+    await ensureSeq();
   }
 
-  const nextNum = String(maxNum + 1).padStart(4, '0');
-  return `TR-${year}-${nextNum}`;
+  const [result] = await sequelize.query(`SELECT nextval('${seqName}') AS next_id`);
+  const nextId = result[0]?.next_id || result[0]?.nextval;
+  return `TR-${year}-${String(nextId).padStart(4, '0')}`;
 };
 
 export const createTravelService = async (data, user) => {
@@ -40,7 +54,6 @@ export const createTravelService = async (data, user) => {
   const isCab = travelMode.toLowerCase() === 'cab' || travelMode.toLowerCase() === 'cabs';
 
   // Determine if Board Approval is required:
-  // 1. Flight Rules: Premium Economy / Business class OR Short Notice (< 7 days)
   let isShortNotice = Boolean(data.isShortNotice);
   if (isFlight) {
     const flightClass = String(data.travelClass || data['Travel class'] || data.bookingDetails?.['Travel class'] || 'Economy').toLowerCase();
@@ -56,23 +69,43 @@ export const createTravelService = async (data, user) => {
     }
   }
 
-  // 2. Cab Policy Rules (SUV < 3 passengers, Premium always, Sedan < 2 passengers)
   if (isCab) {
     const bookingDetails = data.bookingDetails || data.drafts || data || {};
     const passengers = parseInt(bookingDetails['Number of passengers'] || data.passengers || data['Number of passengers'] || '1', 10) || 1;
     const cabTypeStr = String(data.travelClass || bookingDetails['Cab type'] || data['Cab type'] || 'Hatchback').toLowerCase();
 
     if (cabTypeStr.includes('premium') || cabTypeStr.includes('innova')) {
-      isShortNotice = true; // Premium cab always requires Board approval
+      isShortNotice = true;
     } else if (cabTypeStr.includes('suv') || cabTypeStr.includes('ertiga')) {
       if (passengers < 3) {
-        isShortNotice = true; // SUV for < 3 passengers requires Board approval
+        isShortNotice = true;
       }
     } else if (cabTypeStr.includes('sedan') || cabTypeStr.includes('dzire') || cabTypeStr.includes('aura')) {
       if (passengers < 2) {
-        isShortNotice = true; // Sedan for < 2 passengers requires Board approval
+        isShortNotice = true;
       }
     }
+  }
+
+  let validManagerName = null;
+  let validManagerEmail = data.managerEmail || data.Manager ? String(data.managerEmail || data.Manager).trim() : '';
+
+  if (validManagerEmail) {
+    const mgrEmp = await Employee.findOne({
+      where: sequelize.where(sequelize.fn('LOWER', sequelize.col('email')), validManagerEmail.toLowerCase())
+    });
+    if (!mgrEmp) {
+      const err = new Error(`Selected manager "${validManagerEmail}" is not found in the employee directory.`);
+      err.statusCode = 400;
+      throw err;
+    }
+    if (mgrEmp.leftAt || mgrEmp.leftReason || mgrEmp.leftBy) {
+      const err = new Error(`Selected manager "${validManagerEmail}" is inactive/exited.`);
+      err.statusCode = 400;
+      throw err;
+    }
+    validManagerName = mgrEmp.name || null;
+    validManagerEmail = mgrEmp.email || validManagerEmail;
   }
 
   const created = await TravelRequest.create({
@@ -80,7 +113,6 @@ export const createTravelService = async (data, user) => {
     requesterId,
     travellerName,
     travellerEmail,
-    department: data.department || data['Department / Cost Centre'] || user?.department || 'Leadership / Corporate',
     travelMode,
     purpose: data.purpose || data['Purpose of visit'] || '',
     tripType: data.tripType || data['Trip type'] || data['Journey type'] || '',
@@ -93,21 +125,27 @@ export const createTravelService = async (data, user) => {
     isShortNotice,
     bookingDetails: data.bookingDetails || data.drafts || data,
     policyCertified: Boolean(data.certified || data.policyCertified),
+    managerName: validManagerName,
+    managerEmail: validManagerEmail,
+    approvalStage: 'manager_review',
+    approvalCycle: 1,
+    managerReviewEnteredAt: new Date(),
     status: 'Pending Approval'
   });
 
-  // Asynchronously notify Travel Admin & Board (with special notice if short-notice booking)
-  getTravelDeskApproverEmails(isShortNotice)
-    .then((approverEmails) =>
-      sendTravelCreatedEmail({
-        travelReq: created.toJSON ? created.toJSON() : created,
-        requesterName: travellerName,
-        requesterEmail: travellerEmail,
-        approverEmails,
-        isShortNotice
+  // Enqueue initial Stage 1 Manager Invitation
+  if (validManagerEmail) {
+    buildTravelManagerInvitationEmail(created).then((mailPayload) =>
+      enqueueNotification({
+        module: 'travel',
+        requestId: created.id,
+        approvalCycle: created.approvalCycle,
+        jobType: 'manager_invitation',
+        recipientEmail: validManagerEmail,
+        payload: mailPayload
       })
-    )
-    .catch((err) => console.error('[mail] travel notification failed:', err.message));
+    ).catch((err) => console.error('[mail] Queue travel manager invite failed:', err.message));
+  }
 
   return created;
 };
@@ -313,6 +351,13 @@ export const getTravelRequestsService = async ({ user, userId, isWorklist = fals
 };
 
 export const handleTravelActionService = async ({ id, action, comment, actor }) => {
+  const actionComment = (comment || '').trim();
+  if (!actionComment) {
+    const err = new Error(`A non-empty comment is required to ${action} this Travel request.`);
+    err.statusCode = 400;
+    throw err;
+  }
+
   const req = await TravelRequest.findByPk(id);
   if (!req) {
     const err = new Error(`Travel request ${id} not found`);
@@ -345,14 +390,19 @@ export const handleTravelActionService = async ({ id, action, comment, actor }) 
     (actorRole.includes('admin') && actorRole.includes('travel')) ||
     actorRolesList.some(r => r === 'role-2-travel' || (r.includes('admin') && r.includes('travel')));
 
-  // Integrity Rule: Users cannot approve/reject their own requests
+  // Integrity Rule: Users cannot approve/reject their own requests across all aliases
   const actorId = actor?.userKey || actor?.id || actor?.email || '';
   const actorEmail = (actor?.email || '').toLowerCase().trim();
   const reqEmail = (req.travellerEmail || '').toLowerCase().trim();
   const reqId = String(req.requesterId || '');
 
+  const actorAliases = new Set([actorId, actor?.userKey, actor?.id, actor?.employeeBusinessId, actorEmail].filter(Boolean));
+  if (Array.isArray(actor?.aliases)) {
+    actor.aliases.forEach(a => actorAliases.add(String(a)));
+  }
+
   if (
-    (actorId && reqId && (reqId === String(actorId) || reqId === String(actor?.id) || reqId === String(actor?.userKey))) ||
+    actorAliases.has(reqId) ||
     (actorEmail && reqEmail && actorEmail === reqEmail)
   ) {
     const err = new Error('Separation of duties violation: You cannot approve or reject your own travel request.');
@@ -360,7 +410,84 @@ export const handleTravelActionService = async ({ id, action, comment, actor }) 
     throw err;
   }
 
-  // Rule: If Board approval is required (short-notice, premium/business flight, cab rules), ONLY Board Member or Super Admin has authorization
+  const isStage1 = req.approvalStage === 'manager_review';
+  const isStage2 = req.approvalStage === 'stage_2_review' || (!req.approvalStage && req.status === 'Pending Approval');
+
+  if (isStage1) {
+    // Stage 1: Reporting Manager Review
+    const managerEmailLower = (req.managerEmail || '').toLowerCase().trim();
+    const isAssignedManager = Boolean(managerEmailLower && actorEmail && managerEmailLower === actorEmail);
+
+    if (!isAssignedManager && !isSuperAdmin) {
+      const err = new Error('Unauthorized: This travel request is awaiting approval from the assigned reporting manager.');
+      err.statusCode = 403;
+      throw err;
+    }
+
+    if (action === 'reject') {
+      const history = Array.isArray(req.approvalHistory) ? [...req.approvalHistory] : [];
+      history.push({
+        action: 'reject',
+        decision: 'Rejected by Manager',
+        comment: actionComment,
+        actorName: actor?.displayName || actor?.name || actor?.email || 'Reporting Manager',
+        actorEmail: actor?.email || '',
+        actorRole: 'Reporting Manager',
+        timestamp: new Date().toISOString()
+      });
+
+      req.status = 'Rejected';
+      req.approvalStage = 'rejected';
+      req.approvalHistory = history;
+      await req.save();
+
+      sendManagerRejectionEmail({
+        module: 'travel',
+        requestCode: req.requestCode,
+        title: `${req.fromLocation} → ${req.toLocation}`,
+        requesterEmail: req.travellerEmail,
+        requesterName: req.travellerName,
+        managerName: actor?.displayName || actor?.name || 'Manager',
+        managerEmail: actor?.email,
+        comment: actionComment
+      }).catch((err) => console.error('[mail] travel manager rejection notify failed:', err.message));
+
+      return req;
+    }
+
+    if (action === 'approve') {
+      const history = Array.isArray(req.approvalHistory) ? [...req.approvalHistory] : [];
+      history.push({
+        action: 'approve',
+        decision: 'Manager Approved',
+        comment: actionComment,
+        actorName: actor?.displayName || actor?.name || actor?.email || 'Reporting Manager',
+        actorEmail: actor?.email || '',
+        actorRole: 'Reporting Manager',
+        timestamp: new Date().toISOString()
+      });
+
+      req.status = 'Pending Approval';
+      req.approvalStage = 'stage_2_review';
+      req.approvalHistory = history;
+      await req.save();
+
+      // Notify Travel Admin / Board Members for Stage 2
+      getTravelDeskApproverEmails(req.isShortNotice).then((approverEmails) => {
+        sendTravelCreatedEmail({
+          travelReq: req.toJSON ? req.toJSON() : req,
+          requesterName: req.travellerName,
+          requesterEmail: req.travellerEmail,
+          approverEmails,
+          isShortNotice: req.isShortNotice
+        });
+      }).catch((err) => console.error('[mail] travel Stage 2 notify failed:', err.message));
+
+      return req;
+    }
+  }
+
+  // Stage 2: Travel Admin OR Board member
   if (req.isShortNotice) {
     if (!isBoardUser && !isSuperAdmin) {
       const err = new Error('This booking requires Board authorization (Premium/Business class or short-notice booking).');
@@ -369,18 +496,18 @@ export const handleTravelActionService = async ({ id, action, comment, actor }) 
     }
   } else {
     if (!isTravelAdmin && !isBoardUser && !isSuperAdmin) {
-      const err = new Error('Unauthorized to perform action on this travel request.');
+      const err = new Error('Unauthorized: Only Travel Admins or Board Members can decide Stage 2 travel requests.');
       err.statusCode = 403;
       throw err;
     }
   }
 
-  const newStatus = action === 'approve' ? 'Approved' : action === 'reject' ? 'Rejected' : 'Pending Approval';
+  const newStatus = action === 'approve' ? 'Approved' : 'Rejected';
   const history = Array.isArray(req.approvalHistory) ? [...req.approvalHistory] : [];
   history.push({
     action,
     decision: newStatus,
-    comment: comment || '',
+    comment: actionComment,
     actorName: actor?.displayName || actor?.name || actor?.email || 'Approver',
     actorEmail: actor?.email || '',
     actorRole: isBoardUser ? 'Board Member' : isTravelAdmin ? 'Travel Admin' : 'Super Admin',
@@ -388,17 +515,29 @@ export const handleTravelActionService = async ({ id, action, comment, actor }) 
   });
 
   req.status = newStatus;
+  req.approvalStage = action === 'approve' ? 'completed' : 'rejected';
   req.approvalHistory = history;
   await req.save();
 
-  // Asynchronously notify Traveller of the decision
-  sendTravelDecisionEmail({
-    travelReq: req.toJSON ? req.toJSON() : req,
-    action,
-    comment,
-    deciderName: actor?.displayName || actor?.name || actor?.email || 'Approver',
-    deciderRole: isBoardUser ? 'Board Member' : isTravelAdmin ? 'Travel Admin' : 'Super Admin'
-  }).catch((err) => console.error('[mail] travel decision email failed:', err.message));
+  // Notify Traveller, Travel Admin, and Finance (FINANCE_NOTIFICATION_EMAIL if set)
+  Promise.all([
+    getTravelAdminEmails()
+  ]).then(([adminEmails]) => {
+    const financeEmail = process.env.FINANCE_NOTIFICATION_EMAIL ? [process.env.FINANCE_NOTIFICATION_EMAIL] : [];
+    if (!process.env.FINANCE_NOTIFICATION_EMAIL) {
+      console.warn('[mail] FINANCE_NOTIFICATION_EMAIL is unset in backend environment. Continuing without finance copy.');
+    }
+    const ccRecipients = Array.from(new Set([...adminEmails, ...financeEmail])).filter(Boolean);
+
+    sendTravelDecisionEmail({
+      travelReq: req.toJSON ? req.toJSON() : req,
+      action,
+      comment: actionComment,
+      deciderName: actor?.displayName || actor?.name || actor?.email || 'Approver',
+      deciderRole: isBoardUser ? 'Board Member' : isTravelAdmin ? 'Travel Admin' : 'Super Admin',
+      cc: ccRecipients
+    }).catch((err) => console.error('[mail] travel decision email failed:', err.message));
+  }).catch((err) => console.error('[mail] Stage 2 travel decision notify error:', err.message));
 
   return req;
 };

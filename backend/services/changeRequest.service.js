@@ -1,7 +1,6 @@
 import { Op, fn, col } from 'sequelize';
 import {
   sequelize,
-  Workflow,
   CatalogCategory,
   CatalogSubcategory,
   CatalogSubcategoryField,
@@ -23,8 +22,11 @@ import {
   sendChangeRequestCreatedEmail,
   sendChangeRequestApprovedEmail,
   sendChangeRequestImplementedEmail,
-  sendChangeRequestRejectedEmail
+  sendChangeRequestRejectedEmail,
+  sendManagerRejectionEmail,
+  buildChangeRequestManagerInvitationEmail
 } from './mail.service.js';
+import { enqueueNotification } from './notificationQueue.service.js';
 import {
   serializeChangeRequest,
   serializeWorklistEntry
@@ -32,7 +34,6 @@ import {
 
 // Includes reused across change-request queries.
 const CR_INCLUDE = [
-  { model: Workflow, as: 'workflow', attributes: ['id', 'name'] },
   { model: ChangeRequestApproval, as: 'approvals' }
 ];
 
@@ -89,15 +90,14 @@ export const getFilteredChangeRequests = async ({
   }
 
   if (isWorklist) {
-    andClauses.push({ status: { [Op.ne]: 'Draft' }, isDraft: false });
+    andClauses.push({ status: { [Op.ne]: 'Draft' } });
     if (actingUserId) {
       const identityRes = await IdentityResolver.resolveByKey(actingUserId);
       const identity = identityRes.status === 'SUCCESS' ? identityRes.identity : null;
-      const roleId = identity?.roleId || null;
-      const roleName = String(identity?.role || '').toLowerCase();
-      const isSuperOrAdmin = roleId === 'role-1' || roleId === 'role-2' || roleId === 'role-2-change' || roleName.includes('super') || roleName.includes('change desk admin') || roleName.includes('change admin') || (roleName.includes('admin') && !roleName.includes('travel') && !roleName.includes('spend'));
-      const isChangeManager = roleId === 'role-3' || roleName.includes('manager') || (identity?.cmCategories && identity.cmCategories.length > 0);
-      const isChangeImplementer = roleId === 'role-5' || roleName.includes('implementer') || (identity?.ciCategories && identity.ciCategories.length > 0);
+      const rolesList = identity?.rolesList || [roleId].filter(Boolean);
+      const isSuperOrAdmin = rolesList.includes('role-1') || rolesList.includes('role-2') || rolesList.includes('role-2-change') || identity?.isSuperAdmin || identity?.isChangeAdmin;
+      const isChangeManager = rolesList.includes('role-3') || Boolean(identity?.isChangeManager) || (identity?.cmCategories && identity.cmCategories.length > 0);
+      const isChangeImplementer = rolesList.includes('role-5') || Boolean(identity?.isChangeImplementer) || (identity?.ciCategories && identity.ciCategories.length > 0);
 
       // Rule: No user sees their own requests in My Worklist
       if (!organizationScope) {
@@ -207,8 +207,8 @@ export const getFilteredChangeRequests = async ({
 
   const countRows = await ChangeRequest.findAll({
     where: baseWhere,
-    attributes: ['status', 'isDraft', [fn('COUNT', col('id')), 'count']],
-    group: ['status', 'isDraft'],
+    attributes: ['status', [fn('COUNT', col('id')), 'count']],
+    group: ['status'],
     raw: true
   });
 
@@ -231,7 +231,7 @@ export const getFilteredChangeRequests = async ({
       statusCounts.Implemented += count;
     }
     else if (st === 'rejected') statusCounts.Rejected += count;
-    else if (st === 'draft' || row.isDraft) statusCounts.Draft += count;
+    else if (st === 'draft') statusCounts.Draft += count;
   }
 
   let queryWhere = baseWhere;
@@ -247,7 +247,7 @@ export const getFilteredChangeRequests = async ({
     } else if (stLower === 'rejected') {
       statusClause = { status: 'Rejected' };
     } else if (stLower === 'draft') {
-      statusClause = { [Op.or]: [{ status: { [Op.iLike]: '%draft%' } }, { isDraft: true }] };
+      statusClause = { status: { [Op.iLike]: '%draft%' } };
     }
 
     if (statusClause) {
@@ -452,21 +452,39 @@ export const filterChangeRequestsByCategoryService = async (category, requesterI
 };
 
 const nextChangeRequestId = async (tx) => {
+  const seqName = 'change_request_id_seq';
+
+  const fetchNextVal = async () => {
+    const [result] = await sequelize.query(`SELECT nextval('${seqName}') AS next_id`, tx ? { transaction: tx } : {});
+    const nextId = result[0]?.next_id || result[0]?.nextval;
+    return `CR-${nextId}`;
+  };
+
   try {
-    const [result] = await sequelize.query("SELECT nextval('change_request_id_seq') AS next_id", { transaction: tx });
-    const nextId = result[0]?.next_id || result[0]?.nextval;
-    return `CR-${nextId}`;
-  } catch {
-    const [maxRes] = await sequelize.query(
-      `SELECT MAX(CAST(SUBSTRING(id FROM 'CR-([0-9]+)') AS INTEGER)) AS max_num FROM change_requests;`,
-      { transaction: tx }
-    );
-    const maxNum = (maxRes && maxRes[0] && maxRes[0].max_num) ? parseInt(maxRes[0].max_num, 10) : 2054;
-    const startNum = maxNum + 1;
-    await sequelize.query(`CREATE SEQUENCE IF NOT EXISTS change_request_id_seq START WITH ${startNum};`, { transaction: tx });
-    const [result] = await sequelize.query("SELECT nextval('change_request_id_seq') AS next_id", { transaction: tx });
-    const nextId = result[0]?.next_id || result[0]?.nextval;
-    return `CR-${nextId}`;
+    return await fetchNextVal();
+  } catch (err) {
+    const isMissingSeq = err.original?.code === '42P01' || err.message?.includes('does not exist');
+    if (!isMissingSeq) {
+      throw err;
+    }
+
+    const lockKey = 70001;
+    try {
+      await sequelize.query(`SELECT pg_advisory_lock(${lockKey});`);
+      const [seqCheck] = await sequelize.query(`SELECT to_regclass('${seqName}') AS regclass;`);
+      if (!seqCheck[0]?.regclass) {
+        const [maxRes] = await sequelize.query(
+          `SELECT MAX(CAST(SUBSTRING(id FROM 'CR-([0-9]+)') AS INTEGER)) AS max_num FROM change_requests;`
+        );
+        const maxNum = (maxRes && maxRes[0] && maxRes[0].max_num) ? parseInt(maxRes[0].max_num, 10) : 2054;
+        const startNum = maxNum + 1;
+        await sequelize.query(`CREATE SEQUENCE IF NOT EXISTS ${seqName} START WITH ${startNum};`);
+      }
+    } finally {
+      await sequelize.query(`SELECT pg_advisory_unlock(${lockKey});`).catch(() => {});
+    }
+
+    return await fetchNextVal();
   }
 };
 
@@ -538,7 +556,7 @@ export const updateDraftChangeRequestService = async (id, actorId, payload = {})
     throw err;
   }
 
-  if (!cr.isDraft) {
+  if (cr.status !== 'Draft') {
     const err = new Error('Integrity constraint: Only draft change requests can be edited');
     err.statusCode = 400;
     throw err;
@@ -624,15 +642,17 @@ export const submitDraftChangeRequestService = async (id, actorId = null) => {
       err.statusCode = 403;
       throw err;
     }
-    if (!cr.isDraft || cr.status !== 'Draft') {
+    if (cr.status !== 'Draft') {
       const err = new Error('Integrity constraint: Only draft requests can be submitted');
       err.statusCode = 400;
       throw err;
     }
 
     cr.status = 'Pending';
-    cr.isDraft = false;
     cr.activeStep = 1;
+    cr.approvalStage = 'manager_review';
+    cr.approvalCycle = (cr.approvalCycle || 0) + 1;
+    cr.managerReviewEnteredAt = new Date();
     cr.submittedAt = new Date();
     await cr.save({ transaction: tx });
 
@@ -660,13 +680,25 @@ export const submitDraftChangeRequestService = async (id, actorId = null) => {
         actorId,
         action: 'Submitted Draft CR',
         ref: id,
-        detail: `Submitted draft Change Request ${id} ${cr.title} for Change Manager review.`
+        detail: `Submitted draft Change Request ${id} ${cr.title} for Manager review.`
       },
       tx
     );
   });
 
   const updated = await ChangeRequest.findByPk(id, { include: CR_INCLUDE });
+  if (updated && updated.managerEmail) {
+    buildChangeRequestManagerInvitationEmail(updated).then((mailPayload) =>
+      enqueueNotification({
+        module: 'cr',
+        requestId: updated.id,
+        approvalCycle: updated.approvalCycle,
+        jobType: 'manager_invitation',
+        recipientEmail: updated.managerEmail,
+        payload: mailPayload
+      })
+    ).catch((err) => console.error('[mail] Queue manager invite failed:', err.message));
+  }
   return serializeChangeRequest(updated);
 };
 
@@ -803,6 +835,27 @@ export const createChangeRequestService = async (payload = {}) => {
       : ''
   );
 
+  let validManagerName = null;
+  let validManagerEmail = payload.managerEmail ? String(payload.managerEmail).trim() : '';
+
+  if (validManagerEmail) {
+    const mgrEmp = await Employee.findOne({
+      where: sequelize.where(sequelize.fn('LOWER', sequelize.col('email')), validManagerEmail.toLowerCase())
+    });
+    if (!mgrEmp) {
+      const err = new Error(`Selected manager "${validManagerEmail}" is not found in the employee directory.`);
+      err.statusCode = 400;
+      throw err;
+    }
+    if (mgrEmp.leftAt || mgrEmp.leftReason || mgrEmp.leftBy) {
+      const err = new Error(`Selected manager "${validManagerEmail}" is inactive/exited.`);
+      err.statusCode = 400;
+      throw err;
+    }
+    validManagerName = mgrEmp.name || null;
+    validManagerEmail = mgrEmp.email || validManagerEmail;
+  }
+
   const createdCR = await ChangeRequest.create({
     id,
     title: payload.title || 'Untitled change request',
@@ -812,20 +865,21 @@ export const createChangeRequestService = async (payload = {}) => {
     employeeId: empIdToStore,
     employeeName: mergedCustomFields.employeeName || null,
     employeeEmail: mergedCustomFields.employeeEmail || requesterEmail || null,
-    managerEmail: payload.managerEmail || '',
+    managerName: validManagerName,
+    managerEmail: validManagerEmail,
     location: authoritativeLocation || (payload.location && !payload.location.includes('Auto-fetched') && !payload.location.includes('Not specified') ? payload.location : null),
     justification: payload.justification || '',
     startDate: payload.startDate || null,
     endDate: payload.endDate || null,
-    risk,
     activeStep: 1,
     status,
-    isDraft: false,
+    approvalStage: 'manager_review',
+    approvalCycle: 1,
+    managerReviewEnteredAt: new Date(),
     submittedAt: new Date(),
     closedAt: null,
     requesterId,
     approverId: null,
-    workflowId: workflowId || 'wf-1',
     customFieldValues: mergedCustomFields
   });
 
@@ -843,26 +897,25 @@ export const createChangeRequestService = async (payload = {}) => {
     actorId: requesterId,
     action: 'Created Change Request',
     ref: id,
-    detail: `Submitted ${id} ${payload.title || 'Untitled change request'} for Change Manager review.`
+    detail: `Submitted ${id} ${payload.title || 'Untitled change request'} for Manager review.`
   });
 
   const created = await ChangeRequest.findByPk(id, { include: CR_INCLUDE });
   const serialized = serializeChangeRequest(created);
 
-  const categoryTarget = targetCategoryId || categoryName || serialized.category;
-  Promise.all([
-    getApproverEmails(categoryTarget),
-    IdentityResolver.resolveByKey(requesterId)
-  ])
-    .then(([approverEmails, requesterRes]) =>
-      sendChangeRequestCreatedEmail({
-        cr: serialized,
-        requesterName: requesterRes?.identity?.displayName || requesterRes?.identity?.name,
-        approverEmails,
-        managerEmail: payload.managerEmail
+  // Enqueue initial Stage 1 Manager Invitation
+  if (validManagerEmail) {
+    buildChangeRequestManagerInvitationEmail(created).then((mailPayload) =>
+      enqueueNotification({
+        module: 'cr',
+        requestId: created.id,
+        approvalCycle: created.approvalCycle,
+        jobType: 'manager_invitation',
+        recipientEmail: validManagerEmail,
+        payload: mailPayload
       })
-    )
-    .catch((err) => console.error('[mail] change-request notification failed:', err.message));
+    ).catch((err) => console.error('[mail] Queue manager invite failed:', err.message));
+  }
 
   return serialized;
 };
@@ -926,10 +979,11 @@ export const applyWorklistActionService = async ({ id, action, rejectionReason =
     err.statusCode = 403;
     throw err;
   }
-  const isAdminOrSuperAdmin = roleId === 'role-1' || roleId === 'role-2' || roleId === 'role-2-change';
-  const isChangeManager = roleId === 'role-3';
-  const isChangeImplementer = roleId === 'role-5';
-  const assignedCategoryIds = identityRes.status === 'SUCCESS' ? (identityRes.identity.cmCategories || identityRes.identity.ciCategories || identityRes.identity.categoryIds || []) : [];
+  const rolesList = identity?.rolesList || [roleId].filter(Boolean);
+  const isAdminOrSuperAdmin = rolesList.includes('role-1') || rolesList.includes('role-2') || rolesList.includes('role-2-change') || identity?.isSuperAdmin || identity?.isChangeAdmin;
+  const isChangeManager = rolesList.includes('role-3') || Boolean(identity?.isChangeManager);
+  const isChangeImplementer = rolesList.includes('role-5') || Boolean(identity?.isChangeImplementer);
+  const assignedCategoryIds = identityRes.status === 'SUCCESS' ? (identityRes.identity.cmCategories || identityRes.identity.categoryIds || []) : [];
 
   if (action === 'implement') {
     let canImplement = isAdminOrSuperAdmin;
@@ -1033,6 +1087,134 @@ export const applyWorklistActionService = async ({ id, action, rejectionReason =
     return { id, action: 'implement', status: 'Implemented', closedAt: new Date(), implementedComment: actionComment, worklistMetrics: metrics };
   }
 
+  // Mandatory comment enforcement server-side
+  if (!actionComment || !actionComment.trim()) {
+    const err = new Error(`A non-empty comment is required to ${action} this Change Request.`);
+    err.statusCode = 400;
+    throw err;
+  }
+
+  const isStage1 = targetCR.approvalStage === 'manager_review';
+  const isStage2 = targetCR.approvalStage === 'stage_2_review' || (!targetCR.approvalStage && targetCR.status === 'Pending');
+
+  if (isStage1) {
+    // Stage 1: Manager Review
+    // Actor must be the assigned manager or resolved via email token
+    const managerEmailLower = (targetCR.managerEmail || '').toLowerCase().trim();
+    const actorEmailLower = (identity?.email || '').toLowerCase().trim();
+    const isAssignedManager = Boolean(managerEmailLower && actorEmailLower && managerEmailLower === actorEmailLower);
+
+    if (!isAssignedManager && !isAdminOrSuperAdmin) {
+      const err = new Error('Unauthorized: This request is awaiting approval from the assigned reporting manager.');
+      err.statusCode = 403;
+      throw err;
+    }
+
+    if (action === 'reject') {
+      await sequelize.transaction(async (tx) => {
+        const cr = await ChangeRequest.findByPk(id, { transaction: tx, lock: tx.LOCK?.UPDATE });
+        cr.status = 'Rejected';
+        cr.approvalStage = 'rejected';
+        cr.closedAt = new Date();
+        cr.rejectionReason = actionComment;
+        const existingComments = Array.isArray(cr.comments) ? [...cr.comments] : [];
+        existingComments.push({
+          id: `cmt-${Date.now()}`,
+          authorName: actorName,
+          authorRole: 'Reporting Manager',
+          text: actionComment,
+          action: 'Rejected by Manager',
+          createdAt: new Date().toISOString()
+        });
+        cr.comments = existingComments;
+        const currentCustom = cr.customFieldValues && typeof cr.customFieldValues === 'object' ? { ...cr.customFieldValues } : {};
+        currentCustom.comments = existingComments;
+        currentCustom.rejectedComment = actionComment;
+        currentCustom.rejectedBy = actorName;
+        currentCustom.rejectionReason = actionComment;
+        cr.customFieldValues = currentCustom;
+        if (typeof cr.changed === 'function') cr.changed('customFieldValues', true);
+        await cr.save({ transaction: tx });
+
+        await addAuditLog({
+          actorId,
+          action: 'CR Rejected by Manager',
+          ref: id,
+          detail: `Manager ${actorName} (${identity?.email}) rejected Change Request ${id}. Reason: ${actionComment}`
+        }, tx);
+      });
+
+      // Notify requester with "Rejected by Manager" subject
+      sendManagerRejectionEmail({
+        module: 'cr',
+        requestCode: id,
+        title: targetCR.title,
+        requesterEmail: targetCR.employeeEmail || targetCR.requesterEmail,
+        requesterName: targetCR.employeeName || targetCR.requester,
+        managerName: actorName,
+        managerEmail: identity?.email,
+        comment: actionComment
+      }).catch((err) => console.error('[mail] manager rejection notify failed:', err.message));
+
+      return { id, action: 'reject', status: 'Rejected', rejectionReason: actionComment, comment: actionComment };
+    }
+
+    if (action === 'approve') {
+      await sequelize.transaction(async (tx) => {
+        const cr = await ChangeRequest.findByPk(id, { transaction: tx, lock: tx.LOCK?.UPDATE });
+        cr.status = 'Pending';
+        cr.approvalStage = 'stage_2_review';
+        const existingComments = Array.isArray(cr.comments) ? [...cr.comments] : [];
+        existingComments.push({
+          id: `cmt-${Date.now()}`,
+          authorName: actorName,
+          authorRole: 'Reporting Manager',
+          text: actionComment,
+          action: 'Manager Approved',
+          createdAt: new Date().toISOString()
+        });
+        cr.comments = existingComments;
+        const currentCustom = cr.customFieldValues && typeof cr.customFieldValues === 'object' ? { ...cr.customFieldValues } : {};
+        currentCustom.comments = existingComments;
+        currentCustom.managerApprovedComment = actionComment;
+        currentCustom.managerApprovedBy = actorName;
+        currentCustom.managerApprovedAt = new Date().toISOString();
+        cr.customFieldValues = currentCustom;
+        if (typeof cr.changed === 'function') cr.changed('customFieldValues', true);
+        await cr.save({ transaction: tx });
+
+        await addAuditLog({
+          actorId,
+          action: 'CR Manager Approved',
+          ref: id,
+          detail: `Manager ${actorName} (${identity?.email}) approved Change Request ${id}. Comment: ${actionComment}`
+        }, tx);
+      });
+
+      // Advance to Stage 2: Notify Change Managers / Admins
+      const categoryTarget = targetCR.categoryId || targetCR.category;
+      getApproverEmails(categoryTarget).then(async (approverEmails) => {
+        const updatedCR = await ChangeRequest.findByPk(id, { include: CR_INCLUDE });
+        const serialized = serializeChangeRequest(updatedCR);
+        await sendChangeRequestCreatedEmail({
+          cr: serialized,
+          requesterName: serialized.employeeName || serialized.requester,
+          approverEmails,
+          managerEmail: serialized.managerEmail
+        });
+      }).catch((err) => console.error('[mail] Stage 2 invite notification failed:', err.message));
+
+      return { id, action: 'approve', status: 'Pending', approvalStage: 'stage_2_review', comment: actionComment };
+    }
+  }
+
+  // Stage 2: Change Manager / Admin Review
+  if (!isAdminOrSuperAdmin && !isChangeManager) {
+    const err = new Error('Unauthorized: Only authorized Change Desk Admins or Change Managers can decide Stage 2.');
+    err.statusCode = 403;
+    throw err;
+  }
+
   if (isChangeManager && !isAdminOrSuperAdmin) {
     const assignedCategories = await CatalogCategory.findAll({
       where: { id: { [Op.in]: assignedCategoryIds } }
@@ -1055,7 +1237,7 @@ export const applyWorklistActionService = async ({ id, action, rejectionReason =
       const cr = await ChangeRequest.findByPk(id, { transaction: tx });
       if (cr) {
         cr.status = 'Draft';
-        cr.isDraft = true;
+        cr.approvalStage = 'draft';
         await cr.save({ transaction: tx });
         await ChangeRequestApproval.destroy({ where: { changeRequestId: id }, transaction: tx });
         await addAuditLog({ actorId, action: 'CR Sent Back', ref: id, detail: `Sent back ${id} to draft.` }, tx);
@@ -1097,6 +1279,7 @@ export const applyWorklistActionService = async ({ id, action, rejectionReason =
     const changeRequest = await ChangeRequest.findByPk(id, { transaction: t });
     if (changeRequest) {
       changeRequest.status = finalStatus;
+      changeRequest.approvalStage = finalStatus === 'Approved' ? 'completed' : 'rejected';
       if (finalStatus === 'Rejected') {
         changeRequest.closedAt = new Date();
         changeRequest.rejectionReason = actionComment || 'This change request was rejected during Change Manager review.';
