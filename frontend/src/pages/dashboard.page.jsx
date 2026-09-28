@@ -68,7 +68,7 @@ function DashboardPage({ onNavigate, user, isOrgDashboard = false, searchQuery =
 
   // Unified Filter State
   const [activeFilter, setActiveFilter] = useState('All');
-  const [dateFilter, setDateFilter] = useState('last_7_days');
+  const [dateFilter, setDateFilter] = useState('overall');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
 
@@ -423,35 +423,12 @@ function DashboardPage({ onNavigate, user, isOrgDashboard = false, searchQuery =
             >
               {/* Card Header: Title on Left, Action Button (optional) on Right */}
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.75rem' }}>
-                <h2 style={{ fontSize: '1.2rem', fontWeight: 700, color: 'var(--text-primary)', margin: 0 }}>
+                <h3 style={{ fontSize: '1rem', fontWeight: 600, color: 'var(--text-primary)', margin: 0 }}>
                   {card.title}
-                </h2>
+                </h3>
 
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                  {!isOrgDashboard && (
-                    <button
-                      type="button"
-                      onClick={() => onNavigate?.(card.newButtonNav)}
-                      style={{
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: '0.4rem',
-                        padding: '0.45rem 0.85rem',
-                        backgroundColor: 'var(--brand-primary)',
-                        color: '#FFFFFF',
-                        borderRadius: '8px',
-                        fontSize: '0.8rem',
-                        fontWeight: 600,
-                        border: 'none',
-                        cursor: 'pointer'
-                      }}
-                    >
-                      <Plus size={14} />
-                      <span>{card.newButtonLabel}</span>
-                    </button>
-                  )}
-
-                  {isOrgDashboard && isExpanded && (
+                {isOrgDashboard && isExpanded && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
                     <ExportButtonGroup
                       onExportCsv={() => handleExport('csv')}
                       onExportPdf={() => handleExport('pdf')}
@@ -459,8 +436,8 @@ function DashboardPage({ onNavigate, user, isOrgDashboard = false, searchQuery =
                       csvLabel={isExporting ? 'Exporting...' : 'Export CSV'}
                       pdfLabel={isExporting ? 'Exporting...' : 'Export PDF'}
                     />
-                  )}
-                </div>
+                  </div>
+                )}
               </div>
 
               {/* Horizontal Metric Badges */}

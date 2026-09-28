@@ -12,7 +12,8 @@ import {
   Users,
   ExternalLink,
   ChevronDown,
-  ChevronRight
+  ChevronRight,
+  Plus
 } from 'lucide-react';
 import { useTheme } from '../../context/ThemeContext';
 import { useWorklistActionableDots } from '../../queries/worklist.queries';
@@ -73,9 +74,9 @@ function Sidebar({
 
   const topNavItems = [
     { id: 'Dashboard', path: '/dashboard', label: 'My Dashboard', icon: LayoutGrid },
-    { id: 'Change Request', path: '/change-requests/new', label: 'Change Request', icon: FileText },
-    { id: 'Pre-Spend Request', path: '/pre-spend', label: 'Pre-Spend Request', icon: IndianRupee },
-    { id: 'Travel Desk', path: '/travel-desk', label: 'Travel Desk', icon: Plane },
+    { id: 'Change Request', path: '/change-requests/new', label: 'Change Request', icon: FileText, showPlus: true },
+    { id: 'Pre-Spend Request', path: '/pre-spend', label: 'Pre-Spend Request', icon: IndianRupee, showPlus: true },
+    { id: 'Travel Desk', path: '/travel-desk', label: 'Travel Desk', icon: Plane, showPlus: true },
     { id: 'Tribe CRM', label: 'Tribe CRM', icon: Users, externalUrl: 'https://tribe.stfox.com/jsp/iamlogin.jsp' }
   ];
 
@@ -128,6 +129,9 @@ function Sidebar({
           <span style={{ flex: 1, textAlign: 'left', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
             {item.label}
           </span>
+        )}
+        {!mini && item.showPlus && (
+          <Plus size={15} style={{ color: isActive ? 'var(--primary-foreground)' : 'var(--text-secondary)', flexShrink: 0, marginLeft: 'auto', strokeWidth: 2.25 }} />
         )}
         {!mini && item.externalUrl && (
           <ExternalLink size={13} style={{ color: 'var(--text-secondary)', flexShrink: 0, marginLeft: 'auto' }} />

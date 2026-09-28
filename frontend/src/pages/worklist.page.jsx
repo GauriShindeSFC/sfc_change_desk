@@ -79,7 +79,7 @@ function MyWorklistPage({ onNavigate, searchQuery = '', user, isOrgWorklist = fa
   }, [typeof window !== 'undefined' ? window.location.search : '']);
 
   const [selectedCr, setSelectedCr] = useState(null);
-  const [dateFilter, setDateFilter] = useState('last_7_days');
+  const [dateFilter, setDateFilter] = useState('overall');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
 
