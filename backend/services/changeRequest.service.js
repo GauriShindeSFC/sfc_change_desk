@@ -288,6 +288,7 @@ export const getFilteredChangeRequests = async ({
   let isChangeManager = false;
   let isChangeImplementer = false;
   let assignedCategoryIds = new Set();
+  let actingUserEmail = '';
   let categoryNameToIdMap = new Map();
   let actingUserKeys = new Set();
   let identityRes = null;
@@ -343,8 +344,11 @@ export const getFilteredChangeRequests = async ({
     isSuperOrAdmin = roleId === 'role-1' || roleId === 'role-2' || roleId === 'role-2-change' || roleName.includes('super') || roleName.includes('change desk admin') || roleName.includes('change admin') || (roleName.includes('admin') && !roleName.includes('travel') && !roleName.includes('spend'));
     isChangeManager = roleId === 'role-3' || roleName.includes('manager') || (identityRes.identity?.cmCategories && identityRes.identity.cmCategories.length > 0);
     isChangeImplementer = roleId === 'role-5' || roleName.includes('implementer') || (identityRes.identity?.ciCategories && identityRes.identity.ciCategories.length > 0);
-    cmCatIds = new Set(identityRes.status === 'SUCCESS' ? (identityRes.identity.cmCategories || []) : []);
-    ciCatIds = new Set(identityRes.status === 'SUCCESS' ? (identityRes.identity.ciCategories || []) : []);
+    const activeCatIds = isChangeImplementer
+      ? (identityRes.identity.ciCategories || identityRes.identity.categoryIds || [])
+      : (identityRes.identity.cmCategories || identityRes.identity.categoryIds || []);
+    assignedCategoryIds = new Set(identityRes.status === 'SUCCESS' ? activeCatIds : []);
+    actingUserEmail = ((identityRes.status === 'SUCCESS' ? identityRes.identity?.email : '') || '').toLowerCase().trim();
 
     const allCategories = await CatalogCategory.findAll({ attributes: ['id', 'name'] });
     for (const c of allCategories) {
@@ -404,7 +408,6 @@ export const getFilteredChangeRequests = async ({
       const isStage1 = cr.approvalStage === 'manager_review';
       const isStage2 = cr.approvalStage === 'stage_2_review' || (!cr.approvalStage && cr.status === 'Pending');
 
-      const actingUserEmail = (identityRes?.status === 'SUCCESS' ? identityRes.identity?.email : '')?.toLowerCase().trim();
       const crManagerEmail = (cr.managerEmail || '').toLowerCase().trim();
       const isAssignedReportingManager = Boolean(actingUserEmail && crManagerEmail && actingUserEmail === crManagerEmail);
 

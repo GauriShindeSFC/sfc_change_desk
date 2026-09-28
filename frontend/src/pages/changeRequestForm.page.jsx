@@ -44,11 +44,11 @@ export const getFieldOptions = (field, currentUser) => {
 const READONLY_FIELD_STYLE = {
   width: '100%',
   padding: '0.65rem 0.85rem',
-  backgroundColor: '#F1F5F9',
+  backgroundColor: 'var(--input-bg)',
   border: '1px solid var(--border-color)',
   borderRadius: '8px',
   fontSize: '0.85rem',
-  color: '#64748B',
+  color: 'var(--text-secondary)',
   outline: 'none',
   cursor: 'not-allowed',
   boxSizing: 'border-box'
@@ -57,7 +57,7 @@ const READONLY_FIELD_STYLE = {
 const ACTIVE_FIELD_STYLE = {
   width: '100%',
   padding: '0.65rem 0.85rem',
-  backgroundColor: '#FFFFFF',
+  backgroundColor: 'var(--input-bg)',
   border: '1px solid var(--border-color)',
   borderRadius: '8px',
   fontSize: '0.85rem',
@@ -551,11 +551,11 @@ function ChangeRequestFormPage({ onNavigate, user, initialData, searchQuery = ''
   });
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', width: '100%', maxWidth: '1040px', margin: '0 auto', paddingBottom: '3rem' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', width: '100%', paddingBottom: '3rem' }}>
       
       {/* Top Header */}
       <div>
-        <h1 style={{ fontSize: '1.45rem', fontWeight: 600, color: 'var(--text-primary)', lineHeight: 1.2, margin: 0 }}>
+        <h1 style={{ fontSize: '1.45rem', fontWeight: 700, color: 'var(--text-primary)', lineHeight: 1.2, margin: 0 }}>
           New Change Request
         </h1>
         <p style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', marginTop: '0.25rem', margin: 0 }}>
@@ -589,33 +589,45 @@ function ChangeRequestFormPage({ onNavigate, user, initialData, searchQuery = ''
                 display: 'flex',
                 alignItems: 'center',
                 gap: '0.6rem',
-                fontSize: '0.825rem',
-                fontWeight: isActive || isDone ? 600 : 500,
-                color: isActive ? 'var(--brand-primary)' : isDone ? '#059669' : 'var(--text-secondary)',
-                whiteSpace: 'nowrap',
                 cursor: isDone ? 'pointer' : 'default'
               }}
             >
               <div
                 style={{
-                  width: '24px',
-                  height: '24px',
-                  borderRadius: '50%',
                   display: 'flex',
                   alignItems: 'center',
-                  justifyContent: 'center',
-                  fontSize: '0.75rem',
-                  fontWeight: 700,
-                  backgroundColor: isActive ? 'var(--brand-primary)' : isDone ? '#059669' : 'var(--input-bg)',
-                  color: isActive || isDone ? '#FFFFFF' : 'var(--text-secondary)',
-                  border: isActive || isDone ? 'none' : '1px solid var(--border-color)'
+                  gap: '0.5rem',
+                  fontSize: '0.825rem',
+                  fontWeight: isActive || isDone ? 600 : 500,
+                  color: isActive ? '#FFFFFF' : isDone ? '#059669' : 'var(--text-secondary)',
+                  whiteSpace: 'nowrap',
+                  padding: isActive ? '0.3rem 0.85rem 0.3rem 0.3rem' : 0,
+                  borderRadius: isActive ? 'var(--radius-full)' : 0,
+                  backgroundColor: isActive ? 'var(--brand-primary)' : 'transparent'
                 }}
               >
-                {isDone ? <Check size={13} strokeWidth={3} /> : stepNum}
+                <div
+                  style={{
+                    width: '24px',
+                    height: '24px',
+                    borderRadius: '50%',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: '0.75rem',
+                    fontWeight: 700,
+                    flexShrink: 0,
+                    backgroundColor: isActive ? 'rgba(255, 255, 255, 0.2)' : isDone ? '#059669' : 'var(--input-bg)',
+                    color: isActive || isDone ? '#FFFFFF' : 'var(--text-secondary)',
+                    border: isActive || isDone ? 'none' : '1px solid var(--border-color)'
+                  }}
+                >
+                  {isDone ? <Check size={13} strokeWidth={3} /> : stepNum}
+                </div>
+                <span>{label}</span>
               </div>
-              <span>{label}</span>
               {index < stepsList.length - 1 && (
-                <span style={{ color: 'var(--border-color)', marginLeft: '0.5rem' }}>/</span>
+                <span style={{ color: 'var(--border-color)' }}>/</span>
               )}
             </div>
           );
@@ -923,7 +935,6 @@ function ChangeRequestFormPage({ onNavigate, user, initialData, searchQuery = ''
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'space-between',
-                    backgroundColor: '#FFFFFF',
                     userSelect: 'none'
                   }}
                 >
@@ -941,7 +952,7 @@ function ChangeRequestFormPage({ onNavigate, user, initialData, searchQuery = ''
                     right: 0,
                     zIndex: 50,
                     marginTop: '0.35rem',
-                    backgroundColor: '#FFFFFF',
+                    backgroundColor: 'var(--card-bg)',
                     border: '1px solid var(--border-color)',
                     borderRadius: '10px',
                     boxShadow: '0 8px 24px rgba(15, 23, 42, 0.12)',
@@ -949,9 +960,9 @@ function ChangeRequestFormPage({ onNavigate, user, initialData, searchQuery = ''
                     flexDirection: 'column',
                     overflow: 'hidden'
                   }}>
-                    <div style={{ padding: '0.65rem', borderBottom: '1px solid var(--border-color)', backgroundColor: '#F8FAFC' }}>
+                    <div style={{ padding: '0.65rem', borderBottom: '1px solid var(--border-color)', backgroundColor: 'var(--input-bg)' }}>
                       <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
-                        <Search size={14} style={{ position: 'absolute', left: '0.65rem', color: '#94A3B8' }} />
+                        <Search size={14} style={{ position: 'absolute', left: '0.65rem', color: 'var(--text-secondary)' }} />
                         <input
                           type="text"
                           autoFocus
@@ -962,10 +973,11 @@ function ChangeRequestFormPage({ onNavigate, user, initialData, searchQuery = ''
                             width: '100%',
                             padding: '0.45rem 0.65rem 0.45rem 2rem',
                             fontSize: '0.8rem',
-                            border: '1px solid #CBD5E1',
+                            border: '1px solid var(--border-color)',
                             borderRadius: '6px',
                             outline: 'none',
-                            backgroundColor: '#FFFFFF',
+                            backgroundColor: 'var(--card-bg)',
+                            color: 'var(--text-primary)',
                             boxSizing: 'border-box'
                           }}
                         />
@@ -1008,7 +1020,7 @@ function ChangeRequestFormPage({ onNavigate, user, initialData, searchQuery = ''
                                 transition: 'background-color 0.15s'
                               }}
                               onMouseEnter={(e) => {
-                                if (!isSelected) e.currentTarget.style.backgroundColor = '#F8FAFC';
+                                if (!isSelected) e.currentTarget.style.backgroundColor = 'var(--input-bg)';
                               }}
                               onMouseLeave={(e) => {
                                 if (!isSelected) e.currentTarget.style.backgroundColor = 'transparent';

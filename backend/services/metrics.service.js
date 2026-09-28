@@ -143,8 +143,8 @@ export const getStatusBreakdownService = async (userId = null, { dateFilter = nu
 
   const grouped = await ChangeRequest.findAll({
     where: activeWhere,
-    attributes: ['status', 'isDraft', [fn('COUNT', col('id')), 'count']],
-    group: ['status', 'isDraft'],
+    attributes: ['status', [fn('COUNT', col('id')), 'count']],
+    group: ['status'],
     raw: true
   });
   const countFor = (names) => grouped.reduce((sum, row) => (
