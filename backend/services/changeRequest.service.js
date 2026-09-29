@@ -344,10 +344,11 @@ export const getFilteredChangeRequests = async ({
     isSuperOrAdmin = roleId === 'role-1' || roleId === 'role-2' || roleId === 'role-2-change' || roleName.includes('super') || roleName.includes('change desk admin') || roleName.includes('change admin') || (roleName.includes('admin') && !roleName.includes('travel') && !roleName.includes('spend'));
     isChangeManager = roleId === 'role-3' || roleName.includes('manager') || (identityRes.identity?.cmCategories && identityRes.identity.cmCategories.length > 0);
     isChangeImplementer = roleId === 'role-5' || roleName.includes('implementer') || (identityRes.identity?.ciCategories && identityRes.identity.ciCategories.length > 0);
-    const activeCatIds = isChangeImplementer
-      ? (identityRes.identity.ciCategories || identityRes.identity.categoryIds || [])
-      : (identityRes.identity.cmCategories || identityRes.identity.categoryIds || []);
-    assignedCategoryIds = new Set(identityRes.status === 'SUCCESS' ? activeCatIds : []);
+
+    const identity = identityRes.status === 'SUCCESS' ? identityRes.identity : null;
+    cmCatIds = new Set(identity?.cmCategories ?? []);
+    ciCatIds = new Set(identity?.ciCategories ?? []);
+    assignedCategoryIds = new Set([...(identity?.cmCategories ?? []), ...(identity?.ciCategories ?? [])]);
     actingUserEmail = ((identityRes.status === 'SUCCESS' ? identityRes.identity?.email : '') || '').toLowerCase().trim();
 
     const allCategories = await CatalogCategory.findAll({ attributes: ['id', 'name'] });
@@ -462,7 +463,47 @@ export const getFilteredChangeRequests = async ({
 
   let actionableCount = 0;
   if (isWorklist && actingUserId) {
-    actionableCount = data.filter(item => item.canAct === true).length;
+    const allWorklistRows = await ChangeRequest.findAll({
+      where: baseWhere,
+      attributes: ['id', 'status', 'approvalStage', 'category', 'requesterId', 'employeeId', 'managerEmail'],
+      raw: true
+    });
+
+    const allRowIds = allWorklistRows.map(r => r.id);
+    const userAllApprovals = await ChangeRequestApproval.findAll({
+      where: { approverId: actingUserId, changeRequestId: { [Op.in]: allRowIds } },
+      raw: true
+    });
+    const allUserApprovalMap = new Map(userAllApprovals.map(a => [a.changeRequestId, a.decision]));
+
+    for (const cr of allWorklistRows) {
+      const myDecision = allUserApprovalMap.get(cr.id) || 'Pending';
+      const resolvedCategoryId = cr.categoryId || categoryNameToIdMap.get((cr.category || '').toLowerCase().trim());
+      const isCmCategoryAssigned = isSuperOrAdmin || (resolvedCategoryId ? cmCatIds.has(resolvedCategoryId) : false);
+      const isCiCategoryAssigned = isSuperOrAdmin || (resolvedCategoryId ? ciCatIds.has(resolvedCategoryId) : false);
+
+      const isSelfRequest = actingUserId ? (
+        (cr.requesterId && (cr.requesterId === actingUserId || (typeof actingUserKeys !== 'undefined' && actingUserKeys.has(cr.requesterId)))) ||
+        (cr.employeeId && (typeof actingUserKeys !== 'undefined' && actingUserKeys.has(cr.employeeId)))
+      ) : false;
+
+      const isStage1 = cr.approvalStage === 'manager_review';
+      const isStage2 = cr.approvalStage === 'stage_2_review' || (!cr.approvalStage && cr.status === 'Pending');
+      const crManagerEmail = (cr.managerEmail || '').toLowerCase().trim();
+      const isAssignedReportingManager = Boolean(actingUserEmail && crManagerEmail && actingUserEmail === crManagerEmail);
+
+      const canAct = !isSelfRequest && (
+        isSuperOrAdmin
+          ? (cr.status === 'Pending' || cr.status === 'Approved')
+          : isStage1
+            ? (isAssignedReportingManager && cr.status === 'Pending')
+            : isStage2
+              ? (isChangeManager && isCmCategoryAssigned && cr.status === 'Pending' && myDecision === 'Pending')
+              : (isChangeImplementer && isCiCategoryAssigned && cr.status === 'Approved')
+      );
+
+      if (canAct) actionableCount++;
+    }
   }
 
   return {
@@ -1016,9 +1057,9 @@ export const applyWorklistActionService = async ({ id, action, rejectionReason =
   }
   const rolesList = identity?.rolesList || [roleId].filter(Boolean);
   const isAdminOrSuperAdmin = rolesList.includes('role-1') || rolesList.includes('role-2') || rolesList.includes('role-2-change') || identity?.isSuperAdmin || identity?.isChangeAdmin;
-  const isChangeManager = rolesList.includes('role-3') || Boolean(identity?.isChangeManager);
-  const isChangeImplementer = rolesList.includes('role-5') || Boolean(identity?.isChangeImplementer);
-  const assignedCategoryIds = identityRes.status === 'SUCCESS' ? (identityRes.identity.cmCategories || identityRes.identity.categoryIds || []) : [];
+  const isChangeManager = rolesList.includes('role-3') || Boolean(identity?.isChangeManager) || (identity?.cmCategories && identity.cmCategories.length > 0);
+  const isChangeImplementer = rolesList.includes('role-5') || Boolean(identity?.isChangeImplementer) || (identity?.ciCategories && identity.ciCategories.length > 0);
+  const cmAssignedCategoryIds = identityRes.status === 'SUCCESS' ? (identityRes.identity.cmCategories || []) : [];
 
   if (action === 'implement') {
     let canImplement = isAdminOrSuperAdmin;
@@ -1251,14 +1292,29 @@ export const applyWorklistActionService = async ({ id, action, rejectionReason =
   }
 
   if (isChangeManager && !isAdminOrSuperAdmin) {
+    let cmAssignedIds = cmAssignedCategoryIds;
+    if (!cmAssignedIds || cmAssignedIds.length === 0) {
+      const assignments = await ChangeManagerCategory.findAll({
+        where: {
+          [Op.or]: [
+            { userId: actorId },
+            ...(identity?.userKey ? [{ userId: identity.userKey }] : []),
+            ...(identity?.employeeBusinessId ? [{ userId: identity.employeeBusinessId }] : []),
+            ...(identity?.sourceId ? [{ userId: `EMP-${identity.sourceId}` }, { userId: `S8-${identity.sourceId}` }, { userId: String(identity.sourceId) }] : [])
+          ]
+        }
+      });
+      cmAssignedIds = assignments.map(a => a.categoryId);
+    }
+
     const assignedCategories = await CatalogCategory.findAll({
-      where: { id: { [Op.in]: assignedCategoryIds } }
+      where: { id: { [Op.in]: cmAssignedIds } }
     });
     const categoryNames = assignedCategories.map(c => c.name.toLowerCase().trim());
     const crCategory = (targetCR.category || '').toLowerCase().trim();
     const crCategoryId = targetCR.categoryId || '';
 
-    const isAssigned = assignedCategoryIds.includes(crCategoryId) || categoryNames.some(cn => crCategory.includes(cn) || cn.includes(crCategory));
+    const isAssigned = cmAssignedIds.includes(crCategoryId) || categoryNames.some(cn => crCategory.includes(cn) || cn.includes(crCategory));
 
     if (!isAssigned) {
       const err = new Error('Unauthorized: Change Managers can only perform actions on tickets in their assigned categories.');

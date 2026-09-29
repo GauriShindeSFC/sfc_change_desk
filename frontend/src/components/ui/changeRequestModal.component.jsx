@@ -9,14 +9,15 @@ export default function ChangeRequestModal({ cr, onClose, onApprove, onReject, o
   const userRoleName = (currentUser?.role || '').toLowerCase();
   const userRoleId = currentUser?.roleId || '';
   const isAdminOrSuperAdmin = ['role-1', 'role-2'].includes(userRoleId) || userRoleName.includes('admin') || userRoleName.includes('super');
-  const isChangeManager = userRoleId === 'role-3' || userRoleName.includes('manager');
-  const isChangeImplementer = userRoleId === 'role-5' || userRoleName.includes('implementer');
-  const userAssignedCats = currentUser?.ciCategories || currentUser?.categoryIds || currentUser?.cmCategories || [];
+  const isChangeManager = userRoleId === 'role-3' || userRoleName.includes('manager') || (Array.isArray(currentUser?.cmCategories) && currentUser.cmCategories.length > 0);
+  const isChangeImplementer = userRoleId === 'role-5' || userRoleName.includes('implementer') || (Array.isArray(currentUser?.ciCategories) && currentUser.ciCategories.length > 0);
+  const managerCategories = currentUser?.cmCategories ?? [];
+  const implementerCategories = currentUser?.ciCategories ?? [];
   const crCatName = (cr.category || '').toLowerCase().trim();
   const crCatId = cr.categoryId || '';
   const isImplementerAssigned = isChangeImplementer && (
-    userAssignedCats.includes(crCatId) ||
-    userAssignedCats.some(cid => crCatName.includes(cid.toLowerCase()) || cid.toLowerCase().includes(crCatName))
+    implementerCategories.includes(crCatId) ||
+    implementerCategories.some(cid => crCatName.includes(cid.toLowerCase()) || cid.toLowerCase().includes(crCatName))
   );
   const canMarkImplemented = (isAdminOrSuperAdmin || isImplementerAssigned);
   const isRequester = !isAdminOrSuperAdmin && !isChangeManager && !isChangeImplementer;
@@ -228,7 +229,7 @@ export default function ChangeRequestModal({ cr, onClose, onApprove, onReject, o
 
   const activeColor = isRejected ? '#DC2626' : isImplemented ? '#10B981' : isApproved ? '#8B5CF6' : '#F59E0B';
 
-  const canAct = cr.canAct !== false && !isApproved && !isRejected && !isImplemented && !isSelfRequest;
+  const canAct = cr.canAct === true && !isApproved && !isRejected && !isImplemented && !isSelfRequest;
 
   const getStepDate = (stepName) => {
     const todayFormatted = new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });

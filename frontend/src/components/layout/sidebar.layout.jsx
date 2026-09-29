@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { useTheme } from '../../context/ThemeContext';
 import { useWorklistActionableDots } from '../../queries/worklist.queries';
+import { getAllowedWorklistModules } from '../../lib/permissions.lib';
 
 function Sidebar({
   activeItem,
@@ -34,24 +35,11 @@ function Sidebar({
 
   const roleName = (user?.role || '').toLowerCase();
   const roleId = user?.roleId || '';
-  
-  const isSuperAdmin = roleId === 'role-1' || roleName.includes('super');
-  const isBoardUser = roleId === 'role-board' || roleName.includes('board');
-  const isTravelAdmin = roleId === 'role-2-travel' || (roleName.includes('admin') && roleName.includes('travel'));
-  const isPreSpendAdmin = roleId === 'role-2-prespend' || (roleName.includes('admin') && (roleName.includes('spend') || roleName.includes('prespend')));
-  const isChangeAdmin = roleId === 'role-2-change' || (roleName.includes('admin') && !isTravelAdmin && !isPreSpendAdmin && !isSuperAdmin);
-  const isAdmin = isSuperAdmin || isTravelAdmin || isPreSpendAdmin || isChangeAdmin || roleId === 'role-2' || roleName.includes('admin');
-  const isChangeManager = roleId === 'role-3' || roleName.includes('manager');
-  const isChangeImplementer = roleId === 'role-5' || roleName.includes('implementer');
-  const isApprover = isSuperAdmin || isBoardUser || isAdmin || isChangeManager || isChangeImplementer;
+  const rawRoleIds = Array.isArray(user?.rolesList) ? user.rolesList : [];
+  const isSuperAdmin = Boolean(user?.isSuperAdmin || roleId === 'role-1' || rawRoleIds.includes('role-1') || roleName.includes('super'));
 
-  const allowedWorklistModuleIds = isSuperAdmin || isBoardUser
-    ? ['change_request', 'prespend', 'travel']
-    : isTravelAdmin
-    ? ['travel']
-    : isPreSpendAdmin
-    ? ['prespend']
-    : ['change_request'];
+  const allowedWorklistModuleIds = getAllowedWorklistModules(user);
+  const isApprover = allowedWorklistModuleIds.length > 0;
 
   const { data: pendingDots } = useWorklistActionableDots({
     user,
@@ -259,26 +247,15 @@ function Sidebar({
 
       {/* Management section (Visible to Approvers & Admins, Hidden for standard requesters) */}
       {(() => {
-        if (!isApprover) return null;
+        if (!isApprover || allowedWorklistModuleIds.length === 0) return null;
 
-        const allowedWorklistModules = isSuperAdmin
-          ? [
-              { id: 'change_request', path: '/worklist?module=change_request', label: 'Change Request', icon: FileText },
-              { id: 'prespend', path: '/worklist?module=prespend', label: 'Pre-Spend Request', icon: IndianRupee },
-              { id: 'travel', path: '/worklist?module=travel', label: 'Travel Desk', icon: Plane }
-            ]
-          : isBoardUser
-          ? [
-              { id: 'change_request', path: '/worklist?module=change_request', label: 'Change Request', icon: FileText },
-              { id: 'prespend', path: '/worklist?module=prespend', label: 'Pre-Spend Request', icon: IndianRupee },
-              { id: 'travel', path: '/worklist?module=travel', label: 'Travel Desk', icon: Plane }
-            ]
-          : isTravelAdmin
-          ? [{ id: 'travel', path: '/worklist?module=travel', label: 'Travel Desk', icon: Plane }]
-          : isPreSpendAdmin
-          ? [{ id: 'prespend', path: '/worklist?module=prespend', label: 'Pre-Spend Request', icon: IndianRupee }]
-          : [{ id: 'change_request', path: '/worklist?module=change_request', label: 'Change Request', icon: FileText }];
+        const allWorklistModuleDefinitions = [
+          { id: 'change_request', path: '/worklist?module=change_request', label: 'Change Request', icon: FileText },
+          { id: 'prespend', path: '/worklist?module=prespend', label: 'Pre-Spend Request', icon: IndianRupee },
+          { id: 'travel', path: '/worklist?module=travel', label: 'Travel Desk', icon: Plane }
+        ];
 
+        const allowedWorklistModules = allWorklistModuleDefinitions.filter(m => allowedWorklistModuleIds.includes(m.id));
         const hasMultipleWorklistSub = allowedWorklistModules.length > 1;
 
         const visibleMgmtItems = [];

@@ -9,42 +9,30 @@ import ModuleSwitcher from '../components/ui/moduleSwitcher.component';
 import { Pagination, LoadingSpinner, CommentPopupModal } from '../components/ui/primitives.component';
 import { apiFetch } from '../lib/apiFetch.lib';
 import { useWorklistActionableDots } from '../queries/worklist.queries';
+import { getAllowedWorklistModules } from '../lib/permissions.lib';
 
 function MyWorklistPage({ onNavigate, searchQuery = '', user, isOrgWorklist = false }) {
   const queryClient = useQueryClient();
   const roleName = (user?.role || '').toLowerCase();
   const roleId = user?.roleId || '';
+  const rawRoleIds = Array.isArray(user?.rolesList) ? user.rolesList : [];
   const userRolesList = Array.isArray(user?.roles)
     ? user.roles.map(r => (typeof r === 'string' ? r : r.roleName || r.name || r.roleId || '').toLowerCase())
     : [roleName];
 
-  const isSuperAdmin = roleId === 'role-1' || roleName.includes('super') || userRolesList.some(r => r.includes('super'));
-  const isBoardUser = roleId === 'role-board' || roleName.includes('board') || userRolesList.some(r => r.includes('board'));
-  const isTravelAdmin = roleId === 'role-2-travel' || (roleName.includes('admin') && roleName.includes('travel')) || userRolesList.some(r => r.includes('travel admin'));
-  const isPreSpendAdmin = roleId === 'role-2-prespend' || (roleName.includes('admin') && (roleName.includes('spend') || roleName.includes('prespend'))) || userRolesList.some(r => r.includes('pre-spend') || r.includes('prespend'));
-  const isChangeAdmin = roleId === 'role-2-change' || (roleName.includes('admin') && !isTravelAdmin && !isPreSpendAdmin && !isSuperAdmin) || userRolesList.some(r => r.includes('change desk admin') || r.includes('change admin'));
-  const isAdmin = isSuperAdmin || isTravelAdmin || isPreSpendAdmin || isChangeAdmin || roleId === 'role-2' || roleName.includes('admin') || userRolesList.some(r => r.includes('admin'));
-  const isChangeManager = roleId === 'role-3' || roleName.includes('manager') || userRolesList.some(r => r.includes('manager'));
-  const isImplementer = roleId === 'role-5' || roleName.includes('implementer') || userRolesList.some(r => r.includes('implementer'));
-  const isApprover = isSuperAdmin || isBoardUser || isAdmin || isChangeManager || isImplementer;
+  const isSuperAdmin = Boolean(user?.isSuperAdmin || roleId === 'role-1' || rawRoleIds.includes('role-1') || roleName.includes('super') || userRolesList.some(r => r.includes('super')));
+  const isBoardUser = Boolean(user?.isBoardMember || roleId === 'role-board' || roleId === 'role-6' || rawRoleIds.includes('role-6') || rawRoleIds.includes('role-board') || roleName.includes('board') || userRolesList.some(r => r.includes('board')));
+  const isTravelAdmin = Boolean(user?.isTravelAdmin || roleId === 'role-2-travel' || rawRoleIds.includes('role-2-travel') || (roleName.includes('admin') && roleName.includes('travel')) || userRolesList.some(r => r.includes('travel admin')));
+  const isPreSpendAdmin = Boolean(user?.isPreSpendAdmin || roleId === 'role-2-prespend' || rawRoleIds.includes('role-2-prespend') || (roleName.includes('admin') && (roleName.includes('spend') || roleName.includes('prespend'))) || userRolesList.some(r => r.includes('pre-spend') || r.includes('prespend')));
+  const isChangeAdmin = Boolean(user?.isChangeAdmin || roleId === 'role-2-change' || roleId === 'role-2' || rawRoleIds.includes('role-2-change') || rawRoleIds.includes('role-2') || userRolesList.some(r => r.includes('change desk admin') || r.includes('change admin')));
+  const isChangeManager = Boolean(user?.isChangeManager || roleId === 'role-3' || rawRoleIds.includes('role-3') || roleName.includes('manager') || userRolesList.some(r => r.includes('manager')) || (Array.isArray(user?.cmCategories) && user.cmCategories.length > 0));
+  const isImplementer = Boolean(user?.isChangeImplementer || roleId === 'role-5' || rawRoleIds.includes('role-5') || roleName.includes('implementer') || userRolesList.some(r => r.includes('implementer')) || (Array.isArray(user?.ciCategories) && user.ciCategories.length > 0));
+  const isApprover = isSuperAdmin || isBoardUser || isChangeAdmin || isTravelAdmin || isPreSpendAdmin || isChangeManager || isImplementer;
   const isRequester = !isApprover;
 
-  // Determine allowed modules for worklist
-  const allowedModules = isSuperAdmin
-    ? ['change_request', 'prespend', 'travel']
-    : isBoardUser
-    ? ['change_request', 'prespend', 'travel']
-    : isTravelAdmin
-    ? ['travel']
-    : isPreSpendAdmin
-    ? ['prespend']
-    : ['change_request'];
-
-  const defaultModule = isTravelAdmin
-    ? 'travel'
-    : isPreSpendAdmin
-    ? 'prespend'
-    : 'change_request';
+  // Determine allowed modules cumulatively from shared permission helper
+  const allowedModules = getAllowedWorklistModules(user);
+  const defaultModule = allowedModules[0] || null;
 
   // Read module from URL query parameter
   const getModuleFromUrl = () => {
@@ -57,6 +45,13 @@ function MyWorklistPage({ onNavigate, searchQuery = '', user, isOrgWorklist = fa
   };
 
   const [activeModule, setActiveModule] = useState(getModuleFromUrl);
+
+  // If user permissions load and activeModule is no longer allowed, sync to first allowed module
+  useEffect(() => {
+    if (allowedModules.length > 0 && !allowedModules.includes(activeModule)) {
+      setActiveModule(allowedModules[0]);
+    }
+  }, [allowedModules.join(','), activeModule]);
 
   // Keep activeModule in sync when URL changes
   useEffect(() => {
@@ -198,7 +193,7 @@ function MyWorklistPage({ onNavigate, searchQuery = '', user, isOrgWorklist = fa
         metrics: body.metrics || { pending: 0, approved: 0, inProcess: 0, rejected: 0, implemented: 0 }
       };
     },
-    enabled: !isCustomDateIncomplete,
+    enabled: !isCustomDateIncomplete && Boolean(activeModule) && allowedModules.includes(activeModule),
   });
 
   // Dedicated query for status summary counts and metrics (unfiltered by active tab status)
@@ -244,7 +239,7 @@ function MyWorklistPage({ onNavigate, searchQuery = '', user, isOrgWorklist = fa
         metrics: body.metrics || { pending: 0, approved: 0, inProcess: 0, rejected: 0, implemented: 0 }
       };
     },
-    enabled: !isCustomDateIncomplete
+    enabled: !isCustomDateIncomplete && Boolean(activeModule) && allowedModules.includes(activeModule)
   });
 
   // Fetch Pending Actionable Counts across modules for dot indicators using shared hook
@@ -408,6 +403,18 @@ function MyWorklistPage({ onNavigate, searchQuery = '', user, isOrgWorklist = fa
     travel: isOrgWorklist ? 'All corporate flight, train, and hotel reservations requiring travel desk approval' : 'Travel and accommodation requests awaiting your approval'
   };
 
+  if (!isApprover || allowedModules.length === 0) {
+    return (
+      <div style={{ padding: '3rem 1.5rem', textAlign: 'center', backgroundColor: 'var(--card-bg)', borderRadius: '12px', border: '1px solid var(--border-color)', margin: '2rem 0' }}>
+        <CheckCircle2 size={42} style={{ color: 'var(--text-secondary)', margin: '0 auto 1rem auto', opacity: 0.6 }} />
+        <h2 style={{ fontSize: '1.2rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '0.5rem' }}>No Worklist Access</h2>
+        <p style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', maxWidth: '420px', margin: '0 auto' }}>
+          You do not currently have approval or reviewer responsibilities for any active desk modules.
+        </p>
+      </div>
+    );
+  }
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', width: '100%' }}>
 
@@ -422,7 +429,22 @@ function MyWorklistPage({ onNavigate, searchQuery = '', user, isOrgWorklist = fa
           </p>
         </div>
 
-        <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+        <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+          {allowedModules.length > 1 && (
+            <ModuleSwitcher
+              activeModule={activeModule}
+              onModuleChange={(mod) => {
+                setActiveModule(mod);
+                if (typeof window !== 'undefined') {
+                  const url = new URL(window.location.href);
+                  url.searchParams.set('module', mod);
+                  window.history.pushState({}, '', url.toString());
+                }
+              }}
+              pendingCounts={modulePendingCounts || {}}
+              allowedModules={allowedModules}
+            />
+          )}
           <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-secondary)' }}>
             {displayItems.length} total request{displayItems.length !== 1 ? 's' : ''}
           </span>
@@ -683,7 +705,7 @@ function MyWorklistPage({ onNavigate, searchQuery = '', user, isOrgWorklist = fa
                             </button>
                           )}
 
-                          {!isRequester && !isSelfRequest && item.canAct !== false && (status === 'pending' || status === 'pending approval') && item.myDecision !== 'Approved' && item.myDecision !== 'Rejected' && (activeModule !== 'change_request' || (isChangeManager || isAdmin || isSuperAdmin)) ? (
+                          {!isRequester && !isSelfRequest && item.canAct === true && (status === 'pending' || status === 'pending approval') && item.myDecision !== 'Approved' && item.myDecision !== 'Rejected' && (activeModule !== 'change_request' || (isChangeManager || isChangeAdmin || isSuperAdmin)) ? (
                             <>
                               <button
                                 type="button"
@@ -720,7 +742,7 @@ function MyWorklistPage({ onNavigate, searchQuery = '', user, isOrgWorklist = fa
                             }}>
                               Awaiting Board Approval
                             </span>
-                          ) : activeModule === 'change_request' && isItemApproved && status !== 'implemented' && (isAdmin || isImplementer || item.canAct) && !isSelfRequest ? (
+                          ) : activeModule === 'change_request' && isItemApproved && status !== 'implemented' && (isSuperAdmin || isChangeAdmin || isImplementer || item.canAct === true) && !isSelfRequest ? (
                             <button
                               type="button"
                               onClick={() => {
@@ -957,9 +979,9 @@ function MyWorklistPage({ onNavigate, searchQuery = '', user, isOrgWorklist = fa
             cr={selectedCr}
             user={user}
             onClose={() => setSelectedCr(null)}
-            onApprove={(isRequester || selectedCr.canAct === false || isSelf) ? null : (id, comment) => handleAction(id, 'approve', comment)}
-            onReject={(isRequester || selectedCr.canAct === false || isSelf) ? null : (id, reason) => handleAction(id, 'reject', reason)}
-            onSendBack={(isRequester || selectedCr.canAct === false || isSelf) ? null : (id) => handleAction(id, 'sendback')}
+            onApprove={(isRequester || selectedCr.canAct !== true || isSelf) ? null : (id, comment) => handleAction(id, 'approve', comment)}
+            onReject={(isRequester || selectedCr.canAct !== true || isSelf) ? null : (id, reason) => handleAction(id, 'reject', reason)}
+            onSendBack={(isRequester || selectedCr.canAct !== true || isSelf) ? null : (id) => handleAction(id, 'sendback')}
             onImplement={isSelf ? null : (id, comment) => handleAction(id, 'implement', comment)}
           />
         );

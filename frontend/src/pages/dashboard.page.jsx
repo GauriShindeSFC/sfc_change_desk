@@ -100,7 +100,7 @@ function DashboardPage({ onNavigate, user, isOrgDashboard = false, searchQuery =
         return null;
       }
     },
-    refetchInterval: 30000
+    refetchInterval: 1000 * 60 * 5 // 5 minutes
   });
 
   const { data: crSummary } = useQuery({
@@ -124,7 +124,7 @@ function DashboardPage({ onNavigate, user, isOrgDashboard = false, searchQuery =
         return null;
       }
     },
-    refetchInterval: 30000
+    refetchInterval: 1000 * 60 * 5 // 5 minutes
   });
 
   const { data: travelSummary } = useQuery({
@@ -138,7 +138,7 @@ function DashboardPage({ onNavigate, user, isOrgDashboard = false, searchQuery =
         return null;
       }
     },
-    refetchInterval: 30000
+    refetchInterval: 1000 * 60 * 5 // 5 minutes
   });
 
   // 2. Fetch full detailed charts + requests only when a card is expanded
@@ -229,7 +229,7 @@ function DashboardPage({ onNavigate, user, isOrgDashboard = false, searchQuery =
       };
     },
     enabled: Boolean(expandedModule) && !isCustomDateIncomplete,
-    refetchInterval: 30000
+    refetchInterval: 1000 * 60 * 5 // 5 minutes
   });
 
   const handleToggleExpand = (modKey) => {

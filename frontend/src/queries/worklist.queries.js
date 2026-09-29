@@ -89,6 +89,6 @@ export function useWorklistActionableDots({ user, allowedModuleIds = [] }) {
       };
     },
     enabled: Boolean(user?.id) && allowedModuleIds.length > 0,
-    refetchInterval: 30000
+    refetchInterval: 1000 * 60 * 5 // 5 minutes
   });
 }
