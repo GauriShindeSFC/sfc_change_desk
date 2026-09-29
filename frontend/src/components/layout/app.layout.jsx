@@ -68,7 +68,7 @@ export default function AppLayout({ user, onLogout }) {
   };
 
   return (
-    <div className="flex min-h-screen bg-background w-full">
+    <div className="flex h-screen w-full overflow-hidden bg-background">
       <Sidebar
         activeItem={activeItem}
         onItemSelect={handleNavigate}
@@ -80,7 +80,7 @@ export default function AppLayout({ user, onLogout }) {
       />
 
       <div
-        className={`flex-1 flex flex-col min-w-0 transition-[margin-left] duration-200 ${
+        className={`flex h-screen min-w-0 flex-1 flex-col overflow-hidden transition-[margin-left] duration-200 ${
           isMobile ? 'ml-0' : isSidebarHovered ? 'ml-[270px]' : 'ml-[68px]'
         }`}
       >
@@ -95,8 +95,8 @@ export default function AppLayout({ user, onLogout }) {
           onSearchChange={setSearchQuery}
         />
 
-        {/* Dynamic Nested Content */}
-        <main className={`flex-1 ${isMobile ? 'p-4' : 'px-8 py-7'}`}>
+        {/* Dynamic Nested Content — the only scrollable region in the shell */}
+        <main className={`min-h-0 flex-1 overflow-y-auto ${isMobile ? 'p-4' : 'px-8 py-7'}`}>
           <div className="max-w-[1600px] w-full mx-auto">
             <Outlet context={{ user, searchQuery, onNavigate: handleNavigate }} />
           </div>
