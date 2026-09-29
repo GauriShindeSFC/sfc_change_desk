@@ -81,6 +81,17 @@ const start = async () => {
       await sequelize.sync();
     }
     await syncRolesInDb();
+    // Reset or ensure unified global request sequence starts from 1
+    await sequelize.query(`
+      DO $$
+      BEGIN
+        IF NOT EXISTS (SELECT 1 FROM pg_class WHERE relname = 'global_request_code_seq') THEN
+          CREATE SEQUENCE global_request_code_seq START WITH 1;
+        ELSE
+          PERFORM setval('global_request_code_seq', 1, false);
+        END IF;
+      END $$;
+    `).catch((err) => console.warn('[Sequence] Sequence init notice:', err.message));
   } catch (err) {
     console.error('[ChangeDesk Backend] Database connection FAILED:', err.message);
     console.error('  → API will still start, but DB-backed routes will return 500 until it is reachable.');

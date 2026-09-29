@@ -1,7 +1,7 @@
 import { Op, fn, col } from 'sequelize';
 import { PreSpendRequest } from '../models/PreSpendRequest.js';
 import { Employee } from '../models/Employee.js';
-import { sequelize } from '../config/database.js';
+import { sequelize, getNextRequestCode } from '../config/database.js';
 import { getBoardMemberEmails, getPreSpendAdminEmails } from './userManagement.service.js';
 import {
   sendPreSpendCreatedEmail,
@@ -13,36 +13,8 @@ import { enqueueNotification } from './notificationQueue.service.js';
 import { buildDateFilterClause } from '../utils/dateFilterUtils.js';
 import { uploadBase64ToAzureBlob } from '../utils/blobStorage.util.js';
 
-export const generatePreSpendCode = async (_tx = null, year = new Date().getFullYear()) => {
-  const seqName = `prespend_code_seq_${year}`;
-
-  const ensureSeq = async () => {
-    const lockKey = 50000 + (parseInt(year, 10) % 10000);
-    try {
-      await sequelize.query(`SELECT pg_advisory_lock(${lockKey});`);
-      const [seqCheck] = await sequelize.query(`SELECT to_regclass('${seqName}') AS regclass;`);
-      const [maxRes] = await sequelize.query(
-        `SELECT MAX(CAST(SUBSTRING(request_code FROM 'PS-[0-9]+-([0-9]+)') AS INTEGER)) AS max_num FROM pre_spend_requests WHERE request_code LIKE 'PS-${year}-%';`
-      );
-      const maxNum = (maxRes && maxRes[0] && maxRes[0].max_num) ? parseInt(maxRes[0].max_num, 10) : 0;
-
-      if (!seqCheck[0]?.regclass) {
-        const startNum = Math.max(1, maxNum + 1);
-        await sequelize.query(`CREATE SEQUENCE IF NOT EXISTS ${seqName} START WITH ${startNum};`);
-      } else if (maxNum > 0) {
-        // Sync existing sequence forward if maxNum in table is ahead of sequence
-        await sequelize.query(`SELECT setval('${seqName}', GREATEST(nextval('${seqName}'), ${maxNum + 1}), false);`).catch(() => {});
-      }
-    } finally {
-      await sequelize.query(`SELECT pg_advisory_unlock(${lockKey});`).catch(() => {});
-    }
-  };
-
-  await ensureSeq();
-
-  const [result] = await sequelize.query(`SELECT nextval('${seqName}') AS next_id`);
-  const nextId = result[0]?.next_id || result[0]?.nextval;
-  return `PS-${year}-${String(nextId).padStart(4, '0')}`;
+export const generatePreSpendCode = async (_tx = null) => {
+  return await getNextRequestCode('PS', _tx);
 };
 
 export const createPreSpendService = async (data, user) => {

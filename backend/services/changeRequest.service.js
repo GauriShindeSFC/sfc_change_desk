@@ -1,4 +1,5 @@
 import { Op, fn, col } from 'sequelize';
+import { getNextRequestCode } from '../config/database.js';
 import {
   sequelize,
   CatalogCategory,
@@ -528,40 +529,7 @@ export const filterChangeRequestsByCategoryService = async (category, requesterI
 };
 
 const nextChangeRequestId = async (tx) => {
-  const seqName = 'change_request_id_seq';
-
-  const fetchNextVal = async () => {
-    const [result] = await sequelize.query(`SELECT nextval('${seqName}') AS next_id`, tx ? { transaction: tx } : {});
-    const nextId = result[0]?.next_id || result[0]?.nextval;
-    return `CR-${nextId}`;
-  };
-
-  try {
-    return await fetchNextVal();
-  } catch (err) {
-    const isMissingSeq = err.original?.code === '42P01' || err.message?.includes('does not exist');
-    if (!isMissingSeq) {
-      throw err;
-    }
-
-    const lockKey = 70001;
-    try {
-      await sequelize.query(`SELECT pg_advisory_lock(${lockKey});`);
-      const [seqCheck] = await sequelize.query(`SELECT to_regclass('${seqName}') AS regclass;`);
-      if (!seqCheck[0]?.regclass) {
-        const [maxRes] = await sequelize.query(
-          `SELECT MAX(CAST(SUBSTRING(id FROM 'CR-([0-9]+)') AS INTEGER)) AS max_num FROM change_requests;`
-        );
-        const maxNum = (maxRes && maxRes[0] && maxRes[0].max_num) ? parseInt(maxRes[0].max_num, 10) : 2054;
-        const startNum = maxNum + 1;
-        await sequelize.query(`CREATE SEQUENCE IF NOT EXISTS ${seqName} START WITH ${startNum};`);
-      }
-    } finally {
-      await sequelize.query(`SELECT pg_advisory_unlock(${lockKey});`).catch(() => {});
-    }
-
-    return await fetchNextVal();
-  }
+  return await getNextRequestCode('CR', tx);
 };
 
 export async function getVotersForCategory(categoryId, tx) {

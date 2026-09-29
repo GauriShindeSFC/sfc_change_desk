@@ -667,7 +667,7 @@ function MyWorklistPage({ onNavigate, searchQuery = '', user, isOrgWorklist = fa
                             <span className="rounded-[var(--radius-lg)] border border-[#FECACA] bg-[#FEF2F2] px-[0.65rem] py-[0.3rem] text-[0.75rem] font-semibold text-[#DC2626]">
                               Awaiting Board Approval
                             </span>
-                          ) : activeModule === 'change_request' && isItemApproved && status !== 'implemented' && (isSuperAdmin || isChangeAdmin || isImplementer || item.canAct === true) && !isSelfRequest ? (
+                          ) : activeModule === 'change_request' && isItemApproved && status !== 'implemented' && (isSuperAdmin || isChangeAdmin || item.canAct === true) && !isSelfRequest ? (
                             <button
                               type="button"
                               onClick={() => {

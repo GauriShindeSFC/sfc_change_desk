@@ -277,7 +277,7 @@ export const formatCurrencyINR = (val) => {
     maximumFractionDigits: 2,
     minimumFractionDigits: 0
   });
-  return `₹${formattedNum}`;
+  return `Rs. ${formattedNum}`;
 };
 
 const IGNORED_CUSTOM_KEYS = [
