@@ -152,6 +152,7 @@ export const createTravelService = async (data, user) => {
 
 export const getTravelRequestsService = async ({ user, userId, isWorklist = false, isOrgWorklist = false, organizationScope = false, status, searchQuery, dateFilter, startDate, endDate, page = 1, limit = 10 }) => {
   const where = {};
+  const andConditions = [];
   const currentUserId = user?.userKey || user?.id || userId || '';
   const currentUserEmail = (user?.email || '').toLowerCase().trim();
   const isOrgView = isOrgWorklist || organizationScope;
@@ -159,26 +160,24 @@ export const getTravelRequestsService = async ({ user, userId, isWorklist = fals
   // 1. My Dashboard View (not worklist and not organization scope): Only requests raised by the logged-in user
   if (!isWorklist && !isOrgView && currentUserId) {
     if (currentUserEmail) {
-      where[Op.or] = [
-        { requesterId: currentUserId },
-        { travellerEmail: { [Op.iLike]: currentUserEmail } }
-      ];
+      andConditions.push({
+        [Op.or]: [
+          { requesterId: currentUserId },
+          { travellerEmail: { [Op.iLike]: currentUserEmail } }
+        ]
+      });
     } else {
-      where.requesterId = currentUserId;
+      andConditions.push({ requesterId: currentUserId });
     }
   }
 
   // 2. My Worklist View (personal approver inbox): Exclude requests raised by the logged-in user
   if (isWorklist && !isOrgWorklist && (currentUserId || currentUserEmail)) {
-    const andConditions = [];
     if (currentUserId) {
       andConditions.push({ requesterId: { [Op.ne]: currentUserId } });
     }
     if (currentUserEmail) {
       andConditions.push({ travellerEmail: { [Op.notILike]: currentUserEmail } });
-    }
-    if (andConditions.length > 0) {
-      where[Op.and] = andConditions;
     }
   }
 
@@ -197,30 +196,34 @@ export const getTravelRequestsService = async ({ user, userId, isWorklist = fals
   }
 
   if (searchQuery) {
-    where[Op.or] = [
-      { requestCode: { [Op.iLike]: `%${searchQuery}%` } },
-      { travellerName: { [Op.iLike]: `%${searchQuery}%` } },
-      { travelMode: { [Op.iLike]: `%${searchQuery}%` } },
-      { purpose: { [Op.iLike]: `%${searchQuery}%` } },
-      { fromLocation: { [Op.iLike]: `%${searchQuery}%` } },
-      { toLocation: { [Op.iLike]: `%${searchQuery}%` } }
-    ];
+    andConditions.push({
+      [Op.or]: [
+        { requestCode: { [Op.iLike]: `%${searchQuery}%` } },
+        { travellerName: { [Op.iLike]: `%${searchQuery}%` } },
+        { travelMode: { [Op.iLike]: `%${searchQuery}%` } },
+        { purpose: { [Op.iLike]: `%${searchQuery}%` } },
+        { fromLocation: { [Op.iLike]: `%${searchQuery}%` } },
+        { toLocation: { [Op.iLike]: `%${searchQuery}%` } }
+      ]
+    });
   }
 
   const dateClause = buildDateFilterClause(dateFilter, startDate, endDate);
   if (dateClause) {
-    if (where[Op.and]) {
-      where[Op.and].push(dateClause);
-    } else {
-      where[Op.and] = [dateClause];
-    }
+    andConditions.push(dateClause);
   }
 
-  const offset = (Number(page) - 1) * Number(limit);
+  if (andConditions.length > 0) {
+    where[Op.and] = andConditions;
+  }
+
+  const safePage = Math.max(1, parseInt(page, 10) || 1);
+  const safeLimit = Math.max(1, Math.min(100, parseInt(limit, 10) || 10));
+  const offset = (safePage - 1) * safeLimit;
   const { rows, count } = await TravelRequest.findAndCountAll({
     where,
     order: [['createdAt', 'DESC']],
-    limit: Number(limit),
+    limit: safeLimit,
     offset
   });
 
@@ -325,8 +328,8 @@ export const getTravelRequestsService = async ({ user, userId, isWorklist = fals
     data: formattedItems,
     items: formattedItems,
     total: count,
-    totalPages: Math.ceil(count / limit) || 1,
-    currentPage: Number(page),
+    totalPages: Math.ceil(count / safeLimit) || 1,
+    currentPage: safePage,
     metrics: {
       total: allItems.length,
       pending,
@@ -372,10 +375,25 @@ export const handleTravelActionService = async ({ id, action, comment, actor }) 
     throw err;
   }
 
-  const req = await TravelRequest.findByPk(id);
+  return sequelize.transaction(async (transaction) => {
+    return handleTravelActionWithinTransaction({ id, action, actionComment, actor, transaction });
+  });
+};
+
+const handleTravelActionWithinTransaction = async ({ id, action, actionComment, actor, transaction }) => {
+  // Row-locked read: a concurrent decision on the same request blocks here until the
+  // first transaction commits, then sees the now-updated status and is rejected below
+  // instead of silently overwriting the first reviewer's decision.
+  const req = await TravelRequest.findByPk(id, { transaction, lock: transaction.LOCK.UPDATE });
   if (!req) {
     const err = new Error(`Travel request ${id} not found`);
     err.statusCode = 404;
+    throw err;
+  }
+
+  if (['Approved', 'Rejected'].includes(req.status)) {
+    const err = new Error(`This travel request has already been ${req.status.toLowerCase()} by another reviewer.`);
+    err.statusCode = 409;
     throw err;
   }
 
@@ -453,7 +471,7 @@ export const handleTravelActionService = async ({ id, action, comment, actor }) 
       req.status = 'Rejected';
       req.approvalStage = 'rejected';
       req.approvalHistory = history;
-      await req.save();
+      await req.save({ transaction });
 
       sendManagerRejectionEmail({
         module: 'travel',
@@ -484,7 +502,7 @@ export const handleTravelActionService = async ({ id, action, comment, actor }) 
       req.status = 'Pending Approval';
       req.approvalStage = 'stage_2_review';
       req.approvalHistory = history;
-      await req.save();
+      await req.save({ transaction });
 
       // Notify Travel Admin / Board Members for Stage 2
       getTravelDeskApproverEmails(req.isShortNotice).then((approverEmails) => {
@@ -531,7 +549,7 @@ export const handleTravelActionService = async ({ id, action, comment, actor }) 
   req.status = newStatus;
   req.approvalStage = action === 'approve' ? 'completed' : 'rejected';
   req.approvalHistory = history;
-  await req.save();
+  await req.save({ transaction });
 
   // Notify Traveller, Travel Admin, and Finance (FINANCE_NOTIFICATION_EMAIL if set)
   Promise.all([

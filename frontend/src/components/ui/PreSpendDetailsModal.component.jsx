@@ -62,9 +62,12 @@ export default function PreSpendDetailsModal({ item, onClose, onApprove, onRejec
           ? 'Manager approved'
           : status;
 
-  const statusColor = isApproved ? '#059669' : isRejected ? '#DC2626' : '#D97706';
-  const statusBg = isApproved ? '#ECFDF5' : isRejected ? '#FEF2F2' : '#FFFBEB';
-  const statusDot = isApproved ? '#10B981' : isRejected ? '#EF4444' : '#F59E0B';
+  const statusBadgeClass = isApproved
+    ? 'bg-[#ECFDF5] text-[#059669]'
+    : isRejected
+      ? 'bg-[#FEF2F2] text-[#DC2626]'
+      : 'bg-[#FFFBEB] text-[#D97706]';
+  const statusDotClass = isApproved ? 'bg-[#10B981]' : isRejected ? 'bg-[#EF4444]' : 'bg-[#F59E0B]';
 
   const steps = isRejected
     ? ['Requested', 'Rejected']
@@ -154,109 +157,39 @@ export default function PreSpendDetailsModal({ item, onClose, onApprove, onRejec
   };
 
   return (
-    <div style={{
-      position: 'fixed',
-      top: 0,
-      left: 0,
-      width: '100vw',
-      height: '100vh',
-      backgroundColor: 'rgba(15, 23, 42, 0.65)',
-      backdropFilter: 'blur(3px)',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      zIndex: 9999,
-      padding: '1.25rem',
-      boxSizing: 'border-box'
-    }}>
-      <div style={{
-        backgroundColor: 'var(--card-bg, #FFFFFF)',
-        border: '1px solid var(--border-color, #E2E8F0)',
-        borderRadius: '16px',
-        width: '100%',
-        maxWidth: '780px',
-        maxHeight: '90vh',
-        display: 'flex',
-        flexDirection: 'column',
-        boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
-        overflow: 'hidden'
-      }}>
-        
+    <div className="fixed inset-0 z-[9999] box-border flex h-screen w-screen items-center justify-center bg-[rgba(15,23,42,0.65)] p-5 backdrop-blur-[3px]">
+      <div className="flex w-full max-w-[780px] max-h-[90vh] flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-2xl">
+
         {/* Header */}
-        <div style={{
-          padding: '1.25rem 1.75rem',
-          borderBottom: '1px solid var(--border-color, #E2E8F0)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          backgroundColor: 'var(--card-bg, #FFFFFF)'
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem' }}>
-            <div style={{
-              width: '40px',
-              height: '40px',
-              borderRadius: '10px',
-              backgroundColor: '#EFF6FF',
-              color: '#2563EB',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center'
-            }}>
+        <div className="flex items-center justify-between border-b border-border bg-card px-7 py-5">
+          <div className="flex items-center gap-[0.85rem]">
+            <div className="flex h-10 w-10 items-center justify-center rounded-[10px] bg-[#EFF6FF] text-[#2563EB]">
               <IndianRupee size={20} />
             </div>
             <div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-                <h2 style={{ fontSize: '1.15rem', fontWeight: 700, color: 'var(--text-primary, #0F172A)', margin: 0 }}>
+              <div className="flex items-center gap-[0.6rem]">
+                <h2 className="m-0 text-[1.15rem] font-bold text-foreground">
                   Pre-Spend Requisition
                 </h2>
-                <span style={{
-                  fontFamily: 'var(--font-mono)',
-                  fontSize: '0.825rem',
-                  fontWeight: 600,
-                  color: 'var(--brand-primary, #2563EB)',
-                  backgroundColor: '#EFF6FF',
-                  padding: '0.15rem 0.5rem',
-                  borderRadius: '6px'
-                }}>
+                <span className="rounded-md bg-[#EFF6FF] px-2 py-[0.15rem] text-[0.825rem] font-semibold text-primary font-[var(--font-mono)]">
                   {item.requestCode || item.id}
                 </span>
               </div>
-              <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary, #64748B)', margin: '0.2rem 0 0 0' }}>
+              <p className="mt-[0.2rem] mb-0 text-[0.8rem] text-muted-foreground">
                 Financial purchase approval and quotation audit
               </p>
             </div>
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-            <div style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '0.35rem',
-              padding: '0.25rem 0.75rem',
-              borderRadius: '99px',
-              backgroundColor: statusBg,
-              color: statusColor,
-              fontSize: '0.775rem',
-              fontWeight: 600
-            }}>
-              <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: statusDot }} />
+          <div className="flex items-center gap-3">
+            <div className={`inline-flex items-center gap-[0.35rem] rounded-full px-3 py-1 text-[0.775rem] font-semibold ${statusBadgeClass}`}>
+              <span className={`h-[6px] w-[6px] rounded-full ${statusDotClass}`} />
               <span>{status}</span>
             </div>
 
             <button
               onClick={onClose}
-              style={{
-                width: '32px',
-                height: '32px',
-                borderRadius: '8px',
-                border: '1px solid var(--border-color, #E2E8F0)',
-                backgroundColor: 'transparent',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                color: 'var(--text-secondary, #64748B)',
-                cursor: 'pointer'
-              }}
+              className="flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg border border-border bg-transparent text-muted-foreground"
             >
               <X size={16} />
             </button>
@@ -264,77 +197,62 @@ export default function PreSpendDetailsModal({ item, onClose, onApprove, onRejec
         </div>
 
         {/* Scrollable Content */}
-        <div style={{ padding: '1.5rem 1.75rem', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-          
+        <div className="flex flex-col gap-6 overflow-y-auto px-7 py-6">
+
           {/* Section 1: Item & Amount Spotlight */}
-          <div style={{
-            padding: '1.25rem',
-            backgroundColor: 'var(--input-bg, #F8FAFC)',
-            borderRadius: '12px',
-            border: '1px solid var(--border-color, #E2E8F0)',
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'flex-start',
-            gap: '1rem'
-          }}>
-            <div style={{ flex: 1 }}>
-              <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+          <div className="flex items-start justify-between gap-4 rounded-xl border border-border bg-input p-5">
+            <div className="flex-1">
+              <span className="text-[0.75rem] font-semibold uppercase tracking-[0.04em] text-muted-foreground">
                 Item / Buying Requirement
               </span>
-              <h3 style={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--text-primary)', margin: '0.3rem 0 0.5rem 0', lineHeight: 1.4 }}>
+              <h3 className="mx-0 mt-[0.3rem] mb-2 text-[1.1rem] font-bold leading-[1.4] text-foreground">
                 {item.itemDescription || item.buying || item.title}
               </h3>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
-                <span style={{ fontSize: '0.775rem', fontWeight: 600, backgroundColor: '#E2E8F0', color: '#334155', padding: '0.2rem 0.6rem', borderRadius: '6px' }}>
+              <div className="flex flex-wrap gap-2">
+                <span className="rounded-md bg-[#E2E8F0] px-[0.6rem] py-[0.2rem] text-[0.775rem] font-semibold text-[#334155]">
                   {item.category}
                 </span>
                 {item.subcategory && (
-                  <span style={{ fontSize: '0.775rem', fontWeight: 500, backgroundColor: '#FFFFFF', border: '1px solid var(--border-color)', color: 'var(--text-secondary)', padding: '0.2rem 0.6rem', borderRadius: '6px' }}>
+                  <span className="rounded-md border border-border bg-white px-[0.6rem] py-[0.2rem] text-[0.775rem] font-medium text-muted-foreground">
                     {item.subcategory}
                   </span>
                 )}
                 {item.isUrgent && (
-                  <span style={{ fontSize: '0.775rem', fontWeight: 700, backgroundColor: '#FEF2F2', color: '#DC2626', border: '1px solid #FECACA', padding: '0.2rem 0.6rem', borderRadius: '6px', display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}>
+                  <span className="inline-flex items-center gap-[0.3rem] rounded-md border border-[#FECACA] bg-[#FEF2F2] px-[0.6rem] py-[0.2rem] text-[0.775rem] font-bold text-[#DC2626]">
                     <AlertTriangle size={12} /> Urgent Requisition
                   </span>
                 )}
               </div>
             </div>
 
-            <div style={{ textAlign: 'right', flexShrink: 0 }}>
-              <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+            <div className="shrink-0 text-right">
+              <span className="text-[0.75rem] font-semibold uppercase tracking-[0.04em] text-muted-foreground">
                 Estimated Amount
               </span>
-              <div style={{ fontSize: '1.45rem', fontWeight: 800, color: '#059669', marginTop: '0.2rem' }}>
+              <div className="mt-[0.2rem] text-[1.45rem] font-extrabold text-[#059669]">
                 {money(item.estimatedAmount || item.amount)}
               </div>
             </div>
           </div>
 
           {/* Lifecycle Visualizer (Requested -> Approved / Rejected) */}
-          <div style={{
-            padding: '1.25rem 1.5rem',
-            backgroundColor: 'var(--input-bg, #F8FAFC)',
-            borderRadius: '12px',
-            border: '1px solid var(--border-color, #E2E8F0)'
-          }}>
-            <div style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '1.25rem', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+          <div className="rounded-xl border border-border bg-input px-6 py-5">
+            <div className="mb-5 text-[0.85rem] font-bold uppercase tracking-[0.04em] text-foreground">
               Lifecycle
             </div>
-            <div style={{ display: 'flex', alignItems: 'flex-start', width: '100%', padding: '0 0.5rem' }}>
+            <div className="flex w-full items-start px-2">
               {steps.map((step, idx) => {
                 const isLast = idx === steps.length - 1;
                 const isStepCompleted = idx <= currentStepIdx;
                 const isStepRejected = isRejected && idx === currentStepIdx;
 
-                const stepColor = isStepRejected ? '#DC2626' : isStepCompleted ? '#10B981' : 'var(--border-color)';
-                const circleBg = isStepRejected ? '#DC2626' : isStepCompleted ? '#10B981' : 'var(--card-bg)';
-                const circleBorder = isStepRejected ? '2px solid #DC2626' : isStepCompleted ? '2px solid #10B981' : '2px solid var(--border-color)';
-                const textColor = isStepRejected ? '#DC2626' : isStepCompleted ? '#10B981' : 'var(--text-secondary)';
+                const stepAccentClass = isStepRejected ? 'text-[#DC2626]' : isStepCompleted ? 'text-[#10B981]' : 'text-border';
+                const circleBgClass = isStepRejected ? 'bg-[#DC2626]' : isStepCompleted ? 'bg-[#10B981]' : 'bg-card';
+                const circleBorderClass = isStepRejected ? 'border-[#DC2626]' : isStepCompleted ? 'border-[#10B981]' : 'border-border';
 
                 const nextStepCompleted = (idx + 1) <= currentStepIdx;
                 const nextStepRejected = isRejected && (idx + 1) === currentStepIdx;
-                const connectorColor = nextStepRejected ? '#DC2626' : nextStepCompleted ? '#10B981' : 'var(--border-color)';
+                const connectorBgClass = nextStepRejected ? 'bg-[#DC2626]' : nextStepCompleted ? 'bg-[#10B981]' : 'bg-border';
 
                 const stepDate = getStepDate(step);
                 const stepTime = getStepTime(step);
@@ -345,75 +263,45 @@ export default function PreSpendDetailsModal({ item, onClose, onApprove, onRejec
                     <div
                       onMouseEnter={() => setHoveredStepIdx(idx)}
                       onMouseLeave={() => setHoveredStepIdx(null)}
-                      style={{
-                        position: 'relative',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        alignItems: 'center',
-                        minWidth: '100px',
-                        zIndex: 3,
-                        cursor: isStepCompleted ? 'pointer' : 'default'
-                      }}
+                      className={`relative z-[3] flex min-w-[100px] flex-col items-center ${isStepCompleted ? 'cursor-pointer' : 'cursor-default'}`}
                     >
-                      <div style={{
-                        width: '32px',
-                        height: '32px',
-                        borderRadius: '50%',
-                        backgroundColor: circleBg,
-                        border: circleBorder,
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        transition: 'transform 0.15s ease',
-                        transform: hoveredStepIdx === idx ? 'scale(1.15)' : 'scale(1)',
-                        boxShadow: isStepCompleted && !isStepRejected ? '0 0 12px rgba(16, 185, 129, 0.25)' : 'none'
-                      }}>
+                      <div
+                        className={`flex h-8 w-8 items-center justify-center rounded-full border-2 transition-transform duration-150 ease-[ease] ${circleBgClass} ${circleBorderClass} ${hoveredStepIdx === idx ? 'scale-[1.15]' : 'scale-100'} ${isStepCompleted && !isStepRejected ? 'shadow-[0_0_12px_rgba(16,185,129,0.25)]' : 'shadow-none'}`}
+                      >
                         {isStepRejected ? (
-                          <X size={18} color="#FFFFFF" strokeWidth={3} />
+                          <X size={18} strokeWidth={3} className="text-white" />
                         ) : isStepCompleted ? (
-                          <Check size={18} color="#FFFFFF" strokeWidth={3} />
+                          <Check size={18} strokeWidth={3} className="text-white" />
                         ) : null}
                       </div>
 
-                      <span style={{ fontSize: '0.825rem', fontWeight: 800, color: textColor, textAlign: 'center', marginTop: '0.5rem' }}>
+                      <span className={`mt-2 text-center text-[0.825rem] font-extrabold ${stepAccentClass}`}>
                         {step}
                       </span>
 
                       {stepDate && (
-                        <span style={{ fontSize: '0.725rem', color: isStepCompleted ? '#10B981' : 'var(--text-secondary)', fontFamily: 'var(--font-mono)', textAlign: 'center', marginTop: '0.2rem', fontWeight: 600 }}>
+                        <span className={`mt-[0.2rem] text-center text-[0.725rem] font-semibold font-[var(--font-mono)] ${isStepCompleted ? 'text-[#10B981]' : 'text-muted-foreground'}`}>
                           {stepDate}
                         </span>
                       )}
                       {stepTime && (
-                        <span style={{ fontSize: '0.7rem', color: isStepCompleted ? '#059669' : 'var(--text-secondary)', fontFamily: 'var(--font-mono)', textAlign: 'center', marginTop: '0.1rem', fontWeight: 500 }}>
+                        <span className={`mt-[0.1rem] text-center text-[0.7rem] font-medium font-[var(--font-mono)] ${isStepCompleted ? 'text-[#059669]' : 'text-muted-foreground'}`}>
                           {stepTime}
                         </span>
                       )}
 
                       {hoveredStepIdx === idx && tooltipInfo && isStepCompleted && (
-                        <div style={{
-                          position: 'absolute',
-                          bottom: '115%',
-                          backgroundColor: 'var(--card-bg)',
-                          border: '1px solid var(--border-color)',
-                          borderRadius: '10px',
-                          padding: '0.65rem 0.85rem',
-                          boxShadow: '0 10px 25px rgba(0, 0, 0, 0.25)',
-                          zIndex: 300,
-                          width: '220px',
-                          pointerEvents: 'none',
-                          ...(idx === 0
-                            ? { left: '0px', transform: 'none' }
-                            : isLast
-                            ? { right: '0px', left: 'auto', transform: 'none' }
-                            : { left: '50%', transform: 'translateX(-50%)' })
-                        }}>
-                          <div style={{ paddingBottom: '0.25rem', marginBottom: '0.3rem', borderBottom: '1px solid var(--border-color)' }}>
-                            <span style={{ fontSize: '0.725rem', fontWeight: 800, color: stepColor, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                        <div
+                          className={`pointer-events-none absolute bottom-[115%] z-[300] w-[220px] rounded-[10px] border border-border bg-card px-[0.85rem] py-[0.65rem] shadow-[0_10px_25px_rgba(0,0,0,0.25)] ${
+                            idx === 0 ? 'left-0' : isLast ? 'right-0 left-auto' : 'left-1/2 -translate-x-1/2'
+                          }`}
+                        >
+                          <div className="mb-[0.3rem] border-b border-border pb-1">
+                            <span className={`text-[0.725rem] font-extrabold uppercase tracking-[0.04em] ${stepAccentClass}`}>
                               {tooltipInfo.title}
                             </span>
                           </div>
-                          <p style={{ fontSize: '0.8rem', color: 'var(--text-primary)', fontWeight: 500, margin: 0, lineHeight: 1.45, wordBreak: 'break-word', overflowWrap: 'anywhere' }}>
+                          <p className="m-0 break-words text-[0.8rem] font-medium leading-[1.45] text-foreground [overflow-wrap:anywhere]">
                             "{tooltipInfo.comment}"
                           </p>
                         </div>
@@ -421,13 +309,7 @@ export default function PreSpendDetailsModal({ item, onClose, onApprove, onRejec
                     </div>
 
                     {!isLast && (
-                      <div style={{
-                        flex: 1,
-                        height: '2.5px',
-                        backgroundColor: connectorColor,
-                        marginTop: '15px',
-                        transition: 'background-color 0.3s ease'
-                      }} />
+                      <div className={`mt-[15px] h-[2.5px] flex-1 transition-colors duration-300 ease-[ease] ${connectorBgClass}`} />
                     )}
                   </React.Fragment>
                 );
@@ -437,53 +319,53 @@ export default function PreSpendDetailsModal({ item, onClose, onApprove, onRejec
 
           {/* Section 2: Requisition Details */}
           <div>
-            <h4 style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-primary)', textTransform: 'uppercase', letterSpacing: '0.04em', margin: '0 0 0.85rem 0' }}>
+            <h4 className="m-0 mb-[0.85rem] text-[0.85rem] font-bold uppercase tracking-[0.04em] text-foreground">
               Requester &amp; Requisition Details
             </h4>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem' }}>
+            <div className="grid grid-cols-[repeat(auto-fit,minmax(200px,1fr))] gap-4">
               <div>
-                <div style={{ fontSize: '0.775rem', color: 'var(--text-secondary)' }}>Requester</div>
-                <div style={{ fontSize: '0.875rem', fontWeight: 600, color: 'var(--text-primary)', marginTop: '0.15rem' }}>
+                <div className="text-[0.775rem] text-muted-foreground">Requester</div>
+                <div className="mt-[0.15rem] text-[0.875rem] font-semibold text-foreground">
                   {item.employeeName || item.requesterName || item.requester || '—'}
                 </div>
                 {(item.employeeEmail || item.requesterEmail) && (
-                  <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)', marginTop: '0.1rem' }}>
+                  <div className="mt-[0.1rem] text-[0.75rem] text-muted-foreground font-[var(--font-mono)]">
                     {item.employeeEmail || item.requesterEmail}
                   </div>
                 )}
               </div>
 
               <div>
-                <div style={{ fontSize: '0.775rem', color: 'var(--text-secondary)' }}>
+                <div className="text-[0.775rem] text-muted-foreground">
                   {isRejected ? 'Rejected By' : isApproved ? 'Approved By' : 'Approver'}
                 </div>
-                <div style={{ fontSize: '0.875rem', fontWeight: 600, color: isRejected ? '#DC2626' : isApproved ? '#059669' : 'var(--text-primary)', marginTop: '0.15rem' }}>
+                <div className={`mt-[0.15rem] text-[0.875rem] font-semibold ${isRejected ? 'text-[#DC2626]' : isApproved ? 'text-[#059669]' : 'text-foreground'}`}>
                   {item.decidedBy || item.approvedBy || (isApproved ? 'Approved' : isRejected ? 'Rejected' : '—')}
                 </div>
                 {(item.decidedByEmail || item.approvedByEmail) && (
-                  <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)', marginTop: '0.1rem' }}>
+                  <div className="mt-[0.1rem] text-[0.75rem] text-muted-foreground font-[var(--font-mono)]">
                     {item.decidedByEmail || item.approvedByEmail}
                   </div>
                 )}
               </div>
 
               <div>
-                <div style={{ fontSize: '0.775rem', color: 'var(--text-secondary)' }}>Requested On</div>
-                <div style={{ fontSize: '0.875rem', fontWeight: 600, color: 'var(--text-primary)', marginTop: '0.15rem', fontFamily: 'var(--font-mono)' }}>
+                <div className="text-[0.775rem] text-muted-foreground">Requested On</div>
+                <div className="mt-[0.15rem] text-[0.875rem] font-semibold text-foreground font-[var(--font-mono)]">
                   {item.raisedDate || (item.submittedAt ? new Date(item.submittedAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : (item.createdAt ? new Date(item.createdAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'))}
                 </div>
               </div>
 
               <div>
-                <div style={{ fontSize: '0.775rem', color: 'var(--text-secondary)' }}>Location</div>
-                <div style={{ fontSize: '0.875rem', fontWeight: 600, color: 'var(--text-primary)', marginTop: '0.15rem' }}>
+                <div className="text-[0.775rem] text-muted-foreground">Location</div>
+                <div className="mt-[0.15rem] text-[0.875rem] font-semibold text-foreground">
                   {item.location || '—'}
                 </div>
               </div>
 
               <div>
-                <div style={{ fontSize: '0.775rem', color: 'var(--text-secondary)' }}>Needed By Date</div>
-                <div style={{ fontSize: '0.875rem', fontWeight: 600, color: 'var(--text-primary)', marginTop: '0.15rem', fontFamily: 'var(--font-mono)' }}>
+                <div className="text-[0.775rem] text-muted-foreground">Needed By Date</div>
+                <div className="mt-[0.15rem] text-[0.875rem] font-semibold text-foreground font-[var(--font-mono)]">
                   {formatCleanDate(item.neededByDate || item.neededBy)}
                 </div>
               </div>
@@ -492,28 +374,28 @@ export default function PreSpendDetailsModal({ item, onClose, onApprove, onRejec
 
           {/* Business Justification */}
           <div>
-            <h4 style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-primary)', textTransform: 'uppercase', letterSpacing: '0.04em', margin: '0 0 0.5rem 0' }}>
+            <h4 className="m-0 mb-2 text-[0.85rem] font-bold uppercase tracking-[0.04em] text-foreground">
               Business Justification
             </h4>
-            <div style={{ fontSize: '0.85rem', color: 'var(--text-primary)', backgroundColor: 'var(--input-bg)', padding: '0.85rem 1rem', borderRadius: '8px', border: '1px solid var(--border-color)', lineHeight: 1.5 }}>
+            <div className="rounded-lg border border-border bg-input px-4 py-[0.85rem] text-[0.85rem] leading-normal text-foreground">
               {item.justification || item.businessJustification || 'No justification provided.'}
             </div>
           </div>
 
           {/* Section 3: Vendors & Quotations */}
           <div>
-            <h4 style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-primary)', textTransform: 'uppercase', letterSpacing: '0.04em', margin: '0 0 0.75rem 0' }}>
+            <h4 className="m-0 mb-3 text-[0.85rem] font-bold uppercase tracking-[0.04em] text-foreground">
               Vendors &amp; Quotations ({vendors.length})
             </h4>
             {vendors.length > 0 ? (
-              <div style={{ border: '1px solid var(--border-color)', borderRadius: '8px', overflow: 'hidden' }}>
-                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.825rem', textAlign: 'left' }}>
+              <div className="overflow-hidden rounded-lg border border-border">
+                <table className="w-full border-collapse text-left text-[0.825rem]">
                   <thead>
-                    <tr style={{ backgroundColor: 'var(--input-bg)', borderBottom: '1px solid var(--border-color)' }}>
-                      <th style={{ padding: '0.65rem 0.85rem', fontWeight: 600, color: 'var(--text-secondary)' }}>Vendor</th>
-                      <th style={{ padding: '0.65rem 0.85rem', fontWeight: 600, color: 'var(--text-secondary)' }}>Quoted Amount</th>
-                      <th style={{ padding: '0.65rem 0.85rem', fontWeight: 600, color: 'var(--text-secondary)' }}>Quote Date</th>
-                      <th style={{ padding: '0.65rem 0.85rem', fontWeight: 600, color: 'var(--text-secondary)' }}>Quotation Document</th>
+                    <tr className="border-b border-border bg-input">
+                      <th className="px-[0.85rem] py-[0.65rem] font-semibold text-muted-foreground">Vendor</th>
+                      <th className="px-[0.85rem] py-[0.65rem] font-semibold text-muted-foreground">Quoted Amount</th>
+                      <th className="px-[0.85rem] py-[0.65rem] font-semibold text-muted-foreground">Quote Date</th>
+                      <th className="px-[0.85rem] py-[0.65rem] font-semibold text-muted-foreground">Quotation Document</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -521,20 +403,20 @@ export default function PreSpendDetailsModal({ item, onClose, onApprove, onRejec
                       const docSrc = v.fileData || v.fileUrl || (typeof v.file === 'string' ? v.file : null);
                       const hasDoc = Boolean(docSrc || v.fileName);
                       return (
-                        <tr key={i} style={{ borderBottom: i < vendors.length - 1 ? '1px solid var(--border-color)' : 'none' }}>
-                          <td style={{ padding: '0.65rem 0.85rem', fontWeight: 600, color: 'var(--text-primary)' }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                        <tr key={i} className={i < vendors.length - 1 ? 'border-b border-border' : ''}>
+                          <td className="px-[0.85rem] py-[0.65rem] font-semibold text-foreground">
+                            <div className="flex items-center gap-[0.4rem]">
                               <span>{v.name || `Vendor ${i + 1}`}</span>
                               {i === 0 && (
-                                <span style={{ fontSize: '0.65rem', backgroundColor: '#E6F4EA', color: '#137333', fontWeight: 700, padding: '0.1rem 0.4rem', borderRadius: '4px' }}>
+                                <span className="rounded bg-[#E6F4EA] px-[0.4rem] py-[0.1rem] text-[0.65rem] font-bold text-[#137333]">
                                   Primary
                                 </span>
                               )}
                             </div>
                           </td>
-                          <td style={{ padding: '0.65rem 0.85rem', color: '#059669', fontWeight: 600 }}>{v.amount ? money(v.amount) : '—'}</td>
-                          <td style={{ padding: '0.65rem 0.85rem', color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)' }}>{formatCleanDate(v.date)}</td>
-                          <td style={{ padding: '0.65rem 0.85rem' }}>
+                          <td className="px-[0.85rem] py-[0.65rem] font-semibold text-[#059669]">{v.amount ? money(v.amount) : '—'}</td>
+                          <td className="px-[0.85rem] py-[0.65rem] text-muted-foreground font-[var(--font-mono)]">{formatCleanDate(v.date)}</td>
+                          <td className="px-[0.85rem] py-[0.65rem]">
                             {hasDoc ? (
                               <button
                                 type="button"
@@ -563,27 +445,15 @@ export default function PreSpendDetailsModal({ item, onClose, onApprove, onRejec
                                     alert(`Quotation document: ${v.fileName}`);
                                   }
                                 }}
-                                style={{
-                                  display: 'inline-flex',
-                                  alignItems: 'center',
-                                  gap: '0.35rem',
-                                  padding: '0.25rem 0.6rem',
-                                  backgroundColor: '#EFF6FF',
-                                  color: '#1D4ED8',
-                                  border: '1px solid #BFDBFE',
-                                  borderRadius: '6px',
-                                  fontSize: '0.75rem',
-                                  fontWeight: 600,
-                                  cursor: 'pointer'
-                                }}
+                                className="inline-flex cursor-pointer items-center gap-[0.35rem] rounded-md border border-[#BFDBFE] bg-[#EFF6FF] px-[0.6rem] py-1 text-[0.75rem] font-semibold text-[#1D4ED8]"
                               >
                                 <FileText size={12} />
-                                <span style={{ maxWidth: '140px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                <span className="max-w-[140px] overflow-hidden text-ellipsis whitespace-nowrap">
                                   {v.fileName || 'View PDF'}
                                 </span>
                               </button>
                             ) : (
-                              <span style={{ color: 'var(--text-secondary)', fontSize: '0.75rem' }}>None attached</span>
+                              <span className="text-[0.75rem] text-muted-foreground">None attached</span>
                             )}
                           </td>
                         </tr>
@@ -593,7 +463,7 @@ export default function PreSpendDetailsModal({ item, onClose, onApprove, onRejec
                 </table>
               </div>
             ) : (
-              <div style={{ fontSize: '0.825rem', color: 'var(--text-secondary)', fontStyle: 'italic' }}>
+              <div className="text-[0.825rem] italic text-muted-foreground">
                 No vendor quotes attached.
               </div>
             )}
@@ -602,26 +472,26 @@ export default function PreSpendDetailsModal({ item, onClose, onApprove, onRejec
           {/* Section 4: Commercial Reason & Exceptions */}
           {(commercial.exception || commercial.reason || commercial.justification) && (
             <div>
-              <h4 style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-primary)', textTransform: 'uppercase', letterSpacing: '0.04em', margin: '0 0 0.5rem 0' }}>
+              <h4 className="m-0 mb-2 text-[0.85rem] font-bold uppercase tracking-[0.04em] text-foreground">
                 Commercial Evaluation &amp; Exception
               </h4>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '0.75rem', backgroundColor: 'var(--input-bg)', padding: '0.85rem 1rem', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
+              <div className="grid grid-cols-[repeat(auto-fit,minmax(200px,1fr))] gap-3 rounded-lg border border-border bg-input px-4 py-[0.85rem]">
                 {commercial.exception && (
                   <div>
-                    <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Exception Type</div>
-                    <div style={{ fontSize: '0.825rem', fontWeight: 600, color: 'var(--text-primary)' }}>{commercial.exception}</div>
+                    <div className="text-[0.75rem] text-muted-foreground">Exception Type</div>
+                    <div className="text-[0.825rem] font-semibold text-foreground">{commercial.exception}</div>
                   </div>
                 )}
                 {commercial.reason && (
                   <div>
-                    <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Commercial Reason</div>
-                    <div style={{ fontSize: '0.825rem', fontWeight: 600, color: 'var(--text-primary)' }}>{commercial.reason}</div>
+                    <div className="text-[0.75rem] text-muted-foreground">Commercial Reason</div>
+                    <div className="text-[0.825rem] font-semibold text-foreground">{commercial.reason}</div>
                   </div>
                 )}
                 {commercial.justification && (
-                  <div style={{ gridColumn: '1 / -1' }}>
-                    <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Commercial Justification</div>
-                    <div style={{ fontSize: '0.825rem', color: 'var(--text-primary)', marginTop: '0.15rem' }}>{commercial.justification}</div>
+                  <div className="col-span-full">
+                    <div className="text-[0.75rem] text-muted-foreground">Commercial Justification</div>
+                    <div className="mt-[0.15rem] text-[0.825rem] text-foreground">{commercial.justification}</div>
                   </div>
                 )}
               </div>
@@ -630,34 +500,30 @@ export default function PreSpendDetailsModal({ item, onClose, onApprove, onRejec
 
           {/* Decision / Approval History Section */}
           {(isApproved || isRejected || item.approvedComment || item.rejectedComment || item.rejectionReason || (Array.isArray(item.comments) && item.comments.length > 0) || (Array.isArray(item.approvalHistory) && item.approvalHistory.length > 0)) && (
-            <div style={{
-              backgroundColor: isApproved ? '#ECFDF5' : isRejected ? '#FEF2F2' : 'var(--input-bg)',
-              border: `1px solid ${isApproved ? '#A7F3D0' : isRejected ? '#FECACA' : 'var(--border-color)'}`,
-              borderRadius: '10px',
-              padding: '1rem 1.25rem',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '0.65rem'
-            }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.5rem' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                  <ShieldCheck size={16} style={{ color: isApproved ? '#059669' : isRejected ? '#DC2626' : 'var(--brand-primary)' }} />
-                  <span style={{ fontSize: '0.825rem', fontWeight: 700, color: isApproved ? '#065F46' : isRejected ? '#991B1B' : 'var(--text-primary)', textTransform: 'uppercase', letterSpacing: '0.03em' }}>
+            <div
+              className={`flex flex-col gap-[0.65rem] rounded-[10px] border px-5 py-4 ${
+                isApproved ? 'border-[#A7F3D0] bg-[#ECFDF5]' : isRejected ? 'border-[#FECACA] bg-[#FEF2F2]' : 'border-border bg-input'
+              }`}
+            >
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <ShieldCheck size={16} className={isApproved ? 'text-[#059669]' : isRejected ? 'text-[#DC2626]' : 'text-foreground'} />
+                  <span className={`text-[0.825rem] font-bold uppercase tracking-[0.03em] ${isApproved ? 'text-[#065F46]' : isRejected ? 'text-[#991B1B]' : 'text-foreground'}`}>
                     {isApproved ? 'Approved & Authorized' : isRejected ? 'Rejected Decision' : 'Review History'}
                   </span>
                 </div>
                 {(item.approvedDate || item.closedDate) && (
-                  <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)' }}>
+                  <span className="text-[0.75rem] text-muted-foreground font-[var(--font-mono)]">
                     {item.approvedDate || item.closedDate}
                   </span>
                 )}
               </div>
 
               {(item.decidedBy || item.approvedBy) && (
-                <div style={{ fontSize: '0.825rem', color: 'var(--text-primary)', fontWeight: 600 }}>
-                  Decision by: <span style={{ fontWeight: 700 }}>{item.decidedBy || item.approvedBy}</span>
+                <div className="text-[0.825rem] font-semibold text-foreground">
+                  Decision by: <span className="font-bold">{item.decidedBy || item.approvedBy}</span>
                   {(item.decidedByEmail || item.approvedByEmail) && (
-                    <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', fontWeight: 400, marginLeft: '0.4rem', fontFamily: 'var(--font-mono)' }}>
+                    <span className="ml-[0.4rem] text-[0.75rem] font-normal text-muted-foreground font-[var(--font-mono)]">
                       ({item.decidedByEmail || item.approvedByEmail})
                     </span>
                   )}
@@ -665,17 +531,8 @@ export default function PreSpendDetailsModal({ item, onClose, onApprove, onRejec
               )}
 
               {(item.approvedComment || item.rejectedComment || item.rejectionReason) && (
-                <div style={{
-                  fontSize: '0.825rem',
-                  color: 'var(--text-primary)',
-                  backgroundColor: 'var(--card-bg, #FFFFFF)',
-                  padding: '0.65rem 0.85rem',
-                  borderRadius: '6px',
-                  border: '1px solid var(--border-color)',
-                  lineHeight: 1.45,
-                  wordBreak: 'break-word'
-                }}>
-                  <div style={{ fontSize: '0.725rem', fontWeight: 700, color: 'var(--text-secondary)', marginBottom: '0.2rem', textTransform: 'uppercase' }}>
+                <div className="break-words rounded-md border border-border bg-card px-[0.85rem] py-[0.65rem] text-[0.825rem] leading-[1.45] text-foreground">
+                  <div className="mb-[0.2rem] text-[0.725rem] font-bold uppercase text-muted-foreground">
                     Decision Comment / Reason:
                   </div>
                   {item.approvedComment || item.rejectedComment || item.rejectionReason}
@@ -684,14 +541,14 @@ export default function PreSpendDetailsModal({ item, onClose, onApprove, onRejec
 
               {/* Audit Comments Log */}
               {Array.isArray(item.comments) && item.comments.length > 0 && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginTop: '0.25rem' }}>
+                <div className="mt-1 flex flex-col gap-2">
                   {item.comments.map((c, i) => (
-                    <div key={c.id || i} style={{ fontSize: '0.8rem', backgroundColor: 'var(--card-bg, #FFFFFF)', padding: '0.5rem 0.75rem', borderRadius: '6px', border: '1px solid var(--border-color)' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.725rem', color: 'var(--text-secondary)', marginBottom: '0.2rem' }}>
-                        <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{c.authorName || 'Reviewer'} ({c.authorRole || 'Approver'})</span>
-                        <span style={{ fontFamily: 'var(--font-mono)' }}>{c.createdAt ? new Date(c.createdAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : ''}</span>
+                    <div key={c.id || i} className="rounded-md border border-border bg-card px-3 py-2 text-[0.8rem]">
+                      <div className="mb-[0.2rem] flex justify-between text-[0.725rem] text-muted-foreground">
+                        <span className="font-semibold text-foreground">{c.authorName || 'Reviewer'} ({c.authorRole || 'Approver'})</span>
+                        <span className="font-[var(--font-mono)]">{c.createdAt ? new Date(c.createdAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : ''}</span>
                       </div>
-                      <div style={{ color: 'var(--text-primary)' }}>{c.text || c.comment}</div>
+                      <div className="text-foreground">{c.text || c.comment}</div>
                     </div>
                   ))}
                 </div>
@@ -701,16 +558,12 @@ export default function PreSpendDetailsModal({ item, onClose, onApprove, onRejec
 
           {/* Action Prompt (Approve/Reject comment box) */}
           {actionPrompt && (
-            <div style={{
-              padding: '1rem 1.25rem',
-              backgroundColor: actionPrompt === 'approve' ? '#ECFDF5' : '#FEF2F2',
-              borderRadius: '10px',
-              border: `1px solid ${actionPrompt === 'approve' ? '#A7F3D0' : '#FECACA'}`,
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '0.75rem'
-            }}>
-              <div style={{ fontSize: '0.85rem', fontWeight: 700, color: actionPrompt === 'approve' ? '#065F46' : '#991B1B' }}>
+            <div
+              className={`flex flex-col gap-3 rounded-[10px] border px-5 py-4 ${
+                actionPrompt === 'approve' ? 'border-[#A7F3D0] bg-[#ECFDF5]' : 'border-[#FECACA] bg-[#FEF2F2]'
+              }`}
+            >
+              <div className={`text-[0.85rem] font-bold ${actionPrompt === 'approve' ? 'text-[#065F46]' : 'text-[#991B1B]'}`}>
                 {actionPrompt === 'approve' ? 'Approve Pre-Spend Request' : 'Reject Pre-Spend Request'}
               </div>
               <textarea
@@ -718,29 +571,13 @@ export default function PreSpendDetailsModal({ item, onClose, onApprove, onRejec
                 onChange={(e) => setCommentInput(e.target.value)}
                 placeholder={actionPrompt === 'approve' ? 'Add approval note (optional)...' : 'State reason for rejection...'}
                 rows={2}
-                style={{
-                  width: '100%',
-                  padding: '0.5rem 0.75rem',
-                  borderRadius: '6px',
-                  border: '1px solid var(--border-color)',
-                  fontSize: '0.825rem',
-                  fontFamily: 'inherit',
-                  outline: 'none',
-                  boxSizing: 'border-box'
-                }}
+                className="box-border w-full rounded-md border border-border px-3 py-2 text-[0.825rem] outline-none [font-family:inherit]"
               />
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem' }}>
+              <div className="flex justify-end gap-2">
                 <button
                   type="button"
                   onClick={() => setActionPrompt(null)}
-                  style={{
-                    padding: '0.45rem 0.85rem',
-                    borderRadius: '6px',
-                    backgroundColor: '#FFFFFF',
-                    border: '1px solid var(--border-color)',
-                    fontSize: '0.8rem',
-                    cursor: 'pointer'
-                  }}
+                  className="cursor-pointer rounded-md border border-border bg-white px-[0.85rem] py-[0.45rem] text-[0.8rem]"
                 >
                   Cancel
                 </button>
@@ -748,16 +585,7 @@ export default function PreSpendDetailsModal({ item, onClose, onApprove, onRejec
                   type="button"
                   onClick={handleActionSubmit}
                   disabled={isSubmittingAction}
-                  style={{
-                    padding: '0.45rem 1rem',
-                    borderRadius: '6px',
-                    backgroundColor: actionPrompt === 'approve' ? '#059669' : '#DC2626',
-                    color: '#FFFFFF',
-                    border: 'none',
-                    fontSize: '0.8rem',
-                    fontWeight: 600,
-                    cursor: 'pointer'
-                  }}
+                  className={`cursor-pointer rounded-md border-0 px-4 py-[0.45rem] text-[0.8rem] font-semibold text-white ${actionPrompt === 'approve' ? 'bg-[#059669]' : 'bg-[#DC2626]'}`}
                 >
                   {isSubmittingAction ? 'Processing...' : actionPrompt === 'approve' ? 'Confirm Approval' : 'Confirm Rejection'}
                 </button>
@@ -768,45 +596,20 @@ export default function PreSpendDetailsModal({ item, onClose, onApprove, onRejec
         </div>
 
         {/* Footer Actions */}
-        <div style={{
-          padding: '1rem 1.75rem',
-          borderTop: '1px solid var(--border-color, #E2E8F0)',
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          backgroundColor: 'var(--card-bg, #FFFFFF)'
-        }}>
+        <div className="flex items-center justify-between border-t border-border bg-card px-7 py-4">
           <button
             onClick={onClose}
-            style={{
-              padding: '0.55rem 1.25rem',
-              borderRadius: '8px',
-              border: '1px solid var(--border-color, #E2E8F0)',
-              backgroundColor: 'transparent',
-              fontSize: '0.85rem',
-              fontWeight: 600,
-              color: 'var(--text-primary)',
-              cursor: 'pointer'
-            }}
+            className="cursor-pointer rounded-lg border border-border bg-transparent px-5 py-[0.55rem] text-[0.85rem] font-semibold text-foreground"
           >
             Close
           </button>
 
           {canActOnModal && (onApprove || onReject) && !actionPrompt && (
-            <div style={{ display: 'flex', gap: '0.75rem' }}>
+            <div className="flex gap-3">
               {onReject && (
                 <button
                   onClick={() => setActionPrompt('reject')}
-                  style={{
-                    padding: '0.55rem 1.25rem',
-                    borderRadius: '8px',
-                    border: '1px solid #FECACA',
-                    backgroundColor: '#FEF2F2',
-                    color: '#DC2626',
-                    fontSize: '0.85rem',
-                    fontWeight: 600,
-                    cursor: 'pointer'
-                  }}
+                  className="cursor-pointer rounded-lg border border-[#FECACA] bg-[#FEF2F2] px-5 py-[0.55rem] text-[0.85rem] font-semibold text-[#DC2626]"
                 >
                   Reject
                 </button>
@@ -814,16 +617,7 @@ export default function PreSpendDetailsModal({ item, onClose, onApprove, onRejec
               {onApprove && (
                 <button
                   onClick={() => setActionPrompt('approve')}
-                  style={{
-                    padding: '0.55rem 1.25rem',
-                    borderRadius: '8px',
-                    border: 'none',
-                    backgroundColor: '#059669',
-                    color: '#FFFFFF',
-                    fontSize: '0.85rem',
-                    fontWeight: 600,
-                    cursor: 'pointer'
-                  }}
+                  className="cursor-pointer rounded-lg border-0 bg-[#059669] px-5 py-[0.55rem] text-[0.85rem] font-semibold text-white"
                 >
                   Approve Requisition
                 </button>

@@ -1,8 +1,28 @@
 // ────────────────────────────────────────────────────────────────
 //  Auth service – Email-only development authentication using IdentityResolver.
 // ────────────────────────────────────────────────────────────────
+import crypto from 'node:crypto';
 import jwt from 'jsonwebtoken';
 import { IdentityResolver } from './identityResolver.service.js';
+
+// Single-use exchange codes for the SSO redirect: the browser lands with a short-lived
+// opaque code instead of the bearer JWT itself, so a leaked URL (history, proxy/access
+// logs, Referer headers) doesn't hand over a long-lived session.
+const SSO_CODE_TTL_MS = 60_000;
+const ssoExchangeCodes = new Map();
+
+export const createSsoExchangeCode = (token) => {
+  const code = crypto.randomBytes(24).toString('hex');
+  ssoExchangeCodes.set(code, { token, expiresAt: Date.now() + SSO_CODE_TTL_MS });
+  return code;
+};
+
+export const consumeSsoExchangeCode = (code) => {
+  const entry = ssoExchangeCodes.get(code);
+  ssoExchangeCodes.delete(code); // single use, win or lose
+  if (!entry || entry.expiresAt < Date.now()) return null;
+  return entry.token;
+};
 
 if (!process.env.JWT_SECRET) {
   throw new Error('JWT_SECRET environment variable is required and not set.');
@@ -148,7 +168,12 @@ export const authenticate = async (email) => {
 /**
  * Generates Microsoft OAuth2 Authorization URL
  */
-export const getMicrosoftAuthUrl = (state = 'changedesk-auth') => {
+export const getMicrosoftAuthUrl = (state) => {
+  if (!state) {
+    const err = new Error('OAuth state is required to start Microsoft sign-in.');
+    err.statusCode = 500;
+    throw err;
+  }
   const clientId = (process.env.MICROSOFT_CLIENT_ID || process.env.AZURE_CLIENT_ID || '').trim();
   const tenantId = (process.env.MICROSOFT_TENANT_ID || process.env.AZURE_TENANT_ID || 'common').trim();
   const redirectUri = (process.env.MICROSOFT_REDIRECT_URI || 'http://localhost:5001/api/auth/microsoft/callback').trim();

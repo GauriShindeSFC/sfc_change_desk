@@ -73,3 +73,12 @@ export const requireOrganizationScopeRole = (req, res, next) => {
   if (scope !== 'organization' && scope !== 'org') return next();
   return requireRole(['Super Admin', 'role-1'])(req, res, next);
 };
+
+/**
+ * Restricts ?view=worklist queries (the approver inbox, which surfaces every other
+ * user's requests) to the roles allowed to approve that domain
+ */
+export const requireWorklistViewRole = (allowedRoles = []) => (req, res, next) => {
+  if (req.query.view !== 'worklist') return next();
+  return requireRole(allowedRoles)(req, res, next);
+};

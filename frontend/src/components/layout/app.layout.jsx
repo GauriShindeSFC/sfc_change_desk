@@ -68,7 +68,7 @@ export default function AppLayout({ user, onLogout }) {
   };
 
   return (
-    <div className="flex min-h-screen bg-[var(--page-bg)] w-full">
+    <div className="flex min-h-screen bg-background w-full">
       <Sidebar
         activeItem={activeItem}
         onItemSelect={handleNavigate}
@@ -80,10 +80,9 @@ export default function AppLayout({ user, onLogout }) {
       />
 
       <div
-        className="flex-1 flex flex-col min-w-0 transition-[margin-left] duration-200"
-        style={{
-          marginLeft: isMobile ? 0 : isSidebarHovered ? '270px' : '68px'
-        }}
+        className={`flex-1 flex flex-col min-w-0 transition-[margin-left] duration-200 ${
+          isMobile ? 'ml-0' : isSidebarHovered ? 'ml-[270px]' : 'ml-[68px]'
+        }`}
       >
         <Header
           activeRoute={activeItem}

@@ -44,57 +44,26 @@ function Header({
     return () => clearTimeout(timer);
   }, [localSearch, onSearchChange, searchQuery]);
 
-  const squareBtn = {
-    width: '34px',
-    height: '34px',
-    borderRadius: '8px',
-    border: '1px solid var(--border-color)',
-    backgroundColor: 'var(--input-bg)',
-    color: 'var(--text-primary)',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    cursor: 'pointer',
-    flexShrink: 0
-  };
+  const squareBtnClass = 'flex h-[34px] w-[34px] shrink-0 cursor-pointer items-center justify-center rounded-lg border border-border bg-input text-foreground';
 
   return (
     <header
-      style={{
-        height: '60px',
-        backgroundColor: 'var(--card-bg)',
-        borderBottom: '1px solid var(--border-color)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        gap: '0.75rem',
-        padding: isMobile ? '0 1rem' : '0 1.5rem',
-        position: 'sticky',
-        top: 0,
-        zIndex: 40,
-        width: '100%'
-      }}
+      className={`sticky top-0 z-40 flex h-[60px] w-full items-center justify-between gap-3 border-b border-border bg-card ${
+        isMobile ? 'px-4' : 'px-6'
+      }`}
     >
       {/* Left: menu (mobile) + breadcrumb */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', minWidth: 0 }}>
+      <div className="flex min-w-0 items-center gap-[0.6rem]">
         {isMobile && (
-          <button type="button" onClick={onMenuClick} aria-label="Open menu" style={squareBtn}>
+          <button type="button" onClick={onMenuClick} aria-label="Open menu" className={squareBtnClass}>
             <Menu size={18} />
           </button>
         )}
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '0.4rem',
-            fontSize: '0.875rem',
-            minWidth: 0
-          }}
-        >
+        <div className="flex min-w-0 items-center gap-[0.4rem] text-sm">
           {!isMobile && (
             <>
-              <span style={{ color: 'var(--text-secondary)', fontWeight: 500 }}>Workspace</span>
-              <span style={{ color: 'var(--text-secondary)', fontSize: '0.75rem' }}>/</span>
+              <span className="font-medium text-muted-foreground">Workspace</span>
+              <span className="text-[0.75rem] text-muted-foreground">/</span>
             </>
           )}
           {(() => {
@@ -108,16 +77,16 @@ function Header({
                 : 'Change Request';
 
               return (
-                <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}>
-                  <span style={{ color: 'var(--text-secondary)', fontWeight: 500 }}>My Worklist</span>
-                  <span style={{ color: 'var(--text-secondary)', fontSize: '0.75rem' }}>/</span>
-                  <span style={{ color: 'var(--text-primary)', fontWeight: 600 }}>{moduleLabel}</span>
+                <div className="inline-flex items-center gap-[0.4rem]">
+                  <span className="font-medium text-muted-foreground">My Worklist</span>
+                  <span className="text-[0.75rem] text-muted-foreground">/</span>
+                  <span className="font-semibold text-foreground">{moduleLabel}</span>
                 </div>
               );
             }
 
             return (
-              <span style={{ color: 'var(--text-primary)', fontWeight: 500 }}>
+              <span className="font-medium text-foreground">
                 {activeRoute === 'Dashboard' ? 'My Dashboard' : activeRoute}
               </span>
             );
@@ -126,20 +95,10 @@ function Header({
       </div>
 
       {/* Right controls */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+      <div className="flex items-center gap-3">
         {!isMobile && activeRoute !== 'Dashboard' && !activeRoute?.includes('Change Request') && !['Pre-Spend Request', 'Travel Desk', 'Tribe CRM', 'Settings'].includes(activeRoute) && (
-          <div style={{ width: '280px', position: 'relative' }}>
-            <div
-              style={{
-                position: 'absolute',
-                left: '0.85rem',
-                top: '50%',
-                transform: 'translateY(-50%)',
-                color: 'var(--text-secondary)',
-                display: 'flex',
-                alignItems: 'center'
-              }}
-            >
+          <div className="relative w-[280px]">
+            <div className="absolute top-1/2 left-[0.85rem] flex -translate-y-1/2 items-center text-muted-foreground">
               <Search size={14} />
             </div>
             <input
@@ -147,16 +106,7 @@ function Header({
               value={localSearch}
               onChange={(e) => setLocalSearch(e.target.value)}
               placeholder="Search CR-ID, title, requester..."
-              style={{
-                width: '100%',
-                padding: '0.45rem 0.85rem 0.45rem 2.2rem',
-                borderRadius: '8px',
-                border: '1px solid var(--border-color)',
-                backgroundColor: 'var(--input-bg)',
-                color: 'var(--text-primary)',
-                fontSize: '0.8rem',
-                outline: 'none'
-              }}
+              className="w-full rounded-lg border border-border bg-input py-[0.45rem] pr-[0.85rem] pl-[2.2rem] text-[0.8rem] text-foreground outline-none"
             />
           </div>
         )}
@@ -166,73 +116,37 @@ function Header({
           onClick={toggleTheme}
           aria-label="Toggle theme"
           title={theme === 'dark' ? 'Switch to light' : 'Switch to dark'}
-          style={squareBtn}
+          className={squareBtnClass}
         >
           {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
         </button>
 
         {/* Profile Menu */}
-        <div ref={profileRef} style={{ position: 'relative' }}>
+        <div ref={profileRef} className="relative">
           <button
             type="button"
             onClick={() => setShowProfileMenu((v) => !v)}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.6rem',
-              padding: '0.2rem 0.3rem 0.2rem 0.6rem',
-              borderRadius: '8px',
-              border: 'none',
-              backgroundColor: 'transparent',
-              cursor: 'pointer'
-            }}
+            className="flex cursor-pointer items-center gap-[0.6rem] rounded-lg border-none bg-transparent py-[0.2rem] pr-[0.3rem] pl-[0.6rem]"
           >
             {!isMobile && (
-              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', lineHeight: 1.25 }}>
-                <span style={{ fontSize: '0.825rem', fontWeight: 600, color: 'var(--text-primary)', whiteSpace: 'nowrap' }}>
+              <div className="flex flex-col items-end leading-tight">
+                <span className="whitespace-nowrap text-[0.825rem] font-semibold text-foreground">
                   {user?.name || user?.displayName || 'User'}
                 </span>
-                <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>
+                <span className="whitespace-nowrap text-[0.7rem] text-muted-foreground">
                   {user?.email || ''}
                 </span>
               </div>
             )}
-            <div
-              style={{
-                width: '36px',
-                height: '36px',
-                borderRadius: '8px',
-                backgroundColor: 'var(--primary)',
-                color: 'var(--primary-foreground)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                fontSize: '0.85rem',
-                fontWeight: 600,
-                flexShrink: 0
-              }}
-            >
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary text-[0.85rem] font-semibold text-primary-foreground">
               {initials}
             </div>
           </button>
 
           {showProfileMenu && (
-            <div
-              style={{
-                position: 'absolute',
-                right: 0,
-                top: 'calc(100% + 8px)',
-                width: '200px',
-                backgroundColor: 'var(--card-bg)',
-                border: '1px solid var(--border-color)',
-                borderRadius: '8px',
-                boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
-                padding: '0.5rem 0',
-                zIndex: 50
-              }}
-            >
-              <div style={{ padding: '0.5rem 1rem', borderBottom: '1px solid var(--border-color)' }}>
-                <strong style={{ display: 'block', fontSize: '0.825rem', color: 'var(--text-primary)' }}>
+            <div className="absolute right-0 top-[calc(100%+8px)] z-50 w-[200px] rounded-lg border border-border bg-card px-0 py-2 shadow-[0_4px_12px_rgba(0,0,0,0.1)]">
+              <div className="border-b border-border px-4 py-2">
+                <strong className="block text-[0.825rem] text-foreground">
                   {user?.name || 'Unknown user'}
                 </strong>
                 {(() => {
@@ -240,7 +154,7 @@ function Header({
                   const isRequester = roleStr === 'requester' || user?.roleId === 'role-4';
                   if (isRequester || !user?.role) return null;
                   return (
-                    <span style={{ display: 'block', fontSize: '0.7rem', color: 'var(--text-secondary)', marginTop: '0.15rem' }}>
+                    <span className="mt-[0.15rem] block text-[0.7rem] text-muted-foreground">
                       {user.role}
                     </span>
                   );
@@ -252,17 +166,7 @@ function Header({
                   setShowProfileMenu(false);
                   onLogout?.();
                 }}
-                style={{
-                  width: '100%',
-                  textAlign: 'left',
-                  padding: '0.5rem 1rem',
-                  border: 'none',
-                  backgroundColor: 'transparent',
-                  color: '#DC2626',
-                  fontSize: '0.8rem',
-                  fontWeight: 600,
-                  cursor: 'pointer'
-                }}
+                className="w-full cursor-pointer border-none bg-transparent px-4 py-2 text-left text-[0.8rem] font-semibold text-red-600"
               >
                 Sign out
               </button>

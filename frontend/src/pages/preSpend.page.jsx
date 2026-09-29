@@ -1,6 +1,5 @@
-import React, { useId, useState, useEffect, useRef } from 'react';
+import React, { useId, useState, useEffect } from 'react';
 import {
-  Check,
   ArrowLeft,
   ArrowRight,
   IndianRupee,
@@ -10,9 +9,7 @@ import {
   FileText,
   ExternalLink,
   History,
-  Sparkles,
-  ChevronDown,
-  Search
+  Sparkles
 } from 'lucide-react';
 import {
   PRE_SPEND_CATEGORIES,
@@ -21,36 +18,16 @@ import {
   EXCEPTION_OPTIONS
 } from '../lib/preSpend.config.js';
 import { FormLabel } from '../components/ui/primitives.component';
+import FormStepper from '../components/ui/FormStepper.component';
+import ManagerCombobox from '../components/ui/ManagerCombobox.component';
 import { apiFetch } from '../lib/apiFetch.lib';
 
 const emptyVendor = () => ({ name: '', amount: '', date: '', file: null, fileName: '' });
 const money = value => Number(value || 0).toLocaleString('en-IN', { style: 'currency', currency: 'INR' });
 
-const ACTIVE_FIELD_STYLE = {
-  width: '100%',
-  padding: '0.65rem 0.85rem',
-  backgroundColor: 'var(--input-bg)',
-  border: '1px solid var(--border-color)',
-  borderRadius: '8px',
-  fontSize: '0.85rem',
-  fontFamily: 'inherit',
-  color: 'var(--text-primary)',
-  outline: 'none',
-  boxSizing: 'border-box'
-};
+const ACTIVE_FIELD_CLASS = 'w-full box-border rounded-[8px] border border-border bg-input px-[0.85rem] py-[0.65rem] text-[0.85rem] [font-family:inherit] text-foreground outline-none';
 
-const READONLY_FIELD_STYLE = {
-  width: '100%',
-  padding: '0.65rem 0.85rem',
-  backgroundColor: 'var(--input-bg, #F8FAFC)',
-  border: '1px solid var(--border-color, #E2E8F0)',
-  borderRadius: '8px',
-  fontSize: '0.85rem',
-  fontFamily: 'inherit',
-  color: 'var(--text-secondary, #64748B)',
-  cursor: 'not-allowed',
-  boxSizing: 'border-box'
-};
+const READONLY_FIELD_CLASS = 'w-full box-border rounded-[8px] border border-border bg-input px-[0.85rem] py-[0.65rem] text-[0.85rem] [font-family:inherit] text-muted-foreground cursor-not-allowed';
 
 const resolveEmpBusinessId = (u, initialVal) => {
   if (initialVal && typeof initialVal === 'string' && !initialVal.startsWith('S8-') && !initialVal.startsWith('EMP-')) return initialVal;
@@ -89,19 +66,6 @@ export default function PreSpendPage({ onNavigate, user, initialCostCentre = '',
 
   const [availableUsers, setAvailableUsers] = useState([]);
   const [loadingUsers, setLoadingUsers] = useState(false);
-  const [managerDropdownOpen, setManagerDropdownOpen] = useState(false);
-  const [managerSearchTerm, setManagerSearchTerm] = useState('');
-  const managerDropdownRef = useRef(null);
-
-  useEffect(() => {
-    const handleClickOutside = (e) => {
-      if (managerDropdownRef.current && !managerDropdownRef.current.contains(e.target)) {
-        setManagerDropdownOpen(false);
-      }
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
 
   useEffect(() => {
     const fetchUsers = async () => {
@@ -157,7 +121,7 @@ export default function PreSpendPage({ onNavigate, user, initialCostCentre = '',
   const [notice, setNotice] = useState('');
   const [submitted, setSubmitted] = useState(false);
   const [createdCode, setCreatedCode] = useState('');
-  
+
   // Past Vendor Look-up State
   const [pastVendor, setPastVendor] = useState(null);
   const [usePastVendor, setUsePastVendor] = useState(false);
@@ -298,108 +262,34 @@ export default function PreSpendPage({ onNavigate, user, initialCostCentre = '',
   const stepsList = ['Spend Category', 'Request Details', 'Vendors & Quotes', 'Review & Submit'];
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', width: '100%', paddingBottom: '3rem' }}>
-      
+    <div className="flex w-full flex-col gap-5 pb-12">
+
       {/* Top Header */}
       <div>
-        <h1 style={{ fontSize: '1.45rem', fontWeight: 700, color: 'var(--text-primary)', lineHeight: 1.2, margin: 0 }}>
+        <h1 className="m-0 text-[1.45rem] leading-[1.2] font-bold text-foreground">
           New Pre-Spend Request
         </h1>
-        <p style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', marginTop: '0.25rem', margin: 0 }}>
+        <p className="m-0 text-[0.875rem] text-muted-foreground">
           Obtain financial approval before placing an order or committing to a vendor
         </p>
       </div>
 
       {/* Stepper */}
-      <div style={{
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        padding: '0.85rem 1.25rem',
-        backgroundColor: 'var(--card-bg)',
-        border: '1px solid var(--border-color)',
-        borderRadius: '12px',
-        overflowX: 'auto',
-        gap: '0.75rem'
-      }}>
-        {stepsList.map((label, index) => {
-          const stepNum = index + 1;
-          const isActive = step === stepNum;
-          const isDone = step > stepNum;
-          return (
-            <div
-              key={label}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.6rem'
-              }}
-            >
-              <div
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.5rem',
-                  fontSize: '0.825rem',
-                  fontWeight: isActive || isDone ? 600 : 500,
-                  color: isActive ? '#FFFFFF' : isDone ? '#059669' : 'var(--text-secondary)',
-                  whiteSpace: 'nowrap',
-                  padding: isActive ? '0.3rem 0.85rem 0.3rem 0.3rem' : 0,
-                  borderRadius: isActive ? 'var(--radius-full)' : 0,
-                  backgroundColor: isActive ? 'var(--brand-primary)' : 'transparent'
-                }}
-              >
-                <div
-                  style={{
-                    width: '24px',
-                    height: '24px',
-                    borderRadius: '50%',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    fontSize: '0.75rem',
-                    fontWeight: 700,
-                    flexShrink: 0,
-                    backgroundColor: isActive ? 'rgba(255, 255, 255, 0.2)' : isDone ? '#059669' : 'var(--input-bg)',
-                    color: isActive || isDone ? '#FFFFFF' : 'var(--text-secondary)',
-                    border: isActive || isDone ? 'none' : '1px solid var(--border-color)'
-                  }}
-                >
-                  {isDone ? <Check size={13} strokeWidth={3} /> : stepNum}
-                </div>
-                <span>{label}</span>
-              </div>
-              {index < stepsList.length - 1 && (
-                <span style={{ color: 'var(--border-color)' }}>/</span>
-              )}
-            </div>
-          );
-        })}
-      </div>
+      <FormStepper steps={stepsList} currentStep={step} />
 
       {/* Success Banner */}
       {submitted && (
-        <div style={{
-          backgroundColor: '#ECFDF5',
-          border: '1px solid #A7F3D0',
-          borderRadius: '12px',
-          padding: '2rem',
-          textAlign: 'center',
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          gap: '0.75rem'
-        }}>
-          <div style={{ width: '48px', height: '48px', borderRadius: '50%', backgroundColor: '#D1FAE5', color: '#059669', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <div className="flex flex-col items-center gap-3 rounded-[12px] border border-[#A7F3D0] bg-[#ECFDF5] p-8 text-center">
+          <div className="flex h-12 w-12 items-center justify-center rounded-full bg-[#D1FAE5] text-[#059669]">
             <CheckCircle2 size={28} />
           </div>
-          <h3 style={{ fontSize: '1.25rem', fontWeight: 700, color: '#065F46', margin: 0 }}>
+          <h3 className="m-0 text-[1.25rem] font-bold text-[#065F46]">
             Pre-Spend Request Submitted Successfully
           </h3>
-          <p style={{ fontSize: '0.85rem', color: '#047857', maxWidth: '480px', margin: 0, lineHeight: 1.5 }}>
+          <p className="m-0 max-w-[480px] text-[0.85rem] leading-[1.5] text-[#047857]">
             Your pre-spend requisition <strong>{createdCode || ''}</strong> for <strong>{details.buying || category}</strong> has been created and sent for approval.
           </p>
-          <div style={{ display: 'flex', gap: '0.75rem', marginTop: '0.5rem' }}>
+          <div className="mt-2 flex gap-3">
             <button
               type="button"
               onClick={() => {
@@ -408,32 +298,14 @@ export default function PreSpendPage({ onNavigate, user, initialCostCentre = '',
                 setCategory('');
                 setSubcategory('');
               }}
-              style={{
-                padding: '0.65rem 1.35rem',
-                backgroundColor: '#047857',
-                color: '#FFFFFF',
-                border: 'none',
-                borderRadius: '8px',
-                fontSize: '0.85rem',
-                fontWeight: 600,
-                cursor: 'pointer'
-              }}
+              className="cursor-pointer rounded-[8px] border-0 bg-[#047857] px-[1.35rem] py-[0.65rem] text-[0.85rem] font-semibold text-white"
             >
               Create Another Request
             </button>
             <button
               type="button"
               onClick={() => onNavigate?.('Dashboard')}
-              style={{
-                padding: '0.65rem 1.35rem',
-                backgroundColor: 'transparent',
-                color: '#065F46',
-                border: '1px solid #A7F3D0',
-                borderRadius: '8px',
-                fontSize: '0.85rem',
-                fontWeight: 600,
-                cursor: 'pointer'
-              }}
+              className="cursor-pointer rounded-[8px] border border-[#A7F3D0] bg-transparent px-[1.35rem] py-[0.65rem] text-[0.85rem] font-semibold text-[#065F46]"
             >
               Back to Dashboard
             </button>
@@ -443,27 +315,18 @@ export default function PreSpendPage({ onNavigate, user, initialCostCentre = '',
 
       {/* STEP 1: Category */}
       {!submitted && step === 1 && (
-        <div style={{
-          backgroundColor: 'var(--card-bg)',
-          border: '1px solid var(--border-color)',
-          borderRadius: '12px',
-          padding: '1.75rem',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: '1.5rem',
-          boxShadow: '0 1px 3px rgba(16, 21, 30, 0.04)'
-        }}>
+        <div className="flex flex-col gap-6 rounded-[12px] border border-border bg-card p-7 shadow-[0_1px_3px_rgba(16,21,30,0.04)]">
           <div>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem' }}>
-              <h3 style={{ fontSize: '1rem', fontWeight: 600, color: 'var(--text-primary)', margin: 0 }}>
+            <div className="mb-4 flex items-center justify-between">
+              <h3 className="m-0 text-base font-semibold text-foreground">
                 1. Select Spend Category
               </h3>
-              <span style={{ fontSize: '0.775rem', fontWeight: 600, color: 'var(--text-secondary)' }}>
+              <span className="text-[0.775rem] font-semibold text-muted-foreground">
                 Step 1 of 4
               </span>
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '0.75rem' }}>
+            <div className="grid gap-3 [grid-template-columns:repeat(auto-fit,minmax(220px,1fr))]">
               {PRE_SPEND_CATEGORIES.map(item => {
                 const selected = category === item.name;
                 const isHovered = hoveredCat === item.name;
@@ -477,28 +340,18 @@ export default function PreSpendPage({ onNavigate, user, initialCostCentre = '',
                     }}
                     onMouseEnter={() => setHoveredCat(item.name)}
                     onMouseLeave={() => setHoveredCat(null)}
-                    style={{
-                      padding: '1.1rem',
-                      borderRadius: '12px',
-                      textAlign: 'left',
-                      border: selected
-                        ? '2px solid var(--brand-primary, #173C4E)'
+                    className={`cursor-pointer rounded-[12px] p-[1.1rem] text-left transition-[transform,border-color,box-shadow,background-color] duration-200 ${
+                      isHovered ? '-translate-y-[5px]' : 'translate-y-0'
+                    } ${
+                      selected
+                        ? 'border-2 border-primary bg-input shadow-[0_0_0_3px_rgba(23,60,78,0.12)]'
                         : isHovered
-                        ? '1.5px solid var(--brand-primary, #173C4E)'
-                        : '1px solid var(--border-color)',
-                      backgroundColor: selected ? 'var(--input-bg, #F4F5F7)' : 'var(--card-bg)',
-                      boxShadow: selected
-                        ? '0 0 0 3px rgba(23, 60, 78, 0.12)'
-                        : isHovered
-                        ? '0 12px 24px -4px rgba(23, 60, 78, 0.14), 0 4px 12px -2px rgba(0, 0, 0, 0.06)'
-                        : '0 1px 3px rgba(16, 21, 30, 0.04)',
-                      transform: isHovered ? 'translateY(-5px)' : 'translateY(0)',
-                      cursor: 'pointer',
-                      transition: 'transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease'
-                    }}
+                        ? 'border-[1.5px] border-primary bg-card shadow-[0_12px_24px_-4px_rgba(23,60,78,0.14),0_4px_12px_-2px_rgba(0,0,0,0.06)]'
+                        : 'border border-border bg-card shadow-[0_1px_3px_rgba(16,21,30,0.04)]'
+                    }`}
                   >
-                    <div style={{ fontSize: '0.875rem', fontWeight: 600, color: 'var(--text-primary)' }}>{item.name}</div>
-                    <div style={{ fontSize: '0.775rem', color: 'var(--text-secondary)', marginTop: '0.25rem', lineHeight: 1.4 }}>{item.description}</div>
+                    <div className="text-[0.875rem] font-semibold text-foreground">{item.name}</div>
+                    <div className="mt-1 text-[0.775rem] leading-[1.4] text-muted-foreground">{item.description}</div>
                   </button>
                 );
               })}
@@ -506,11 +359,11 @@ export default function PreSpendPage({ onNavigate, user, initialCostCentre = '',
           </div>
 
           {selectedCategory && (
-            <div style={{ paddingTop: '1.25rem', borderTop: '1px solid var(--border-color)' }}>
-              <h3 style={{ fontSize: '1rem', fontWeight: 600, color: 'var(--text-primary)', margin: '0 0 0.75rem 0' }}>
+            <div className="border-t border-border pt-5">
+              <h3 className="mt-0 mr-0 mb-3 ml-0 text-base font-semibold text-foreground">
                 2. Select Subcategory for {selectedCategory.name}
               </h3>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '0.6rem' }}>
+              <div className="grid gap-[0.6rem] [grid-template-columns:repeat(auto-fit,minmax(180px,1fr))]">
                 {selectedCategory.subcategories.map(sub => {
                   const selected = subcategory === sub;
                   const isHovered = hoveredSubcat === sub;
@@ -521,28 +374,15 @@ export default function PreSpendPage({ onNavigate, user, initialCostCentre = '',
                       onClick={() => setSubcategory(sub)}
                       onMouseEnter={() => setHoveredSubcat(sub)}
                       onMouseLeave={() => setHoveredSubcat(null)}
-                      style={{
-                        padding: '0.65rem 0.85rem',
-                        borderRadius: '8px',
-                        fontSize: '0.825rem',
-                        fontWeight: selected ? 600 : 500,
-                        textAlign: 'left',
-                        border: selected
-                          ? '2px solid var(--brand-primary, #173C4E)'
+                      className={`cursor-pointer rounded-[8px] bg-transparent px-[0.85rem] py-[0.65rem] text-left text-[0.825rem] text-foreground transition-[transform,border-color,box-shadow] duration-[180ms] ${
+                        selected ? 'font-semibold' : 'font-medium'
+                      } ${isHovered ? '-translate-y-[3px]' : 'translate-y-0'} ${
+                        selected
+                          ? 'border-2 border-primary shadow-[0_0_0_3px_rgba(23,60,78,0.12)]'
                           : isHovered
-                          ? '1.5px solid var(--brand-primary, #173C4E)'
-                          : '1px solid var(--border-color)',
-                        backgroundColor: 'transparent',
-                        color: 'var(--text-primary)',
-                        boxShadow: selected
-                          ? '0 0 0 3px rgba(23, 60, 78, 0.12)'
-                          : isHovered
-                          ? '0 6px 14px -2px rgba(23, 60, 78, 0.12)'
-                          : 'none',
-                        transform: isHovered ? 'translateY(-3px)' : 'translateY(0)',
-                        cursor: 'pointer',
-                        transition: 'transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease'
-                      }}
+                          ? 'border-[1.5px] border-primary shadow-[0_6px_14px_-2px_rgba(23,60,78,0.12)]'
+                          : 'border border-border shadow-none'
+                      }`}
                     >
                       {sub}
                     </button>
@@ -552,25 +392,14 @@ export default function PreSpendPage({ onNavigate, user, initialCostCentre = '',
             </div>
           )}
 
-          <div style={{ display: 'flex', justifyContent: 'flex-end', paddingTop: '1rem', borderTop: '1px solid var(--border-color)' }}>
+          <div className="flex justify-end border-t border-border pt-4">
             <button
               type="button"
               disabled={!category || !subcategory}
               onClick={() => setStep(2)}
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '0.45rem',
-                padding: '0.65rem 1.35rem',
-                backgroundColor: 'var(--brand-primary)',
-                color: '#FFFFFF',
-                border: 'none',
-                borderRadius: '8px',
-                fontSize: '0.85rem',
-                fontWeight: 600,
-                cursor: (!category || !subcategory) ? 'not-allowed' : 'pointer',
-                opacity: (!category || !subcategory) ? 0.5 : 1
-              }}
+              className={`inline-flex items-center gap-[0.45rem] rounded-[8px] border-0 bg-primary px-[1.35rem] py-[0.65rem] text-[0.85rem] font-semibold text-white ${
+                (!category || !subcategory) ? 'cursor-not-allowed opacity-50' : 'cursor-pointer opacity-100'
+              }`}
             >
               <span>Next: Request Details</span>
               <ArrowRight size={14} />
@@ -581,23 +410,14 @@ export default function PreSpendPage({ onNavigate, user, initialCostCentre = '',
 
       {/* STEP 2: Request Details */}
       {!submitted && step === 2 && (
-        <form onSubmit={(e) => { e.preventDefault(); setStep(3); }} style={{
-          backgroundColor: 'var(--card-bg)',
-          border: '1px solid var(--border-color)',
-          borderRadius: '12px',
-          padding: '1.75rem',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: '1.5rem',
-          boxShadow: '0 1px 3px rgba(16, 21, 30, 0.04)'
-        }}>
+        <form onSubmit={(e) => { e.preventDefault(); setStep(3); }} className="flex flex-col gap-6 rounded-[12px] border border-border bg-card p-7 shadow-[0_1px_3px_rgba(16,21,30,0.04)]">
           {/* Section 1: Requester Details */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <h3 style={{ fontSize: '1rem', fontWeight: 600, color: 'var(--text-primary)', margin: 0 }}>
+          <div className="flex flex-col gap-5">
+            <div className="flex items-center justify-between">
+              <h3 className="m-0 text-base font-semibold text-foreground">
                 Requester Details
               </h3>
-              <span style={{ fontSize: '0.775rem', fontWeight: 600, color: 'var(--text-secondary)' }}>
+              <span className="text-[0.775rem] font-semibold text-muted-foreground">
                 Section 1 of 2
               </span>
             </div>
@@ -610,7 +430,7 @@ export default function PreSpendPage({ onNavigate, user, initialCostCentre = '',
                   readOnly
                   disabled
                   value={requesterDetails.employeeName}
-                  style={READONLY_FIELD_STYLE}
+                  className={READONLY_FIELD_CLASS}
                 />
               </div>
               <div>
@@ -621,7 +441,7 @@ export default function PreSpendPage({ onNavigate, user, initialCostCentre = '',
                   disabled
                   placeholder="e.g. employee@company.com"
                   value={requesterDetails.employeeEmail}
-                  style={READONLY_FIELD_STYLE}
+                  className={READONLY_FIELD_CLASS}
                 />
               </div>
               <div>
@@ -632,7 +452,7 @@ export default function PreSpendPage({ onNavigate, user, initialCostCentre = '',
                   disabled
                   placeholder="e.g. SFC-0083"
                   value={requesterDetails.employeeId}
-                  style={READONLY_FIELD_STYLE}
+                  className={READONLY_FIELD_CLASS}
                 />
               </div>
               <div>
@@ -643,121 +463,18 @@ export default function PreSpendPage({ onNavigate, user, initialCostCentre = '',
                   disabled
                   placeholder="Enter Location"
                   value={requesterDetails.location || resolveEmpLocation(activeSessionUser) || ''}
-                  style={READONLY_FIELD_STYLE}
+                  className={READONLY_FIELD_CLASS}
                 />
               </div>
 
               {/* Searchable Manager Combobox Dropdown */}
-              <div ref={managerDropdownRef} style={{ position: 'relative' }}>
-                <FormLabel required>Manager Name</FormLabel>
-                <div
-                  tabIndex={0}
-                  onClick={() => setManagerDropdownOpen(prev => !prev)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' || e.key === ' ') {
-                      e.preventDefault();
-                      setManagerDropdownOpen(prev => !prev);
-                    }
-                  }}
-                  style={{
-                    ...ACTIVE_FIELD_STYLE,
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    userSelect: 'none'
-                  }}
-                >
-                  <span style={{ color: requesterDetails.managerName ? 'var(--text-primary)' : 'var(--text-secondary)' }}>
-                    {requesterDetails.managerName || (loadingUsers ? 'Loading employees...' : 'Select Reporting Manager...')}
-                  </span>
-                  <ChevronDown size={16} style={{ color: 'var(--text-secondary)', transition: 'transform 0.2s', transform: managerDropdownOpen ? 'rotate(180deg)' : 'none' }} />
-                </div>
-
-                {managerDropdownOpen && (
-                  <div style={{
-                    position: 'absolute',
-                    top: '100%',
-                    left: 0,
-                    right: 0,
-                    zIndex: 50,
-                    marginTop: '0.35rem',
-                    backgroundColor: 'var(--card-bg)',
-                    border: '1px solid var(--border-color)',
-                    borderRadius: '10px',
-                    boxShadow: '0 8px 24px rgba(15, 23, 42, 0.12)',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    overflow: 'hidden'
-                  }}>
-                    <div style={{ padding: '0.65rem', borderBottom: '1px solid var(--border-color)', backgroundColor: 'var(--input-bg)' }}>
-                      <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
-                        <Search size={14} style={{ position: 'absolute', left: '0.65rem', color: 'var(--text-secondary)' }} />
-                        <input
-                          type="text"
-                          autoFocus
-                          value={managerSearchTerm}
-                          onChange={(e) => setManagerSearchTerm(e.target.value)}
-                          placeholder="Search manager by name or email..."
-                          style={{
-                            width: '100%',
-                            padding: '0.45rem 0.65rem 0.45rem 2rem',
-                            fontSize: '0.8rem',
-                            border: '1px solid var(--border-color)',
-                            borderRadius: '6px',
-                            outline: 'none',
-                            backgroundColor: 'var(--card-bg)',
-                            color: 'var(--text-primary)',
-                            boxSizing: 'border-box'
-                          }}
-                        />
-                      </div>
-                    </div>
-
-                    <div style={{ maxHeight: '200px', overflowY: 'auto' }}>
-                      {availableUsers
-                        .filter(u => {
-                          if (!managerSearchTerm.trim()) return true;
-                          const term = managerSearchTerm.toLowerCase();
-                          return (u.name && u.name.toLowerCase().includes(term)) || (u.email && u.email.toLowerCase().includes(term));
-                        })
-                        .map(u => (
-                          <div
-                            key={u.id || u.email}
-                            onClick={() => {
-                              setRequesterDetails(prev => ({
-                                ...prev,
-                                managerName: u.name,
-                                managerEmail: u.email
-                              }));
-                              setManagerDropdownOpen(false);
-                              setManagerSearchTerm('');
-                            }}
-                            style={{
-                              padding: '0.6rem 0.85rem',
-                              cursor: 'pointer',
-                              display: 'flex',
-                              flexDirection: 'column',
-                              gap: '0.15rem',
-                              borderBottom: '1px solid var(--border-color)',
-                              backgroundColor: requesterDetails.managerEmail === u.email ? 'var(--input-bg)' : 'transparent',
-                              transition: 'background-color 0.15s'
-                            }}
-                            onMouseEnter={(e) => {
-                              if (requesterDetails.managerEmail !== u.email) e.currentTarget.style.backgroundColor = 'var(--input-bg)';
-                            }}
-                            onMouseLeave={(e) => {
-                              if (requesterDetails.managerEmail !== u.email) e.currentTarget.style.backgroundColor = 'transparent';
-                            }}
-                          >
-                            <span style={{ fontSize: '0.825rem', fontWeight: 600, color: 'var(--text-primary)' }}>{u.name}</span>
-                            <span style={{ fontSize: '0.725rem', color: 'var(--text-secondary)' }}>{u.email}</span>
-                          </div>
-                        ))}
-                    </div>
-                  </div>
-                )}
-              </div>
+              <ManagerCombobox
+                managerName={requesterDetails.managerName}
+                managerEmail={requesterDetails.managerEmail}
+                onSelect={(u) => setRequesterDetails(prev => ({ ...prev, managerName: u.name, managerEmail: u.email }))}
+                users={availableUsers}
+                loading={loadingUsers}
+              />
 
               <div>
                 <FormLabel>Manager Email</FormLabel>
@@ -767,26 +484,26 @@ export default function PreSpendPage({ onNavigate, user, initialCostCentre = '',
                   disabled
                   placeholder="Selected manager's email"
                   value={requesterDetails.managerEmail}
-                  style={READONLY_FIELD_STYLE}
+                  className={READONLY_FIELD_CLASS}
                 />
               </div>
             </div>
           </div>
 
-          <div style={{ height: '1px', backgroundColor: 'var(--border-color)' }} />
+          <div className="h-px bg-border" />
 
           {/* Section 2: Requisition Details */}
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <h3 style={{ fontSize: '1rem', fontWeight: 600, color: 'var(--text-primary)', margin: 0 }}>
+          <div className="flex items-center justify-between">
+            <h3 className="m-0 text-base font-semibold text-foreground">
               Requisition Details ({category} - {subcategory})
             </h3>
-            <span style={{ fontSize: '0.775rem', fontWeight: 600, color: 'var(--text-secondary)' }}>
+            <span className="text-[0.775rem] font-semibold text-muted-foreground">
               Section 2 of 2
             </span>
           </div>
 
           <div className="cd-responsive-form-grid">
-            <div style={{ gridColumn: '1 / -1' }}>
+            <div className="col-span-full">
               <FormLabel required htmlFor={id('buying')}>What are you buying?</FormLabel>
               <input
                 id={id('buying')}
@@ -795,7 +512,7 @@ export default function PreSpendPage({ onNavigate, user, initialCostCentre = '',
                 value={details.buying}
                 onChange={e => changeDetails('buying', e.target.value)}
                 placeholder="Item / service description, quantity and brief spec"
-                style={ACTIVE_FIELD_STYLE}
+                className={ACTIVE_FIELD_CLASS}
               />
             </div>
 
@@ -811,7 +528,7 @@ export default function PreSpendPage({ onNavigate, user, initialCostCentre = '',
                   changeDetails('location', val);
                 }}
                 placeholder="Enter Location"
-                style={ACTIVE_FIELD_STYLE}
+                className={ACTIVE_FIELD_CLASS}
               />
             </div>
 
@@ -824,11 +541,11 @@ export default function PreSpendPage({ onNavigate, user, initialCostCentre = '',
                 min={todayStr}
                 value={details.neededBy}
                 onChange={e => changeDetails('neededBy', e.target.value)}
-                style={ACTIVE_FIELD_STYLE}
+                className={ACTIVE_FIELD_CLASS}
               />
             </div>
 
-            <div style={{ gridColumn: '1 / -1' }}>
+            <div className="col-span-full">
               <FormLabel required htmlFor={id('justification')}>Business Justification</FormLabel>
               <textarea
                 id={id('justification')}
@@ -837,60 +554,36 @@ export default function PreSpendPage({ onNavigate, user, initialCostCentre = '',
                 value={details.justification}
                 onChange={e => changeDetails('justification', e.target.value)}
                 placeholder="Why is this purchase required? What is the business impact if delayed?"
-                style={{ ...ACTIVE_FIELD_STYLE, resize: 'vertical' }}
+                className={`${ACTIVE_FIELD_CLASS} resize-y`}
               />
             </div>
 
-            <div style={{ gridColumn: '1 / -1', display: 'flex', alignItems: 'center', gap: '0.5rem', paddingTop: '0.5rem' }}>
+            <div className="col-span-full flex items-center gap-2 pt-2">
               <input
                 id={id('urgent')}
                 type="checkbox"
                 checked={details.urgent}
                 onChange={e => changeDetails('urgent', e.target.checked)}
-                style={{ cursor: 'pointer', width: '16px', height: '16px' }}
+                className="h-4 w-4 cursor-pointer"
               />
-              <label htmlFor={id('urgent')} style={{ fontSize: '0.825rem', fontWeight: 500, color: 'var(--text-primary)', cursor: 'pointer' }}>
+              <label htmlFor={id('urgent')} className="cursor-pointer text-[0.825rem] font-medium text-foreground">
                 Mark as urgent requirement
               </label>
             </div>
           </div>
 
-          <div style={{ display: 'flex', justifyContent: 'space-between', paddingTop: '1rem', borderTop: '1px solid var(--border-color)' }}>
+          <div className="flex justify-between border-t border-border pt-4">
             <button
               type="button"
               onClick={() => setStep(1)}
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '0.45rem',
-                padding: '0.55rem 1rem',
-                backgroundColor: 'var(--card-bg)',
-                color: 'var(--text-primary)',
-                border: '1px solid var(--border-color)',
-                borderRadius: '8px',
-                fontSize: '0.825rem',
-                fontWeight: 600,
-                cursor: 'pointer'
-              }}
+              className="inline-flex cursor-pointer items-center gap-[0.45rem] rounded-[8px] border border-border bg-card px-4 py-[0.55rem] text-[0.825rem] font-semibold text-foreground"
             >
               <ArrowLeft size={14} />
               <span>Back</span>
             </button>
             <button
               type="submit"
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '0.45rem',
-                padding: '0.65rem 1.35rem',
-                backgroundColor: 'var(--brand-primary)',
-                color: '#FFFFFF',
-                border: 'none',
-                borderRadius: '8px',
-                fontSize: '0.85rem',
-                fontWeight: 600,
-                cursor: 'pointer'
-              }}
+              className="inline-flex cursor-pointer items-center gap-[0.45rem] rounded-[8px] border-0 bg-primary px-[1.35rem] py-[0.65rem] text-[0.85rem] font-semibold text-white"
             >
               <span>Next: Vendors & Quotes</span>
               <ArrowRight size={14} />
@@ -901,74 +594,39 @@ export default function PreSpendPage({ onNavigate, user, initialCostCentre = '',
 
       {/* STEP 3: Vendors & Quotes */}
       {!submitted && step === 3 && (
-        <form onSubmit={(e) => { e.preventDefault(); setStep(4); }} style={{
-          backgroundColor: 'var(--card-bg)',
-          border: '1px solid var(--border-color)',
-          borderRadius: '16px',
-          padding: '2rem',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: '1.75rem',
-          boxShadow: '0 1px 3px rgba(16, 21, 30, 0.04)'
-        }}>
+        <form onSubmit={(e) => { e.preventDefault(); setStep(4); }} className="flex flex-col gap-7 rounded-[16px] border border-border bg-card p-8 shadow-[0_1px_3px_rgba(16,21,30,0.04)]">
           <div>
-            <h2 style={{ fontSize: '1.25rem', fontWeight: 600, color: 'var(--text-primary)', margin: 0 }}>
+            <h2 className="m-0 text-[1.25rem] font-semibold text-foreground">
               Vendors & Quotes
             </h2>
-            <p style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', margin: '0.25rem 0 0 0' }}>
+            <p className="mt-1 mr-0 mb-0 ml-0 text-[0.875rem] text-muted-foreground">
               Compare your preferred vendor with available alternatives.
             </p>
           </div>
 
           {/* Previous Approved Vendor Reference Banner (If available for this Subcategory) */}
           {pastVendor && (
-            <div style={{
-              backgroundColor: usePastVendor ? '#F0FDF4' : '#F8FAFC',
-              border: `1.5px solid ${usePastVendor ? '#10B981' : '#CBD5E1'}`,
-              borderRadius: '12px',
-              padding: '1rem 1.25rem',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '0.75rem',
-              transition: 'all 0.2s ease'
-            }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.5rem' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                  <div style={{
-                    width: '28px',
-                    height: '28px',
-                    borderRadius: '8px',
-                    backgroundColor: usePastVendor ? '#DCFCE7' : '#E2E8F0',
-                    color: usePastVendor ? '#15803D' : '#475569',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center'
-                  }}>
+            <div className={`flex flex-col gap-3 rounded-[12px] border-[1.5px] px-5 py-4 transition-all duration-200 ${
+              usePastVendor ? 'border-[#10B981] bg-[#F0FDF4]' : 'border-[#CBD5E1] bg-[#F8FAFC]'
+            }`}>
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <div className={`flex h-7 w-7 items-center justify-center rounded-[8px] ${
+                    usePastVendor ? 'bg-[#DCFCE7] text-[#15803D]' : 'bg-[#E2E8F0] text-[#475569]'
+                  }`}>
                     <History size={15} />
                   </div>
                   <div>
-                    <span style={{ fontSize: '0.825rem', fontWeight: 600, color: '#0F172A', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-                      Previously Selected Vendor for <span style={{ color: 'var(--brand-primary)' }}>{pastVendor.subcategory || subcategory}</span>
-                      <span style={{ fontSize: '0.65rem', backgroundColor: '#FFFFFF', color: 'var(--brand-primary)', padding: '0.1rem 0.4rem', borderRadius: '4px', fontWeight: 600, border: '1px solid #CBD5E1' }}>History</span>
+                    <span className="flex items-center gap-[0.35rem] text-[0.825rem] font-semibold text-[#0F172A]">
+                      Previously Selected Vendor for <span className="text-primary">{pastVendor.subcategory || subcategory}</span>
+                      <span className="rounded-[4px] border border-[#CBD5E1] bg-white px-[0.4rem] py-[0.1rem] text-[0.65rem] font-semibold text-primary">History</span>
                     </span>
                   </div>
                 </div>
 
-                <label style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '0.5rem',
-                  cursor: 'pointer',
-                  backgroundColor: usePastVendor ? '#10B981' : '#FFFFFF',
-                  color: usePastVendor ? '#FFFFFF' : '#0F172A',
-                  border: `1px solid ${usePastVendor ? '#059669' : '#CBD5E1'}`,
-                  padding: '0.4rem 0.85rem',
-                  borderRadius: '8px',
-                  fontSize: '0.8rem',
-                  fontWeight: 600,
-                  transition: 'all 0.15s ease',
-                  userSelect: 'none'
-                }}>
+                <label className={`inline-flex cursor-pointer items-center gap-2 rounded-[8px] px-[0.85rem] py-[0.4rem] text-[0.8rem] font-semibold transition-all duration-150 select-none ${
+                  usePastVendor ? 'border border-[#059669] bg-[#10B981] text-white' : 'border border-[#CBD5E1] bg-white text-[#0F172A]'
+                }`}>
                   <input
                     type="checkbox"
                     checked={usePastVendor}
@@ -989,37 +647,30 @@ export default function PreSpendPage({ onNavigate, user, initialCostCentre = '',
                         ]);
                       }
                     }}
-                    style={{ cursor: 'pointer', width: '15px', height: '15px' }}
+                    className="h-[15px] w-[15px] cursor-pointer"
                   />
                   <span>{usePastVendor ? 'Past Vendor Selected' : 'Select this past vendor'}</span>
                 </label>
               </div>
 
-              <div style={{
-                display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
-                gap: '0.75rem',
-                backgroundColor: usePastVendor ? '#FFFFFF' : '#F1F5F9',
-                padding: '0.75rem 1rem',
-                borderRadius: '8px',
-                border: '1px solid #E2E8F0',
-                fontSize: '0.8rem'
-              }}>
+              <div className={`grid gap-3 rounded-[8px] border border-[#E2E8F0] px-4 py-3 text-[0.8rem] [grid-template-columns:repeat(auto-fit,minmax(180px,1fr))] ${
+                usePastVendor ? 'bg-white' : 'bg-[#F1F5F9]'
+              }`}>
                 <div>
-                  <span style={{ color: '#64748B', display: 'block', fontSize: '0.7rem', fontWeight: 600, textTransform: 'uppercase' }}>Vendor Name</span>
-                  <span style={{ fontWeight: 600, color: '#0F172A', fontSize: '0.875rem' }}>{pastVendor.vendorName}</span>
+                  <span className="block text-[0.7rem] font-semibold text-[#64748B] uppercase">Vendor Name</span>
+                  <span className="text-[0.875rem] font-semibold text-[#0F172A]">{pastVendor.vendorName}</span>
                 </div>
                 <div>
-                  <span style={{ color: '#64748B', display: 'block', fontSize: '0.7rem', fontWeight: 600, textTransform: 'uppercase' }}>Subcategory</span>
-                  <span style={{ fontWeight: 600, color: '#0F172A' }}>{pastVendor.subcategory || subcategory}</span>
+                  <span className="block text-[0.7rem] font-semibold text-[#64748B] uppercase">Subcategory</span>
+                  <span className="font-semibold text-[#0F172A]">{pastVendor.subcategory || subcategory}</span>
                 </div>
                 <div>
-                  <span style={{ color: '#64748B', display: 'block', fontSize: '0.7rem', fontWeight: 600, textTransform: 'uppercase' }}>Historical Cost</span>
-                  <span style={{ fontWeight: 600, color: '#059669', fontFamily: 'var(--font-mono)' }}>{pastVendor.vendorAmount ? money(pastVendor.vendorAmount) : '—'}</span>
+                  <span className="block text-[0.7rem] font-semibold text-[#64748B] uppercase">Historical Cost</span>
+                  <span className="[font-family:var(--font-mono)] font-semibold text-[#059669]">{pastVendor.vendorAmount ? money(pastVendor.vendorAmount) : '—'}</span>
                 </div>
                 <div>
-                  <span style={{ color: '#64748B', display: 'block', fontSize: '0.7rem', fontWeight: 600, textTransform: 'uppercase' }}>Quote Date</span>
-                  <span style={{ fontWeight: 600, color: '#0F172A', fontFamily: 'var(--font-mono)' }}>{pastVendor.quoteDate || '—'}</span>
+                  <span className="block text-[0.7rem] font-semibold text-[#64748B] uppercase">Quote Date</span>
+                  <span className="[font-family:var(--font-mono)] font-semibold text-[#0F172A]">{pastVendor.quoteDate || '—'}</span>
                 </div>
               </div>
             </div>
@@ -1045,42 +696,17 @@ export default function PreSpendPage({ onNavigate, user, initialCostCentre = '',
             // Quote Exception is disabled if Vendor 1 has been started
             const isExceptionDisabled = isVendor1Started;
 
-            const DISABLED_CARD_STYLE = {
-              opacity: 0.55,
-              backgroundColor: 'var(--input-bg)',
-              borderColor: 'var(--border-color)',
-              pointerEvents: 'none',
-              filter: 'grayscale(0.6)'
-            };
+            const DISABLED_CARD_CLASS = 'border-border bg-input opacity-[0.55] pointer-events-none grayscale-[60%]';
 
             return (
-              <div style={{
-                display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))',
-                gap: '1.25rem'
-              }}>
+              <div className="grid gap-5 [grid-template-columns:repeat(auto-fit,minmax(360px,1fr))]">
                 {/* 1. Preferred Vendor */}
-                <div style={{
-                  padding: '1.5rem',
-                  borderRadius: '14px',
-                  border: '1.5px solid #10B981',
-                  backgroundColor: 'var(--card-bg)',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: '1rem'
-                }}>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                    <span style={{ fontSize: '0.95rem', fontWeight: 600, color: 'var(--text-primary)' }}>
+                <div className="flex flex-col gap-4 rounded-[14px] border-[1.5px] border-[#10B981] bg-card p-6">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[0.95rem] font-semibold text-foreground">
                       Preferred Vendor
                     </span>
-                    <span style={{
-                      fontSize: '0.75rem',
-                      backgroundColor: '#E6F4EA',
-                      color: '#137333',
-                      fontWeight: 700,
-                      padding: '0.2rem 0.65rem',
-                      borderRadius: '12px'
-                    }}>
+                    <span className="rounded-[12px] bg-[#E6F4EA] px-[0.65rem] py-[0.2rem] text-[0.75rem] font-bold text-[#137333]">
                       Preferred
                     </span>
                   </div>
@@ -1094,11 +720,11 @@ export default function PreSpendPage({ onNavigate, user, initialCostCentre = '',
                       value={vendors[0]?.name || ''}
                       onChange={e => changeVendor(0, 'name', e.target.value)}
                       placeholder="Search or enter vendor"
-                      style={ACTIVE_FIELD_STYLE}
+                      className={ACTIVE_FIELD_CLASS}
                     />
                   </div>
 
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                  <div className="grid grid-cols-2 gap-3">
                     <div>
                       <FormLabel required={!usePastVendor} htmlFor="vendor-0-amount">Quoted amount (₹)</FormLabel>
                       <input
@@ -1110,7 +736,7 @@ export default function PreSpendPage({ onNavigate, user, initialCostCentre = '',
                         onChange={e => changeVendor(0, 'amount', e.target.value)}
                         onWheel={e => e.target.blur()}
                         placeholder="0"
-                        style={ACTIVE_FIELD_STYLE}
+                        className={ACTIVE_FIELD_CLASS}
                       />
                     </div>
                     <div>
@@ -1121,7 +747,7 @@ export default function PreSpendPage({ onNavigate, user, initialCostCentre = '',
                         required={!usePastVendor && (!commercial.exception || commercial.exception === 'Not applicable')}
                         value={vendors[0]?.date || ''}
                         onChange={e => changeVendor(0, 'date', e.target.value)}
-                        style={ACTIVE_FIELD_STYLE}
+                        className={ACTIVE_FIELD_CLASS}
                       />
                     </div>
                   </div>
@@ -1131,7 +757,7 @@ export default function PreSpendPage({ onNavigate, user, initialCostCentre = '',
                     <input
                       id="vendor-0-file"
                       type="file"
-                      style={{ display: 'none' }}
+                      className="hidden"
                       onChange={e => {
                         const f = e.target.files?.[0];
                         if (f) {
@@ -1142,24 +768,9 @@ export default function PreSpendPage({ onNavigate, user, initialCostCentre = '',
                     />
                     <label
                       htmlFor="vendor-0-file"
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        height: '42px',
-                        border: '1px dashed var(--border-color)',
-                        borderRadius: '8px',
-                        backgroundColor: 'var(--card-bg)',
-                        color: vendors[0]?.fileName ? 'var(--text-primary)' : 'var(--text-secondary)',
-                        fontSize: '0.85rem',
-                        fontWeight: 500,
-                        cursor: 'pointer',
-                        textAlign: 'center',
-                        padding: '0 1rem',
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis',
-                        whiteSpace: 'nowrap'
-                      }}
+                      className={`flex h-[42px] cursor-pointer items-center justify-center overflow-hidden text-ellipsis whitespace-nowrap rounded-[8px] border border-dashed border-border bg-card px-4 text-center text-[0.85rem] font-medium ${
+                        vendors[0]?.fileName ? 'text-foreground' : 'text-muted-foreground'
+                      }`}
                     >
                       {vendors[0]?.fileName ? vendors[0].fileName : 'Choose PDF, image or email quotation'}
                     </label>
@@ -1167,23 +778,13 @@ export default function PreSpendPage({ onNavigate, user, initialCostCentre = '',
                 </div>
 
                 {/* 2. Alternative Vendor 1 */}
-                <div style={{
-                  padding: '1.5rem',
-                  borderRadius: '14px',
-                  border: '1px solid var(--border-color)',
-                  backgroundColor: 'var(--card-bg)',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: '1rem',
-                  transition: 'all 0.2s ease',
-                  ...(isVendor1Disabled ? DISABLED_CARD_STYLE : {})
-                }}>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                    <span style={{ fontSize: '0.95rem', fontWeight: 600, color: 'var(--text-primary)' }}>
+                <div className={`flex flex-col gap-4 rounded-[14px] border border-border bg-card p-6 transition-all duration-200 ${isVendor1Disabled ? DISABLED_CARD_CLASS : ''}`}>
+                  <div className="flex items-center justify-between">
+                    <span className="text-[0.95rem] font-semibold text-foreground">
                       Alternative Vendor 1
                     </span>
                     {isVendor1Disabled && (
-                      <span style={{ fontSize: '0.75rem', color: '#94A3B8', fontWeight: 500 }}>
+                      <span className="text-[0.75rem] font-medium text-[#94A3B8]">
                         Locked (Exception Selected)
                       </span>
                     )}
@@ -1204,11 +805,11 @@ export default function PreSpendPage({ onNavigate, user, initialCostCentre = '',
                         }
                       }}
                       placeholder="Enter vendor"
-                      style={isVendor1Disabled ? READONLY_FIELD_STYLE : ACTIVE_FIELD_STYLE}
+                      className={isVendor1Disabled ? READONLY_FIELD_CLASS : ACTIVE_FIELD_CLASS}
                     />
                   </div>
 
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                  <div className="grid grid-cols-2 gap-3">
                     <div>
                       <FormLabel htmlFor="vendor-1-amount">Quoted amount (₹)</FormLabel>
                       <input
@@ -1226,7 +827,7 @@ export default function PreSpendPage({ onNavigate, user, initialCostCentre = '',
                         }}
                         onWheel={e => e.target.blur()}
                         placeholder="0"
-                        style={isVendor1Disabled ? READONLY_FIELD_STYLE : ACTIVE_FIELD_STYLE}
+                        className={isVendor1Disabled ? READONLY_FIELD_CLASS : ACTIVE_FIELD_CLASS}
                       />
                     </div>
                     <div>
@@ -1243,7 +844,7 @@ export default function PreSpendPage({ onNavigate, user, initialCostCentre = '',
                             changeCommercial('exceptionReason', '');
                           }
                         }}
-                        style={isVendor1Disabled ? READONLY_FIELD_STYLE : ACTIVE_FIELD_STYLE}
+                        className={isVendor1Disabled ? READONLY_FIELD_CLASS : ACTIVE_FIELD_CLASS}
                       />
                     </div>
                   </div>
@@ -1254,7 +855,7 @@ export default function PreSpendPage({ onNavigate, user, initialCostCentre = '',
                       id="vendor-1-file"
                       type="file"
                       disabled={isVendor1Disabled}
-                      style={{ display: 'none' }}
+                      className="hidden"
                       onChange={e => {
                         const f = e.target.files?.[0];
                         if (f) {
@@ -1269,24 +870,9 @@ export default function PreSpendPage({ onNavigate, user, initialCostCentre = '',
                     />
                     <label
                       htmlFor={isVendor1Disabled ? undefined : "vendor-1-file"}
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        height: '42px',
-                        border: '1px dashed var(--border-color)',
-                        borderRadius: '8px',
-                        backgroundColor: isVendor1Disabled ? 'var(--input-bg)' : 'var(--card-bg)',
-                        color: vendors[1]?.fileName ? 'var(--text-primary)' : 'var(--text-secondary)',
-                        fontSize: '0.85rem',
-                        fontWeight: 500,
-                        cursor: isVendor1Disabled ? 'not-allowed' : 'pointer',
-                        textAlign: 'center',
-                        padding: '0 1rem',
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis',
-                        whiteSpace: 'nowrap'
-                      }}
+                      className={`flex h-[42px] items-center justify-center overflow-hidden text-ellipsis whitespace-nowrap rounded-[8px] border border-dashed border-border px-4 text-center text-[0.85rem] font-medium ${
+                        isVendor1Disabled ? 'cursor-not-allowed bg-input' : 'cursor-pointer bg-card'
+                      } ${vendors[1]?.fileName ? 'text-foreground' : 'text-muted-foreground'}`}
                     >
                       {vendors[1]?.fileName ? vendors[1].fileName : 'Choose quotation file'}
                     </label>
@@ -1294,22 +880,12 @@ export default function PreSpendPage({ onNavigate, user, initialCostCentre = '',
                 </div>
 
                 {/* 3. Alternative Vendor 2 */}
-                <div style={{
-                  padding: '1.5rem',
-                  borderRadius: '14px',
-                  border: '1px solid var(--border-color)',
-                  backgroundColor: 'var(--card-bg)',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: '1rem',
-                  transition: 'all 0.2s ease',
-                  ...(isVendor2Disabled ? DISABLED_CARD_STYLE : {})
-                }}>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                    <span style={{ fontSize: '0.95rem', fontWeight: 600, color: 'var(--text-primary)' }}>
+                <div className={`flex flex-col gap-4 rounded-[14px] border border-border bg-card p-6 transition-all duration-200 ${isVendor2Disabled ? DISABLED_CARD_CLASS : ''}`}>
+                  <div className="flex items-center justify-between">
+                    <span className="text-[0.95rem] font-semibold text-foreground">
                       Alternative Vendor 2
                     </span>
-                    <span style={{ fontSize: '0.75rem', color: isVendor2Disabled ? '#94A3B8' : 'var(--text-secondary)', fontWeight: 500 }}>
+                    <span className={`text-[0.75rem] font-medium ${isVendor2Disabled ? 'text-[#94A3B8]' : 'text-muted-foreground'}`}>
                       {isVendor2Disabled ? 'Locked (Fill Vendor 1 first)' : 'Optional'}
                     </span>
                   </div>
@@ -1323,11 +899,11 @@ export default function PreSpendPage({ onNavigate, user, initialCostCentre = '',
                       value={vendors[2]?.name || ''}
                       onChange={e => changeVendor(2, 'name', e.target.value)}
                       placeholder={isVendor2Disabled ? 'Complete Alternative Vendor 1 first' : 'Enter vendor'}
-                      style={isVendor2Disabled ? READONLY_FIELD_STYLE : ACTIVE_FIELD_STYLE}
+                      className={isVendor2Disabled ? READONLY_FIELD_CLASS : ACTIVE_FIELD_CLASS}
                     />
                   </div>
 
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                  <div className="grid grid-cols-2 gap-3">
                     <div>
                       <FormLabel htmlFor="vendor-2-amount">Quoted amount (₹)</FormLabel>
                       <input
@@ -1339,7 +915,7 @@ export default function PreSpendPage({ onNavigate, user, initialCostCentre = '',
                         onChange={e => changeVendor(2, 'amount', e.target.value)}
                         onWheel={e => e.target.blur()}
                         placeholder="0"
-                        style={isVendor2Disabled ? READONLY_FIELD_STYLE : ACTIVE_FIELD_STYLE}
+                        className={isVendor2Disabled ? READONLY_FIELD_CLASS : ACTIVE_FIELD_CLASS}
                       />
                     </div>
                     <div>
@@ -1350,7 +926,7 @@ export default function PreSpendPage({ onNavigate, user, initialCostCentre = '',
                         disabled={isVendor2Disabled}
                         value={vendors[2]?.date || ''}
                         onChange={e => changeVendor(2, 'date', e.target.value)}
-                        style={isVendor2Disabled ? READONLY_FIELD_STYLE : ACTIVE_FIELD_STYLE}
+                        className={isVendor2Disabled ? READONLY_FIELD_CLASS : ACTIVE_FIELD_CLASS}
                       />
                     </div>
                   </div>
@@ -1361,7 +937,7 @@ export default function PreSpendPage({ onNavigate, user, initialCostCentre = '',
                       id="vendor-2-file"
                       type="file"
                       disabled={isVendor2Disabled}
-                      style={{ display: 'none' }}
+                      className="hidden"
                       onChange={e => {
                         const f = e.target.files?.[0];
                         if (f) {
@@ -1372,24 +948,9 @@ export default function PreSpendPage({ onNavigate, user, initialCostCentre = '',
                     />
                     <label
                       htmlFor={isVendor2Disabled ? undefined : "vendor-2-file"}
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        height: '42px',
-                        border: '1px dashed var(--border-color)',
-                        borderRadius: '8px',
-                        backgroundColor: isVendor2Disabled ? 'var(--input-bg)' : 'var(--card-bg)',
-                        color: vendors[2]?.fileName ? 'var(--text-primary)' : 'var(--text-secondary)',
-                        fontSize: '0.85rem',
-                        fontWeight: 500,
-                        cursor: isVendor2Disabled ? 'not-allowed' : 'pointer',
-                        textAlign: 'center',
-                        padding: '0 1rem',
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis',
-                        whiteSpace: 'nowrap'
-                      }}
+                      className={`flex h-[42px] items-center justify-center overflow-hidden text-ellipsis whitespace-nowrap rounded-[8px] border border-dashed border-border px-4 text-center text-[0.85rem] font-medium ${
+                        isVendor2Disabled ? 'cursor-not-allowed bg-input' : 'cursor-pointer bg-card'
+                      } ${vendors[2]?.fileName ? 'text-foreground' : 'text-muted-foreground'}`}
                     >
                       {vendors[2]?.fileName ? vendors[2].fileName : 'Choose quotation file'}
                     </label>
@@ -1397,23 +958,13 @@ export default function PreSpendPage({ onNavigate, user, initialCostCentre = '',
                 </div>
 
                 {/* 4. Quote Exception Card */}
-                <div style={{
-                  padding: '1.5rem',
-                  borderRadius: '14px',
-                  border: '1px solid var(--border-color)',
-                  backgroundColor: 'var(--card-bg)',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: '1rem',
-                  transition: 'all 0.2s ease',
-                  ...(isExceptionDisabled ? DISABLED_CARD_STYLE : {})
-                }}>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                    <span style={{ fontSize: '0.95rem', fontWeight: 600, color: 'var(--text-primary)' }}>
+                <div className={`flex flex-col gap-4 rounded-[14px] border border-border bg-card p-6 transition-all duration-200 ${isExceptionDisabled ? DISABLED_CARD_CLASS : ''}`}>
+                  <div className="flex items-center justify-between">
+                    <span className="text-[0.95rem] font-semibold text-foreground">
                       Quote Exception
                     </span>
                     {isExceptionDisabled && (
-                      <span style={{ fontSize: '0.75rem', color: '#94A3B8', fontWeight: 500 }}>
+                      <span className="text-[0.75rem] font-medium text-[#94A3B8]">
                         Locked (Vendor 1 Added)
                       </span>
                     )}
@@ -1433,7 +984,7 @@ export default function PreSpendPage({ onNavigate, user, initialCostCentre = '',
                           setVendors(prev => [prev[0], emptyVendor(), emptyVendor()]);
                         }
                       }}
-                      style={isExceptionDisabled ? READONLY_FIELD_STYLE : ACTIVE_FIELD_STYLE}
+                      className={isExceptionDisabled ? READONLY_FIELD_CLASS : ACTIVE_FIELD_CLASS}
                     >
                       {EXCEPTION_OPTIONS.map(opt => (
                         <option key={opt} value={opt}>{opt}</option>
@@ -1441,7 +992,7 @@ export default function PreSpendPage({ onNavigate, user, initialCostCentre = '',
                     </select>
                   </div>
 
-                  <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+                  <div className="flex flex-1 flex-col">
                     <FormLabel htmlFor="exception-justification">Exception justification</FormLabel>
                     <textarea
                       id="exception-justification"
@@ -1450,7 +1001,7 @@ export default function PreSpendPage({ onNavigate, user, initialCostCentre = '',
                       value={commercial.exceptionReason}
                       onChange={e => changeCommercial('exceptionReason', e.target.value)}
                       placeholder={isExceptionDisabled ? 'Not required when alternative vendors are provided' : 'Explain why comparison quotes are not available'}
-                      style={{ ...(isExceptionDisabled ? READONLY_FIELD_STYLE : ACTIVE_FIELD_STYLE), flex: 1, minHeight: '74px', resize: 'vertical' }}
+                      className={`${isExceptionDisabled ? READONLY_FIELD_CLASS : ACTIVE_FIELD_CLASS} min-h-[74px] flex-1 resize-y`}
                     />
                   </div>
                 </div>
@@ -1459,7 +1010,7 @@ export default function PreSpendPage({ onNavigate, user, initialCostCentre = '',
           })()}
 
           {/* Selection Reason and Commercial Justification Fields */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+          <div className="flex flex-col gap-5">
             <div>
               <FormLabel required htmlFor="commercial-reason">Why have you selected this vendor?</FormLabel>
               <select
@@ -1467,7 +1018,7 @@ export default function PreSpendPage({ onNavigate, user, initialCostCentre = '',
                 required
                 value={commercial.reason}
                 onChange={e => changeCommercial('reason', e.target.value)}
-                style={ACTIVE_FIELD_STYLE}
+                className={ACTIVE_FIELD_CLASS}
               >
                 <option value="">Select primary reason</option>
                 {COMMERCIAL_REASONS.map(r => (
@@ -1485,47 +1036,23 @@ export default function PreSpendPage({ onNavigate, user, initialCostCentre = '',
                 value={commercial.justification}
                 onChange={e => changeCommercial('justification', e.target.value)}
                 placeholder="Explain the commercial and operational reason for selecting this vendor"
-                style={{ ...ACTIVE_FIELD_STYLE, resize: 'vertical', minHeight: '80px' }}
+                className={`${ACTIVE_FIELD_CLASS} min-h-[80px] resize-y`}
               />
             </div>
           </div>
 
           {/* Navigation Buttons */}
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '1rem', borderTop: '1px solid var(--border-color)' }}>
+          <div className="flex items-center justify-between border-t border-border pt-4">
             <button
               type="button"
               onClick={() => setStep(2)}
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '0.45rem',
-                padding: '0.65rem 1.35rem',
-                backgroundColor: 'var(--card-bg)',
-                color: 'var(--text-primary)',
-                border: '1px solid var(--border-color)',
-                borderRadius: '8px',
-                fontSize: '0.875rem',
-                fontWeight: 600,
-                cursor: 'pointer'
-              }}
+              className="inline-flex cursor-pointer items-center gap-[0.45rem] rounded-[8px] border border-border bg-card px-[1.35rem] py-[0.65rem] text-[0.875rem] font-semibold text-foreground"
             >
               <span>Back</span>
             </button>
             <button
               type="submit"
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '0.45rem',
-                padding: '0.65rem 1.6rem',
-                backgroundColor: '#0F172A',
-                color: '#FFFFFF',
-                border: 'none',
-                borderRadius: '8px',
-                fontSize: '0.875rem',
-                fontWeight: 600,
-                cursor: 'pointer'
-              }}
+              className="inline-flex cursor-pointer items-center gap-[0.45rem] rounded-[8px] border-0 bg-[#0F172A] px-[1.6rem] py-[0.65rem] text-[0.875rem] font-semibold text-white"
             >
               <span>Review Request</span>
             </button>
@@ -1535,120 +1062,100 @@ export default function PreSpendPage({ onNavigate, user, initialCostCentre = '',
 
       {/* STEP 4: Review & Submit */}
       {!submitted && step === 4 && (
-        <form onSubmit={handleSubmit} style={{
-          backgroundColor: 'var(--card-bg)',
-          border: '1px solid var(--border-color)',
-          borderRadius: '16px',
-          padding: '2rem',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: '1.75rem',
-          boxShadow: '0 1px 3px rgba(16, 21, 30, 0.04)'
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <form onSubmit={handleSubmit} className="flex flex-col gap-7 rounded-[16px] border border-border bg-card p-8 shadow-[0_1px_3px_rgba(16,21,30,0.04)]">
+          <div className="flex items-center justify-between">
             <div>
-              <h2 style={{ fontSize: '1.25rem', fontWeight: 600, color: 'var(--text-primary)', margin: 0 }}>
+              <h2 className="m-0 text-[1.25rem] font-semibold text-foreground">
                 Review Pre-Spend Request
               </h2>
-              <p style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', margin: '0.25rem 0 0 0' }}>
+              <p className="mt-1 mr-0 mb-0 ml-0 text-[0.875rem] text-muted-foreground">
                 Verify all spend information, vendor quotes, and attachments before submitting for approval
               </p>
             </div>
-            <span style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-secondary)', backgroundColor: 'var(--input-bg)', padding: '0.3rem 0.65rem', borderRadius: '6px', border: '1px solid var(--border-color)' }}>
+            <span className="rounded-[6px] border border-border bg-input px-[0.65rem] py-[0.3rem] text-[0.8rem] font-semibold text-muted-foreground">
               Step 4 of 4
             </span>
           </div>
 
           {/* Section 1: Request Details */}
-          <div style={{ borderRadius: '12px', border: '1px solid var(--border-color)', overflow: 'hidden' }}>
-            <div style={{ padding: '0.75rem 1.25rem', backgroundColor: 'var(--card-bg)', borderBottom: '1px solid var(--border-color)', fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-primary)' }}>
+          <div className="overflow-hidden rounded-[12px] border border-border">
+            <div className="border-b border-border bg-card px-5 py-3 text-[0.85rem] font-semibold text-foreground">
               1. Request Details
             </div>
-            <div style={{ padding: '1.25rem', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1rem', fontSize: '0.85rem' }}>
+            <div className="grid gap-4 p-5 text-[0.85rem] [grid-template-columns:repeat(auto-fit,minmax(280px,1fr))]">
               <div>
-                <span style={{ color: 'var(--text-secondary)', display: 'block', fontSize: '0.75rem', fontWeight: 600, textTransform: 'uppercase' }}>Category / Subcategory</span>
-                <span style={{ color: 'var(--text-primary)', fontWeight: 600 }}>{category} — {subcategory}</span>
-              </div>
-              <div>
-                <span style={{ color: 'var(--text-secondary)', display: 'block', fontSize: '0.75rem', fontWeight: 600, textTransform: 'uppercase' }}>Location</span>
-                <span style={{ color: 'var(--text-primary)', fontWeight: 600 }}>{details.location || '—'}</span>
+                <span className="block text-[0.75rem] font-semibold text-muted-foreground uppercase">Category / Subcategory</span>
+                <span className="font-semibold text-foreground">{category} — {subcategory}</span>
               </div>
               <div>
-                <span style={{ color: 'var(--text-secondary)', display: 'block', fontSize: '0.75rem', fontWeight: 600, textTransform: 'uppercase' }}>Request Date</span>
-                <span style={{ color: 'var(--text-primary)', fontWeight: 600 }}>{new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}</span>
+                <span className="block text-[0.75rem] font-semibold text-muted-foreground uppercase">Location</span>
+                <span className="font-semibold text-foreground">{details.location || '—'}</span>
               </div>
               <div>
-                <span style={{ color: 'var(--text-secondary)', display: 'block', fontSize: '0.75rem', fontWeight: 600, textTransform: 'uppercase' }}>Needed By Date</span>
-                <span style={{ color: 'var(--text-primary)', fontWeight: 600 }}>{details.neededBy || '—'}</span>
+                <span className="block text-[0.75rem] font-semibold text-muted-foreground uppercase">Request Date</span>
+                <span className="font-semibold text-foreground">{new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}</span>
               </div>
-              <div style={{ gridColumn: '1 / -1' }}>
-                <span style={{ color: 'var(--text-secondary)', display: 'block', fontSize: '0.75rem', fontWeight: 600, textTransform: 'uppercase' }}>What are you buying? (Scope & Spec)</span>
-                <p style={{ color: 'var(--text-primary)', margin: '0.25rem 0 0 0', lineHeight: 1.5, whiteSpace: 'pre-wrap' }}>{details.buying}</p>
+              <div>
+                <span className="block text-[0.75rem] font-semibold text-muted-foreground uppercase">Needed By Date</span>
+                <span className="font-semibold text-foreground">{details.neededBy || '—'}</span>
               </div>
-              <div style={{ gridColumn: '1 / -1' }}>
-                <span style={{ color: 'var(--text-secondary)', display: 'block', fontSize: '0.75rem', fontWeight: 600, textTransform: 'uppercase' }}>Business Justification</span>
-                <p style={{ color: 'var(--text-secondary)', margin: '0.25rem 0 0 0', lineHeight: 1.5, whiteSpace: 'pre-wrap' }}>{details.justification}</p>
+              <div className="col-span-full">
+                <span className="block text-[0.75rem] font-semibold text-muted-foreground uppercase">What are you buying? (Scope & Spec)</span>
+                <p className="mt-1 mr-0 mb-0 ml-0 leading-[1.5] whitespace-pre-wrap text-foreground">{details.buying}</p>
+              </div>
+              <div className="col-span-full">
+                <span className="block text-[0.75rem] font-semibold text-muted-foreground uppercase">Business Justification</span>
+                <p className="mt-1 mr-0 mb-0 ml-0 leading-[1.5] whitespace-pre-wrap text-muted-foreground">{details.justification}</p>
               </div>
               {details.urgent && (
-                <div style={{ gridColumn: '1 / -1', padding: '0.75rem 1rem', backgroundColor: '#FEF2F2', border: '1px solid #FCA5A5', borderRadius: '8px' }}>
-                  <span style={{ color: '#DC2626', fontWeight: 600, display: 'block', fontSize: '0.8rem' }}>URGENT REQUIREMENT</span>
+                <div className="col-span-full rounded-[8px] border border-[#FCA5A5] bg-[#FEF2F2] px-4 py-3">
+                  <span className="block text-[0.8rem] font-semibold text-[#DC2626]">URGENT REQUIREMENT</span>
                 </div>
               )}
             </div>
           </div>
 
           {/* Section 2: Vendors & Quotations Comparison */}
-          <div style={{ borderRadius: '12px', border: '1px solid var(--border-color)', overflow: 'hidden' }}>
-            <div style={{ padding: '0.75rem 1.25rem', backgroundColor: 'var(--card-bg)', borderBottom: '1px solid var(--border-color)', fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-primary)' }}>
+          <div className="overflow-hidden rounded-[12px] border border-border">
+            <div className="border-b border-border bg-card px-5 py-3 text-[0.85rem] font-semibold text-foreground">
               2. Vendor Quotations & Comparison
             </div>
-            <div style={{ padding: '1.25rem', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1rem' }}>
+            <div className="grid gap-4 p-5 [grid-template-columns:repeat(auto-fit,minmax(280px,1fr))]">
               {vendors.filter(v => v.name?.trim() || v.amount || v.fileName).map((v, i) => (
-                <div key={i} style={{
-                  padding: '1rem',
-                  borderRadius: '10px',
-                  border: i === 0 ? '1.5px solid #10B981' : '1px solid #E2E8F0',
-                  backgroundColor: i === 0 ? '#F0FDF4' : '#FFFFFF',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: '0.65rem'
-                }}>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                    <span style={{ fontSize: '0.875rem', fontWeight: 600, color: 'var(--text-primary)' }}>
+                <div key={i} className={`flex flex-col gap-[0.65rem] rounded-[10px] p-4 ${
+                  i === 0 ? 'border-[1.5px] border-[#10B981] bg-[#F0FDF4]' : 'border border-[#E2E8F0] bg-white'
+                }`}>
+                  <div className="flex items-center justify-between">
+                    <span className="text-[0.875rem] font-semibold text-foreground">
                       {i === 0 ? 'Preferred Vendor' : `Alternative Vendor ${i}`}
                     </span>
                     {i === 0 && (
-                      <span style={{
-                        fontSize: '0.7rem',
-                        backgroundColor: usePastVendor ? '#EFF6FF' : '#E6F4EA',
-                        color: usePastVendor ? '#1D4ED8' : '#137333',
-                        fontWeight: 600,
-                        padding: '0.15rem 0.5rem',
-                        borderRadius: '10px'
-                      }}>
+                      <span className={`rounded-[10px] px-2 py-[0.15rem] text-[0.7rem] font-semibold ${
+                        usePastVendor ? 'bg-[#EFF6FF] text-[#1D4ED8]' : 'bg-[#E6F4EA] text-[#137333]'
+                      }`}>
                         {usePastVendor ? '✓ Past Selected Vendor' : 'Selected'}
                       </span>
                     )}
                   </div>
 
-                  <div style={{ fontSize: '0.825rem' }}>
-                    <span style={{ color: '#64748B', display: 'block', fontSize: '0.75rem' }}>Vendor Name</span>
-                    <strong style={{ color: '#0F172A' }}>{v.name || '—'}</strong>
+                  <div className="text-[0.825rem]">
+                    <span className="block text-[0.75rem] text-[#64748B]">Vendor Name</span>
+                    <strong className="text-[#0F172A]">{v.name || '—'}</strong>
                   </div>
 
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem', fontSize: '0.825rem' }}>
+                  <div className="grid grid-cols-2 gap-2 text-[0.825rem]">
                     <div>
-                      <span style={{ color: '#64748B', display: 'block', fontSize: '0.75rem' }}>Quoted Amount</span>
-                      <strong style={{ color: '#0F172A', fontFamily: 'var(--font-mono)' }}>{v.amount ? money(v.amount) : '₹0'}</strong>
+                      <span className="block text-[0.75rem] text-[#64748B]">Quoted Amount</span>
+                      <strong className="[font-family:var(--font-mono)] text-[#0F172A]">{v.amount ? money(v.amount) : '₹0'}</strong>
                     </div>
                     <div>
-                      <span style={{ color: '#64748B', display: 'block', fontSize: '0.75rem' }}>Quote Date</span>
-                      <strong style={{ color: '#0F172A' }}>{v.date || '—'}</strong>
+                      <span className="block text-[0.75rem] text-[#64748B]">Quote Date</span>
+                      <strong className="text-[#0F172A]">{v.date || '—'}</strong>
                     </div>
                   </div>
 
-                  <div style={{ fontSize: '0.825rem', paddingTop: '0.35rem', borderTop: '1px dashed #CBD5E1' }}>
-                    <span style={{ color: '#64748B', display: 'block', fontSize: '0.75rem', marginBottom: '0.25rem' }}>Attached Quotation</span>
+                  <div className="border-t border-dashed border-[#CBD5E1] pt-[0.35rem] text-[0.825rem]">
+                    <span className="mb-1 block text-[0.75rem] text-[#64748B]">Attached Quotation</span>
                     {v.file || v.fileName ? (
                       <button
                         type="button"
@@ -1664,29 +1171,16 @@ export default function PreSpendPage({ onNavigate, user, initialCostCentre = '',
                             alert(`Quotation file: ${v.fileName || 'Document attached'}`);
                           }
                         }}
-                        style={{
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: '0.45rem',
-                          padding: '0.35rem 0.65rem',
-                          backgroundColor: '#EFF6FF',
-                          color: '#1D4ED8',
-                          border: '1px solid #BFDBFE',
-                          borderRadius: '6px',
-                          fontSize: '0.8rem',
-                          fontWeight: 600,
-                          cursor: 'pointer',
-                          transition: 'all 0.15s ease'
-                        }}
+                        className="inline-flex cursor-pointer items-center gap-[0.45rem] rounded-[6px] border border-[#BFDBFE] bg-[#EFF6FF] px-[0.65rem] py-[0.35rem] text-[0.8rem] font-semibold text-[#1D4ED8] transition-all duration-150"
                       >
                         <FileText size={14} />
-                        <span style={{ maxWidth: '180px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        <span className="max-w-[180px] overflow-hidden text-ellipsis whitespace-nowrap">
                           {v.fileName || 'View Quotation'}
                         </span>
-                        <ExternalLink size={12} style={{ opacity: 0.7 }} />
+                        <ExternalLink size={12} className="opacity-70" />
                       </button>
                     ) : (
-                      <span style={{ color: '#94A3B8', fontStyle: 'italic', fontSize: '0.8rem' }}>No quotation file uploaded</span>
+                      <span className="text-[0.8rem] text-[#94A3B8] italic">No quotation file uploaded</span>
                     )}
                   </div>
                 </div>
@@ -1695,39 +1189,39 @@ export default function PreSpendPage({ onNavigate, user, initialCostCentre = '',
           </div>
 
           {/* Section 3: Commercial Evaluation & Justification */}
-          <div style={{ borderRadius: '12px', border: '1px solid var(--border-color)', overflow: 'hidden' }}>
-            <div style={{ padding: '0.75rem 1.25rem', backgroundColor: 'var(--card-bg)', borderBottom: '1px solid var(--border-color)', fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-primary)' }}>
+          <div className="overflow-hidden rounded-[12px] border border-border">
+            <div className="border-b border-border bg-card px-5 py-3 text-[0.85rem] font-semibold text-foreground">
               3. Commercial Evaluation & Justification
             </div>
-            <div style={{ padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '0.85rem', fontSize: '0.85rem' }}>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1rem' }}>
+            <div className="flex flex-col gap-[0.85rem] p-5 text-[0.85rem]">
+              <div className="grid gap-4 [grid-template-columns:repeat(auto-fit,minmax(280px,1fr))]">
                 <div>
-                  <span style={{ color: 'var(--text-secondary)', display: 'block', fontSize: '0.75rem', fontWeight: 600, textTransform: 'uppercase' }}>Reason for Vendor Selection</span>
-                  <span style={{ color: 'var(--text-primary)', fontWeight: 600 }}>{commercial.reason || '—'}</span>
+                  <span className="block text-[0.75rem] font-semibold text-muted-foreground uppercase">Reason for Vendor Selection</span>
+                  <span className="font-semibold text-foreground">{commercial.reason || '—'}</span>
                 </div>
                 <div>
-                  <span style={{ color: 'var(--text-secondary)', display: 'block', fontSize: '0.75rem', fontWeight: 600, textTransform: 'uppercase' }}>Quote Exception Rule</span>
-                  <span style={{ color: 'var(--text-primary)', fontWeight: 600 }}>{commercial.exception || 'Not applicable'}</span>
+                  <span className="block text-[0.75rem] font-semibold text-muted-foreground uppercase">Quote Exception Rule</span>
+                  <span className="font-semibold text-foreground">{commercial.exception || 'Not applicable'}</span>
                 </div>
               </div>
 
               {commercial.exception && commercial.exception !== 'Not applicable' && commercial.exceptionReason && (
                 <div>
-                  <span style={{ color: 'var(--text-secondary)', display: 'block', fontSize: '0.75rem', fontWeight: 600, textTransform: 'uppercase' }}>Exception Justification</span>
-                  <p style={{ color: 'var(--text-secondary)', margin: '0.2rem 0 0 0', lineHeight: 1.5 }}>{commercial.exceptionReason}</p>
+                  <span className="block text-[0.75rem] font-semibold text-muted-foreground uppercase">Exception Justification</span>
+                  <p className="mt-[0.2rem] mr-0 mb-0 ml-0 leading-[1.5] text-muted-foreground">{commercial.exceptionReason}</p>
                 </div>
               )}
 
               <div>
-                <span style={{ color: 'var(--text-secondary)', display: 'block', fontSize: '0.75rem', fontWeight: 600, textTransform: 'uppercase' }}>Vendor Selection Justification</span>
-                <p style={{ color: 'var(--text-secondary)', margin: '0.2rem 0 0 0', lineHeight: 1.5, whiteSpace: 'pre-wrap' }}>{commercial.justification || '—'}</p>
+                <span className="block text-[0.75rem] font-semibold text-muted-foreground uppercase">Vendor Selection Justification</span>
+                <p className="mt-[0.2rem] mr-0 mb-0 ml-0 leading-[1.5] whitespace-pre-wrap text-muted-foreground">{commercial.justification || '—'}</p>
               </div>
             </div>
           </div>
 
           {/* Section 4: Confirmation Checkbox */}
-          <div style={{ padding: '1rem 0', borderTop: '1px solid var(--border-color)', borderBottom: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+          <div className="flex flex-col gap-2 border-t border-b border-border py-4">
+            <div className="flex items-center gap-3">
               <input
                 id="certify"
                 type="checkbox"
@@ -1737,33 +1231,21 @@ export default function PreSpendPage({ onNavigate, user, initialCostCentre = '',
                   setCertified(e.target.checked);
                   setNotice('');
                 }}
-                style={{ cursor: 'pointer', width: '18px', height: '18px', accentColor: '#2563EB' }}
+                className="h-[18px] w-[18px] cursor-pointer accent-[#2563EB]"
               />
-              <label htmlFor="certify" style={{ fontSize: '0.9rem', color: 'var(--text-primary)', fontWeight: 500, cursor: 'pointer', lineHeight: 1.45 }}>
+              <label htmlFor="certify" className="cursor-pointer text-[0.9rem] leading-[1.45] font-medium text-foreground">
                 I confirm that no order, payment or vendor commitment has been made and the information provided is correct.
               </label>
             </div>
-            {notice && <div style={{ fontSize: '0.775rem', fontWeight: 600, color: '#DC2626', paddingLeft: '2.1rem' }}>{notice}</div>}
+            {notice && <div className="pl-[2.1rem] text-[0.775rem] font-semibold text-[#DC2626]">{notice}</div>}
           </div>
 
           {/* Navigation & Submit Buttons */}
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '0.5rem' }}>
+          <div className="flex items-center justify-between pt-2">
             <button
               type="button"
               onClick={() => setStep(3)}
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '0.45rem',
-                padding: '0.65rem 1.35rem',
-                backgroundColor: 'var(--card-bg)',
-                color: 'var(--text-primary)',
-                border: '1px solid var(--border-color)',
-                borderRadius: '8px',
-                fontSize: '0.875rem',
-                fontWeight: 600,
-                cursor: 'pointer'
-              }}
+              className="inline-flex cursor-pointer items-center gap-[0.45rem] rounded-[8px] border border-border bg-card px-[1.35rem] py-[0.65rem] text-[0.875rem] font-semibold text-foreground"
             >
               <ArrowLeft size={14} />
               <span>Back</span>
@@ -1771,20 +1253,9 @@ export default function PreSpendPage({ onNavigate, user, initialCostCentre = '',
             <button
               type="submit"
               disabled={!certified || isSubmitting}
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '0.5rem',
-                padding: '0.75rem 1.75rem',
-                backgroundColor: '#0F172A',
-                color: '#FFFFFF',
-                border: 'none',
-                borderRadius: '8px',
-                fontSize: '0.9rem',
-                fontWeight: 600,
-                cursor: (!certified || isSubmitting) ? 'not-allowed' : 'pointer',
-                opacity: (!certified || isSubmitting) ? 0.5 : 1
-              }}
+              className={`inline-flex items-center gap-2 rounded-[8px] border-0 bg-[#0F172A] px-7 py-3 text-[0.9rem] font-semibold text-white ${
+                (!certified || isSubmitting) ? 'cursor-not-allowed opacity-50' : 'cursor-pointer opacity-100'
+              }`}
             >
               <Send size={15} />
               <span>{isSubmitting ? 'Submitting...' : 'Submit Pre-Spend Request'}</span>

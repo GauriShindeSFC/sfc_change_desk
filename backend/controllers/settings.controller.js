@@ -60,11 +60,11 @@ export const exportAuditLogs = asyncHandler(async (req, res) => {
     const rows = logs.map(l => [
       `"${l.id}"`,
       `"${l.timestamp || ''}"`,
-      `"${(l.actor || '').replace(/"/g, '""')}"`,
-      `"${(l.action || '').replace(/"/g, '""')}"`,
-      `"${(l.reference || '').replace(/"/g, '""')}"`,
-      `"${(l.employeeEmail || '').replace(/"/g, '""')}"`,
-      `"${(l.category || '').replace(/"/g, '""')}"`
+      `"${(l.actor || '').replace(/"/g, '""').replace(/^([=+\-@\t\r])/, "'$1")}"`,
+      `"${(l.action || '').replace(/"/g, '""').replace(/^([=+\-@\t\r])/, "'$1")}"`,
+      `"${(l.reference || '').replace(/"/g, '""').replace(/^([=+\-@\t\r])/, "'$1")}"`,
+      `"${(l.employeeEmail || '').replace(/"/g, '""').replace(/^([=+\-@\t\r])/, "'$1")}"`,
+      `"${(l.category || '').replace(/"/g, '""').replace(/^([=+\-@\t\r])/, "'$1")}"`
     ]);
 
     const csvContent = [headers.join(','), ...rows.map(row => row.join(','))].join('\n');

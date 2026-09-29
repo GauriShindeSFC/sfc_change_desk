@@ -13,7 +13,7 @@ import { getTravelRequestsService } from '../services/travelDesk.service.js';
 
 export const getMetrics = asyncHandler(async (req, res) => {
   const isOrgScope = req.query.scope === 'organization' || req.query.scope === 'org';
-  const userId = isOrgScope ? null : (req.user?.userKey || req.user?.id || req.headers['x-user-id'] || req.query.userId || null);
+  const userId = isOrgScope ? null : (req.user?.userKey || req.user?.id || null);
   if (!isOrgScope && !userId) {
     return res.status(401).json({ success: false, message: 'Unauthorized: Personal dashboard scope requires valid user identity.' });
   }
@@ -24,7 +24,7 @@ export const getMetrics = asyncHandler(async (req, res) => {
 
 export const getCategories = asyncHandler(async (req, res) => {
   const isOrgScope = req.query.scope === 'organization' || req.query.scope === 'org';
-  const userId = isOrgScope ? null : (req.user?.userKey || req.user?.id || req.headers['x-user-id'] || req.query.userId || null);
+  const userId = isOrgScope ? null : (req.user?.userKey || req.user?.id || null);
   if (!isOrgScope && !userId) {
     return res.status(401).json({ success: false, message: 'Unauthorized: Personal dashboard scope requires valid user identity.' });
   }
@@ -34,7 +34,7 @@ export const getCategories = asyncHandler(async (req, res) => {
 
 export const getStatusBreakdown = asyncHandler(async (req, res) => {
   const isOrgScope = req.query.scope === 'organization' || req.query.scope === 'org';
-  const userId = isOrgScope ? null : (req.user?.userKey || req.user?.id || req.headers['x-user-id'] || req.query.userId || null);
+  const userId = isOrgScope ? null : (req.user?.userKey || req.user?.id || null);
   if (!isOrgScope && !userId) {
     return res.status(401).json({ success: false, message: 'Unauthorized: Personal dashboard scope requires valid user identity.' });
   }
@@ -76,7 +76,7 @@ export const exportDashboardData = asyncHandler(async (req, res) => {
       lines.push(`"Generated At","${new Date().toLocaleString()}"`);
       lines.push(`"Date Filter","${dateFilter || 'overall'}${dateFilter === 'custom' ? ` (${startDate} to ${endDate})` : ''}"`);
       lines.push(`"Status Filter","${status || 'All'}"`);
-      if (searchQuery) lines.push(`"Search Query","${String(searchQuery).replace(/"/g, '""')}"`);
+      if (searchQuery) lines.push(`"Search Query","${String(searchQuery).replace(/"/g, '""').replace(/^([=+\-@\t\r])/, "'$1")}"`);
       lines.push('');
 
       // Summary Metrics
@@ -89,7 +89,7 @@ export const exportDashboardData = asyncHandler(async (req, res) => {
       lines.push('--- SPEND BY CATEGORY ---');
       lines.push('"Category","Request Count"');
       Object.entries(categoryCounts).forEach(([cat, count]) => {
-        lines.push(`"${cat.replace(/"/g, '""')}",${count}`);
+        lines.push(`"${cat.replace(/"/g, '""').replace(/^([=+\-@\t\r])/, "'$1")}",${count}`);
       });
       lines.push('');
 
@@ -98,20 +98,20 @@ export const exportDashboardData = asyncHandler(async (req, res) => {
       lines.push('"PS ID","Item Description","Category","Subcategory","Estimated Amount (INR)","Cost Centre","Budget Line","Requester Name","Requester Email","Needed By Date","Selected Vendor","Commercial Exception","Status","Approved By"');
       requests.forEach((r) => {
         lines.push([
-          `"${(r.requestCode || r.id || '').replace(/"/g, '""')}"`,
-          `"${(r.itemDescription || '').replace(/"/g, '""')}"`,
-          `"${(r.category || '').replace(/"/g, '""')}"`,
-          `"${(r.subcategory || '').replace(/"/g, '""')}"`,
+          `"${(r.requestCode || r.id || '').replace(/"/g, '""').replace(/^([=+\-@\t\r])/, "'$1")}"`,
+          `"${(r.itemDescription || '').replace(/"/g, '""').replace(/^([=+\-@\t\r])/, "'$1")}"`,
+          `"${(r.category || '').replace(/"/g, '""').replace(/^([=+\-@\t\r])/, "'$1")}"`,
+          `"${(r.subcategory || '').replace(/"/g, '""').replace(/^([=+\-@\t\r])/, "'$1")}"`,
           Number(r.estimatedAmount || 0),
-          `"${(r.costCentre || '').replace(/"/g, '""')}"`,
-          `"${(r.budgetLine || '').replace(/"/g, '""')}"`,
-          `"${(r.requesterName || '').replace(/"/g, '""')}"`,
-          `"${(r.requesterEmail || '').replace(/"/g, '""')}"`,
-          `"${(r.neededByDate ? new Date(r.neededByDate).toLocaleDateString('en-GB') : '—').replace(/"/g, '""')}"`,
-          `"${(r.selectedVendor || '').replace(/"/g, '""')}"`,
-          `"${(r.commercialException || 'None').replace(/"/g, '""')}"`,
-          `"${(r.status || 'Pending').replace(/"/g, '""')}"`,
-          `"${(r.decidedBy || r.approvedBy || (r.status === 'Approved' ? 'Approver' : '—')).replace(/"/g, '""')}"`
+          `"${(r.costCentre || '').replace(/"/g, '""').replace(/^([=+\-@\t\r])/, "'$1")}"`,
+          `"${(r.budgetLine || '').replace(/"/g, '""').replace(/^([=+\-@\t\r])/, "'$1")}"`,
+          `"${(r.requesterName || '').replace(/"/g, '""').replace(/^([=+\-@\t\r])/, "'$1")}"`,
+          `"${(r.requesterEmail || '').replace(/"/g, '""').replace(/^([=+\-@\t\r])/, "'$1")}"`,
+          `"${(r.neededByDate ? new Date(r.neededByDate).toLocaleDateString('en-GB') : '—').replace(/"/g, '""').replace(/^([=+\-@\t\r])/, "'$1")}"`,
+          `"${(r.selectedVendor || '').replace(/"/g, '""').replace(/^([=+\-@\t\r])/, "'$1")}"`,
+          `"${(r.commercialException || 'None').replace(/"/g, '""').replace(/^([=+\-@\t\r])/, "'$1")}"`,
+          `"${(r.status || 'Pending').replace(/"/g, '""').replace(/^([=+\-@\t\r])/, "'$1")}"`,
+          `"${(r.decidedBy || r.approvedBy || (r.status === 'Approved' ? 'Approver' : '—')).replace(/"/g, '""').replace(/^([=+\-@\t\r])/, "'$1")}"`
         ].join(','));
       });
 
@@ -218,7 +218,7 @@ export const exportDashboardData = asyncHandler(async (req, res) => {
       lines.push(`"Generated At","${new Date().toLocaleString()}"`);
       lines.push(`"Date Filter","${dateFilter || 'overall'}${dateFilter === 'custom' ? ` (${startDate} to ${endDate})` : ''}"`);
       lines.push(`"Status Filter","${status || 'All'}"`);
-      if (searchQuery) lines.push(`"Search Query","${String(searchQuery).replace(/"/g, '""')}"`);
+      if (searchQuery) lines.push(`"Search Query","${String(searchQuery).replace(/"/g, '""').replace(/^([=+\-@\t\r])/, "'$1")}"`);
       lines.push('');
 
       // Summary Metrics
@@ -231,7 +231,7 @@ export const exportDashboardData = asyncHandler(async (req, res) => {
       lines.push('--- TRAVEL BY MODE ---');
       lines.push('"Mode","Booking Count"');
       Object.entries(modeCounts).forEach(([mode, count]) => {
-        lines.push(`"${mode.replace(/"/g, '""')}",${count}`);
+        lines.push(`"${mode.replace(/"/g, '""').replace(/^([=+\-@\t\r])/, "'$1")}",${count}`);
       });
       lines.push('');
 
@@ -240,20 +240,20 @@ export const exportDashboardData = asyncHandler(async (req, res) => {
       lines.push('"TR ID","Title / Description","Travel Mode","Origin","Destination","Travel Date","Return Date","Traveller Name","Traveller Email","Department","Purpose","Short Notice","Status","Approved By"');
       requests.forEach((r) => {
         lines.push([
-          `"${(r.requestCode || r.id || '').replace(/"/g, '""')}"`,
-          `"${(r.title || '').replace(/"/g, '""')}"`,
-          `"${(r.travelMode || 'Flight').replace(/"/g, '""')}"`,
-          `"${(r.fromLocation || '').replace(/"/g, '""')}"`,
-          `"${(r.toLocation || '').replace(/"/g, '""')}"`,
-          `"${(r.departureDate ? new Date(r.departureDate).toLocaleDateString('en-GB') : '—').replace(/"/g, '""')}"`,
-          `"${(r.returnDate ? new Date(r.returnDate).toLocaleDateString('en-GB') : '—').replace(/"/g, '""')}"`,
-          `"${(r.travellerName || '').replace(/"/g, '""')}"`,
-          `"${(r.travellerEmail || '').replace(/"/g, '""')}"`,
-          `"${(r.department || '').replace(/"/g, '""')}"`,
-          `"${(r.purpose || '').replace(/"/g, '""')}"`,
+          `"${(r.requestCode || r.id || '').replace(/"/g, '""').replace(/^([=+\-@\t\r])/, "'$1")}"`,
+          `"${(r.title || '').replace(/"/g, '""').replace(/^([=+\-@\t\r])/, "'$1")}"`,
+          `"${(r.travelMode || 'Flight').replace(/"/g, '""').replace(/^([=+\-@\t\r])/, "'$1")}"`,
+          `"${(r.fromLocation || '').replace(/"/g, '""').replace(/^([=+\-@\t\r])/, "'$1")}"`,
+          `"${(r.toLocation || '').replace(/"/g, '""').replace(/^([=+\-@\t\r])/, "'$1")}"`,
+          `"${(r.departureDate ? new Date(r.departureDate).toLocaleDateString('en-GB') : '—').replace(/"/g, '""').replace(/^([=+\-@\t\r])/, "'$1")}"`,
+          `"${(r.returnDate ? new Date(r.returnDate).toLocaleDateString('en-GB') : '—').replace(/"/g, '""').replace(/^([=+\-@\t\r])/, "'$1")}"`,
+          `"${(r.travellerName || '').replace(/"/g, '""').replace(/^([=+\-@\t\r])/, "'$1")}"`,
+          `"${(r.travellerEmail || '').replace(/"/g, '""').replace(/^([=+\-@\t\r])/, "'$1")}"`,
+          `"${(r.department || '').replace(/"/g, '""').replace(/^([=+\-@\t\r])/, "'$1")}"`,
+          `"${(r.purpose || '').replace(/"/g, '""').replace(/^([=+\-@\t\r])/, "'$1")}"`,
           r.isShortNotice ? '"Yes (< 7 days)"' : '"No"',
-          `"${(r.status || 'Pending').replace(/"/g, '""')}"`,
-          `"${(r.decidedBy || r.approvedBy || (r.status === 'Approved' ? 'Approver' : '—')).replace(/"/g, '""')}"`
+          `"${(r.status || 'Pending').replace(/"/g, '""').replace(/^([=+\-@\t\r])/, "'$1")}"`,
+          `"${(r.decidedBy || r.approvedBy || (r.status === 'Approved' ? 'Approver' : '—')).replace(/"/g, '""').replace(/^([=+\-@\t\r])/, "'$1")}"`
         ].join(','));
       });
 
@@ -384,14 +384,14 @@ export const exportDashboardData = asyncHandler(async (req, res) => {
     lines.push(`"Generated At","${new Date().toLocaleString()}"`);
     lines.push(`"Date Filter","${dateFilter || 'overall'}${dateFilter === 'custom' ? ` (${startDate} to ${endDate})` : ''}"`);
     lines.push(`"Status Filter","${status || 'All'}"`);
-    if (searchQuery) lines.push(`"Search Query","${String(searchQuery).replace(/"/g, '""')}"`);
+    if (searchQuery) lines.push(`"Search Query","${String(searchQuery).replace(/"/g, '""').replace(/^([=+\-@\t\r])/, "'$1")}"`);
     lines.push('');
 
     // Section 1: Tickets by Category
     lines.push('--- TICKETS BY CATEGORY ---');
     lines.push('"Category","Ticket Count","Percentage"');
     (categories || []).forEach((c) => {
-      const name = (c.category || c.label || c.name || '').replace(/"/g, '""');
+      const name = (c.category || c.label || c.name || '').replace(/"/g, '""').replace(/^([=+\-@\t\r])/, "'$1");
       const count = c.count || 0;
       const pct = `${c.percentage || 0}%`;
       lines.push(`"${name}",${count},"${pct}"`);
@@ -403,7 +403,7 @@ export const exportDashboardData = asyncHandler(async (req, res) => {
     lines.push('"Status","Ticket Count","Percentage"');
     const totalCRs = (statusBreakdown || []).reduce((sum, s) => sum + (s.count || 0), 0);
     (statusBreakdown || []).forEach((s) => {
-      const name = (s.label || s.status || '').replace(/"/g, '""');
+      const name = (s.label || s.status || '').replace(/"/g, '""').replace(/^([=+\-@\t\r])/, "'$1");
       const count = s.count || 0;
       const pct = totalCRs > 0 ? `${Math.round((count / totalCRs) * 100)}%` : '0%';
       lines.push(`"${name}",${count},"${pct}"`);
@@ -414,7 +414,7 @@ export const exportDashboardData = asyncHandler(async (req, res) => {
     lines.push('--- REQUESTS BY LOCATION ---');
     lines.push('"Location","Ticket Count","Percentage"');
     locationStats.forEach((l) => {
-      lines.push(`"${l.location.replace(/"/g, '""')}",${l.count},"${l.percentage}%"`);
+      lines.push(`"${l.location.replace(/"/g, '""').replace(/^([=+\-@\t\r])/, "'$1")}",${l.count},"${l.percentage}%"`);
     });
     lines.push('');
 
@@ -429,18 +429,18 @@ export const exportDashboardData = asyncHandler(async (req, res) => {
         : (cr.approvedBy || cr.decidedBy || (['Approved', 'Implemented'].includes(cr.status) ? 'Approver' : '—'));
 
       lines.push([
-        `"${(cr.id || '').replace(/"/g, '""')}"`,
-        `"${(cr.title || '').replace(/"/g, '""')}"`,
-        `"${(cr.category || '').replace(/"/g, '""')}"`,
-        `"${(cr.subCategory || cr.subcategory || '').replace(/"/g, '""')}"`,
-        `"${(cr.location || 'Unspecified').replace(/"/g, '""')}"`,
-        `"${reqName.replace(/"/g, '""')}"`,
-        `"${reqEmail.replace(/"/g, '""')}"`,
-        `"${(cr.raisedDate || cr.submittedAt || '').replace(/"/g, '""')}"`,
-        `"${(cr.closedDate || '—').replace(/"/g, '""')}"`,
-        `"${approver.replace(/"/g, '""')}"`,
-        `"${(cr.status || '').replace(/"/g, '""')}"`,
-        `"${(cr.priority || 'Medium').replace(/"/g, '""')}"`
+        `"${(cr.id || '').replace(/"/g, '""').replace(/^([=+\-@\t\r])/, "'$1")}"`,
+        `"${(cr.title || '').replace(/"/g, '""').replace(/^([=+\-@\t\r])/, "'$1")}"`,
+        `"${(cr.category || '').replace(/"/g, '""').replace(/^([=+\-@\t\r])/, "'$1")}"`,
+        `"${(cr.subCategory || cr.subcategory || '').replace(/"/g, '""').replace(/^([=+\-@\t\r])/, "'$1")}"`,
+        `"${(cr.location || 'Unspecified').replace(/"/g, '""').replace(/^([=+\-@\t\r])/, "'$1")}"`,
+        `"${reqName.replace(/"/g, '""').replace(/^([=+\-@\t\r])/, "'$1")}"`,
+        `"${reqEmail.replace(/"/g, '""').replace(/^([=+\-@\t\r])/, "'$1")}"`,
+        `"${(cr.raisedDate || cr.submittedAt || '').replace(/"/g, '""').replace(/^([=+\-@\t\r])/, "'$1")}"`,
+        `"${(cr.closedDate || '—').replace(/"/g, '""').replace(/^([=+\-@\t\r])/, "'$1")}"`,
+        `"${approver.replace(/"/g, '""').replace(/^([=+\-@\t\r])/, "'$1")}"`,
+        `"${(cr.status || '').replace(/"/g, '""').replace(/^([=+\-@\t\r])/, "'$1")}"`,
+        `"${(cr.priority || 'Medium').replace(/"/g, '""').replace(/^([=+\-@\t\r])/, "'$1")}"`
       ].join(','));
     });
 

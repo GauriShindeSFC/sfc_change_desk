@@ -47,6 +47,21 @@ export const login = async (email) => {
 
 export const MICROSOFT_LOGIN_URL = `${AUTH_BASE_URL}/microsoft`;
 
+// Exchanges the single-use code from the SSO redirect for the real session token.
+// The redirect never carries the JWT itself, only this short-lived opaque code.
+export const exchangeSsoCode = async (code) => {
+  const res = await fetch(`${AUTH_BASE_URL}/exchange`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ code })
+  });
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok || !body.success) {
+    throw new Error(body.message || 'Sign-in link is invalid or has expired.');
+  }
+  return body.token;
+};
+
 // Re-validate the token and refresh the user record on app load.
 export const fetchMe = async (overrideToken = null) => {
   const token = overrideToken || getToken();

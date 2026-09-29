@@ -332,63 +332,33 @@ export default function ChangeRequestModal({ cr, onClose, onApprove, onReject, o
   };
 
   return (
-    <div style={{
-      position: 'fixed',
-      top: 0,
-      left: 0,
-      right: 0,
-      bottom: 0,
-      backgroundColor: 'rgba(0, 0, 0, 0.5)',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      zIndex: 200,
-      padding: '1rem'
-    }}>
-      <div style={{
-        backgroundColor: 'var(--card-bg)',
-        border: '1px solid var(--border-color)',
-        borderRadius: '16px',
-        width: '100%',
-        maxWidth: '680px',
-        maxHeight: '88vh',
-        overflowY: 'auto',
-        boxShadow: '0 20px 40px rgba(0, 0, 0, 0.2)',
-        display: 'flex',
-        flexDirection: 'column'
-      }}>
-        
+    <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/50 p-4">
+      <div className="flex max-h-[88vh] w-full max-w-[680px] flex-col overflow-y-auto rounded-2xl border border-border bg-card shadow-[0_20px_40px_rgba(0,0,0,0.2)]">
+
         {/* Header */}
-        <div style={{ padding: '1.5rem 1.75rem 1rem 1.75rem', display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', borderBottom: '1px solid var(--border-color)' }}>
+        <div className="flex items-start justify-between border-b border-border px-7 pb-4 pt-6">
           <div>
-            <h2 style={{ fontSize: '1.25rem', fontWeight: 500, color: 'var(--text-primary)', margin: 0, lineHeight: 1.3 }}>
+            <h2 className="m-0 text-xl font-medium leading-[1.3] text-foreground">
               {cr.id}: {cr.title}
             </h2>
-            <span style={{ fontSize: '0.825rem', color: 'var(--text-secondary)', display: 'block', marginTop: '0.25rem' }}>
+            <span className="mt-1 block text-[0.825rem] text-muted-foreground">
               {cr.category} {cr.subCategory ? `· ${cr.subCategory}` : ''}
             </span>
           </div>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', padding: '0.2rem' }}>
+          <button onClick={onClose} className="cursor-pointer border-none bg-none p-[0.2rem] text-muted-foreground">
             <X size={20} />
           </button>
         </div>
 
         {/* Status */}
-        <div style={{ padding: '1.25rem 1.75rem 0.5rem 1.75rem', display: 'flex', alignItems: 'center', gap: '3rem' }}>
+        <div className="flex items-center gap-12 px-7 pb-2 pt-5">
           <div>
-            <div style={{ fontSize: '0.8rem', fontWeight: 500, color: 'var(--text-primary)', marginBottom: '0.4rem' }}>Status</div>
-            <div style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '0.35rem',
-              padding: '0.25rem 0.75rem',
-              borderRadius: 'var(--radius-lg)',
-              backgroundColor: statusBg,
-              color: statusColor,
-              fontSize: '0.8rem',
-              fontWeight: 500
-            }}>
-              <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: statusDot }} />
+            <div className="mb-[0.4rem] text-[0.8rem] font-medium text-foreground">Status</div>
+            <div
+              className="inline-flex items-center gap-[0.35rem] rounded-[var(--radius-lg)] px-3 py-1 text-[0.8rem] font-medium"
+              style={{ backgroundColor: statusBg, color: statusColor }}
+            >
+              <span className="h-[6px] w-[6px] rounded-full" style={{ backgroundColor: statusDot }} />
               <span>{statusLabel}</span>
             </div>
           </div>
@@ -397,24 +367,15 @@ export default function ChangeRequestModal({ cr, onClose, onApprove, onReject, o
 
         {/* Rejection Rationale Display Banner */}
         {(isRejected || cr.rejectionReason || cr.rejection_reason) && (
-          <div style={{ padding: '0.5rem 1.75rem 0.5rem 1.75rem' }}>
-            <div style={{
-              padding: '1rem 1.25rem',
-              backgroundColor: '#FEF2F2',
-              borderRadius: '12px',
-              border: '1px solid #FCA5A5',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '0.4rem',
-              boxShadow: '0 2px 6px rgba(220, 38, 38, 0.08)'
-            }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
-                <span style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#DC2626' }} />
-                <span style={{ fontSize: '0.775rem', fontWeight: 600, color: '#DC2626', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+          <div className="px-7 py-2">
+            <div className="flex flex-col gap-[0.4rem] rounded-xl border border-[#FCA5A5] bg-[#FEF2F2] p-5 shadow-[0_2px_6px_rgba(220,38,38,0.08)]">
+              <div className="flex items-center gap-[0.45rem]">
+                <span className="h-2 w-2 rounded-full bg-[#DC2626]" />
+                <span className="text-[0.775rem] font-semibold uppercase tracking-[0.05em] text-[#DC2626]">
                   Rejection Reason / Approver Comments
                 </span>
               </div>
-              <p style={{ fontSize: '0.9rem', fontWeight: 500, color: '#991B1B', margin: 0, lineHeight: 1.5, wordBreak: 'break-word', overflowWrap: 'anywhere' }}>
+              <p className="m-0 break-words text-[0.9rem] font-medium leading-normal text-[#991B1B] [overflow-wrap:anywhere]">
                 {cr.rejectionReason || cr.rejection_reason || cr.customFieldValues?.rejectionReason || 'This change request was rejected during Change Manager review.'}
               </p>
             </div>
@@ -422,9 +383,9 @@ export default function ChangeRequestModal({ cr, onClose, onApprove, onReject, o
         )}
 
         {/* Dynamic Lifecycle Visualizer with Hover Tooltips & Dates */}
-        <div style={{ padding: '1.25rem 1.75rem 1.75rem 1.75rem' }}>
-          <div style={{ fontSize: '0.85rem', fontWeight: 800, color: 'var(--text-primary)', marginBottom: '1.5rem' }}>Lifecycle</div>
-          <div style={{ display: 'flex', alignItems: 'flex-start', width: '100%', padding: '0 0.5rem' }}>
+        <div className="px-7 pb-7 pt-5">
+          <div className="mb-6 text-[0.85rem] font-extrabold text-foreground">Lifecycle</div>
+          <div className="flex w-full items-start px-2">
             {steps.map((step, idx) => {
               const isLast = idx === steps.length - 1;
               const isStepRejected = isRejected && idx === currentStepIdx;
@@ -474,81 +435,68 @@ export default function ChangeRequestModal({ cr, onClose, onApprove, onReject, o
                   <div
                     onMouseEnter={() => setHoveredStepIdx(idx)}
                     onMouseLeave={() => setHoveredStepIdx(null)}
-                    style={{
-                      position: 'relative',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      alignItems: 'center',
-                      minWidth: '100px',
-                      zIndex: 3,
-                      cursor: isFinished ? 'pointer' : 'default'
-                    }}
+                    className={`relative z-[3] flex min-w-[100px] flex-col items-center ${isFinished ? 'cursor-pointer' : 'cursor-default'}`}
                   >
                     {/* Circle Node */}
-                    <div style={{
-                      width: '32px',
-                      height: '32px',
-                      borderRadius: '50%',
-                      backgroundColor: circleBg,
-                      border: circleBorder,
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      transition: 'transform 0.15s ease',
-                      transform: hoveredStepIdx === idx ? 'scale(1.15)' : 'scale(1)',
-                      boxShadow: isFinished ? '0 0 12px rgba(16, 185, 129, 0.25)' : isCurrentPending ? '0 0 10px rgba(245, 158, 11, 0.2)' : 'none'
-                    }}>
+                    <div
+                      className={`flex h-8 w-8 items-center justify-center rounded-full border-2 transition-transform duration-150 [transition-timing-function:ease] ${
+                        hoveredStepIdx === idx ? 'scale-[1.15]' : 'scale-100'
+                      } ${
+                        isStepRejected
+                          ? 'border-[#DC2626] bg-[#DC2626] shadow-none'
+                          : isFinished
+                          ? 'border-[#10B981] bg-[#10B981] shadow-[0_0_12px_rgba(16,185,129,0.25)]'
+                          : isCurrentPending
+                          ? 'border-[#F59E0B] bg-[#FFFBEB] shadow-[0_0_10px_rgba(245,158,11,0.2)]'
+                          : 'border-border bg-card shadow-none'
+                      }`}
+                    >
                       {isStepRejected ? (
                         <X size={18} color="#FFFFFF" strokeWidth={3} />
                       ) : isFinished ? (
                         <Check size={18} color="#FFFFFF" strokeWidth={3} />
                       ) : isCurrentPending ? (
-                        <span style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#F59E0B' }} />
+                        <span className="h-2 w-2 rounded-full bg-[#F59E0B]" />
                       ) : null}
                     </div>
 
                     {/* Step Title */}
-                    <span style={{ fontSize: '0.825rem', fontWeight: 800, color: textColor, textAlign: 'center', marginTop: '0.5rem' }}>
+                    <span
+                      className={`mt-2 text-center text-[0.825rem] font-extrabold ${
+                        isStepRejected ? 'text-[#DC2626]' : isFinished ? 'text-[#10B981]' : isCurrentPending ? 'text-[#D97706]' : 'text-muted-foreground'
+                      }`}
+                    >
                       {step}
                     </span>
 
                     {/* Step Date & Time */}
                     {stepDate && (
-                      <span style={{ fontSize: '0.725rem', color: isFinished ? '#10B981' : 'var(--text-secondary)', fontFamily: 'var(--font-mono)', textAlign: 'center', marginTop: '0.2rem', fontWeight: 600 }}>
+                      <span className={`mt-[0.2rem] text-center font-mono text-[0.725rem] font-semibold ${isFinished ? 'text-[#10B981]' : 'text-muted-foreground'}`}>
                         {stepDate}
                       </span>
                     )}
                     {stepTime && (
-                      <span style={{ fontSize: '0.7rem', color: isFinished ? '#059669' : 'var(--text-secondary)', fontFamily: 'var(--font-mono)', textAlign: 'center', marginTop: '0.1rem', fontWeight: 500 }}>
+                      <span className={`mt-[0.1rem] text-center font-mono text-[0.7rem] font-medium ${isFinished ? 'text-[#059669]' : 'text-muted-foreground'}`}>
                         {stepTime}
                       </span>
                     )}
 
                     {/* Hover Tooltip Popover (Only comment shown) */}
                     {hoveredStepIdx === idx && tooltipInfo && isFinished && (
-                      <div style={{
-                        position: 'absolute',
-                        bottom: '115%',
-                        backgroundColor: 'var(--card-bg)',
-                        border: '1px solid var(--border-color)',
-                        borderRadius: '10px',
-                        padding: '0.65rem 0.85rem',
-                        boxShadow: '0 10px 25px rgba(0, 0, 0, 0.25)',
-                        zIndex: 300,
-                        width: '220px',
-                        pointerEvents: 'none',
-                        ...(idx === 0
-                          ? { left: '0px', transform: 'none' }
-                          : isLast
-                          ? { right: '0px', left: 'auto', transform: 'none' }
-                          : { left: '50%', transform: 'translateX(-50%)' })
-                      }}>
-                        <div style={{ paddingBottom: '0.25rem', marginBottom: '0.3rem', borderBottom: '1px solid var(--border-color)' }}>
-                          <span style={{ fontSize: '0.725rem', fontWeight: 800, color: stepColor, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                      <div
+                        className={`absolute bottom-[115%] z-[300] w-[220px] rounded-[10px] border border-border bg-card px-[0.85rem] py-[0.65rem] pointer-events-none shadow-[0_10px_25px_rgba(0,0,0,0.25)] ${
+                          idx === 0 ? 'left-0' : isLast ? 'left-auto right-0' : 'left-1/2 -translate-x-1/2'
+                        }`}
+                      >
+                        <div className="mb-[0.3rem] border-b border-border pb-1">
+                          <span
+                            className="text-[0.725rem] font-extrabold uppercase tracking-[0.04em]"
+                            style={{ color: stepColor }}
+                          >
                             {tooltipInfo.title}
                           </span>
                         </div>
-                        <p style={{ fontSize: '0.8rem', color: 'var(--text-primary)', fontWeight: 500, margin: 0, lineHeight: 1.45, wordBreak: 'break-word', overflowWrap: 'anywhere' }}>
+                        <p className="m-0 break-words text-[0.8rem] font-medium leading-[1.45] text-foreground [overflow-wrap:anywhere]">
                           "{tooltipInfo.comment}"
                         </p>
                       </div>
@@ -557,13 +505,11 @@ export default function ChangeRequestModal({ cr, onClose, onApprove, onReject, o
 
                   {/* Connector Line to Next Step (rendered ONLY if NOT the last step) */}
                   {!isLast && (
-                    <div style={{
-                      flex: 1,
-                      height: '2.5px',
-                      backgroundColor: connectorColor,
-                      marginTop: '15px',
-                      transition: 'background-color 0.3s ease'
-                    }} />
+                    <div
+                      className={`mt-[15px] h-[2.5px] flex-1 transition-colors duration-300 [transition-timing-function:ease] ${
+                        nextStepRejected ? 'bg-[#DC2626]' : nextStepFinished ? 'bg-[#10B981]' : 'bg-border'
+                      }`}
+                    />
                   )}
                 </React.Fragment>
               );
@@ -572,43 +518,43 @@ export default function ChangeRequestModal({ cr, onClose, onApprove, onReject, o
         </div>
 
         {/* Section 1: Requester Details */}
-        <div style={{ padding: '1.25rem 1.75rem', borderBottom: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <h3 style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--text-primary)', margin: 0 }}>Section 1: Requester Details</h3>
+        <div className="flex flex-col gap-4 border-b border-border px-7 py-5">
+          <div className="flex items-center justify-between">
+            <h3 className="m-0 text-[0.9rem] font-semibold text-foreground">Section 1: Requester Details</h3>
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '1rem' }}>
+          <div className="grid grid-cols-[repeat(auto-fit,minmax(160px,1fr))] gap-4">
             <div>
-              <div style={{ fontSize: '0.8rem', fontWeight: 500, color: 'var(--text-primary)', marginBottom: '0.25rem' }}>Requester / Employee</div>
-              <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>{cr.employeeName || cr.requester || 'Requester'}</div>
+              <div className="mb-1 text-[0.8rem] font-medium text-foreground">Requester / Employee</div>
+              <div className="text-[0.85rem] text-muted-foreground">{cr.employeeName || cr.requester || 'Requester'}</div>
             </div>
             <div>
-              <div style={{ fontSize: '0.8rem', fontWeight: 500, color: 'var(--text-primary)', marginBottom: '0.25rem' }}>
+              <div className="mb-1 text-[0.8rem] font-medium text-foreground">
                 {isRejected ? 'Rejected By' : isApproved || isImplemented ? 'Approved By' : 'Approver'}
               </div>
-              <div style={{ fontSize: '0.85rem', fontWeight: 500, color: isRejected ? '#DC2626' : isApproved || isImplemented ? '#059669' : 'var(--text-secondary)' }}>
+              <div className={`text-[0.85rem] font-medium ${isRejected ? 'text-[#DC2626]' : isApproved || isImplemented ? 'text-[#059669]' : 'text-muted-foreground'}`}>
                 {cr.decidedBy || cr.approver || (isApproved || isImplemented || isRejected ? 'Gauri Shinde' : '—')}
               </div>
             </div>
             <div>
-              <div style={{ fontSize: '0.8rem', fontWeight: 500, color: 'var(--text-primary)', marginBottom: '0.25rem' }}>Employee ID</div>
-              <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)' }}>{cr.employeeId || cr.empId || 'N/A'}</div>
+              <div className="mb-1 text-[0.8rem] font-medium text-foreground">Employee ID</div>
+              <div className="font-mono text-[0.85rem] text-muted-foreground">{cr.employeeId || cr.empId || 'N/A'}</div>
             </div>
             <div>
-              <div style={{ fontSize: '0.8rem', fontWeight: 500, color: 'var(--text-primary)', marginBottom: '0.25rem' }}>Employee Email</div>
-              <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>{cr.employeeEmail || cr.requesterEmail || 'N/A'}</div>
+              <div className="mb-1 text-[0.8rem] font-medium text-foreground">Employee Email</div>
+              <div className="text-[0.85rem] text-muted-foreground">{cr.employeeEmail || cr.requesterEmail || 'N/A'}</div>
             </div>
             {(isImplemented || cr.implementedBy || cr.implementedComment) && (
               <>
                 <div>
-                  <div style={{ fontSize: '0.8rem', fontWeight: 500, color: 'var(--text-primary)', marginBottom: '0.25rem' }}>Implemented By</div>
-                  <div style={{ fontSize: '0.85rem', fontWeight: 600, color: '#7C3AED' }}>
+                  <div className="mb-1 text-[0.8rem] font-medium text-foreground">Implemented By</div>
+                  <div className="text-[0.85rem] font-semibold text-[#7C3AED]">
                     {cr.implementedBy || cr.customFieldValues?.implementedBy || cr.decidedBy || 'Implementer'}
                   </div>
                 </div>
                 {Boolean(cr.implementedByEmail || cr.customFieldValues?.implementedByEmail) && (
                   <div>
-                    <div style={{ fontSize: '0.8rem', fontWeight: 500, color: 'var(--text-primary)', marginBottom: '0.25rem' }}>Implementer Email</div>
-                    <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
+                    <div className="mb-1 text-[0.8rem] font-medium text-foreground">Implementer Email</div>
+                    <div className="text-[0.85rem] text-muted-foreground">
                       {cr.implementedByEmail || cr.customFieldValues?.implementedByEmail}
                     </div>
                   </div>
@@ -616,66 +562,58 @@ export default function ChangeRequestModal({ cr, onClose, onApprove, onReject, o
               </>
             )}
             <div>
-              <div style={{ fontSize: '0.8rem', fontWeight: 500, color: 'var(--text-primary)', marginBottom: '0.25rem' }}>Location</div>
-              <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>{cr.location || 'Not specified'}</div>
+              <div className="mb-1 text-[0.8rem] font-medium text-foreground">Location</div>
+              <div className="text-[0.85rem] text-muted-foreground">{cr.location || 'Not specified'}</div>
             </div>
             {cr.customFieldValues?.managerName && (
               <div>
-                <div style={{ fontSize: '0.8rem', fontWeight: 500, color: 'var(--text-primary)', marginBottom: '0.25rem' }}>Manager Name</div>
-                <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>{cr.customFieldValues.managerName}</div>
+                <div className="mb-1 text-[0.8rem] font-medium text-foreground">Manager Name</div>
+                <div className="text-[0.85rem] text-muted-foreground">{cr.customFieldValues.managerName}</div>
               </div>
             )}
             <div>
-              <div style={{ fontSize: '0.8rem', fontWeight: 500, color: 'var(--text-primary)', marginBottom: '0.25rem' }}>Manager Email</div>
-              <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>{cr.managerEmail || 'N/A'}</div>
+              <div className="mb-1 text-[0.8rem] font-medium text-foreground">Manager Email</div>
+              <div className="text-[0.85rem] text-muted-foreground">{cr.managerEmail || 'N/A'}</div>
             </div>
           </div>
         </div>
 
         {/* Section 2: Change Details */}
-        <div style={{ padding: '1.25rem 1.75rem 0.75rem 1.75rem', borderBottom: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+        <div className="flex flex-col gap-5 border-b border-border px-7 pb-3 pt-5">
           <div>
-            <h3 style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--text-primary)', margin: 0 }}>Section 2: Change Details</h3>
+            <h3 className="m-0 text-[0.9rem] font-semibold text-foreground">Section 2: Change Details</h3>
           </div>
 
           {/* Core Change Request Form Fields */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem' }}>
-            <div style={{ gridColumn: '1 / -1' }}>
-              <div style={{ fontSize: '0.8rem', fontWeight: 500, color: 'var(--text-primary)', marginBottom: '0.25rem' }}>Change Title</div>
-              <div style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--text-primary)' }}>{cr.title || 'Untitled Request'}</div>
+          <div className="grid grid-cols-[repeat(auto-fit,minmax(200px,1fr))] gap-4">
+            <div className="col-span-full">
+              <div className="mb-1 text-[0.8rem] font-medium text-foreground">Change Title</div>
+              <div className="text-[0.9rem] font-semibold text-foreground">{cr.title || 'Untitled Request'}</div>
             </div>
 
             <div>
-              <div style={{ fontSize: '0.8rem', fontWeight: 500, color: 'var(--text-primary)', marginBottom: '0.25rem' }}>Category</div>
-              <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>{cr.category || 'Server & Infra'}</div>
+              <div className="mb-1 text-[0.8rem] font-medium text-foreground">Category</div>
+              <div className="text-[0.85rem] text-muted-foreground">{cr.category || 'Server & Infra'}</div>
             </div>
 
             <div>
-              <div style={{ fontSize: '0.8rem', fontWeight: 500, color: 'var(--text-primary)', marginBottom: '0.25rem' }}>Sub-category</div>
-              <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>{cr.subCategory || 'Server Lifecycle'}</div>
+              <div className="mb-1 text-[0.8rem] font-medium text-foreground">Sub-category</div>
+              <div className="text-[0.85rem] text-muted-foreground">{cr.subCategory || 'Server Lifecycle'}</div>
             </div>
 
             <div>
-              <div style={{ fontSize: '0.8rem', fontWeight: 500, color: 'var(--text-primary)', marginBottom: '0.25rem' }}>Start Date</div>
-              <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)' }}>{formatCleanDate(cr.startDate)}</div>
+              <div className="mb-1 text-[0.8rem] font-medium text-foreground">Start Date</div>
+              <div className="font-mono text-[0.85rem] text-muted-foreground">{formatCleanDate(cr.startDate)}</div>
             </div>
           </div>
 
           {/* Action-specific and Custom Form Fields */}
           {customFields.length > 0 && (
-            <div style={{
-              padding: '1.1rem 1.25rem',
-              backgroundColor: 'var(--input-bg)',
-              borderRadius: '10px',
-              border: '1px solid var(--border-color)',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '0.85rem'
-            }}>
-              <span style={{ fontSize: '0.775rem', fontWeight: 700, color: 'var(--brand-primary)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+            <div className="flex flex-col gap-[0.85rem] rounded-[10px] border border-border bg-input px-5 py-[1.1rem]">
+              <span className="text-[0.775rem] font-bold uppercase tracking-[0.04em] text-info">
                 Action & Specification Details
               </span>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '1rem' }}>
+              <div className="grid grid-cols-[repeat(auto-fit,minmax(180px,1fr))] gap-4">
                 {customFields.map(([key, val]) => {
                   const formattedKey = key
                     .replace(/([A-Z])/g, ' $1')
@@ -690,10 +628,10 @@ export default function ChangeRequestModal({ cr, onClose, onApprove, onReject, o
 
                   return (
                     <div key={key}>
-                      <div style={{ fontSize: '0.75rem', fontWeight: 500, color: 'var(--text-secondary)' }}>
+                      <div className="text-xs font-medium text-muted-foreground">
                         {formattedKey}
                       </div>
-                      <div style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-primary)', marginTop: '0.15rem', wordBreak: 'break-word' }}>
+                      <div className="mt-[0.15rem] break-words text-[0.85rem] font-semibold text-foreground">
                         {String(val)}
                       </div>
                     </div>
@@ -704,41 +642,41 @@ export default function ChangeRequestModal({ cr, onClose, onApprove, onReject, o
           )}
 
           {/* Dynamic Status-Aware Dates */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '1.25rem' }}>
+          <div className="grid grid-cols-[repeat(auto-fit,minmax(130px,1fr))] gap-5">
             <div>
-              <div style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '0.25rem' }}>Raised Date</div>
-              <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)' }}>{getStepDate('Requested') || cr.raisedDate || 'Recently'}</div>
+              <div className="mb-1 text-[0.8rem] font-bold text-foreground">Raised Date</div>
+              <div className="font-mono text-[0.85rem] text-muted-foreground">{getStepDate('Requested') || cr.raisedDate || 'Recently'}</div>
             </div>
 
             {isImplemented ? (
               <>
                 <div>
-                  <div style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '0.25rem' }}>Approved Date</div>
-                  <div style={{ fontSize: '0.85rem', color: '#059669', fontWeight: 700, fontFamily: 'var(--font-mono)' }}>{getStepDate('Approved') || cr.approvedDate || 'Approved'}</div>
+                  <div className="mb-1 text-[0.8rem] font-bold text-foreground">Approved Date</div>
+                  <div className="font-mono text-[0.85rem] font-bold text-[#059669]">{getStepDate('Approved') || cr.approvedDate || 'Approved'}</div>
                 </div>
                 <div>
-                  <div style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '0.25rem' }}>Implemented Date</div>
-                  <div style={{ fontSize: '0.85rem', color: '#0284C7', fontWeight: 700, fontFamily: 'var(--font-mono)' }}>{getStepDate('Implemented') || cr.implementedDate || cr.closedDate || 'Implemented'}</div>
+                  <div className="mb-1 text-[0.8rem] font-bold text-foreground">Implemented Date</div>
+                  <div className="font-mono text-[0.85rem] font-bold text-[#0284C7]">{getStepDate('Implemented') || cr.implementedDate || cr.closedDate || 'Implemented'}</div>
                 </div>
               </>
             ) : isApproved ? (
               <div>
-                <div style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '0.25rem' }}>Approved Date</div>
-                <div style={{ fontSize: '0.85rem', color: '#059669', fontWeight: 700, fontFamily: 'var(--font-mono)' }}>{getStepDate('Approved') || cr.approvedDate || 'Approved'}</div>
+                <div className="mb-1 text-[0.8rem] font-bold text-foreground">Approved Date</div>
+                <div className="font-mono text-[0.85rem] font-bold text-[#059669]">{getStepDate('Approved') || cr.approvedDate || 'Approved'}</div>
               </div>
             ) : isRejected ? (
               <div>
-                <div style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '0.25rem' }}>Rejected Date</div>
-                <div style={{ fontSize: '0.85rem', color: '#DC2626', fontWeight: 700, fontFamily: 'var(--font-mono)' }}>{getStepDate('Rejected') || cr.rejectedDate || cr.closedDate || 'Rejected'}</div>
+                <div className="mb-1 text-[0.8rem] font-bold text-foreground">Rejected Date</div>
+                <div className="font-mono text-[0.85rem] font-bold text-[#DC2626]">{getStepDate('Rejected') || cr.rejectedDate || cr.closedDate || 'Rejected'}</div>
               </div>
             ) : null}
           </div>
 
           {/* Business Justification */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+          <div className="flex flex-col gap-4">
             <div>
-              <div style={{ fontSize: '0.8rem', fontWeight: 500, color: 'var(--text-primary)', marginBottom: '0.35rem' }}>Business Justification</div>
-              <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', lineHeight: 1.45, wordBreak: 'break-word', overflowWrap: 'anywhere' }}>
+              <div className="mb-[0.35rem] text-[0.8rem] font-medium text-foreground">Business Justification</div>
+              <div className="break-words text-[0.85rem] leading-[1.45] text-muted-foreground [overflow-wrap:anywhere]">
                 {cr.justification || 'No business justification provided.'}
               </div>
             </div>
@@ -747,50 +685,21 @@ export default function ChangeRequestModal({ cr, onClose, onApprove, onReject, o
 
         {/* Action Confirmation Modal Popup (Approve / Reject / Implement) */}
         {actionPrompt && (
-          <div style={{
-            position: 'fixed',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            backgroundColor: 'rgba(0, 0, 0, 0.65)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 400,
-            padding: '1rem'
-          }}>
-            <div style={{
-              backgroundColor: 'var(--card-bg)',
-              border: `1px solid ${actionPrompt.color === '#DC2626' ? '#FCA5A5' : 'var(--border-color)'}`,
-              borderRadius: '16px',
-              width: '100%',
-              maxWidth: '500px',
-              padding: '1.5rem 1.75rem',
-              boxShadow: '0 25px 50px rgba(0, 0, 0, 0.4)',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '1rem'
-            }}>
+          <div className="fixed inset-0 z-[400] flex items-center justify-center bg-black/65 p-4">
+            <div
+              className="flex w-full max-w-[500px] flex-col gap-4 rounded-2xl border bg-card px-7 py-6 shadow-[0_25px_50px_rgba(0,0,0,0.4)]"
+              style={{ borderColor: actionPrompt.color === '#DC2626' ? '#FCA5A5' : 'var(--border-color)' }}
+            >
               <div>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem' }}>
-                  <h3 style={{ fontSize: '1.05rem', fontWeight: 800, color: actionPrompt.color, margin: 0 }}>
+                <div className="flex items-center justify-between gap-2">
+                  <h3 className="m-0 text-[1.05rem] font-extrabold" style={{ color: actionPrompt.color }}>
                     {actionPrompt.title}
                   </h3>
-                  <span style={{
-                    fontSize: '0.725rem',
-                    fontWeight: 600,
-                    color: '#64748B',
-                    backgroundColor: '#F1F5F9',
-                    border: '1px solid #CBD5E1',
-                    padding: '0.15rem 0.5rem',
-                    borderRadius: '5px',
-                    whiteSpace: 'nowrap'
-                  }}>
+                  <span className="whitespace-nowrap rounded-[5px] border border-[#CBD5E1] bg-[#F1F5F9] px-2 py-[0.15rem] text-[0.725rem] font-semibold text-[#64748B]">
                     Visible to all
                   </span>
                 </div>
-                <p style={{ fontSize: '0.825rem', color: 'var(--text-secondary)', marginTop: '0.35rem', margin: 0, lineHeight: 1.4 }}>
+                <p className="m-0 mt-[0.35rem] text-[0.825rem] leading-[1.4] text-muted-foreground">
                   {actionPrompt.action === 'implement'
                     ? 'A comment explaining what has been done'
                     : actionPrompt.action === 'reject'
@@ -807,26 +716,18 @@ export default function ChangeRequestModal({ cr, onClose, onApprove, onReject, o
                   setActionCommentInput(e.target.value);
                   if (actionCommentError) setActionCommentError('');
                 }}
-                style={{
-                  width: '100%',
-                  padding: '0.75rem 0.95rem',
-                  backgroundColor: 'var(--input-bg)',
-                  border: `1px solid ${actionCommentError ? '#DC2626' : 'var(--border-color)'}`,
-                  borderRadius: '10px',
-                  fontSize: '0.875rem',
-                  color: 'var(--text-primary)',
-                  outline: 'none',
-                  resize: 'vertical'
-                }}
+                className={`w-full resize-y rounded-[10px] border bg-input px-[0.95rem] py-3 text-sm text-foreground outline-none ${
+                  actionCommentError ? 'border-[#DC2626]' : 'border-border'
+                }`}
               />
 
               {actionCommentError && (
-                <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#DC2626' }}>
+                <span className="text-[0.8rem] font-bold text-[#DC2626]">
                   {actionCommentError}
                 </span>
               )}
 
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '0.25rem' }}>
+              <div className="mt-1 flex justify-end gap-3">
                 <button
                   type="button"
                   onClick={() => {
@@ -834,7 +735,7 @@ export default function ChangeRequestModal({ cr, onClose, onApprove, onReject, o
                     setActionCommentInput('');
                     setActionCommentError('');
                   }}
-                  style={{ padding: '0.55rem 1.1rem', backgroundColor: 'var(--card-bg)', border: '1px solid var(--border-color)', borderRadius: '8px', fontSize: '0.825rem', fontWeight: 600, color: 'var(--text-primary)', cursor: 'pointer' }}
+                  className="cursor-pointer rounded-lg border border-border bg-card px-[1.1rem] py-[0.55rem] text-[0.825rem] font-semibold text-foreground"
                 >
                   Cancel
                 </button>
@@ -863,7 +764,8 @@ export default function ChangeRequestModal({ cr, onClose, onApprove, onReject, o
                     setActionCommentInput('');
                     onClose();
                   }}
-                  style={{ padding: '0.55rem 1.25rem', backgroundColor: actionPrompt.color, color: '#FFFFFF', border: 'none', borderRadius: '8px', fontSize: '0.825rem', fontWeight: 700, cursor: 'pointer', boxShadow: '0 2px 6px rgba(0,0,0,0.2)' }}
+                  className="cursor-pointer rounded-lg border-none px-5 py-[0.55rem] text-[0.825rem] font-bold text-white shadow-[0_2px_6px_rgba(0,0,0,0.2)]"
+                  style={{ backgroundColor: actionPrompt.color }}
                 >
                   {actionPrompt.action === 'implement' ? 'Submit for Implement' : 'Submit'}
                 </button>
@@ -873,16 +775,16 @@ export default function ChangeRequestModal({ cr, onClose, onApprove, onReject, o
         )}
 
         {/* Footer Actions */}
-        <div style={{ padding: '1rem 1.75rem 1.5rem 1.75rem', borderTop: '1px solid var(--border-color)', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '0.75rem', backgroundColor: 'var(--card-bg)', position: 'sticky', bottom: 0 }}>
-            <button onClick={onClose} style={{ padding: '0.55rem 1.1rem', backgroundColor: 'var(--card-bg)', border: '1px solid var(--border-color)', borderRadius: '8px', fontSize: '0.825rem', fontWeight: 600, color: 'var(--text-primary)', cursor: 'pointer' }}>Close</button>
-            
+        <div className="sticky bottom-0 flex items-center justify-end gap-3 border-t border-border bg-card px-7 pb-6 pt-4">
+            <button onClick={onClose} className="cursor-pointer rounded-lg border border-border bg-card px-[1.1rem] py-[0.55rem] text-[0.825rem] font-semibold text-foreground">Close</button>
+
             {canAct ? (
               <>
                 {onReject && (
-                  <button onClick={() => { setActionPrompt({ action: 'reject', title: 'Reject Change Request', color: '#DC2626' }); setActionCommentInput(''); }} style={{ padding: '0.55rem 1.1rem', backgroundColor: '#FEF2F2', color: '#DC2626', border: '1px solid #FCA5A5', borderRadius: '8px', fontSize: '0.825rem', fontWeight: 700, cursor: 'pointer' }}>Reject</button>
+                  <button onClick={() => { setActionPrompt({ action: 'reject', title: 'Reject Change Request', color: '#DC2626' }); setActionCommentInput(''); }} className="cursor-pointer rounded-lg border border-[#FCA5A5] bg-[#FEF2F2] px-[1.1rem] py-[0.55rem] text-[0.825rem] font-bold text-[#DC2626]">Reject</button>
                 )}
                 {onApprove && (
-                  <button onClick={() => { setActionPrompt({ action: 'approve', title: 'Approve Change Request', color: '#0D9488' }); setActionCommentInput(''); }} style={{ padding: '0.55rem 1.25rem', backgroundColor: '#0D9488', color: '#FFFFFF', border: 'none', borderRadius: '8px', fontSize: '0.825rem', fontWeight: 700, cursor: 'pointer', boxShadow: '0 1px 3px rgba(13, 148, 136, 0.2)' }}>Approve</button>
+                  <button onClick={() => { setActionPrompt({ action: 'approve', title: 'Approve Change Request', color: '#0D9488' }); setActionCommentInput(''); }} className="cursor-pointer rounded-lg border-none bg-[#0D9488] px-5 py-[0.55rem] text-[0.825rem] font-bold text-white shadow-[0_1px_3px_rgba(13,148,136,0.2)]">Approve</button>
                 )}
               </>
             ) : isApproved && canMarkImplemented && !isSelfRequest ? (
@@ -891,33 +793,20 @@ export default function ChangeRequestModal({ cr, onClose, onApprove, onReject, o
                   setActionPrompt({ action: 'implement', title: 'Mark as Implemented', color: '#0D9488' });
                   setActionCommentInput('');
                 }}
-                style={{
-                  padding: '0.55rem 1.25rem',
-                  backgroundColor: 'var(--brand-primary)',
-                  color: '#FFFFFF',
-                  border: 'none',
-                  borderRadius: '8px',
-                  fontSize: '0.825rem',
-                  fontWeight: 500,
-                  cursor: 'pointer',
-                  boxShadow: '0 1px 3px rgba(0, 0, 0, 0.2)'
-                }}
+                className="cursor-pointer rounded-lg border-none bg-primary px-5 py-[0.55rem] text-[0.825rem] font-medium text-white shadow-[0_1px_3px_rgba(0,0,0,0.2)]"
               >
                 Mark as Implemented
               </button>
             ) : (
-              <span style={{
-                padding: '0.45rem 0.95rem',
-                borderRadius: '8px',
-                fontSize: '0.8rem',
-                fontWeight: 600,
-                backgroundColor: (isApproved || isImplemented) ? '#D1FAE5' : isRejected ? '#FEE2E2' : '#FEF3C7',
-                color: (isApproved || isImplemented) ? '#059669' : isRejected ? '#DC2626' : '#92400E',
-                border: `1px solid ${(isApproved || isImplemented) ? '#A7F3D0' : isRejected ? '#FCA5A5' : '#FDE68A'}`,
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '0.35rem'
-              }}>
+              <span
+                className={`inline-flex items-center gap-[0.35rem] rounded-lg border px-[0.95rem] py-[0.45rem] text-[0.8rem] font-semibold ${
+                  (isApproved || isImplemented)
+                    ? 'border-[#A7F3D0] bg-[#D1FAE5] text-[#059669]'
+                    : isRejected
+                    ? 'border-[#FCA5A5] bg-[#FEE2E2] text-[#DC2626]'
+                    : 'border-[#FDE68A] bg-[#FEF3C7] text-[#92400E]'
+                }`}
+              >
                 {(isApproved || isImplemented)
                   ? 'Approved'
                   : isRejected

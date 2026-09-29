@@ -14,7 +14,7 @@ export const getAllUsers = asyncHandler(async (req, res) => {
 
 export const getMyRequests = asyncHandler(async (req, res) => {
   const organizationScope = ['organization', 'org'].includes(String(req.query.scope || '').toLowerCase());
-  const userId = organizationScope ? null : (req.user?.userKey || req.user?.id || req.headers['x-user-id']);
+  const userId = organizationScope ? null : (req.user?.userKey || req.user?.id);
   const page = req.query.page || 1;
   const limit = req.query.limit || 10;
   const status = req.query.status || null;

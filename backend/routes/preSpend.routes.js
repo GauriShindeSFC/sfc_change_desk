@@ -1,5 +1,6 @@
 import express from 'express';
 import { asyncHandler } from '../utils/asyncHandler.js';
+import { requireOrganizationScopeRole, requireWorklistViewRole } from '../middlewares/auth.middleware.js';
 import {
   createPreSpendService,
   getPreSpendRequestsService,
@@ -15,26 +16,30 @@ router.get('/past-vendor', asyncHandler(async (req, res) => {
   res.json({ success: true, data: result });
 }));
 
-router.get('/', asyncHandler(async (req, res) => {
-  const isWorklist = req.query.view === 'worklist';
-  const isOrgWorklist = req.query.scope === 'organization' || req.query.scope === 'org';
-  const organizationScope = isOrgWorklist;
-  const currentUser = req.user || (req.headers['x-user-id'] ? { id: req.headers['x-user-id'] } : null);
-  const result = await getPreSpendRequestsService({
-    user: currentUser,
-    isWorklist,
-    isOrgWorklist,
-    organizationScope,
-    status: req.query.status,
-    searchQuery: req.query.search,
-    dateFilter: req.query.dateFilter,
-    startDate: req.query.startDate,
-    endDate: req.query.endDate,
-    page: req.query.page || 1,
-    limit: req.query.limit || 10
-  });
-  res.json({ success: true, ...result });
-}));
+router.get(
+  '/',
+  requireWorklistViewRole(['Admin', 'Super Admin', 'PreSpend Admin', 'role-1', 'role-2', 'role-2-prespend', 'role-board']),
+  requireOrganizationScopeRole,
+  asyncHandler(async (req, res) => {
+    const isWorklist = req.query.view === 'worklist';
+    const isOrgWorklist = req.query.scope === 'organization' || req.query.scope === 'org';
+    const organizationScope = isOrgWorklist;
+    const result = await getPreSpendRequestsService({
+      user: req.user,
+      isWorklist,
+      isOrgWorklist,
+      organizationScope,
+      status: req.query.status,
+      searchQuery: req.query.search,
+      dateFilter: req.query.dateFilter,
+      startDate: req.query.startDate,
+      endDate: req.query.endDate,
+      page: req.query.page || 1,
+      limit: req.query.limit || 10
+    });
+    res.json({ success: true, ...result });
+  })
+);
 
 router.post('/', asyncHandler(async (req, res) => {
   const item = await createPreSpendService(req.body, req.user);

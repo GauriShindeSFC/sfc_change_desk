@@ -21,18 +21,7 @@ export default function ModuleSwitcher({
   return (
     <div
       role="tablist"
-      style={{
-        display: 'inline-flex',
-        alignItems: 'center',
-        padding: '0.25rem',
-        backgroundColor: 'var(--input-bg)',
-        border: '1px solid var(--border-color)',
-        borderRadius: '10px',
-        gap: '0.25rem',
-        width: 'fit-content',
-        maxWidth: '100%',
-        overflowX: 'auto'
-      }}
+      className="inline-flex w-fit max-w-full items-center gap-1 overflow-x-auto rounded-[10px] border border-border bg-input p-1"
     >
       {visibleModules.map(m => {
         const Icon = m.icon;
@@ -46,56 +35,30 @@ export default function ModuleSwitcher({
             role="tab"
             aria-selected={isSelected}
             onClick={() => onModuleChange?.(m.id)}
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '0.45rem',
-              padding: '0.45rem 0.95rem',
-              borderRadius: '7px',
-              border: isSelected ? '1px solid var(--border-color)' : '1px solid transparent',
-              backgroundColor: isSelected ? 'var(--card-bg)' : 'transparent',
-              color: isSelected ? 'var(--text-primary)' : 'var(--text-secondary)',
-              fontWeight: isSelected ? 600 : 500,
-              fontSize: '0.825rem',
-              cursor: 'pointer',
-              boxShadow: isSelected ? '0 1px 3px rgba(0, 0, 0, 0.06)' : 'none',
-              transition: 'all 0.15s ease',
-              whiteSpace: 'nowrap'
-            }}
+            className={`inline-flex items-center gap-[0.45rem] whitespace-nowrap rounded-[7px] px-[0.95rem] py-[0.45rem] text-[0.825rem] transition-all duration-150 ${
+              isSelected
+                ? 'border border-border bg-card font-semibold text-foreground shadow-[0_1px_3px_rgba(0,0,0,0.06)]'
+                : 'border border-transparent bg-transparent font-medium text-muted-foreground shadow-none'
+            } cursor-pointer`}
           >
             <Icon
               size={15}
-              style={{
-                color: isSelected ? 'var(--text-primary)' : 'var(--text-secondary)',
-                flexShrink: 0
-              }}
+              className={`shrink-0 ${isSelected ? 'text-foreground' : 'text-muted-foreground'}`}
             />
-            <span style={{ position: 'relative', display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}>
+            <span className="relative inline-flex items-center gap-[0.35rem]">
               {m.label}
               {Boolean(pendingCounts && pendingCounts[m.id] > 0) && (
                 <span
                   title={`${pendingCounts[m.id]} pending request${pendingCounts[m.id] > 1 ? 's' : ''}`}
-                  style={{
-                    width: '6.5px',
-                    height: '6.5px',
-                    borderRadius: '50%',
-                    backgroundColor: '#D97706',
-                    display: 'inline-block',
-                    flexShrink: 0
-                  }}
+                  className="inline-block h-[6.5px] w-[6.5px] shrink-0 rounded-full bg-[#D97706]"
                 />
               )}
             </span>
             {count !== undefined && count !== null && (
               <span
-                style={{
-                  fontSize: '0.7rem',
-                  padding: '0.05rem 0.4rem',
-                  borderRadius: '9999px',
-                  backgroundColor: isSelected ? 'var(--input-bg)' : 'rgba(0,0,0,0.06)',
-                  color: isSelected ? 'var(--text-primary)' : 'var(--text-secondary)',
-                  fontWeight: 600
-                }}
+                className={`rounded-full px-[0.4rem] py-[0.05rem] text-[0.7rem] font-semibold ${
+                  isSelected ? 'bg-input text-foreground' : 'bg-black/[0.06] text-muted-foreground'
+                }`}
               >
                 {count}
               </span>

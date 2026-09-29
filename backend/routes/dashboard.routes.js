@@ -5,7 +5,7 @@ import {
   getStatusBreakdown,
   exportDashboardData
 } from '../controllers/dashboard.controller.js';
-import { authenticateUser, requireOrganizationScopeRole } from '../middlewares/auth.middleware.js';
+import { authenticateUser, requireOrganizationScopeRole, requireRole } from '../middlewares/auth.middleware.js';
 
 import changeRequestsRouter from './changeRequest.routes.js';
 import worklistRouter from './worklist.routes.js';
@@ -24,7 +24,10 @@ router.use(authenticateUser);
 router.get('/metrics', requireOrganizationScopeRole, getMetrics);
 router.get('/categories', requireOrganizationScopeRole, getCategories);
 router.get('/status-breakdown', requireOrganizationScopeRole, getStatusBreakdown);
-router.get('/export', requireOrganizationScopeRole, exportDashboardData);
+// /export always returns an organization-wide dump regardless of query params
+// (see exportDashboardData: every module branch hardcodes org scope), so unlike the
+// other routes here this needs an unconditional role check, not the scope-triggered one.
+router.get('/export', requireRole(['Super Admin', 'role-1']), exportDashboardData);
 
 // Modular Domain Routers
 router.use('/', changeRequestsRouter);

@@ -35,86 +35,34 @@ export class ErrorBoundary extends React.Component {
       const isDev = process.env.NODE_ENV !== 'production';
 
       return (
-        <div style={{
-          minHeight: '100vh',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          backgroundColor: '#F8FAFC',
-          padding: '2rem 1.5rem',
-          fontFamily: 'var(--font-family, Montserrat, sans-serif)'
-        }}>
-          <div style={{
-            maxWidth: '560px',
-            width: '100%',
-            backgroundColor: '#FFFFFF',
-            border: '1px solid #E2E8F0',
-            borderRadius: '16px',
-            padding: '2.5rem 2rem',
-            boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.08), 0 8px 10px -6px rgba(0, 0, 0, 0.04)',
-            textAlign: 'center'
-          }}>
-            <div style={{
-              width: '64px',
-              height: '64px',
-              borderRadius: '50%',
-              backgroundColor: '#FEE2E2',
-              color: '#DC2626',
-              display: 'inline-flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              marginBottom: '1.25rem'
-            }}>
+        <div className="flex min-h-screen items-center justify-center bg-[#F8FAFC] px-6 py-8 font-[var(--font-family,_Montserrat,_sans-serif)]">
+          <div className="w-full max-w-[560px] rounded-2xl border border-[#E2E8F0] bg-[#FFFFFF] px-8 py-10 text-center shadow-[0_10px_25px_-5px_rgba(0,0,0,0.08),0_8px_10px_-6px_rgba(0,0,0,0.04)]">
+            <div className="mb-5 inline-flex h-16 w-16 items-center justify-center rounded-full bg-[#FEE2E2] text-[#DC2626]">
               <ShieldAlert size={34} />
             </div>
 
-            <h1 style={{ fontSize: '1.4rem', fontWeight: 800, color: '#0F172A', margin: '0 0 0.5rem' }}>
+            <h1 className="m-0 mb-2 text-[1.4rem] font-extrabold text-[#0F172A]">
               Something unexpected occurred
             </h1>
 
-            <p style={{ fontSize: '0.9rem', color: '#64748B', lineHeight: 1.55, margin: '0 0 1.75rem' }}>
+            <p className="m-0 mb-7 text-[0.9rem] leading-[1.55] text-[#64748B]">
               An unexpected application error prevented this page from rendering correctly. Your session remains secure.
             </p>
 
             {isDev && this.state.error && (
-              <div style={{
-                textAlign: 'left',
-                backgroundColor: '#0F172A',
-                color: '#F8FAFC',
-                padding: '1rem',
-                borderRadius: '8px',
-                fontSize: '0.75rem',
-                fontFamily: 'monospace',
-                maxHeight: '140px',
-                overflowY: 'auto',
-                marginBottom: '1.75rem',
-                wordBreak: 'break-word'
-              }}>
-                <div style={{ color: '#F87171', fontWeight: 700, marginBottom: '0.35rem' }}>
+              <div className="mb-7 max-h-[140px] overflow-y-auto rounded-lg bg-[#0F172A] p-4 text-left text-xs font-[monospace] text-[#F8FAFC] break-words">
+                <div className="mb-[0.35rem] font-bold text-[#F87171]">
                   {this.state.error.toString()}
                 </div>
                 {this.state.errorInfo?.componentStack}
               </div>
             )}
 
-            <div style={{ display: 'flex', gap: '0.85rem', justifyContent: 'center', flexWrap: 'wrap' }}>
+            <div className="flex flex-wrap justify-center gap-[0.85rem]">
               <button
                 type="button"
                 onClick={this.handleReload}
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '0.5rem',
-                  padding: '0.7rem 1.4rem',
-                  backgroundColor: '#0F172A',
-                  color: '#FFFFFF',
-                  border: 'none',
-                  borderRadius: '8px',
-                  fontSize: '0.875rem',
-                  fontWeight: 600,
-                  cursor: 'pointer',
-                  boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
-                }}
+                className="inline-flex items-center gap-2 rounded-lg border-0 bg-[#0F172A] px-[1.4rem] py-[0.7rem] text-sm font-semibold text-[#FFFFFF] shadow-[0_2px_4px_rgba(0,0,0,0.1)] cursor-pointer"
               >
                 <RefreshCw size={15} />
                 <span>Reload Page</span>
@@ -123,19 +71,7 @@ export class ErrorBoundary extends React.Component {
               <button
                 type="button"
                 onClick={this.handleGoHome}
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '0.5rem',
-                  padding: '0.7rem 1.4rem',
-                  backgroundColor: '#FFFFFF',
-                  color: '#0F172A',
-                  border: '1px solid #CBD5E1',
-                  borderRadius: '8px',
-                  fontSize: '0.875rem',
-                  fontWeight: 600,
-                  cursor: 'pointer'
-                }}
+                className="inline-flex items-center gap-2 rounded-lg border border-[#CBD5E1] bg-[#FFFFFF] px-[1.4rem] py-[0.7rem] text-sm font-semibold text-[#0F172A] cursor-pointer"
               >
                 <Home size={15} />
                 <span>Go to Dashboard</span>

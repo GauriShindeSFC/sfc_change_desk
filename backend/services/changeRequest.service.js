@@ -1189,6 +1189,11 @@ export const applyWorklistActionService = async ({ id, action, rejectionReason =
     if (action === 'reject') {
       await sequelize.transaction(async (tx) => {
         const cr = await ChangeRequest.findByPk(id, { transaction: tx, lock: tx.LOCK?.UPDATE });
+        if (cr.status !== 'Pending') {
+          const err = new Error(`This change request has already been decided (current status: ${cr.status}).`);
+          err.statusCode = 409;
+          throw err;
+        }
         cr.status = 'Rejected';
         cr.approvalStage = 'rejected';
         cr.closedAt = new Date();
@@ -1238,6 +1243,11 @@ export const applyWorklistActionService = async ({ id, action, rejectionReason =
     if (action === 'approve') {
       await sequelize.transaction(async (tx) => {
         const cr = await ChangeRequest.findByPk(id, { transaction: tx, lock: tx.LOCK?.UPDATE });
+        if (cr.status !== 'Pending' || cr.approvalStage !== 'manager_review') {
+          const err = new Error(`This change request has already been decided (current status: ${cr.status}).`);
+          err.statusCode = 409;
+          throw err;
+        }
         cr.status = 'Pending';
         cr.approvalStage = 'stage_2_review';
         const existingComments = Array.isArray(cr.comments) ? [...cr.comments] : [];
@@ -1367,7 +1377,12 @@ export const applyWorklistActionService = async ({ id, action, rejectionReason =
       { where: { changeRequestId: id, decision: 'Pending', approverId: { [Op.ne]: actorId } }, transaction: t }
     );
 
-    const changeRequest = await ChangeRequest.findByPk(id, { transaction: t });
+    const changeRequest = await ChangeRequest.findByPk(id, { transaction: t, lock: t.LOCK?.UPDATE });
+    if (changeRequest && changeRequest.status !== 'Pending') {
+      const err = new Error(`This change request has already been decided (current status: ${changeRequest.status}).`);
+      err.statusCode = 409;
+      throw err;
+    }
     if (changeRequest) {
       changeRequest.status = finalStatus;
       changeRequest.approvalStage = finalStatus === 'Approved' ? 'completed' : 'rejected';

@@ -119,6 +119,7 @@ export const createPreSpendService = async (data, user) => {
 
 export const getPreSpendRequestsService = async ({ user, userId, isWorklist = false, isOrgWorklist = false, organizationScope = false, status, searchQuery, dateFilter, startDate, endDate, page = 1, limit = 10 }) => {
   const where = {};
+  const andConditions = [];
   const currentUserId = user?.userKey || user?.id || userId || '';
   const currentUserEmail = (user?.email || '').toLowerCase().trim();
   const isOrgView = isOrgWorklist || organizationScope;
@@ -126,26 +127,24 @@ export const getPreSpendRequestsService = async ({ user, userId, isWorklist = fa
   // 1. My Dashboard View (not worklist and not organization scope): Only requests raised by the logged-in user
   if (!isWorklist && !isOrgView && currentUserId) {
     if (currentUserEmail) {
-      where[Op.or] = [
-        { requesterId: currentUserId },
-        { requesterEmail: { [Op.iLike]: currentUserEmail } }
-      ];
+      andConditions.push({
+        [Op.or]: [
+          { requesterId: currentUserId },
+          { requesterEmail: { [Op.iLike]: currentUserEmail } }
+        ]
+      });
     } else {
-      where.requesterId = currentUserId;
+      andConditions.push({ requesterId: currentUserId });
     }
   }
 
   // 2. My Worklist View (personal approver inbox): Exclude requests raised by the logged-in user
   if (isWorklist && !isOrgWorklist && (currentUserId || currentUserEmail)) {
-    const andConditions = [];
     if (currentUserId) {
       andConditions.push({ requesterId: { [Op.ne]: currentUserId } });
     }
     if (currentUserEmail) {
       andConditions.push({ requesterEmail: { [Op.notILike]: currentUserEmail } });
-    }
-    if (andConditions.length > 0) {
-      where[Op.and] = andConditions;
     }
   }
 
@@ -164,28 +163,32 @@ export const getPreSpendRequestsService = async ({ user, userId, isWorklist = fa
   }
 
   if (searchQuery) {
-    where[Op.or] = [
-      { requestCode: { [Op.iLike]: `%${searchQuery}%` } },
-      { itemDescription: { [Op.iLike]: `%${searchQuery}%` } },
-      { category: { [Op.iLike]: `%${searchQuery}%` } },
-      { requesterName: { [Op.iLike]: `%${searchQuery}%` } }
-    ];
+    andConditions.push({
+      [Op.or]: [
+        { requestCode: { [Op.iLike]: `%${searchQuery}%` } },
+        { itemDescription: { [Op.iLike]: `%${searchQuery}%` } },
+        { category: { [Op.iLike]: `%${searchQuery}%` } },
+        { requesterName: { [Op.iLike]: `%${searchQuery}%` } }
+      ]
+    });
   }
 
   const dateClause = buildDateFilterClause(dateFilter, startDate, endDate);
   if (dateClause) {
-    if (where[Op.and]) {
-      where[Op.and].push(dateClause);
-    } else {
-      where[Op.and] = [dateClause];
-    }
+    andConditions.push(dateClause);
   }
 
-  const offset = (Number(page) - 1) * Number(limit);
+  if (andConditions.length > 0) {
+    where[Op.and] = andConditions;
+  }
+
+  const safePage = Math.max(1, parseInt(page, 10) || 1);
+  const safeLimit = Math.max(1, Math.min(100, parseInt(limit, 10) || 10));
+  const offset = (safePage - 1) * safeLimit;
   const { rows, count } = await PreSpendRequest.findAndCountAll({
     where,
     order: [['createdAt', 'DESC']],
-    limit: Number(limit),
+    limit: safeLimit,
     offset
   });
 
@@ -348,8 +351,8 @@ export const getPreSpendRequestsService = async ({ user, userId, isWorklist = fa
     data: formattedItems,
     items: formattedItems,
     total: count,
-    totalPages: Math.ceil(count / limit) || 1,
-    currentPage: Number(page),
+    totalPages: Math.ceil(count / safeLimit) || 1,
+    currentPage: safePage,
     metrics: {
       total: totalCount,
       pending,
@@ -386,10 +389,25 @@ export const handlePreSpendActionService = async ({ id, action, comment, actor }
     throw err;
   }
 
-  const req = await PreSpendRequest.findByPk(id);
+  return sequelize.transaction(async (transaction) => {
+    return handlePreSpendActionWithinTransaction({ id, action, actionComment, actor, transaction });
+  });
+};
+
+const handlePreSpendActionWithinTransaction = async ({ id, action, actionComment, actor, transaction }) => {
+  // Row-locked read: a concurrent decision on the same request blocks here until the
+  // first transaction commits, then sees the now-updated status and is rejected below
+  // instead of silently overwriting the first reviewer's decision.
+  const req = await PreSpendRequest.findByPk(id, { transaction, lock: transaction.LOCK.UPDATE });
   if (!req) {
     const err = new Error(`Pre-spend request ${id} not found`);
     err.statusCode = 404;
+    throw err;
+  }
+
+  if (['Approved', 'Rejected'].includes(req.status)) {
+    const err = new Error(`This pre-spend request has already been ${req.status.toLowerCase()} by another reviewer.`);
+    err.statusCode = 409;
     throw err;
   }
 
@@ -467,7 +485,7 @@ export const handlePreSpendActionService = async ({ id, action, comment, actor }
       req.status = 'Rejected';
       req.approvalStage = 'rejected';
       req.approvalHistory = history;
-      await req.save();
+      await req.save({ transaction });
 
       sendManagerRejectionEmail({
         module: 'prespend',
@@ -498,7 +516,7 @@ export const handlePreSpendActionService = async ({ id, action, comment, actor }
       req.status = 'Pending Approval';
       req.approvalStage = 'stage_2_review';
       req.approvalHistory = history;
-      await req.save();
+      await req.save({ transaction });
 
       // Notify Board members (Stage 2 approvers) & send view-only copy to Pre-Spend Admin
       Promise.all([
@@ -545,7 +563,7 @@ export const handlePreSpendActionService = async ({ id, action, comment, actor }
   req.status = newStatus;
   req.approvalStage = action === 'approve' ? 'completed' : 'rejected';
   req.approvalHistory = history;
-  await req.save();
+  await req.save({ transaction });
 
   // Notify Requester, Pre-Spend Admin, and Finance (FINANCE_NOTIFICATION_EMAIL if set)
   Promise.all([

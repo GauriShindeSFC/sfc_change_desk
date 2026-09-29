@@ -6,7 +6,7 @@ import {
 } from '../services/dashboard.service.js';
 
 export const getWorklist = asyncHandler(async (req, res) => {
-  const userId = req.user?.userKey || req.user?.id || req.headers['x-user-id'];
+  const userId = req.user?.userKey || req.user?.id;
   const organizationScope = ['organization', 'org'].includes(String(req.query.scope || '').toLowerCase());
   const page = req.query.page || 1;
   const limit = req.query.limit || 10;
@@ -39,7 +39,7 @@ export const handleWorklistAction = asyncHandler(async (req, res) => {
     return res.status(400).json({ success: false, message: 'Both "id" and "action" are required' });
   }
   const actionComment = (comment || rejectionReason || rationale || '').trim();
-  const actorId = req.user?.userKey || req.user?.id || req.headers['x-user-id'];
+  const actorId = req.user?.userKey || req.user?.id;
   const result = await applyWorklistActionService({ id, action, rejectionReason: actionComment, comment: actionComment, actorId });
   res.json({ success: true, message: `Action "${action}" processed for ${id}`, data: result });
 });

@@ -158,20 +158,13 @@ export const FormLabel = ({
 }) => (
   <label
     htmlFor={htmlFor}
-    className={className}
-    style={{
-      display: 'block',
-      fontSize: '0.825rem',
-      fontWeight: 500,
-      color: 'var(--text-primary)',
-      marginBottom: '0.4rem',
-      ...style
-    }}
+    className={`block mb-[0.4rem] text-[0.825rem] font-medium text-[var(--text-primary)] ${className}`}
+    style={style}
     {...props}
   >
     {children}
     {required && (
-      <span style={{ color: 'var(--error-color, #DC2626)', marginLeft: '3px' }}>*</span>
+      <span className="ml-[3px] text-[var(--error-color,_#DC2626)]">*</span>
     )}
   </label>
 );
@@ -186,7 +179,7 @@ export const FormField = ({
   style = {},
   ...props
 }) => (
-  <div className={className} style={{ display: 'flex', flexDirection: 'column', ...style }} {...props}>
+  <div className={`flex flex-col ${className}`} style={style} {...props}>
     {label && (
       <FormLabel required={required}>
         {label}
@@ -194,11 +187,11 @@ export const FormField = ({
     )}
     {children}
     {error ? (
-      <span style={{ fontSize: '0.75rem', color: 'var(--error-color, #DC2626)', fontWeight: 500, marginTop: '0.25rem', display: 'flex', alignItems: 'center', gap: '4px' }}>
+      <span className="mt-1 flex items-center gap-1 text-[0.75rem] font-medium text-[var(--error-color,_#DC2626)]">
         <span>⚠</span> {error}
       </span>
     ) : helperText ? (
-      <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '0.25rem' }}>
+      <span className="mt-1 text-[0.75rem] text-[var(--text-secondary)]">
         {helperText}
       </span>
     ) : null}
@@ -366,7 +359,6 @@ export const Pagination = ({
   return (
     <div
       className={`flex flex-wrap items-center justify-between gap-3 px-4 py-3 border-t border-[var(--border-color)] bg-[var(--card-bg)] text-xs text-[var(--text-secondary)] select-none ${className}`}
-      style={{ borderTop: '1px solid var(--border-color)' }}
     >
       {/* Left: Summary & Per-Page selector */}
       <div className="flex items-center gap-3">
@@ -464,23 +456,9 @@ export const ExportButtonGroup = ({
         type="button"
         onClick={onExportCsv}
         disabled={isExporting}
-        style={{
-          display: 'inline-flex',
-          alignItems: 'center',
-          gap: '0.45rem',
-          padding: '0.45rem 0.95rem',
-          fontSize: '0.85rem',
-          fontWeight: 600,
-          color: 'var(--text-primary)',
-          backgroundColor: '#FFFFFF',
-          border: '1px solid #E2E8F0',
-          borderRadius: '10px',
-          cursor: isExporting ? 'not-allowed' : 'pointer',
-          opacity: isExporting ? 0.7 : 1,
-          boxShadow: '0 1px 2px rgba(0, 0, 0, 0.05)',
-          transition: 'all 0.15s ease'
-        }}
-        className="hover:border-slate-300 hover:bg-slate-50/80 active:bg-slate-100"
+        className={`inline-flex items-center gap-[0.45rem] rounded-[10px] border border-[#E2E8F0] bg-white px-[0.95rem] py-[0.45rem] text-[0.85rem] font-semibold text-[var(--text-primary)] shadow-[0_1px_2px_rgba(0,0,0,0.05)] [transition:all_0.15s_ease] hover:border-slate-300 hover:bg-slate-50/80 active:bg-slate-100 ${
+          isExporting ? 'cursor-not-allowed opacity-70' : 'cursor-pointer opacity-100'
+        }`}
         title="Export data as CSV spreadsheet"
       >
         {/* Clean green spreadsheet icon matching design */}
@@ -508,23 +486,9 @@ export const ExportButtonGroup = ({
         type="button"
         onClick={onExportPdf}
         disabled={isExporting}
-        style={{
-          display: 'inline-flex',
-          alignItems: 'center',
-          gap: '0.45rem',
-          padding: '0.45rem 0.95rem',
-          fontSize: '0.85rem',
-          fontWeight: 600,
-          color: 'var(--text-primary)',
-          backgroundColor: '#FFFFFF',
-          border: '1px solid #E2E8F0',
-          borderRadius: '10px',
-          cursor: isExporting ? 'not-allowed' : 'pointer',
-          opacity: isExporting ? 0.7 : 1,
-          boxShadow: '0 1px 2px rgba(0, 0, 0, 0.05)',
-          transition: 'all 0.15s ease'
-        }}
-        className="hover:border-slate-300 hover:bg-slate-50/80 active:bg-slate-100"
+        className={`inline-flex items-center gap-[0.45rem] rounded-[10px] border border-[#E2E8F0] bg-white px-[0.95rem] py-[0.45rem] text-[0.85rem] font-semibold text-[var(--text-primary)] shadow-[0_1px_2px_rgba(0,0,0,0.05)] [transition:all_0.15s_ease] hover:border-slate-300 hover:bg-slate-50/80 active:bg-slate-100 ${
+          isExporting ? 'cursor-not-allowed opacity-70' : 'cursor-pointer opacity-100'
+        }`}
         title="Export data as PDF document"
       >
         {/* Clean red PDF document icon matching design */}
@@ -571,16 +535,13 @@ export const LoadingSpinner = ({
 
   const spinner = (
     <div
-      className={`inline-block rounded-full animate-spin ${className}`}
+      className={`inline-block box-border rounded-full border-solid border-[rgba(0,164,239,0.18)] animate-spin ${className}`}
       style={{
         width: selectedSize.dim,
         height: selectedSize.dim,
         borderWidth: selectedSize.border,
-        borderStyle: 'solid',
-        borderColor: 'rgba(0, 164, 239, 0.18)',
         borderTopColor: color,
-        borderRightColor: color,
-        boxSizing: 'border-box'
+        borderRightColor: color
       }}
       role="status"
       aria-label="loading"
@@ -589,20 +550,10 @@ export const LoadingSpinner = ({
 
   if (fullPage) {
     return (
-      <div style={{
-        position: 'fixed',
-        inset: 0,
-        zIndex: 9999,
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        justifyContent: 'center',
-        backgroundColor: 'rgba(255, 255, 255, 0.85)',
-        backdropFilter: 'blur(4px)'
-      }}>
+      <div className="fixed inset-0 z-[9999] flex flex-col items-center justify-center bg-white/85 backdrop-blur-sm">
         {spinner}
         {message && (
-          <p style={{ marginTop: '0.85rem', fontSize: '0.875rem', fontWeight: 500, color: 'var(--text-secondary)' }}>
+          <p className="mt-[0.85rem] text-sm font-medium text-[var(--text-secondary)]">
             {message}
           </p>
         )}
@@ -612,21 +563,10 @@ export const LoadingSpinner = ({
 
   if (overlay) {
     return (
-      <div style={{
-        position: 'absolute',
-        inset: 0,
-        zIndex: 50,
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        justifyContent: 'center',
-        backgroundColor: 'rgba(255, 255, 255, 0.75)',
-        backdropFilter: 'blur(2px)',
-        borderRadius: 'inherit'
-      }}>
+      <div className="absolute inset-0 z-50 flex flex-col items-center justify-center rounded-[inherit] bg-white/75 backdrop-blur-[2px]">
         {spinner}
         {message && (
-          <p style={{ marginTop: '0.5rem', fontSize: '0.8rem', fontWeight: 500, color: 'var(--text-secondary)' }}>
+          <p className="mt-2 text-[0.8rem] font-medium text-[var(--text-secondary)]">
             {message}
           </p>
         )}
@@ -636,10 +576,10 @@ export const LoadingSpinner = ({
 
   if (center) {
     return (
-      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', width: '100%', padding: '2.5rem 1rem' }}>
+      <div className="flex w-full flex-col items-center justify-center px-4 py-10">
         {spinner}
         {message && (
-          <p style={{ marginTop: '0.75rem', fontSize: '0.85rem', fontWeight: 500, color: 'var(--text-secondary)' }}>
+          <p className="mt-3 text-[0.85rem] font-medium text-[var(--text-secondary)]">
             {message}
           </p>
         )}
@@ -648,9 +588,9 @@ export const LoadingSpinner = ({
   }
 
   return (
-    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem' }}>
+    <span className="inline-flex items-center gap-2">
       {spinner}
-      {message && <span style={{ fontSize: '0.825rem', color: 'var(--text-secondary)' }}>{message}</span>}
+      {message && <span className="text-[0.825rem] text-[var(--text-secondary)]">{message}</span>}
     </span>
   );
 };
@@ -664,83 +604,19 @@ export const LoadingPopupModal = ({
   if (!isOpen) return null;
 
   return (
-    <div
-      style={{
-        position: 'fixed',
-        inset: 0,
-        backgroundColor: 'rgba(15, 23, 42, 0.65)',
-        backdropFilter: 'blur(5px)',
-        WebkitBackdropFilter: 'blur(5px)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        zIndex: 99999,
-        padding: '1rem',
-        animation: 'fadeIn 0.15s ease'
-      }}
-    >
-      <div
-        style={{
-          backgroundColor: '#FFFFFF',
-          borderRadius: '16px',
-          padding: '2rem 2.25rem',
-          maxWidth: '420px',
-          width: '100%',
-          textAlign: 'center',
-          boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
-          border: '1px solid #E2E8F0',
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          gap: '1rem'
-        }}
-      >
-        <div
-          style={{
-            width: '52px',
-            height: '52px',
-            borderRadius: '50%',
-            backgroundColor: '#F0FDFA',
-            border: '2px solid #CCFBF1',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            position: 'relative'
-          }}
-        >
+    <div className="fixed inset-0 z-[99999] flex items-center justify-center bg-slate-900/65 p-4 backdrop-blur-[5px] [animation:fadeIn_0.15s_ease]">
+      <div className="flex w-full max-w-[420px] flex-col items-center gap-4 rounded-2xl border border-slate-200 bg-white px-9 py-8 text-center shadow-2xl">
+        <div className="relative flex h-[52px] w-[52px] items-center justify-center rounded-full border-2 border-teal-100 bg-teal-50">
           <div
-            className="animate-spin"
-            style={{
-              width: '32px',
-              height: '32px',
-              borderRadius: '50%',
-              border: '3px solid #CCFBF1',
-              borderTopColor: '#0D9488',
-              borderRightColor: '#0D9488'
-            }}
+            className="h-8 w-8 animate-spin rounded-full border-[3px] border-teal-100 border-t-teal-600 border-r-teal-600"
           />
         </div>
 
         <div>
-          <h3
-            style={{
-              fontSize: '1.1rem',
-              fontWeight: 700,
-              color: '#0F172A',
-              margin: '0 0 0.4rem 0',
-              lineHeight: 1.3
-            }}
-          >
+          <h3 className="m-0 mb-[0.4rem] text-[1.1rem] font-bold leading-[1.3] text-slate-900">
             {title}
           </h3>
-          <p
-            style={{
-              fontSize: '0.85rem',
-              color: '#64748B',
-              margin: 0,
-              lineHeight: 1.5
-            }}
-          >
+          <p className="m-0 text-[0.85rem] leading-normal text-slate-500">
             {subtitle}
           </p>
         </div>
@@ -763,57 +639,19 @@ export const CommentPopupModal = ({ isOpen, onClose, data }) => {
 
   return (
     <div
-      style={{
-        position: 'fixed',
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        backgroundColor: 'rgba(15, 23, 42, 0.65)',
-        backdropFilter: 'blur(4px)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        zIndex: 1000,
-        padding: '1rem'
-      }}
+      className="fixed inset-0 z-[1000] flex items-center justify-center bg-slate-900/65 p-4 backdrop-blur-sm"
       onClick={onClose}
     >
       <div
-        style={{
-          backgroundColor: 'var(--card-bg, #FFFFFF)',
-          border: '1px solid var(--border-color, #E2E8F0)',
-          borderRadius: '16px',
-          width: '100%',
-          maxWidth: '480px',
-          boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
-          overflow: 'hidden',
-          animation: 'fadeIn 0.15s ease'
-        }}
+        className="w-full max-w-[480px] overflow-hidden rounded-2xl border border-[var(--border-color,_#E2E8F0)] bg-[var(--card-bg,_#FFFFFF)] shadow-[0_20px_25px_-5px_rgba(0,0,0,0.1),0_10px_10px_-5px_rgba(0,0,0,0.04)] [animation:fadeIn_0.15s_ease]"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div
-          style={{
-            padding: '1.25rem 1.5rem',
-            borderBottom: '1px solid var(--border-color, #E2E8F0)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between'
-          }}
-        >
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
+        <div className="flex items-center justify-between border-b border-[var(--border-color,_#E2E8F0)] px-6 py-5">
+          <div className="flex items-center gap-[0.65rem]">
             <div
-              style={{
-                width: '32px',
-                height: '32px',
-                borderRadius: '8px',
-                backgroundColor: badgeBg,
-                color: badgeColor,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center'
-              }}
+              className="flex h-8 w-8 items-center justify-center rounded-lg"
+              style={{ backgroundColor: badgeBg, color: badgeColor }}
             >
               {isRejected ? (
                 <XCircle size={18} />
@@ -826,21 +664,12 @@ export const CommentPopupModal = ({ isOpen, onClose, data }) => {
               )}
             </div>
             <div>
-              <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 600, color: 'var(--text-primary, #0F172A)' }}>
+              <h3 className="m-0 text-base font-semibold text-[var(--text-primary,_#0F172A)]">
                 {data.title || 'Decision Note'}
               </h3>
               <span
-                style={{
-                  fontSize: '0.725rem',
-                  fontWeight: 600,
-                  color: badgeColor,
-                  backgroundColor: badgeBg,
-                  border: `1px solid ${badgeBorder}`,
-                  padding: '0.1rem 0.45rem',
-                  borderRadius: '12px',
-                  display: 'inline-block',
-                  marginTop: '0.2rem'
-                }}
+                className="mt-[0.2rem] inline-block rounded-xl border px-[0.45rem] py-[0.1rem] text-[0.725rem] font-semibold"
+                style={{ color: badgeColor, backgroundColor: badgeBg, borderColor: badgeBorder }}
               >
                 {data.action}
               </span>
@@ -849,80 +678,42 @@ export const CommentPopupModal = ({ isOpen, onClose, data }) => {
           <button
             type="button"
             onClick={onClose}
-            style={{
-              background: 'none',
-              border: 'none',
-              color: 'var(--text-secondary, #64748B)',
-              cursor: 'pointer',
-              padding: '0.25rem',
-              borderRadius: '6px'
-            }}
+            className="cursor-pointer rounded-md border-none bg-transparent p-1 text-[var(--text-secondary,_#64748B)]"
           >
             <X size={18} />
           </button>
         </div>
 
         {/* Body */}
-        <div style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+        <div className="flex flex-col gap-4 p-6">
           {/* Author Info */}
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.8rem' }}>
+          <div className="flex items-center justify-between text-[0.8rem]">
             <div>
-              <span style={{ color: 'var(--text-secondary, #64748B)' }}>By: </span>
-              <strong style={{ color: 'var(--text-primary, #0F172A)' }}>{data.authorName || 'Approver'}</strong>
+              <span className="text-[var(--text-secondary,_#64748B)]">By: </span>
+              <strong className="text-[var(--text-primary,_#0F172A)]">{data.authorName || 'Approver'}</strong>
               {data.authorEmail && (
-                <span style={{ color: 'var(--text-secondary, #64748B)', marginLeft: '0.35rem', fontFamily: 'var(--font-mono)' }}>
+                <span className="ml-[0.35rem] text-[var(--text-secondary,_#64748B)] [font-family:var(--font-mono)]">
                   ({data.authorEmail})
                 </span>
               )}
             </div>
-            <div style={{ color: 'var(--text-secondary, #64748B)', fontSize: '0.75rem' }}>
+            <div className="text-[0.75rem] text-[var(--text-secondary,_#64748B)]">
               {data.date || ''}
             </div>
           </div>
 
           {/* Comment Box */}
-          <div
-            style={{
-              backgroundColor: 'var(--input-bg, #F8FAFC)',
-              border: '1px solid var(--border-color, #E2E8F0)',
-              borderRadius: '10px',
-              padding: '1rem',
-              fontSize: '0.875rem',
-              color: 'var(--text-primary, #0F172A)',
-              lineHeight: 1.5,
-              whiteSpace: 'pre-wrap',
-              wordBreak: 'break-word',
-              maxHeight: '220px',
-              overflowY: 'auto'
-            }}
-          >
+          <div className="max-h-[220px] overflow-y-auto whitespace-pre-wrap break-words rounded-[10px] border border-[var(--border-color,_#E2E8F0)] bg-[var(--input-bg,_#F8FAFC)] p-4 text-sm leading-normal text-[var(--text-primary,_#0F172A)]">
             {data.comment || 'No remark or comment recorded.'}
           </div>
         </div>
 
         {/* Footer */}
-        <div
-          style={{
-            padding: '0.85rem 1.5rem',
-            borderTop: '1px solid var(--border-color, #E2E8F0)',
-            display: 'flex',
-            justifyContent: 'flex-end',
-            backgroundColor: 'var(--input-bg, #F8FAFC)'
-          }}
-        >
+        <div className="flex justify-end border-t border-[var(--border-color,_#E2E8F0)] bg-[var(--input-bg,_#F8FAFC)] px-6 py-[0.85rem]">
           <button
             type="button"
             onClick={onClose}
-            style={{
-              padding: '0.5rem 1.25rem',
-              backgroundColor: 'var(--card-bg, #FFFFFF)',
-              color: 'var(--text-primary, #0F172A)',
-              border: '1px solid var(--border-color, #CBD5E1)',
-              borderRadius: '8px',
-              fontSize: '0.825rem',
-              fontWeight: 600,
-              cursor: 'pointer'
-            }}
+            className="cursor-pointer rounded-lg border border-[var(--border-color,_#CBD5E1)] bg-[var(--card-bg,_#FFFFFF)] px-5 py-2 text-[0.825rem] font-semibold text-[var(--text-primary,_#0F172A)]"
           >
             Close
           </button>

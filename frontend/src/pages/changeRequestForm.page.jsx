@@ -1,9 +1,11 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { Send, ArrowLeft, ArrowRight, Check, CheckCircle2, Search, ChevronDown, Edit3 } from 'lucide-react';
+import { Send, ArrowLeft, ArrowRight, CheckCircle2, Edit3 } from 'lucide-react';
 import { apiFetch } from '../lib/apiFetch.lib';
 import { getSession } from '../lib/auth.lib';
 import { FormLabel } from '../components/ui/primitives.component';
+import FormStepper from '../components/ui/FormStepper.component';
+import ManagerCombobox from '../components/ui/ManagerCombobox.component';
 
 export const RESTRICTED_ACTIONS = [
   'create an email id',
@@ -41,30 +43,9 @@ export const getFieldOptions = (field, currentUser) => {
   return opts;
 };
 
-const READONLY_FIELD_STYLE = {
-  width: '100%',
-  padding: '0.65rem 0.85rem',
-  backgroundColor: 'var(--input-bg)',
-  border: '1px solid var(--border-color)',
-  borderRadius: '8px',
-  fontSize: '0.85rem',
-  color: 'var(--text-secondary)',
-  outline: 'none',
-  cursor: 'not-allowed',
-  boxSizing: 'border-box'
-};
+const READONLY_FIELD_CLASS = 'box-border w-full cursor-not-allowed rounded-lg border border-border bg-input px-[0.85rem] py-[0.65rem] text-[0.85rem] text-muted-foreground outline-none';
 
-const ACTIVE_FIELD_STYLE = {
-  width: '100%',
-  padding: '0.65rem 0.85rem',
-  backgroundColor: 'var(--input-bg)',
-  border: '1px solid var(--border-color)',
-  borderRadius: '8px',
-  fontSize: '0.85rem',
-  color: 'var(--text-primary)',
-  outline: 'none',
-  boxSizing: 'border-box'
-};
+const ACTIVE_FIELD_CLASS = 'box-border w-full rounded-lg border border-border bg-input px-[0.85rem] py-[0.65rem] text-[0.85rem] text-foreground outline-none';
 
 function ChangeRequestFormPage({ onNavigate, user, initialData, searchQuery = '' }) {
   const queryClient = useQueryClient();
@@ -126,20 +107,6 @@ function ChangeRequestFormPage({ onNavigate, user, initialData, searchQuery = ''
 
   const [availableUsers, setAvailableUsers] = useState([]);
   const [loadingUsers, setLoadingUsers] = useState(false);
-  const [managerDropdownOpen, setManagerDropdownOpen] = useState(false);
-  const [managerSearchTerm, setManagerSearchTerm] = useState('');
-  const managerDropdownRef = useRef(null);
-
-  // Close manager dropdown on click outside
-  useEffect(() => {
-    const handleClickOutside = (e) => {
-      if (managerDropdownRef.current && !managerDropdownRef.current.contains(e.target)) {
-        setManagerDropdownOpen(false);
-      }
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
 
   // Fetch active employees for Manager dropdown from employees table
   useEffect(() => {
@@ -551,128 +518,41 @@ function ChangeRequestFormPage({ onNavigate, user, initialData, searchQuery = ''
   });
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', width: '100%', paddingBottom: '3rem' }}>
-      
+    <div className="flex w-full flex-col gap-5 pb-12">
+
       {/* Top Header */}
       <div>
-        <h1 style={{ fontSize: '1.45rem', fontWeight: 700, color: 'var(--text-primary)', lineHeight: 1.2, margin: 0 }}>
+        <h1 className="m-0 text-[1.45rem] font-bold leading-[1.2] text-foreground">
           New Change Request
         </h1>
-        <p style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', marginTop: '0.25rem', margin: 0 }}>
+        <p className="m-0 text-sm text-muted-foreground">
           Submit and track IT infrastructure, system, access, and asset change requests
         </p>
       </div>
 
       {/* Stepper Header */}
-      <div style={{
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        padding: '0.85rem 1.25rem',
-        backgroundColor: 'var(--card-bg)',
-        border: '1px solid var(--border-color)',
-        borderRadius: '12px',
-        overflowX: 'auto',
-        gap: '0.75rem'
-      }}>
-        {stepsList.map((label, index) => {
-          const stepNum = index + 1;
-          const isActive = step === stepNum;
-          const isDone = step > stepNum;
-          return (
-            <div
-              key={label}
-              onClick={() => {
-                if (isDone) setStep(stepNum);
-              }}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.6rem',
-                cursor: isDone ? 'pointer' : 'default'
-              }}
-            >
-              <div
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.5rem',
-                  fontSize: '0.825rem',
-                  fontWeight: isActive || isDone ? 600 : 500,
-                  color: isActive ? '#FFFFFF' : isDone ? '#059669' : 'var(--text-secondary)',
-                  whiteSpace: 'nowrap',
-                  padding: isActive ? '0.3rem 0.85rem 0.3rem 0.3rem' : 0,
-                  borderRadius: isActive ? 'var(--radius-full)' : 0,
-                  backgroundColor: isActive ? 'var(--brand-primary)' : 'transparent'
-                }}
-              >
-                <div
-                  style={{
-                    width: '24px',
-                    height: '24px',
-                    borderRadius: '50%',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    fontSize: '0.75rem',
-                    fontWeight: 700,
-                    flexShrink: 0,
-                    backgroundColor: isActive ? 'rgba(255, 255, 255, 0.2)' : isDone ? '#059669' : 'var(--input-bg)',
-                    color: isActive || isDone ? '#FFFFFF' : 'var(--text-secondary)',
-                    border: isActive || isDone ? 'none' : '1px solid var(--border-color)'
-                  }}
-                >
-                  {isDone ? <Check size={13} strokeWidth={3} /> : stepNum}
-                </div>
-                <span>{label}</span>
-              </div>
-              {index < stepsList.length - 1 && (
-                <span style={{ color: 'var(--border-color)' }}>/</span>
-              )}
-            </div>
-          );
-        })}
-      </div>
+      <FormStepper steps={stepsList} currentStep={step} onStepClick={setStep} />
 
       {/* Error Message Banner */}
       {errorMessage && (
-        <div style={{
-          backgroundColor: '#FEE2E2',
-          border: '1px solid #FCA5A5',
-          color: '#DC2626',
-          borderRadius: '8px',
-          padding: '0.75rem 1rem',
-          fontSize: '0.85rem',
-          fontWeight: 600
-        }}>
+        <div className="rounded-lg border border-[#FCA5A5] bg-[#FEE2E2] px-4 py-3 text-[0.85rem] font-semibold text-[#DC2626]">
           {errorMessage}
         </div>
       )}
 
       {/* Success Banner */}
       {submitSuccess && (
-        <div style={{
-          backgroundColor: '#ECFDF5',
-          border: '1px solid #A7F3D0',
-          borderRadius: '12px',
-          padding: '2.5rem 2rem',
-          textAlign: 'center',
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          gap: '0.75rem',
-          boxShadow: '0 1px 3px rgba(16, 21, 30, 0.04)'
-        }}>
-          <div style={{ width: '48px', height: '48px', borderRadius: '50%', backgroundColor: '#D1FAE5', color: '#059669', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <div className="flex flex-col items-center gap-3 rounded-xl border border-[#A7F3D0] bg-[#ECFDF5] px-8 py-10 text-center shadow-[0_1px_3px_rgba(16,21,30,0.04)]">
+          <div className="flex h-12 w-12 items-center justify-center rounded-full bg-[#D1FAE5] text-[#059669]">
             <CheckCircle2 size={28} />
           </div>
-          <h3 style={{ fontSize: '1.25rem', fontWeight: 700, color: '#065F46', margin: 0 }}>
+          <h3 className="m-0 text-xl font-bold text-[#065F46]">
             Change Request Submitted Successfully!
           </h3>
-          <p style={{ fontSize: '0.85rem', color: '#047857', maxWidth: '480px', margin: 0, lineHeight: 1.5 }}>
+          <p className="m-0 max-w-[480px] text-[0.85rem] leading-normal text-[#047857]">
             Your change request <strong>{createdCode || ''}</strong> has been routed to Change Managers for review and authorization.
           </p>
-          <div style={{ display: 'flex', gap: '0.75rem', marginTop: '0.5rem' }}>
+          <div className="mt-2 flex gap-3">
             <button
               type="button"
               onClick={() => {
@@ -680,32 +560,14 @@ function ChangeRequestFormPage({ onNavigate, user, initialData, searchQuery = ''
                 setStep(1);
                 setCertified(false);
               }}
-              style={{
-                padding: '0.65rem 1.35rem',
-                backgroundColor: '#047857',
-                color: '#FFFFFF',
-                border: 'none',
-                borderRadius: '8px',
-                fontSize: '0.85rem',
-                fontWeight: 600,
-                cursor: 'pointer'
-              }}
+              className="cursor-pointer rounded-lg border-none bg-[#047857] px-[1.35rem] py-[0.65rem] text-[0.85rem] font-semibold text-white"
             >
               Create Another Request
             </button>
             <button
               type="button"
               onClick={() => onNavigate?.('Dashboard')}
-              style={{
-                padding: '0.65rem 1.35rem',
-                backgroundColor: 'transparent',
-                color: '#065F46',
-                border: '1px solid #A7F3D0',
-                borderRadius: '8px',
-                fontSize: '0.85rem',
-                fontWeight: 600,
-                cursor: 'pointer'
-              }}
+              className="cursor-pointer rounded-lg border border-[#A7F3D0] bg-transparent px-[1.35rem] py-[0.65rem] text-[0.85rem] font-semibold text-[#065F46]"
             >
               Back to Dashboard
             </button>
@@ -715,27 +577,18 @@ function ChangeRequestFormPage({ onNavigate, user, initialData, searchQuery = ''
 
       {/* STEP 1: Select Change Category & Subcategory */}
       {!submitSuccess && step === 1 && (
-        <div style={{
-          backgroundColor: 'var(--card-bg)',
-          border: '1px solid var(--border-color)',
-          borderRadius: '12px',
-          padding: '1.75rem',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: '1.5rem',
-          boxShadow: '0 1px 3px rgba(16, 21, 30, 0.04)'
-        }}>
+        <div className="flex flex-col gap-6 rounded-xl border border-border bg-card p-7 shadow-[0_1px_3px_rgba(16,21,30,0.04)]">
           <div>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem' }}>
-              <h3 style={{ fontSize: '1rem', fontWeight: 600, color: 'var(--text-primary)', margin: 0 }}>
+            <div className="mb-4 flex items-center justify-between">
+              <h3 className="m-0 text-base font-semibold text-foreground">
                 1. Select Change Category
               </h3>
-              <span style={{ fontSize: '0.775rem', fontWeight: 600, color: 'var(--text-secondary)' }}>
+              <span className="text-[0.775rem] font-semibold text-muted-foreground">
                 Step 1 of 3
               </span>
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '0.75rem' }}>
+            <div className="grid grid-cols-[repeat(auto-fit,minmax(220px,1fr))] gap-3">
               {categories.map(cat => {
                 const selected = selectedCategoryId === cat.id;
                 const isHovered = hoveredCatId === cat.id;
@@ -746,28 +599,18 @@ function ChangeRequestFormPage({ onNavigate, user, initialData, searchQuery = ''
                     onClick={() => handleCategoryChange(cat.id)}
                     onMouseEnter={() => setHoveredCatId(cat.id)}
                     onMouseLeave={() => setHoveredCatId(null)}
-                    style={{
-                      padding: '1.1rem',
-                      borderRadius: '12px',
-                      textAlign: 'left',
-                      border: selected
-                        ? '2px solid var(--brand-primary, #173C4E)'
+                    className={`cursor-pointer rounded-xl p-[1.1rem] text-left transition-[transform,background-color,border-color,box-shadow] duration-200 ease ${
+                      isHovered ? '-translate-y-[5px]' : 'translate-y-0'
+                    } ${
+                      selected
+                        ? 'border-2 border-primary bg-input shadow-[0_0_0_3px_rgba(23,60,78,0.12)]'
                         : isHovered
-                        ? '1.5px solid var(--brand-primary, #173C4E)'
-                        : '1px solid var(--border-color)',
-                      backgroundColor: selected ? 'var(--input-bg, #F4F5F7)' : 'var(--card-bg)',
-                      boxShadow: selected
-                        ? '0 0 0 3px rgba(23, 60, 78, 0.12)'
-                        : isHovered
-                        ? '0 12px 24px -4px rgba(23, 60, 78, 0.14), 0 4px 12px -2px rgba(0, 0, 0, 0.06)'
-                        : '0 1px 3px rgba(16, 21, 30, 0.04)',
-                      transform: isHovered ? 'translateY(-5px)' : 'translateY(0)',
-                      cursor: 'pointer',
-                      transition: 'transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease'
-                    }}
+                        ? 'border-[1.5px] border-primary bg-card shadow-[0_12px_24px_-4px_rgba(23,60,78,0.14),0_4px_12px_-2px_rgba(0,0,0,0.06)]'
+                        : 'border border-border bg-card shadow-[0_1px_3px_rgba(16,21,30,0.04)]'
+                    }`}
                   >
-                    <div style={{ fontSize: '0.875rem', fontWeight: 600, color: 'var(--text-primary)' }}>{cat.name}</div>
-                    <div style={{ fontSize: '0.775rem', color: 'var(--text-secondary)', marginTop: '0.25rem', lineHeight: 1.4 }}>
+                    <div className="text-sm font-semibold text-foreground">{cat.name}</div>
+                    <div className="mt-1 text-[0.775rem] leading-[1.4] text-muted-foreground">
                       {cat.subcategories?.length || 0} subcategories available
                     </div>
                   </button>
@@ -777,11 +620,11 @@ function ChangeRequestFormPage({ onNavigate, user, initialData, searchQuery = ''
           </div>
 
           {selectedCategoryObj && (
-            <div style={{ paddingTop: '1.25rem', borderTop: '1px solid var(--border-color)' }}>
-              <h3 style={{ fontSize: '1rem', fontWeight: 600, color: 'var(--text-primary)', margin: '0 0 0.75rem 0' }}>
+            <div className="border-t border-border pt-5">
+              <h3 className="m-0 mb-3 text-base font-semibold text-foreground">
                 2. Select Subcategory for {selectedCategoryObj.name}
               </h3>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '0.6rem' }}>
+              <div className="grid grid-cols-[repeat(auto-fit,minmax(200px,1fr))] gap-[0.6rem]">
                 {subcategories.map(sub => {
                   const selected = selectedSubcategoryId === sub.id;
                   const isHovered = hoveredSubId === sub.id;
@@ -792,28 +635,15 @@ function ChangeRequestFormPage({ onNavigate, user, initialData, searchQuery = ''
                       onClick={() => handleSubcategoryChange(sub.id)}
                       onMouseEnter={() => setHoveredSubId(sub.id)}
                       onMouseLeave={() => setHoveredSubId(null)}
-                      style={{
-                        padding: '0.75rem 0.95rem',
-                        borderRadius: '8px',
-                        fontSize: '0.825rem',
-                        fontWeight: selected ? 600 : 500,
-                        textAlign: 'left',
-                        border: selected
-                          ? '2px solid var(--brand-primary, #173C4E)'
+                      className={`cursor-pointer rounded-lg bg-transparent px-[0.95rem] py-3 text-left text-[0.825rem] text-foreground transition-[transform,border-color,box-shadow] duration-[180ms] ease ${
+                        selected ? 'font-semibold' : 'font-medium'
+                      } ${isHovered ? '-translate-y-[3px]' : 'translate-y-0'} ${
+                        selected
+                          ? 'border-2 border-primary shadow-[0_0_0_3px_rgba(23,60,78,0.12)]'
                           : isHovered
-                          ? '1.5px solid var(--brand-primary, #173C4E)'
-                          : '1px solid var(--border-color)',
-                        backgroundColor: 'transparent',
-                        color: 'var(--text-primary)',
-                        boxShadow: selected
-                          ? '0 0 0 3px rgba(23, 60, 78, 0.12)'
-                          : isHovered
-                          ? '0 6px 14px -2px rgba(23, 60, 78, 0.12)'
-                          : 'none',
-                        transform: isHovered ? 'translateY(-3px)' : 'translateY(0)',
-                        cursor: 'pointer',
-                        transition: 'transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease'
-                      }}
+                          ? 'border-[1.5px] border-primary shadow-[0_6px_14px_-2px_rgba(23,60,78,0.12)]'
+                          : 'border border-border shadow-none'
+                      }`}
                     >
                       {sub.name}
                     </button>
@@ -823,25 +653,14 @@ function ChangeRequestFormPage({ onNavigate, user, initialData, searchQuery = ''
             </div>
           )}
 
-          <div style={{ display: 'flex', justifyContent: 'flex-end', paddingTop: '1rem', borderTop: '1px solid var(--border-color)' }}>
+          <div className="flex justify-end border-t border-border pt-4">
             <button
               type="button"
               disabled={!selectedCategoryId || !selectedSubcategoryId}
               onClick={() => setStep(2)}
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '0.45rem',
-                padding: '0.65rem 1.35rem',
-                backgroundColor: 'var(--brand-primary)',
-                color: '#FFFFFF',
-                border: 'none',
-                borderRadius: '8px',
-                fontSize: '0.85rem',
-                fontWeight: 600,
-                cursor: (!selectedCategoryId || !selectedSubcategoryId) ? 'not-allowed' : 'pointer',
-                opacity: (!selectedCategoryId || !selectedSubcategoryId) ? 0.5 : 1
-              }}
+              className={`inline-flex items-center gap-[0.45rem] rounded-lg border-none bg-primary px-[1.35rem] py-[0.65rem] text-[0.85rem] font-semibold text-white ${
+                (!selectedCategoryId || !selectedSubcategoryId) ? 'cursor-not-allowed opacity-50' : 'cursor-pointer opacity-100'
+              }`}
             >
               <span>Next: Request Details</span>
               <ArrowRight size={14} />
@@ -852,23 +671,14 @@ function ChangeRequestFormPage({ onNavigate, user, initialData, searchQuery = ''
 
       {/* STEP 2: Fill in Request Details */}
       {!submitSuccess && step === 2 && (
-        <form onSubmit={handleDetailsSubmit} style={{
-          backgroundColor: 'var(--card-bg)',
-          border: '1px solid var(--border-color)',
-          borderRadius: '12px',
-          padding: '1.75rem',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: '1.75rem',
-          boxShadow: '0 1px 3px rgba(16, 21, 30, 0.04)'
-        }}>
+        <form onSubmit={handleDetailsSubmit} className="flex flex-col gap-7 rounded-xl border border-border bg-card p-7 shadow-[0_1px_3px_rgba(16,21,30,0.04)]">
           {/* Section 1: Requester Details */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <h3 style={{ fontSize: '1rem', fontWeight: 600, color: 'var(--text-primary)', margin: 0 }}>
+          <div className="flex flex-col gap-5">
+            <div className="flex items-center justify-between">
+              <h3 className="m-0 text-base font-semibold text-foreground">
                 Requester Details
               </h3>
-              <span style={{ fontSize: '0.775rem', fontWeight: 600, color: 'var(--text-secondary)' }}>
+              <span className="text-[0.775rem] font-semibold text-muted-foreground">
                 Section 1 of 2
               </span>
             </div>
@@ -881,7 +691,7 @@ function ChangeRequestFormPage({ onNavigate, user, initialData, searchQuery = ''
                   readOnly
                   disabled
                   value={formData.employeeName}
-                  style={READONLY_FIELD_STYLE}
+                  className={READONLY_FIELD_CLASS}
                 />
               </div>
               <div>
@@ -892,7 +702,7 @@ function ChangeRequestFormPage({ onNavigate, user, initialData, searchQuery = ''
                   disabled
                   placeholder="e.g. employee@company.com"
                   value={formData.employeeEmail}
-                  style={READONLY_FIELD_STYLE}
+                  className={READONLY_FIELD_CLASS}
                 />
               </div>
               <div>
@@ -903,7 +713,7 @@ function ChangeRequestFormPage({ onNavigate, user, initialData, searchQuery = ''
                   disabled
                   placeholder="e.g. SFC-0083"
                   value={formData.employeeId}
-                  style={READONLY_FIELD_STYLE}
+                  className={READONLY_FIELD_CLASS}
                 />
               </div>
               <div>
@@ -914,140 +724,17 @@ function ChangeRequestFormPage({ onNavigate, user, initialData, searchQuery = ''
                   disabled
                   placeholder="Enter Location"
                   value={formData.location || resolveEmpLocation(activeSessionUser) || ''}
-                  style={READONLY_FIELD_STYLE}
+                  className={READONLY_FIELD_CLASS}
                 />
               </div>
               {/* Searchable Manager Combobox Dropdown */}
-              <div ref={managerDropdownRef} style={{ position: 'relative' }}>
-                <FormLabel required>Manager Name</FormLabel>
-                <div
-                  tabIndex={0}
-                  onClick={() => setManagerDropdownOpen(prev => !prev)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' || e.key === ' ') {
-                      e.preventDefault();
-                      setManagerDropdownOpen(prev => !prev);
-                    }
-                  }}
-                  style={{
-                    ...ACTIVE_FIELD_STYLE,
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    userSelect: 'none'
-                  }}
-                >
-                  <span style={{ color: formData.managerName ? 'var(--text-primary)' : 'var(--text-secondary)' }}>
-                    {formData.managerName || (loadingUsers ? 'Loading employees...' : 'Select Reporting Manager...')}
-                  </span>
-                  <ChevronDown size={16} style={{ color: 'var(--text-secondary)', transition: 'transform 0.2s', transform: managerDropdownOpen ? 'rotate(180deg)' : 'none' }} />
-                </div>
-
-                {managerDropdownOpen && (
-                  <div style={{
-                    position: 'absolute',
-                    top: '100%',
-                    left: 0,
-                    right: 0,
-                    zIndex: 50,
-                    marginTop: '0.35rem',
-                    backgroundColor: 'var(--card-bg)',
-                    border: '1px solid var(--border-color)',
-                    borderRadius: '10px',
-                    boxShadow: '0 8px 24px rgba(15, 23, 42, 0.12)',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    overflow: 'hidden'
-                  }}>
-                    <div style={{ padding: '0.65rem', borderBottom: '1px solid var(--border-color)', backgroundColor: 'var(--input-bg)' }}>
-                      <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
-                        <Search size={14} style={{ position: 'absolute', left: '0.65rem', color: 'var(--text-secondary)' }} />
-                        <input
-                          type="text"
-                          autoFocus
-                          value={managerSearchTerm}
-                          onChange={(e) => setManagerSearchTerm(e.target.value)}
-                          placeholder="Search manager by name or email..."
-                          style={{
-                            width: '100%',
-                            padding: '0.45rem 0.65rem 0.45rem 2rem',
-                            fontSize: '0.8rem',
-                            border: '1px solid var(--border-color)',
-                            borderRadius: '6px',
-                            outline: 'none',
-                            backgroundColor: 'var(--card-bg)',
-                            color: 'var(--text-primary)',
-                            boxSizing: 'border-box'
-                          }}
-                        />
-                      </div>
-                    </div>
-
-                    <div style={{ maxHeight: '200px', overflowY: 'auto', padding: '0.25rem 0' }}>
-                      {availableUsers
-                        .filter((u) => {
-                          if (!managerSearchTerm.trim()) return true;
-                          const term = managerSearchTerm.toLowerCase().trim();
-                          const nameMatch = (u.name || '').toLowerCase().includes(term);
-                          const emailMatch = (u.email || '').toLowerCase().includes(term);
-                          const empIdMatch = (u.empId || '').toLowerCase().includes(term);
-                          return nameMatch || emailMatch || empIdMatch;
-                        })
-                        .map((u) => {
-                          const isSelected = formData.managerName === u.name;
-                          return (
-                            <div
-                              key={u.id || u.email}
-                              onClick={() => {
-                                setFormData(prev => ({
-                                  ...prev,
-                                  managerName: u.name,
-                                  managerEmail: u.email || ''
-                                }));
-                                setManagerDropdownOpen(false);
-                                setManagerSearchTerm('');
-                              }}
-                              style={{
-                                padding: '0.55rem 0.85rem',
-                                fontSize: '0.825rem',
-                                cursor: 'pointer',
-                                backgroundColor: isSelected ? '#EFF6FF' : 'transparent',
-                                color: isSelected ? '#1D4ED8' : 'var(--text-primary)',
-                                display: 'flex',
-                                flexDirection: 'column',
-                                gap: '0.1rem',
-                                transition: 'background-color 0.15s'
-                              }}
-                              onMouseEnter={(e) => {
-                                if (!isSelected) e.currentTarget.style.backgroundColor = 'var(--input-bg)';
-                              }}
-                              onMouseLeave={(e) => {
-                                if (!isSelected) e.currentTarget.style.backgroundColor = 'transparent';
-                              }}
-                            >
-                              <div style={{ fontWeight: isSelected ? 700 : 500 }}>
-                                {u.name}
-                              </div>
-                              <div style={{ fontSize: '0.725rem', color: '#64748B', fontFamily: 'var(--font-mono)' }}>
-                                {u.email} {u.empId ? `• ${u.empId}` : ''}
-                              </div>
-                            </div>
-                          );
-                        })}
-                      {availableUsers.filter((u) => {
-                        if (!managerSearchTerm.trim()) return true;
-                        const term = managerSearchTerm.toLowerCase().trim();
-                        return (u.name || '').toLowerCase().includes(term) || (u.email || '').toLowerCase().includes(term);
-                      }).length === 0 && (
-                        <div style={{ padding: '0.85rem', textAlign: 'center', fontSize: '0.8rem', color: '#94A3B8' }}>
-                          No employees found matching "{managerSearchTerm}"
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                )}
-              </div>
+              <ManagerCombobox
+                managerName={formData.managerName}
+                managerEmail={formData.managerEmail}
+                onSelect={(u) => setFormData(prev => ({ ...prev, managerName: u.name, managerEmail: u.email || '' }))}
+                users={availableUsers}
+                loading={loadingUsers}
+              />
 
               {/* Manager Email */}
               <div>
@@ -1057,22 +744,22 @@ function ChangeRequestFormPage({ onNavigate, user, initialData, searchQuery = ''
                   readOnly
                   disabled
                   value={formData.managerEmail || ''}
-                  style={READONLY_FIELD_STYLE}
+                  className={READONLY_FIELD_CLASS}
                 />
               </div>
             </div>
           </div>
 
           {/* Section Divider Line */}
-          <div style={{ borderTop: '1px solid var(--border-color)', width: '100%' }} />
+          <div className="w-full border-t border-border" />
 
           {/* Section 2: Change Details */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <h3 style={{ fontSize: '1rem', fontWeight: 600, color: 'var(--text-primary)', margin: 0 }}>
+          <div className="flex flex-col gap-5">
+            <div className="flex items-center justify-between">
+              <h3 className="m-0 text-base font-semibold text-foreground">
                 Change Details
               </h3>
-              <span style={{ fontSize: '0.775rem', fontWeight: 600, color: 'var(--text-secondary)' }}>
+              <span className="text-[0.775rem] font-semibold text-muted-foreground">
                 Section 2 of 2
               </span>
             </div>
@@ -1087,7 +774,7 @@ function ChangeRequestFormPage({ onNavigate, user, initialData, searchQuery = ''
                   disabled
                   placeholder="Auto-generated from action and sub-category"
                   value={formData.title}
-                  style={READONLY_FIELD_STYLE}
+                  className={READONLY_FIELD_CLASS}
                 />
               </div>
 
@@ -1099,7 +786,7 @@ function ChangeRequestFormPage({ onNavigate, user, initialData, searchQuery = ''
                   readOnly
                   disabled
                   value={selectedCategoryObj?.name || formData.category || 'Server & Infra'}
-                  style={READONLY_FIELD_STYLE}
+                  className={READONLY_FIELD_CLASS}
                 />
               </div>
 
@@ -1111,7 +798,7 @@ function ChangeRequestFormPage({ onNavigate, user, initialData, searchQuery = ''
                   readOnly
                   disabled
                   value={selectedSubcategory?.name || formData.subCategory || 'Server Lifecycle'}
-                  style={READONLY_FIELD_STYLE}
+                  className={READONLY_FIELD_CLASS}
                 />
               </div>
 
@@ -1124,14 +811,14 @@ function ChangeRequestFormPage({ onNavigate, user, initialData, searchQuery = ''
                   min={new Date().toISOString().split('T')[0]}
                   value={formData.startDate}
                   onChange={(e) => handleInputChange('startDate', e.target.value)}
-                  style={ACTIVE_FIELD_STYLE}
+                  className={ACTIVE_FIELD_CLASS}
                 />
               </div>
 
               {/* Dynamic Fields */}
               {visibleFields.length > 0 && (
-                <div style={{ gridColumn: '1 / -1', display: 'flex', flexDirection: 'column', gap: '1rem', padding: '1rem', backgroundColor: 'var(--card-bg, #FFFFFF)', borderRadius: '10px', border: '1px solid var(--border-color)' }}>
-                  <div className="cd-responsive-form-grid" style={{ gap: '1rem' }}>
+                <div className="col-span-full flex flex-col gap-4 rounded-[10px] border border-border bg-card p-4">
+                  <div className="cd-responsive-form-grid !gap-4">
                     {visibleFields.map((field) => {
                       const isOtherSubcat =
                         selectedSubcategoryId === 'subcat-srv-oth' ||
@@ -1155,14 +842,14 @@ function ChangeRequestFormPage({ onNavigate, user, initialData, searchQuery = ''
                                   type="text"
                                   disabled
                                   value="Other"
-                                  style={READONLY_FIELD_STYLE}
+                                  className={READONLY_FIELD_CLASS}
                                 />
                               ) : (
                                 <select
                                   disabled={isDisabled}
                                   value={customFieldValues[field.fieldKey] || ''}
                                   onChange={(e) => handleCustomFieldChange(field.fieldKey, e.target.value)}
-                                  style={isDisabled ? READONLY_FIELD_STYLE : ACTIVE_FIELD_STYLE}
+                                  className={isDisabled ? READONLY_FIELD_CLASS : ACTIVE_FIELD_CLASS}
                                 >
                                   {isDisabled ? (
                                     <option value="">Loading options...</option>
@@ -1183,7 +870,7 @@ function ChangeRequestFormPage({ onNavigate, user, initialData, searchQuery = ''
                                 placeholder="Enter custom action..."
                                 value={customFieldValues.otherAction || ''}
                                 onChange={(e) => handleCustomFieldChange('otherAction', e.target.value)}
-                                style={ACTIVE_FIELD_STYLE}
+                                className={ACTIVE_FIELD_CLASS}
                               />
                             </div>
                           </div>
@@ -1203,7 +890,7 @@ function ChangeRequestFormPage({ onNavigate, user, initialData, searchQuery = ''
                                   disabled={isDisabled}
                                   value={customFieldValues[field.fieldKey] || ''}
                                   onChange={(e) => handleCustomFieldChange(field.fieldKey, e.target.value)}
-                                  style={isDisabled ? READONLY_FIELD_STYLE : ACTIVE_FIELD_STYLE}
+                                  className={isDisabled ? READONLY_FIELD_CLASS : ACTIVE_FIELD_CLASS}
                                 >
                                   {isDisabled ? (
                                     <option value="">Loading options...</option>
@@ -1218,13 +905,13 @@ function ChangeRequestFormPage({ onNavigate, user, initialData, searchQuery = ''
 
                             if (field.fieldType === 'boolean') {
                               return (
-                                <label style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', marginTop: '0.5rem' }}>
+                                <label className="mt-2 inline-flex cursor-pointer items-center gap-2">
                                   <input
                                     type="checkbox"
                                     checked={Boolean(customFieldValues[field.fieldKey])}
                                     onChange={(e) => handleCustomFieldChange(field.fieldKey, e.target.checked)}
                                   />
-                                  <span style={{ fontSize: '0.85rem', color: 'var(--text-primary)' }}>Enable / Yes</span>
+                                  <span className="text-[0.85rem] text-foreground">Enable / Yes</span>
                                 </label>
                               );
                             }
@@ -1235,7 +922,7 @@ function ChangeRequestFormPage({ onNavigate, user, initialData, searchQuery = ''
                                   type="date"
                                   value={customFieldValues[field.fieldKey] || ''}
                                   onChange={(e) => handleCustomFieldChange(field.fieldKey, e.target.value)}
-                                  style={ACTIVE_FIELD_STYLE}
+                                  className={ACTIVE_FIELD_CLASS}
                                 />
                               );
                             }
@@ -1247,10 +934,7 @@ function ChangeRequestFormPage({ onNavigate, user, initialData, searchQuery = ''
                                   placeholder={`Enter ${field.fieldLabel}`}
                                   value={customFieldValues[field.fieldKey] || ''}
                                   onChange={(e) => handleCustomFieldChange(field.fieldKey, e.target.value)}
-                                  style={{
-                                    ...ACTIVE_FIELD_STYLE,
-                                    resize: 'vertical'
-                                  }}
+                                  className={`${ACTIVE_FIELD_CLASS} resize-y`}
                                 />
                               );
                             }
@@ -1272,7 +956,7 @@ function ChangeRequestFormPage({ onNavigate, user, initialData, searchQuery = ''
                                 placeholder={placeholderText}
                                 value={customFieldValues[field.fieldKey] || ''}
                                 onChange={(e) => handleCustomFieldChange(field.fieldKey, e.target.value)}
-                                style={ACTIVE_FIELD_STYLE}
+                                className={ACTIVE_FIELD_CLASS}
                               />
                             );
                           })()}
@@ -1284,7 +968,7 @@ function ChangeRequestFormPage({ onNavigate, user, initialData, searchQuery = ''
               )}
 
               {/* Business justification */}
-              <div style={{ gridColumn: '1 / -1' }}>
+              <div className="col-span-full">
                 <FormLabel required>Business Justification</FormLabel>
                 <textarea
                   rows={4}
@@ -1292,52 +976,25 @@ function ChangeRequestFormPage({ onNavigate, user, initialData, searchQuery = ''
                   placeholder="Enter business justification..."
                   value={formData.justification}
                   onChange={(e) => handleInputChange('justification', e.target.value)}
-                  style={{
-                    ...ACTIVE_FIELD_STYLE,
-                    resize: 'vertical'
-                  }}
+                  className={`${ACTIVE_FIELD_CLASS} resize-y`}
                 />
               </div>
             </div>
           </div>
 
           {/* Step 2 Action Buttons */}
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingTop: '1rem', borderTop: '1px solid var(--border-color)' }}>
+          <div className="flex items-center justify-between border-t border-border pt-4">
             <button
               type="button"
               onClick={() => setStep(1)}
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '0.45rem',
-                padding: '0.65rem 1.35rem',
-                backgroundColor: 'var(--card-bg)',
-                color: 'var(--text-primary)',
-                border: '1px solid var(--border-color)',
-                borderRadius: '8px',
-                fontSize: '0.85rem',
-                fontWeight: 600,
-                cursor: 'pointer'
-              }}
+              className="inline-flex cursor-pointer items-center gap-[0.45rem] rounded-lg border border-border bg-card px-[1.35rem] py-[0.65rem] text-[0.85rem] font-semibold text-foreground"
             >
               <ArrowLeft size={14} />
               <span>Back</span>
             </button>
             <button
               type="submit"
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '0.45rem',
-                padding: '0.65rem 1.35rem',
-                backgroundColor: 'var(--brand-primary)',
-                color: '#FFFFFF',
-                border: 'none',
-                borderRadius: '8px',
-                fontSize: '0.85rem',
-                fontWeight: 600,
-                cursor: 'pointer'
-              }}
+              className="inline-flex cursor-pointer items-center gap-[0.45rem] rounded-lg border-none bg-primary px-[1.35rem] py-[0.65rem] text-[0.85rem] font-semibold text-white"
             >
               <span>Next: Review &amp; Submit</span>
               <ArrowRight size={14} />
@@ -1348,40 +1005,21 @@ function ChangeRequestFormPage({ onNavigate, user, initialData, searchQuery = ''
 
       {/* STEP 3: Review & Submit */}
       {!submitSuccess && step === 3 && (
-        <form onSubmit={handleSubmit} style={{
-          backgroundColor: 'var(--card-bg)',
-          border: '1px solid var(--border-color)',
-          borderRadius: '12px',
-          padding: '1.75rem',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: '1.5rem',
-          boxShadow: '0 1px 3px rgba(16, 21, 30, 0.04)'
-        }}>
+        <form onSubmit={handleSubmit} className="flex flex-col gap-6 rounded-xl border border-border bg-card p-7 shadow-[0_1px_3px_rgba(16,21,30,0.04)]">
           {/* Header Row with Edit details Action */}
-          <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: '1rem' }}>
+          <div className="flex flex-wrap items-start justify-between gap-4">
             <div>
-              <h2 style={{ fontSize: '1.25rem', fontWeight: 600, color: 'var(--text-primary)', margin: 0 }}>
+              <h2 className="m-0 text-xl font-semibold text-foreground">
                 Review &amp; Submit Change Request
               </h2>
-              <p style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', marginTop: '0.25rem', margin: 0 }}>
+              <p className="m-0 text-sm text-muted-foreground">
                 Confirm the details before submitting for approval.
               </p>
             </div>
             <button
               type="button"
               onClick={() => setStep(2)}
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '0.35rem',
-                background: 'none',
-                border: 'none',
-                color: 'var(--brand-primary)',
-                fontSize: '0.875rem',
-                fontWeight: 600,
-                cursor: 'pointer'
-              }}
+              className="inline-flex cursor-pointer items-center gap-[0.35rem] border-none bg-none text-sm font-semibold text-info"
             >
               <Edit3 size={14} />
               <span>Edit Details</span>
@@ -1389,63 +1027,63 @@ function ChangeRequestFormPage({ onNavigate, user, initialData, searchQuery = ''
           </div>
 
           {/* Section 1: Requester Profile */}
-          <div style={{ borderRadius: '12px', border: '1px solid var(--border-color)', overflow: 'hidden' }}>
-            <div style={{ padding: '0.75rem 1.25rem', backgroundColor: 'var(--card-bg)', borderBottom: '1px solid var(--border-color)', fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-primary)' }}>
+          <div className="overflow-hidden rounded-xl border border-border">
+            <div className="border-b border-border bg-card px-5 py-3 text-[0.85rem] font-semibold text-foreground">
               1. Requester Profile &amp; Approver
             </div>
-            <div style={{ padding: '1.25rem', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem', fontSize: '0.85rem' }}>
+            <div className="grid grid-cols-[repeat(auto-fit,minmax(220px,1fr))] gap-4 p-5 text-[0.85rem]">
               <div>
-                <span style={{ color: 'var(--text-secondary)', display: 'block', fontSize: '0.75rem', fontWeight: 600, textTransform: 'uppercase' }}>Requester</span>
-                <span style={{ color: 'var(--text-primary)', fontWeight: 600 }}>{formData.employeeName || '—'}</span>
+                <span className="block text-xs font-semibold uppercase text-muted-foreground">Requester</span>
+                <span className="font-semibold text-foreground">{formData.employeeName || '—'}</span>
               </div>
               <div>
-                <span style={{ color: 'var(--text-secondary)', display: 'block', fontSize: '0.75rem', fontWeight: 600, textTransform: 'uppercase' }}>Email</span>
-                <span style={{ color: 'var(--text-primary)', fontWeight: 600 }}>{formData.employeeEmail || '—'}</span>
+                <span className="block text-xs font-semibold uppercase text-muted-foreground">Email</span>
+                <span className="font-semibold text-foreground">{formData.employeeEmail || '—'}</span>
               </div>
               <div>
-                <span style={{ color: 'var(--text-secondary)', display: 'block', fontSize: '0.75rem', fontWeight: 600, textTransform: 'uppercase' }}>Employee ID</span>
-                <span style={{ color: 'var(--text-primary)', fontWeight: 600 }}>{formData.employeeId || '—'}</span>
+                <span className="block text-xs font-semibold uppercase text-muted-foreground">Employee ID</span>
+                <span className="font-semibold text-foreground">{formData.employeeId || '—'}</span>
               </div>
               <div>
-                <span style={{ color: 'var(--text-secondary)', display: 'block', fontSize: '0.75rem', fontWeight: 600, textTransform: 'uppercase' }}>Location</span>
-                <span style={{ color: 'var(--text-primary)', fontWeight: 600 }}>{formData.location || '—'}</span>
+                <span className="block text-xs font-semibold uppercase text-muted-foreground">Location</span>
+                <span className="font-semibold text-foreground">{formData.location || '—'}</span>
               </div>
               <div>
-                <span style={{ color: 'var(--text-secondary)', display: 'block', fontSize: '0.75rem', fontWeight: 600, textTransform: 'uppercase' }}>Reporting Manager</span>
-                <span style={{ color: 'var(--text-primary)', fontWeight: 600 }}>{formData.managerName || '—'}</span>
+                <span className="block text-xs font-semibold uppercase text-muted-foreground">Reporting Manager</span>
+                <span className="font-semibold text-foreground">{formData.managerName || '—'}</span>
               </div>
               <div>
-                <span style={{ color: 'var(--text-secondary)', display: 'block', fontSize: '0.75rem', fontWeight: 600, textTransform: 'uppercase' }}>Manager Email</span>
-                <span style={{ color: 'var(--text-primary)', fontWeight: 600 }}>{formData.managerEmail || '—'}</span>
+                <span className="block text-xs font-semibold uppercase text-muted-foreground">Manager Email</span>
+                <span className="font-semibold text-foreground">{formData.managerEmail || '—'}</span>
               </div>
             </div>
           </div>
 
           {/* Section 2: Change Specifications */}
-          <div style={{ borderRadius: '12px', border: '1px solid var(--border-color)', overflow: 'hidden' }}>
-            <div style={{ padding: '0.75rem 1.25rem', backgroundColor: 'var(--card-bg)', borderBottom: '1px solid var(--border-color)', fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-primary)' }}>
+          <div className="overflow-hidden rounded-xl border border-border">
+            <div className="border-b border-border bg-card px-5 py-3 text-[0.85rem] font-semibold text-foreground">
               2. Change Details &amp; Justification
             </div>
-            <div style={{ padding: '1.25rem', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem', fontSize: '0.85rem' }}>
-              <div style={{ gridColumn: '1 / -1' }}>
-                <span style={{ color: 'var(--text-secondary)', display: 'block', fontSize: '0.75rem', fontWeight: 600, textTransform: 'uppercase' }}>Change Title</span>
-                <span style={{ color: 'var(--text-primary)', fontWeight: 700, fontSize: '0.95rem' }}>{formData.title || '—'}</span>
+            <div className="grid grid-cols-[repeat(auto-fit,minmax(220px,1fr))] gap-4 p-5 text-[0.85rem]">
+              <div className="col-span-full">
+                <span className="block text-xs font-semibold uppercase text-muted-foreground">Change Title</span>
+                <span className="text-[0.95rem] font-bold text-foreground">{formData.title || '—'}</span>
               </div>
               <div>
-                <span style={{ color: 'var(--text-secondary)', display: 'block', fontSize: '0.75rem', fontWeight: 600, textTransform: 'uppercase' }}>Category</span>
-                <span style={{ color: 'var(--text-primary)', fontWeight: 600 }}>{selectedCategoryObj?.name || formData.category || '—'}</span>
+                <span className="block text-xs font-semibold uppercase text-muted-foreground">Category</span>
+                <span className="font-semibold text-foreground">{selectedCategoryObj?.name || formData.category || '—'}</span>
               </div>
               <div>
-                <span style={{ color: 'var(--text-secondary)', display: 'block', fontSize: '0.75rem', fontWeight: 600, textTransform: 'uppercase' }}>Sub-category</span>
-                <span style={{ color: 'var(--text-primary)', fontWeight: 600 }}>{selectedSubcategory?.name || formData.subCategory || '—'}</span>
+                <span className="block text-xs font-semibold uppercase text-muted-foreground">Sub-category</span>
+                <span className="font-semibold text-foreground">{selectedSubcategory?.name || formData.subCategory || '—'}</span>
               </div>
               <div>
-                <span style={{ color: 'var(--text-secondary)', display: 'block', fontSize: '0.75rem', fontWeight: 600, textTransform: 'uppercase' }}>Target Start Date</span>
-                <span style={{ color: 'var(--text-primary)', fontWeight: 600 }}>{formData.startDate || '—'}</span>
+                <span className="block text-xs font-semibold uppercase text-muted-foreground">Target Start Date</span>
+                <span className="font-semibold text-foreground">{formData.startDate || '—'}</span>
               </div>
               <div>
-                <span style={{ color: 'var(--text-secondary)', display: 'block', fontSize: '0.75rem', fontWeight: 600, textTransform: 'uppercase' }}>Action Required</span>
-                <span style={{ color: 'var(--text-primary)', fontWeight: 600 }}>
+                <span className="block text-xs font-semibold uppercase text-muted-foreground">Action Required</span>
+                <span className="font-semibold text-foreground">
                   {customFieldValues.actionRequired === 'Other' ? (customFieldValues.otherAction || 'Other') : (customFieldValues.actionRequired || '—')}
                 </span>
               </div>
@@ -1457,55 +1095,43 @@ function ChangeRequestFormPage({ onNavigate, user, initialData, searchQuery = ''
                 const displayVal = typeof val === 'boolean' ? (val ? 'Yes' : 'No') : String(val);
                 return (
                   <div key={field.fieldKey}>
-                    <span style={{ color: 'var(--text-secondary)', display: 'block', fontSize: '0.75rem', fontWeight: 600, textTransform: 'uppercase' }}>{field.fieldLabel}</span>
-                    <span style={{ color: 'var(--text-primary)', fontWeight: 600 }}>{displayVal}</span>
+                    <span className="block text-xs font-semibold uppercase text-muted-foreground">{field.fieldLabel}</span>
+                    <span className="font-semibold text-foreground">{displayVal}</span>
                   </div>
                 );
               })}
 
-              <div style={{ gridColumn: '1 / -1', paddingTop: '0.5rem', borderTop: '1px dashed var(--border-color)' }}>
-                <span style={{ color: 'var(--text-secondary)', display: 'block', fontSize: '0.75rem', fontWeight: 600, textTransform: 'uppercase' }}>Business Justification</span>
-                <p style={{ color: 'var(--text-primary)', margin: '0.25rem 0 0 0', lineHeight: 1.5, whiteSpace: 'pre-wrap' }}>{formData.justification || '—'}</p>
+              <div className="col-span-full border-t border-dashed border-border pt-2">
+                <span className="block text-xs font-semibold uppercase text-muted-foreground">Business Justification</span>
+                <p className="m-0 mt-1 whitespace-pre-wrap leading-normal text-foreground">{formData.justification || '—'}</p>
               </div>
             </div>
           </div>
 
           {/* Compliance Checkbox */}
-          <div style={{ padding: '1rem 0', borderTop: '1px solid var(--border-color)', borderBottom: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+          <div className="flex flex-col gap-2 border-y border-border py-4">
+            <div className="flex items-center gap-3">
               <input
                 id="certify-change"
                 type="checkbox"
                 required
                 checked={certified}
                 onChange={e => setCertified(e.target.checked)}
-                style={{ cursor: 'pointer', width: '18px', height: '18px', accentColor: 'var(--brand-primary)' }}
+                className="h-[18px] w-[18px] cursor-pointer accent-primary"
               />
-              <label htmlFor="certify-change" style={{ fontSize: '0.875rem', color: 'var(--text-primary)', fontWeight: 500, cursor: 'pointer', lineHeight: 1.45 }}>
+              <label htmlFor="certify-change" className="cursor-pointer text-sm font-medium leading-[1.45] text-foreground">
                 I confirm that the change information provided is accurate and complies with the IT change management governance policy.
               </label>
             </div>
           </div>
 
           {/* Submit Action Footer */}
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '0.5rem' }}>
+          <div className="flex items-center justify-between pt-2">
             <button
               type="button"
               onClick={() => setStep(2)}
               disabled={isSubmitting}
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '0.45rem',
-                padding: '0.65rem 1.35rem',
-                backgroundColor: 'var(--card-bg)',
-                color: 'var(--text-primary)',
-                border: '1px solid var(--border-color)',
-                borderRadius: '8px',
-                fontSize: '0.85rem',
-                fontWeight: 600,
-                cursor: isSubmitting ? 'not-allowed' : 'pointer'
-              }}
+              className={`inline-flex items-center gap-[0.45rem] rounded-lg border border-border bg-card px-[1.35rem] py-[0.65rem] text-[0.85rem] font-semibold text-foreground ${isSubmitting ? 'cursor-not-allowed' : 'cursor-pointer'}`}
             >
               <ArrowLeft size={14} />
               <span>Back</span>
@@ -1513,20 +1139,9 @@ function ChangeRequestFormPage({ onNavigate, user, initialData, searchQuery = ''
             <button
               type="submit"
               disabled={!certified || isSubmitting}
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '0.5rem',
-                padding: '0.75rem 1.75rem',
-                backgroundColor: 'var(--brand-primary)',
-                color: '#FFFFFF',
-                border: 'none',
-                borderRadius: '8px',
-                fontSize: '0.9rem',
-                fontWeight: 600,
-                cursor: (!certified || isSubmitting) ? 'not-allowed' : 'pointer',
-                opacity: (!certified || isSubmitting) ? 0.5 : 1
-              }}
+              className={`inline-flex items-center gap-2 rounded-lg border-none bg-primary px-7 py-3 text-[0.9rem] font-semibold text-white ${
+                (!certified || isSubmitting) ? 'cursor-not-allowed opacity-50' : 'cursor-pointer opacity-100'
+              }`}
             >
               <Send size={15} />
               <span>{isSubmitting ? 'Submitting...' : 'Submit Change Request'}</span>

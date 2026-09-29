@@ -50,30 +50,13 @@ export default function FilterBar({
 
   return (
     <div
-      style={{
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: tabs?.length && showDate ? align : tabs?.length ? 'flex-start' : 'flex-end',
-        borderBottom: variant === 'row' ? '1px solid var(--border-color)' : 'none',
-        paddingBottom: variant === 'row' ? '0.75rem' : 0,
-        flexWrap: 'wrap',
-        gap: '0.75rem'
-      }}
+      className={`flex flex-wrap items-center gap-3 ${
+        variant === 'row' ? 'border-b border-border pb-3' : 'pb-0'
+      }`}
+      style={{ justifyContent: tabs?.length && showDate ? align : tabs?.length ? 'flex-start' : 'flex-end' }}
     >
       {Boolean(tabs?.length) && (
-        <div
-          style={{
-            display: 'flex',
-            gap: '0.4rem',
-            flexWrap: 'nowrap',
-            overflowX: 'auto',
-            maxWidth: '100%',
-            scrollbarWidth: 'none',
-            msOverflowStyle: 'none',
-            alignItems: 'center',
-            paddingBottom: '2px'
-          }}
-        >
+        <div className="flex max-w-full flex-nowrap items-center gap-[0.4rem] overflow-x-auto pb-0.5 [scrollbar-width:none] [-ms-overflow-style:none]">
           {tabs.map((tab) => {
             const isActive = activeTab === tab.id;
             const hasPendingDot = tab.hasPending || (tab.id === 'Pending' && typeof tab.count === 'number' && tab.count > 0);
@@ -82,36 +65,12 @@ export default function FilterBar({
                 key={tab.id}
                 type="button"
                 onClick={() => onTabChange?.(tab.id)}
-                style={{
-                  position: 'relative',
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '0.4rem',
-                  padding: '0.4rem 0.75rem',
-                  backgroundColor: isActive ? 'var(--brand-primary)' : 'transparent',
-                  color: isActive ? '#FFFFFF' : 'var(--text-secondary)',
-                  border: isActive ? '1px solid var(--brand-primary)' : '1px solid var(--border-color)',
-                  borderRadius: 'var(--radius-lg)',
-                  fontSize: '0.8rem',
-                  fontWeight: 500,
-                  cursor: 'pointer',
-                  transition: 'all 0.15s ease',
-                  whiteSpace: 'nowrap',
-                  flexShrink: 0
-                }}
+                className={`relative inline-flex shrink-0 cursor-pointer items-center gap-[0.4rem] whitespace-nowrap rounded-[var(--radius-lg)] border px-[0.75rem] py-[0.4rem] text-[0.8rem] font-medium [transition:all_0.15s_ease] ${
+                  isActive ? 'border-primary bg-primary text-white' : 'border-border bg-transparent text-muted-foreground'
+                }`}
               >
                 {hasPendingDot && (
-                  <span
-                    style={{
-                      width: '7px',
-                      height: '7px',
-                      borderRadius: '50%',
-                      backgroundColor: '#D97706',
-                      display: 'inline-block',
-                      flexShrink: 0,
-                      boxShadow: '0 0 0 1.5px rgba(217, 119, 6, 0.25)'
-                    }}
-                  />
+                  <span className="inline-block h-[7px] w-[7px] shrink-0 rounded-full bg-amber-600 shadow-[0_0_0_1.5px_rgba(217,119,6,0.25)]" />
                 )}
                 <span>{tab.label}</span>
                 {typeof tab.count === 'number' ? ` (${tab.count})` : ''}
@@ -122,38 +81,19 @@ export default function FilterBar({
       )}
 
       {showDate && (
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '0.35rem' }}>
-          <div
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '0.4rem',
-              backgroundColor: 'var(--card-bg)',
-              border: '1px solid var(--border-color)',
-              borderRadius: 'var(--radius-lg)',
-              padding: '0.4rem 0.75rem'
-            }}
-          >
-            <Calendar size={14} style={{ color: 'var(--text-secondary)', flexShrink: 0 }} />
+        <div className="flex flex-col items-end gap-[0.35rem]">
+          <div className="inline-flex items-center gap-[0.4rem] rounded-[var(--radius-lg)] border border-border bg-card px-[0.75rem] py-[0.4rem]">
+            <Calendar size={14} className="shrink-0 text-muted-foreground" />
             <select
               value={dateValue}
               onChange={(e) => onDateChange(e.target.value)}
-              style={{
-                backgroundColor: 'transparent',
-                color: 'var(--text-primary)',
-                border: 'none',
-                fontSize: '0.8rem',
-                fontWeight: 500,
-                cursor: 'pointer',
-                outline: 'none',
-                padding: '0.1rem 0'
-              }}
+              className="cursor-pointer border-none bg-transparent px-0 py-[0.1rem] text-[0.8rem] font-medium text-foreground outline-none"
             >
               {DATE_OPTIONS.map((opt) => (
                 <option
                   key={opt.value}
                   value={opt.value}
-                  style={{ backgroundColor: 'var(--card-bg)', color: 'var(--text-primary)' }}
+                  className="bg-card text-foreground"
                 >
                   {opt.label}
                 </option>
@@ -162,40 +102,28 @@ export default function FilterBar({
           </div>
 
           {dateValue === 'custom' && onStartDateChange && onEndDateChange && (
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '0.25rem' }}>
-              <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}>
+            <div className="flex flex-col items-end gap-1">
+              <div className="inline-flex items-center gap-[0.4rem]">
                 <input
                   type="date"
                   value={startDate || ''}
                   onChange={(e) => onStartDateChange(e.target.value)}
-                  style={{
-                    backgroundColor: 'var(--card-bg)',
-                    border: `1px solid ${customError ? '#DC2626' : 'var(--border-color)'}`,
-                    borderRadius: 'var(--radius-md)',
-                    padding: '0.3rem 0.6rem',
-                    fontSize: '0.775rem',
-                    color: 'var(--text-primary)',
-                    outline: 'none'
-                  }}
+                  className={`rounded-[var(--radius-md)] border bg-card px-[0.6rem] py-[0.3rem] text-[0.775rem] text-foreground outline-none ${
+                    customError ? 'border-[#DC2626]' : 'border-border'
+                  }`}
                 />
-                <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>to</span>
+                <span className="text-[0.75rem] text-muted-foreground">to</span>
                 <input
                   type="date"
                   value={endDate || ''}
                   onChange={(e) => onEndDateChange(e.target.value)}
-                  style={{
-                    backgroundColor: 'var(--card-bg)',
-                    border: `1px solid ${customError ? '#DC2626' : 'var(--border-color)'}`,
-                    borderRadius: 'var(--radius-md)',
-                    padding: '0.3rem 0.6rem',
-                    fontSize: '0.775rem',
-                    color: 'var(--text-primary)',
-                    outline: 'none'
-                  }}
+                  className={`rounded-[var(--radius-md)] border bg-card px-[0.6rem] py-[0.3rem] text-[0.775rem] text-foreground outline-none ${
+                    customError ? 'border-[#DC2626]' : 'border-border'
+                  }`}
                 />
               </div>
               {customError && (
-                <span style={{ fontSize: '0.725rem', color: '#DC2626', fontWeight: 500 }}>
+                <span className="text-[0.725rem] font-medium text-[#DC2626]">
                   {customError}
                 </span>
               )}

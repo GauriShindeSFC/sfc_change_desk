@@ -20,7 +20,8 @@ export const sequelize = new Sequelize(DATABASE_URI, {
   // Keep one remote/TLS connection warm across the UI's 30-second polls.
   pool: { max: maxPool, min: minPool, acquire: 30000, idle: 60000, evict: 5000 },
   dialectOptions: {
-    // Supabase (and most managed Postgres) require TLS
-    ssl: { require: true, rejectUnauthorized: false }
+    // Supabase (and most managed Postgres) require TLS; verify the server certificate
+    // against Node's trusted CA store instead of accepting any certificate blindly.
+    ssl: { require: true, rejectUnauthorized: true }
   }
 });

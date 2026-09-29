@@ -416,20 +416,20 @@ function MyWorklistPage({ onNavigate, searchQuery = '', user, isOrgWorklist = fa
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', width: '100%' }}>
+    <div className="flex w-full flex-col gap-5">
 
       {/* Header Row: Title & Subtitle with Total Count */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '1rem', width: '100%' }}>
+      <div className="flex w-full flex-wrap items-center justify-between gap-4">
         <div>
-          <h1 style={{ fontSize: '1.45rem', fontWeight: 700, color: 'var(--text-primary)', lineHeight: 1.2, margin: 0 }}>
+          <h1 className="m-0 text-[1.45rem] font-bold leading-[1.2] text-foreground">
             {activeModule === 'prespend' ? 'Pre-Spend Request' : activeModule === 'travel' ? 'Travel Desk' : 'Change Request'}
           </h1>
-          <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginTop: '0.2rem', marginBottom: 0 }}>
+          <p className="mt-[0.2rem] mb-0 text-[0.85rem] text-muted-foreground">
             {moduleSubtitles[activeModule]}
           </p>
         </div>
 
-        <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+        <div className="ml-auto flex flex-wrap items-center gap-3">
           {allowedModules.length > 1 && (
             <ModuleSwitcher
               activeModule={activeModule}
@@ -445,35 +445,30 @@ function MyWorklistPage({ onNavigate, searchQuery = '', user, isOrgWorklist = fa
               allowedModules={allowedModules}
             />
           )}
-          <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-secondary)' }}>
+          <span className="text-[0.85rem] font-semibold text-muted-foreground">
             {displayItems.length} total request{displayItems.length !== 1 ? 's' : ''}
           </span>
         </div>
       </div>
 
       {/* Metric Cards Grid */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))', gap: '1rem' }}>
+      <div className="grid gap-4 [grid-template-columns:repeat(auto-fit,minmax(190px,1fr))]">
         {metricCards.map(card => {
           const IconComp = card.icon;
           return (
             <div
               key={card.id}
-              style={{
-                backgroundColor: 'var(--card-bg)',
-                border: '1px solid var(--border-color)',
-                borderRadius: '12px',
-                padding: '1.1rem 1.25rem',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '1rem'
-              }}
+              className="flex items-center gap-4 rounded-xl border border-border bg-card px-5 py-[1.1rem]"
             >
-              <div style={{ width: '42px', height: '42px', borderRadius: '10px', backgroundColor: card.iconBg, color: card.iconColor, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+              <div
+                className="flex h-[42px] w-[42px] shrink-0 items-center justify-center rounded-[10px]"
+                style={{ backgroundColor: card.iconBg, color: card.iconColor }}
+              >
                 <IconComp size={20} />
               </div>
               <div>
-                <div style={{ fontSize: '1.35rem', fontWeight: 700, color: 'var(--text-primary)', lineHeight: 1.1 }}>{card.count}</div>
-                <div style={{ fontSize: '0.775rem', color: 'var(--text-secondary)', marginTop: '0.2rem', fontWeight: 600 }}>{card.title}</div>
+                <div className="text-[1.35rem] font-bold leading-[1.1] text-foreground">{card.count}</div>
+                <div className="mt-[0.2rem] text-[0.775rem] font-semibold text-muted-foreground">{card.title}</div>
               </div>
             </div>
           );
@@ -502,29 +497,29 @@ function MyWorklistPage({ onNavigate, searchQuery = '', user, isOrgWorklist = fa
       />
 
       {/* Worklist Table */}
-      <div style={{ backgroundColor: 'var(--card-bg)', border: '1px solid var(--border-color)', borderRadius: '12px', overflow: 'hidden', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
-        <div style={{ overflowX: 'auto' }}>
-          <table style={{ width: '100%', minWidth: '1100px', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.85rem' }}>
+      <div className="overflow-hidden rounded-xl border border-border bg-card shadow-[0_1px_3px_rgba(0,0,0,0.05)]">
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[1100px] border-collapse text-left text-[0.85rem]">
             <thead>
-              <tr style={{ backgroundColor: 'var(--input-bg)', borderBottom: '1px solid var(--border-color)', color: 'var(--text-secondary)', fontSize: '0.75rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                <th style={{ padding: '0.9rem 1.1rem', minWidth: '100px', whiteSpace: 'nowrap' }}>
+              <tr className="border-b border-border bg-input text-[0.75rem] font-semibold uppercase tracking-[0.05em] text-muted-foreground">
+                <th className="min-w-[100px] whitespace-nowrap px-[1.1rem] py-[0.9rem]">
                   {activeModule === 'travel' ? 'TR ID' : activeModule === 'prespend' ? 'PS ID' : 'CR ID'}
                 </th>
-                <th style={{ padding: '0.9rem 1.1rem', minWidth: '280px' }}>Title</th>
-                <th style={{ padding: '0.9rem 1.1rem', minWidth: '180px' }}>Category</th>
-                <th style={{ padding: '0.9rem 1.1rem', minWidth: '180px', whiteSpace: 'nowrap' }}>Requester Details</th>
-                <th style={{ padding: '0.9rem 1.1rem', minWidth: '130px', whiteSpace: 'nowrap' }}>
+                <th className="min-w-[280px] px-[1.1rem] py-[0.9rem]">Title</th>
+                <th className="min-w-[180px] px-[1.1rem] py-[0.9rem]">Category</th>
+                <th className="min-w-[180px] whitespace-nowrap px-[1.1rem] py-[0.9rem]">Requester Details</th>
+                <th className="min-w-[130px] whitespace-nowrap px-[1.1rem] py-[0.9rem]">
                   Requested On
                 </th>
                 {activeModule === 'travel' && (
-                  <th style={{ padding: '0.9rem 1.1rem', minWidth: '120px', whiteSpace: 'nowrap' }}>
+                  <th className="min-w-[120px] whitespace-nowrap px-[1.1rem] py-[0.9rem]">
                     Travel Date
                   </th>
                 )}
-                <th style={{ padding: '0.9rem 1.1rem', minWidth: '120px', whiteSpace: 'nowrap' }}>Closed Date</th>
-                <th style={{ padding: '0.9rem 1.1rem', minWidth: '130px', whiteSpace: 'nowrap' }}>Approved By</th>
-                <th style={{ padding: '0.9rem 1.1rem', minWidth: '140px', whiteSpace: 'nowrap' }}>Status</th>
-                <th style={{ padding: '0.9rem 1.1rem', minWidth: '160px', textAlign: 'left', whiteSpace: 'nowrap' }}>Actions</th>
+                <th className="min-w-[120px] whitespace-nowrap px-[1.1rem] py-[0.9rem]">Closed Date</th>
+                <th className="min-w-[130px] whitespace-nowrap px-[1.1rem] py-[0.9rem]">Approved By</th>
+                <th className="min-w-[140px] whitespace-nowrap px-[1.1rem] py-[0.9rem]">Status</th>
+                <th className="min-w-[160px] whitespace-nowrap px-[1.1rem] py-[0.9rem] text-left">Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -571,99 +566,79 @@ function MyWorklistPage({ onNavigate, searchQuery = '', user, isOrgWorklist = fa
                   const requestedOnDate = item.raisedDate || (item.submittedAt ? new Date(item.submittedAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : (item.createdAt ? new Date(item.createdAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'));
 
                   return (
-                    <tr key={item.id} style={{ borderBottom: '1px solid var(--border-color)', transition: 'background-color 0.15s ease' }}>
-                      <td style={{ padding: '1rem 1.1rem', fontWeight: 500, color: 'var(--text-primary)', fontFamily: 'var(--font-mono)', whiteSpace: 'nowrap' }}>
+                    <tr key={item.id} className="border-b border-border [transition:background-color_0.15s_ease]">
+                      <td className="whitespace-nowrap px-[1.1rem] py-4 font-medium text-foreground [font-family:var(--font-mono)]">
                         {item.requestCode || item.id}
                       </td>
-                      <td style={{ padding: '1rem 1.1rem', fontWeight: 500, color: 'var(--text-primary)', minWidth: '280px' }}>
-                        <span style={{ lineHeight: 1.4, color: 'var(--text-primary)', display: 'block' }}>{item.title}</span>
+                      <td className="min-w-[280px] px-[1.1rem] py-4 font-medium text-foreground">
+                        <span className="block leading-[1.4] text-foreground">{item.title}</span>
                       </td>
-                      <td style={{ padding: '1rem 1.1rem', color: 'var(--text-secondary)', minWidth: '180px' }}>
-                        <div style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{item.category}</div>
-                        {item.subCategory && <div style={{ fontSize: '0.775rem', color: 'var(--text-secondary)' }}>{item.subCategory}</div>}
+                      <td className="min-w-[180px] px-[1.1rem] py-4 text-muted-foreground">
+                        <div className="font-semibold text-foreground">{item.category}</div>
+                        {item.subCategory && <div className="text-[0.775rem] text-muted-foreground">{item.subCategory}</div>}
                       </td>
-                      <td style={{ padding: '1rem 1.1rem', color: 'var(--text-primary)', whiteSpace: 'nowrap' }}>
-                        <div style={{ fontWeight: 600, fontSize: '0.85rem', color: 'var(--text-primary)' }}>
+                      <td className="whitespace-nowrap px-[1.1rem] py-4 text-foreground">
+                        <div className="text-[0.85rem] font-semibold text-foreground">
                           {displayName}
                         </div>
                         {emailVal && (
-                          <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)', marginTop: '0.15rem' }}>
+                          <div className="mt-[0.15rem] text-[0.75rem] text-muted-foreground [font-family:var(--font-mono)]">
                             {emailVal}
                           </div>
                         )}
                       </td>
-                      <td style={{ padding: '1rem 1.1rem', color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)', whiteSpace: 'nowrap' }}>
+                      <td className="whitespace-nowrap px-[1.1rem] py-4 text-muted-foreground [font-family:var(--font-mono)]">
                         {requestedOnDate}
                       </td>
                       {activeModule === 'travel' && (
-                        <td style={{ padding: '1rem 1.1rem', color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)', whiteSpace: 'nowrap' }}>
+                        <td className="whitespace-nowrap px-[1.1rem] py-4 text-muted-foreground [font-family:var(--font-mono)]">
                           {item.departureDate ? new Date(item.departureDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'}
                         </td>
                       )}
-                      <td style={{ padding: '1rem 1.1rem', color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)', whiteSpace: 'nowrap' }}>
+                      <td className="whitespace-nowrap px-[1.1rem] py-4 text-muted-foreground [font-family:var(--font-mono)]">
                         {item.closedDate || (item.closedAt ? new Date(item.closedAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '—')}
                       </td>
-                      <td style={{ padding: '1rem 1.1rem', color: 'var(--text-primary)', whiteSpace: 'nowrap' }}>
+                      <td className="whitespace-nowrap px-[1.1rem] py-4 text-foreground">
                         {approverName ? (
                           <>
-                            <div style={{ fontWeight: 600, fontSize: '0.85rem', color: 'var(--text-primary)' }}>
+                            <div className="text-[0.85rem] font-semibold text-foreground">
                               {approverName}
                             </div>
                             {approverEmail && (
-                              <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)', marginTop: '0.15rem' }}>
+                              <div className="mt-[0.15rem] text-[0.75rem] text-muted-foreground [font-family:var(--font-mono)]">
                                 {approverEmail}
                               </div>
                             )}
                           </>
                         ) : (
-                          <span style={{ color: 'var(--text-secondary)' }}>—</span>
+                          <span className="text-muted-foreground">—</span>
                         )}
                       </td>
-                      <td style={{ padding: '1rem 1.1rem', whiteSpace: 'nowrap' }}>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem', alignItems: 'flex-start' }}>
-                          <div style={{
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: '0.35rem',
-                            padding: '0.2rem 0.65rem',
-                            borderRadius: 'var(--radius-lg)',
-                            backgroundColor: statusBg,
-                            color: statusColor,
-                            fontSize: '0.775rem',
-                            fontWeight: 500,
-                            whiteSpace: 'nowrap'
-                          }}>
-                            <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: statusDot }} />
-                            <span style={{ whiteSpace: 'nowrap' }}>
+                      <td className="whitespace-nowrap px-[1.1rem] py-4">
+                        <div className="flex flex-col items-start gap-[0.3rem]">
+                          <div
+                            className="inline-flex items-center gap-[0.35rem] whitespace-nowrap rounded-[var(--radius-lg)] px-[0.65rem] py-[0.2rem] text-[0.775rem] font-medium"
+                            style={{ backgroundColor: statusBg, color: statusColor }}
+                          >
+                            <span className="h-[6px] w-[6px] rounded-full" style={{ backgroundColor: statusDot }} />
+                            <span className="whitespace-nowrap">
                               {statusBadgeLabel}
                             </span>
                           </div>
                           {isUrgentPreSpend && (
-                            <div style={{
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              gap: '0.25rem',
-                              padding: '0.15rem 0.5rem',
-                              borderRadius: '4px',
-                              backgroundColor: '#FEF2F2',
-                              color: '#DC2626',
-                              border: '1px solid #FECACA',
-                              fontSize: '0.7rem',
-                              fontWeight: 700,
-                              whiteSpace: 'nowrap'
-                            }}>
+                            <div className="inline-flex items-center gap-[0.25rem] whitespace-nowrap rounded border border-[#FECACA] bg-[#FEF2F2] px-2 py-[0.15rem] text-[0.7rem] font-bold text-[#DC2626]">
                               <AlertTriangle size={11} strokeWidth={2.5} />
                               <span>Urgent</span>
                             </div>
                           )}
                         </div>
                       </td>
-                      <td style={{ padding: '1rem 1.1rem', textAlign: 'left', whiteSpace: 'nowrap' }}>
-                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', justifyContent: 'flex-start' }}>
+                      <td className="whitespace-nowrap px-[1.1rem] py-4 text-left">
+                        <div className="inline-flex items-center justify-start gap-2">
                           <button
                             type="button"
                             onClick={() => setSelectedCr(item)}
-                            style={{ padding: '0.4rem 0.8rem', backgroundColor: 'var(--card-bg)', color: 'var(--text-primary)', border: '1px solid var(--border-color)', borderRadius: '6px', fontSize: '0.8rem', fontWeight: 600, cursor: 'pointer' }}
+                            className="cursor-pointer rounded-md border border-border bg-card px-[0.8rem] py-[0.4rem] text-[0.8rem] font-semibold text-foreground"
                           >
                             View
                           </button>
@@ -686,19 +661,13 @@ function MyWorklistPage({ onNavigate, searchQuery = '', user, isOrgWorklist = fa
                                   comment: item.approvedComment || item.rejectedComment || item.rejectionReason || item.implementedComment
                                 });
                               }}
-                              style={{
-                                padding: '0.35rem 0.6rem',
-                                backgroundColor: isItemRejected ? '#FEF2F2' : isItemApproved ? '#ECFDF5' : 'var(--input-bg)',
-                                color: isItemRejected ? '#DC2626' : isItemApproved ? '#059669' : 'var(--text-primary)',
-                                border: `1px solid ${isItemRejected ? '#FECACA' : isItemApproved ? '#A7F3D0' : 'var(--border-color)'}`,
-                                borderRadius: '6px',
-                                fontSize: '0.775rem',
-                                fontWeight: 600,
-                                cursor: 'pointer',
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                gap: '0.3rem'
-                              }}
+                              className={`inline-flex cursor-pointer items-center gap-[0.3rem] rounded-md border px-[0.6rem] py-[0.35rem] text-[0.775rem] font-semibold ${
+                                isItemRejected
+                                  ? 'border-[#FECACA] bg-[#FEF2F2] text-[#DC2626]'
+                                  : isItemApproved
+                                  ? 'border-[#A7F3D0] bg-[#ECFDF5] text-[#059669]'
+                                  : 'border-border bg-input text-foreground'
+                              }`}
                             >
                               <MessageSquare size={13} />
                               <span>Note</span>
@@ -714,7 +683,7 @@ function MyWorklistPage({ onNavigate, searchQuery = '', user, isOrgWorklist = fa
                                   setRowActionCommentInput('');
                                   setRowActionCommentError('');
                                 }}
-                                style={{ padding: '0.4rem 0.8rem', backgroundColor: '#FEF2F2', color: '#DC2626', border: '1px solid #FCA5A5', borderRadius: '6px', fontSize: '0.8rem', fontWeight: 700, cursor: 'pointer' }}
+                                className="cursor-pointer rounded-md border border-[#FCA5A5] bg-[#FEF2F2] px-[0.8rem] py-[0.4rem] text-[0.8rem] font-bold text-[#DC2626]"
                               >
                                 Reject
                               </button>
@@ -725,21 +694,13 @@ function MyWorklistPage({ onNavigate, searchQuery = '', user, isOrgWorklist = fa
                                   setRowActionCommentInput('');
                                   setRowActionCommentError('');
                                 }}
-                                style={{ padding: '0.4rem 0.95rem', backgroundColor: '#0D9488', color: '#FFFFFF', border: 'none', borderRadius: '6px', fontSize: '0.8rem', fontWeight: 700, cursor: 'pointer', boxShadow: '0 1px 2px rgba(13, 148, 136, 0.2)' }}
+                                className="cursor-pointer rounded-md border-none bg-[#0D9488] px-[0.95rem] py-[0.4rem] text-[0.8rem] font-bold text-white shadow-[0_1px_2px_rgba(13,148,136,0.2)]"
                               >
                                 Approve
                               </button>
                             </>
                           ) : isShortNoticeFlight && !isBoardUser && status === 'pending' ? (
-                            <span style={{
-                              padding: '0.3rem 0.65rem',
-                              borderRadius: 'var(--radius-lg)',
-                              fontSize: '0.75rem',
-                              fontWeight: 600,
-                              backgroundColor: '#FEF2F2',
-                              color: '#DC2626',
-                              border: '1px solid #FECACA'
-                            }}>
+                            <span className="rounded-[var(--radius-lg)] border border-[#FECACA] bg-[#FEF2F2] px-[0.65rem] py-[0.3rem] text-[0.75rem] font-semibold text-[#DC2626]">
                               Awaiting Board Approval
                             </span>
                           ) : activeModule === 'change_request' && isItemApproved && status !== 'implemented' && (isSuperAdmin || isChangeAdmin || isImplementer || item.canAct === true) && !isSelfRequest ? (
@@ -750,7 +711,7 @@ function MyWorklistPage({ onNavigate, searchQuery = '', user, isOrgWorklist = fa
                                 setRowActionCommentInput('');
                                 setRowActionCommentError('');
                               }}
-                              style={{ padding: '0.4rem 0.95rem', backgroundColor: '#0D9488', color: '#FFFFFF', border: 'none', borderRadius: '6px', fontSize: '0.8rem', fontWeight: 700, cursor: 'pointer', boxShadow: '0 1px 2px rgba(13, 148, 136, 0.2)' }}
+                              className="cursor-pointer rounded-md border-none bg-[#0D9488] px-[0.95rem] py-[0.4rem] text-[0.8rem] font-bold text-white shadow-[0_1px_2px_rgba(13,148,136,0.2)]"
                             >
                               Implement
                             </button>
@@ -762,13 +723,13 @@ function MyWorklistPage({ onNavigate, searchQuery = '', user, isOrgWorklist = fa
                 })
               ) : isLoading ? (
                 <tr>
-                  <td colSpan={9} style={{ padding: '3rem', textAlign: 'center' }}>
+                  <td colSpan={9} className="p-12 text-center">
                     <LoadingSpinner size="md" message="Loading worklist change requests..." />
                   </td>
                 </tr>
               ) : (
                 <tr>
-                  <td colSpan={9} style={{ padding: '2.5rem', textAlign: 'center', color: 'var(--text-secondary)' }}>
+                  <td colSpan={9} className="p-10 text-center text-muted-foreground">
                     {activeModule === 'prespend'
                       ? 'No pre-spend requests found.'
                       : activeModule === 'travel'
@@ -796,50 +757,18 @@ function MyWorklistPage({ onNavigate, searchQuery = '', user, isOrgWorklist = fa
 
       {/* Table Row Action Mandatory Comment Modal */}
       {rowActionPrompt && (
-        <div style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          backgroundColor: 'rgba(0, 0, 0, 0.5)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          zIndex: 250,
-          padding: '1rem'
-        }}>
-          <div style={{
-            backgroundColor: 'var(--card-bg)',
-            border: '1px solid var(--border-color)',
-            borderRadius: '14px',
-            width: '100%',
-            maxWidth: '520px',
-            padding: '1.5rem',
-            boxShadow: '0 20px 40px rgba(0, 0, 0, 0.2)',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '1rem'
-          }}>
+        <div className="fixed inset-0 z-[250] flex items-center justify-center bg-black/50 p-4">
+          <div className="flex w-full max-w-[520px] flex-col gap-4 rounded-[14px] border border-border bg-card p-6 shadow-[0_20px_40px_rgba(0,0,0,0.2)]">
             <div>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem' }}>
-                <h3 style={{ fontSize: '1.1rem', fontWeight: 800, color: rowActionPrompt.color, margin: 0 }}>
+              <div className="flex items-center justify-between gap-2">
+                <h3 className="m-0 text-[1.1rem] font-extrabold" style={{ color: rowActionPrompt.color }}>
                   {rowActionPrompt.title}
                 </h3>
-                <span style={{
-                  fontSize: '0.725rem',
-                  fontWeight: 600,
-                  color: '#64748B',
-                  backgroundColor: '#F1F5F9',
-                  border: '1px solid #CBD5E1',
-                  padding: '0.15rem 0.5rem',
-                  borderRadius: '5px',
-                  whiteSpace: 'nowrap'
-                }}>
+                <span className="whitespace-nowrap rounded-[5px] border border-[#CBD5E1] bg-[#F1F5F9] px-2 py-[0.15rem] text-[0.725rem] font-semibold text-[#64748B]">
                   Visible to all
                 </span>
               </div>
-              <p style={{ fontSize: '0.825rem', color: 'var(--text-secondary)', marginTop: '0.35rem', margin: 0 }}>
+              <p className="m-0 text-[0.825rem] text-muted-foreground">
                 {rowActionPrompt.action === 'implement'
                   ? 'A comment explaining what has been done'
                   : rowActionPrompt.action === 'reject'
@@ -856,25 +785,18 @@ function MyWorklistPage({ onNavigate, searchQuery = '', user, isOrgWorklist = fa
                 setRowActionCommentInput(e.target.value);
                 if (rowActionCommentError) setRowActionCommentError('');
               }}
-              style={{
-                width: '100%',
-                padding: '0.65rem 0.85rem',
-                backgroundColor: 'var(--input-bg)',
-                border: `1px solid ${rowActionCommentError ? '#DC2626' : 'var(--border-color)'}`,
-                borderRadius: '8px',
-                fontSize: '0.85rem',
-                color: 'var(--text-primary)',
-                outline: 'none'
-              }}
+              className={`w-full rounded-lg border bg-input px-[0.85rem] py-[0.65rem] text-[0.85rem] text-foreground outline-none ${
+                rowActionCommentError ? 'border-[#DC2626]' : 'border-border'
+              }`}
             />
 
             {rowActionCommentError && (
-              <span style={{ fontSize: '0.775rem', fontWeight: 700, color: '#DC2626' }}>
+              <span className="text-[0.775rem] font-bold text-[#DC2626]">
                 {rowActionCommentError}
               </span>
             )}
 
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.65rem' }}>
+            <div className="flex justify-end gap-[0.65rem]">
               <button
                 type="button"
                 disabled={isActionSubmitting}
@@ -884,16 +806,9 @@ function MyWorklistPage({ onNavigate, searchQuery = '', user, isOrgWorklist = fa
                   setRowActionCommentInput('');
                   setRowActionCommentError('');
                 }}
-                style={{
-                  padding: '0.5rem 1rem',
-                  backgroundColor: 'var(--card-bg)',
-                  border: '1px solid var(--border-color)',
-                  borderRadius: '6px',
-                  fontSize: '0.825rem',
-                  fontWeight: 600,
-                  cursor: isActionSubmitting ? 'not-allowed' : 'pointer',
-                  opacity: isActionSubmitting ? 0.6 : 1
-                }}
+                className={`rounded-md border border-border bg-card px-4 py-2 text-[0.825rem] font-semibold ${
+                  isActionSubmitting ? 'cursor-not-allowed opacity-60' : 'cursor-pointer opacity-100'
+                }`}
               >
                 Cancel
               </button>
@@ -916,21 +831,10 @@ function MyWorklistPage({ onNavigate, searchQuery = '', user, isOrgWorklist = fa
                     setIsActionSubmitting(false);
                   }
                 }}
-                style={{
-                  padding: '0.5rem 1.15rem',
-                  backgroundColor: rowActionPrompt.color,
-                  color: '#FFFFFF',
-                  border: 'none',
-                  borderRadius: '6px',
-                  fontSize: '0.825rem',
-                  fontWeight: 700,
-                  cursor: isActionSubmitting ? 'not-allowed' : 'pointer',
-                  boxShadow: '0 1px 3px rgba(0,0,0,0.15)',
-                  opacity: isActionSubmitting ? 0.75 : 1,
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '0.45rem'
-                }}
+                style={{ backgroundColor: rowActionPrompt.color }}
+                className={`inline-flex items-center gap-[0.45rem] rounded-md border-none px-[1.15rem] py-2 text-[0.825rem] font-bold text-white shadow-[0_1px_3px_rgba(0,0,0,0.15)] ${
+                  isActionSubmitting ? 'cursor-not-allowed opacity-75' : 'cursor-pointer opacity-100'
+                }`}
               >
                 {isActionSubmitting && <LoadingSpinner size="sm" color="#FFFFFF" />}
                 <span>

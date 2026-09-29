@@ -389,23 +389,23 @@ function SettingsPage({ user }) {
 
   if (!isSuperAdmin) {
     return (
-      <div style={{ padding: '2rem', textAlign: 'center', backgroundColor: 'var(--card-bg)', border: '1px solid var(--border-color)', borderRadius: '12px' }}>
-        <h2 style={{ fontSize: '1.25rem', fontWeight: 500, color: 'var(--text-primary)', marginBottom: '0.5rem' }}>Access Restricted</h2>
-        <p style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>Settings and user management are accessible to Super Admin users only.</p>
+      <div className="rounded-xl border border-border bg-card p-8 text-center">
+        <h2 className="mb-2 text-xl font-medium text-foreground">Access Restricted</h2>
+        <p className="text-sm text-muted-foreground">Settings and user management are accessible to Super Admin users only.</p>
       </div>
     );
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-      
+    <div className="flex flex-col gap-5">
+
       {/* Header Row */}
-      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: '1rem' }}>
+      <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h1 style={{ fontSize: '1.45rem', fontWeight: 700, color: 'var(--text-primary)', lineHeight: 1.2 }}>
+          <h1 className="text-[1.45rem] font-bold leading-[1.2] text-foreground">
             Settings
           </h1>
-          <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginTop: '0.2rem' }}>
+          <p className="mt-[0.2rem] text-[0.85rem] text-muted-foreground">
             Users and system-wide audit history
           </p>
         </div>
@@ -414,20 +414,7 @@ function SettingsPage({ user }) {
         {isSuperAdmin && activeTab === 'users' && (
           <button
             onClick={() => setIsInviteModalOpen(true)}
-            style={{
-              padding: '0.55rem 1.1rem',
-              backgroundColor: 'var(--brand-primary)',
-              color: '#FFFFFF',
-              border: 'none',
-              borderRadius: '8px',
-              fontSize: '0.85rem',
-              fontWeight: 500,
-              cursor: 'pointer',
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '0.4rem',
-              boxShadow: '0 1px 3px rgba(0, 0, 0, 0.2)'
-            }}
+            className="inline-flex cursor-pointer items-center gap-[0.4rem] rounded-lg border-0 bg-primary px-[1.1rem] py-[0.55rem] text-[0.85rem] font-medium text-[#FFFFFF] shadow-[0_1px_3px_rgba(0,0,0,0.2)]"
           >
             <Plus size={16} />
             <span>Invite user</span>
@@ -444,7 +431,7 @@ function SettingsPage({ user }) {
       </div>
 
       {/* Main Sub-Tabs */}
-      <div style={{ display: 'flex', gap: '0.5rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.5rem', flexWrap: 'wrap' }}>
+      <div className="flex flex-wrap gap-2 border-b border-border pb-2">
         {[
           { id: 'users', label: 'Users' },
           { id: 'audit', label: 'Audit Logs' }
@@ -454,16 +441,9 @@ function SettingsPage({ user }) {
             <button
               key={tab.id}
               onClick={() => handleTabChange(tab.id)}
-              style={{
-                padding: '0.45rem 1.1rem',
-                borderRadius: 'var(--radius-lg)',
-                border: 'none',
-                backgroundColor: isActive ? '#10172A' : 'transparent',
-                color: isActive ? '#FFFFFF' : 'var(--text-secondary)',
-                fontSize: '0.85rem',
-                fontWeight: 500,
-                cursor: 'pointer'
-              }}
+              className={`cursor-pointer rounded-[var(--radius-lg)] border-0 px-[1.1rem] py-[0.45rem] text-[0.85rem] font-medium ${
+                isActive ? 'bg-[#10172A] text-[#FFFFFF]' : 'bg-transparent text-muted-foreground'
+              }`}
             >
               {tab.label}
             </button>
@@ -473,52 +453,44 @@ function SettingsPage({ user }) {
 
       {/* TAB 1: USERS DIRECTORY */}
       {activeTab === 'users' && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-          <div style={{ backgroundColor: 'var(--card-bg)', border: '1px solid var(--border-color)', borderRadius: '12px', overflow: 'hidden', boxShadow: '0 1px 3px rgba(16, 21, 30, 0.04)' }}>
-            <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
-              <table style={{ width: '100%', minWidth: '650px', borderCollapse: 'collapse', textAlign: 'left' }}>
+        <div className="flex flex-col gap-4">
+          <div className="overflow-hidden rounded-xl border border-border bg-card shadow-[0_1px_3px_rgba(16,21,30,0.04)]">
+            <div className="overflow-x-auto [-webkit-overflow-scrolling:touch]">
+              <table className="w-full min-w-[650px] border-collapse text-left">
                 <thead>
-                  <tr style={{ backgroundColor: 'var(--input-bg)', color: 'var(--text-secondary)', fontSize: '0.6875rem', fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', borderBottom: '1px solid var(--border-color)' }}>
-                    <th style={{ padding: '0.75rem 0.85rem', whiteSpace: 'nowrap' }}>USER</th>
-                    <th style={{ padding: '0.75rem 0.85rem', whiteSpace: 'nowrap' }}>EMAIL ID</th>
-                    <th style={{ padding: '0.75rem 0.85rem', whiteSpace: 'nowrap' }}>ROLE</th>
-                    <th style={{ padding: '0.75rem 0.85rem', textAlign: 'right', whiteSpace: 'nowrap' }}>ACTIONS</th>
+                  <tr className="border-b border-border bg-input text-[0.6875rem] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+                    <th className="whitespace-nowrap px-[0.85rem] py-[0.75rem]">USER</th>
+                    <th className="whitespace-nowrap px-[0.85rem] py-[0.75rem]">EMAIL ID</th>
+                    <th className="whitespace-nowrap px-[0.85rem] py-[0.75rem]">ROLE</th>
+                    <th className="whitespace-nowrap px-[0.85rem] py-[0.75rem] text-right">ACTIONS</th>
                   </tr>
                 </thead>
                 <tbody>
                   {isLoadingUsers ? (
                     <tr>
-                      <td colSpan={4} style={{ padding: '3rem 1rem', textAlign: 'center' }}>
+                      <td colSpan={4} className="px-4 py-12 text-center">
                         <LoadingSpinner size="md" message="Loading users..." />
                       </td>
                     </tr>
                   ) : users.length === 0 ? (
                     <tr>
-                      <td colSpan={4} style={{ padding: '2.5rem 1rem', textAlign: 'center', color: 'var(--text-secondary)', fontSize: '0.875rem' }}>
+                      <td colSpan={4} className="px-4 py-10 text-center text-sm text-muted-foreground">
                         No users found.
                       </td>
                     </tr>
                   ) : (
                     users.slice((usersPage - 1) * usersPageSize, usersPage * usersPageSize).map((u, idx, arr) => (
-                      <tr key={u.id} style={{ borderBottom: idx === arr.length - 1 ? 'none' : '1px solid var(--border-color)' }}>
-                        <td style={{ padding: '0.75rem 0.85rem', fontSize: '0.875rem', fontWeight: 500, color: 'var(--text-primary)', whiteSpace: 'nowrap' }}>{u.name}</td>
-                        <td style={{ padding: '0.75rem 0.85rem', fontSize: '0.825rem', color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)', whiteSpace: 'nowrap' }}>{u.email}</td>
-                        <td style={{ padding: '0.75rem 0.85rem', whiteSpace: 'nowrap' }}>
-                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.35rem', alignItems: 'center' }}>
+                      <tr key={u.id} className={idx === arr.length - 1 ? '' : 'border-b border-border'}>
+                        <td className="whitespace-nowrap px-[0.85rem] py-[0.75rem] text-sm font-medium text-foreground">{u.name}</td>
+                        <td className="whitespace-nowrap px-[0.85rem] py-[0.75rem] font-[var(--font-mono)] text-[0.825rem] text-muted-foreground">{u.email}</td>
+                        <td className="whitespace-nowrap px-[0.85rem] py-[0.75rem]">
+                          <div className="flex flex-wrap items-center gap-[0.35rem]">
                             {(Array.isArray(u.roles) && u.roles.length > 0 ? u.roles : [{ roleName: u.role || 'Change Desk Admin' }]).map((r, rIdx) => {
                               const rName = typeof r === 'string' ? r : (r.roleName || r.name);
                               return (
                                 <span
                                   key={rIdx}
-                                  style={{
-                                    padding: '0.2rem 0.55rem',
-                                    borderRadius: '5px',
-                                    fontSize: '0.75rem',
-                                    fontWeight: 500,
-                                    backgroundColor: 'var(--input-bg)',
-                                    color: 'var(--text-primary)',
-                                    border: '1px solid var(--border-color)'
-                                  }}
+                                  className="rounded-[5px] border border-border bg-input px-[0.55rem] py-[0.2rem] text-xs font-medium text-foreground"
                                 >
                                   {rName}
                                 </span>
@@ -526,21 +498,14 @@ function SettingsPage({ user }) {
                             })}
                           </div>
                         </td>
-                        <td style={{ padding: '0.75rem 0.85rem', textAlign: 'right', whiteSpace: 'nowrap' }}>
+                        <td className="whitespace-nowrap px-[0.85rem] py-[0.75rem] text-right">
                           <button
                             type="button"
                             onClick={() => handleOpenManageUser(u)}
                             disabled={isRequester}
-                            style={{
-                              background: 'none',
-                              border: 'none',
-                              color: isRequester ? 'var(--text-secondary)' : 'var(--brand-primary)',
-                              fontSize: '0.8rem',
-                              fontWeight: 600,
-                              cursor: isRequester ? 'not-allowed' : 'pointer',
-                              opacity: isRequester ? 0.4 : 1,
-                              whiteSpace: 'nowrap'
-                            }}
+                            className={`whitespace-nowrap border-0 bg-transparent text-[0.8rem] font-semibold ${
+                              isRequester ? 'cursor-not-allowed text-muted-foreground opacity-40' : 'cursor-pointer text-info opacity-100'
+                            }`}
                           >
                             Manage user
                           </button>
@@ -571,8 +536,8 @@ function SettingsPage({ user }) {
 
       {/* TAB 2: AUDIT LOGS */}
       {activeTab === 'audit' && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-          
+        <div className="flex flex-col gap-4">
+
           {/* Audit Sub-Filter Pills Bar */}
           <FilterBar
             variant="inline"
@@ -582,47 +547,47 @@ function SettingsPage({ user }) {
           />
 
           {/* Audit Logs Table */}
-          <div style={{ backgroundColor: 'var(--card-bg)', border: '1px solid var(--border-color)', borderRadius: '12px', overflow: 'hidden', boxShadow: '0 1px 3px rgba(16, 21, 30, 0.04)' }}>
-            <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
-              <table style={{ width: '100%', minWidth: '780px', borderCollapse: 'collapse', textAlign: 'left' }}>
+          <div className="overflow-hidden rounded-xl border border-border bg-card shadow-[0_1px_3px_rgba(16,21,30,0.04)]">
+            <div className="overflow-x-auto [-webkit-overflow-scrolling:touch]">
+              <table className="w-full min-w-[780px] border-collapse text-left">
                 <thead>
-                  <tr style={{ backgroundColor: 'var(--input-bg)', color: 'var(--text-secondary)', fontSize: '0.6875rem', fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', borderBottom: '1px solid var(--border-color)' }}>
-                    <th style={{ padding: '0.75rem 1rem' }}>TIMESTAMP</th>
-                    <th style={{ padding: '0.75rem 1rem' }}>ACTOR</th>
-                    <th style={{ padding: '0.75rem 1rem' }}>ACTION</th>
-                    <th style={{ padding: '0.75rem 1rem' }}>REFERENCE</th>
-                    <th style={{ padding: '0.75rem 1rem' }}>EMPLOYEE EMAIL</th>
+                  <tr className="border-b border-border bg-input text-[0.6875rem] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+                    <th className="px-4 py-3">TIMESTAMP</th>
+                    <th className="px-4 py-3">ACTOR</th>
+                    <th className="px-4 py-3">ACTION</th>
+                    <th className="px-4 py-3">REFERENCE</th>
+                    <th className="px-4 py-3">EMPLOYEE EMAIL</th>
                   </tr>
                 </thead>
                 <tbody>
                   {isLoadingAuditLogs ? (
                     <tr>
-                      <td colSpan={5} style={{ padding: '3rem 1rem', textAlign: 'center' }}>
+                      <td colSpan={5} className="px-4 py-12 text-center">
                         <LoadingSpinner size="md" message={`Loading audit records for "${auditFilter}"...`} />
                       </td>
                     </tr>
                   ) : auditLogs.length === 0 ? (
                     <tr>
-                      <td colSpan={5} style={{ padding: '2.5rem 1rem', textAlign: 'center', color: 'var(--text-secondary)', fontSize: '0.875rem' }}>
+                      <td colSpan={5} className="px-4 py-10 text-center text-sm text-muted-foreground">
                         No audit records found for "{auditFilter}".
                       </td>
                     </tr>
                   ) : (
                     auditLogs.slice((auditPage - 1) * auditPageSize, auditPage * auditPageSize).map((log, idx, arr) => (
-                      <tr key={log.id} style={{ borderBottom: idx === arr.length - 1 ? 'none' : '1px solid var(--border-color)' }}>
-                        <td style={{ padding: '0.85rem 1rem', fontSize: '0.825rem', color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)' }}>
+                      <tr key={log.id} className={idx === arr.length - 1 ? '' : 'border-b border-border'}>
+                        <td className="px-4 py-[0.85rem] font-[var(--font-mono)] text-[0.825rem] text-muted-foreground">
                           {formatAuditTimestamp(log.timestamp)}
                         </td>
-                        <td style={{ padding: '0.85rem 1rem', fontSize: '0.875rem', fontWeight: 500, color: 'var(--text-primary)' }}>
+                        <td className="px-4 py-[0.85rem] text-sm font-medium text-foreground">
                           {log.actor}
                         </td>
-                        <td style={{ padding: '0.85rem 1rem', fontSize: '0.835rem', color: 'var(--text-primary)', fontWeight: 600 }}>
+                        <td className="px-4 py-[0.85rem] text-[0.835rem] font-semibold text-foreground">
                           {log.action}
                         </td>
-                        <td style={{ padding: '0.85rem 1rem', fontSize: '0.825rem', color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)' }}>
+                        <td className="px-4 py-[0.85rem] font-[var(--font-mono)] text-[0.825rem] text-muted-foreground">
                           {log.reference}
                         </td>
-                        <td style={{ padding: '0.85rem 1rem', fontSize: '0.825rem', color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)' }}>
+                        <td className="px-4 py-[0.85rem] font-[var(--font-mono)] text-[0.825rem] text-muted-foreground">
                           {log.employeeEmail || '—'}
                         </td>
                       </tr>
@@ -652,54 +617,31 @@ function SettingsPage({ user }) {
 
       {/* Invite User Modal Dialog */}
       {isInviteModalOpen && (
-        <div style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          backgroundColor: 'rgba(0, 0, 0, 0.5)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          zIndex: 200,
-          padding: '1rem'
-        }}>
-          <div style={{
-            backgroundColor: 'var(--card-bg)',
-            border: '1px solid var(--border-color)',
-            borderRadius: '16px',
-            width: '100%',
-            maxWidth: '560px',
-            maxHeight: '90vh',
-            boxShadow: '0 20px 40px rgba(0, 0, 0, 0.2)',
-            display: 'flex',
-            flexDirection: 'column',
-            overflow: 'hidden'
-          }}>
-            
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-[rgba(0,0,0,0.5)] p-4">
+          <div className="flex w-full max-w-[560px] max-h-[90vh] flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-[0_20px_40px_rgba(0,0,0,0.2)]">
+
             {/* Modal Header */}
-            <div style={{ padding: '1.25rem 1.75rem 0.75rem 1.75rem', display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', borderBottom: '1px solid var(--border-color)' }}>
+            <div className="flex items-start justify-between border-b border-border px-7 pb-3 pt-5">
               <div>
-                <h2 style={{ fontSize: '1.25rem', fontWeight: 500, color: 'var(--text-primary)', margin: 0, lineHeight: 1.3 }}>
+                <h2 className="m-0 text-xl font-medium leading-[1.3] text-foreground">
                   Invite User
                 </h2>
-                <p style={{ fontSize: '0.825rem', color: 'var(--text-secondary)', margin: 0, marginTop: '0.25rem' }}>
+                <p className="m-0 mt-1 text-[0.825rem] text-muted-foreground">
                   Map this user to a defined role
                 </p>
               </div>
-              <button onClick={() => setIsInviteModalOpen(false)} style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', padding: '0.2rem' }}>
+              <button onClick={() => setIsInviteModalOpen(false)} className="cursor-pointer border-0 bg-transparent p-[0.2rem] text-muted-foreground">
                 <X size={20} />
               </button>
             </div>
 
             {/* Modal Form Body */}
-            <form onSubmit={handleSaveInviteUser} style={{ display: 'flex', flexDirection: 'column', gap: '1rem', padding: '1.25rem 1.75rem', overflowY: 'auto', flex: 1 }}>
-              
+            <form onSubmit={handleSaveInviteUser} className="flex flex-1 flex-col gap-4 overflow-y-auto px-7 py-5">
+
               {/* Full name & Email ID 2-Col Grid */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+              <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label style={{ display: 'block', fontSize: '0.825rem', fontWeight: 500, color: 'var(--text-primary)', marginBottom: '0.4rem' }}>
+                  <label className="mb-[0.4rem] block text-[0.825rem] font-medium text-foreground">
                     Full name
                   </label>
                   <input
@@ -708,21 +650,12 @@ function SettingsPage({ user }) {
                     placeholder="e.g. Neha Kapoor"
                     value={newUser.name}
                     onChange={(e) => setNewUser(prev => ({ ...prev, name: e.target.value }))}
-                    style={{
-                      width: '100%',
-                      padding: '0.65rem 0.85rem',
-                      backgroundColor: 'var(--input-bg)',
-                      border: '1px solid var(--border-color)',
-                      borderRadius: '8px',
-                      fontSize: '0.85rem',
-                      color: 'var(--text-primary)',
-                      outline: 'none'
-                    }}
+                    className="w-full rounded-lg border border-border bg-input px-[0.85rem] py-[0.65rem] text-[0.85rem] text-foreground outline-none"
                   />
                 </div>
 
                 <div>
-                  <label style={{ display: 'block', fontSize: '0.825rem', fontWeight: 500, color: 'var(--text-primary)', marginBottom: '0.4rem' }}>
+                  <label className="mb-[0.4rem] block text-[0.825rem] font-medium text-foreground">
                     Email ID
                   </label>
                   <input
@@ -731,41 +664,23 @@ function SettingsPage({ user }) {
                     placeholder="e.g. neha.kapoor@stfox.com"
                     value={newUser.email}
                     onChange={(e) => setNewUser(prev => ({ ...prev, email: e.target.value }))}
-                    style={{
-                      width: '100%',
-                      padding: '0.65rem 0.85rem',
-                      backgroundColor: 'var(--input-bg)',
-                      border: '1px solid var(--border-color)',
-                      borderRadius: '8px',
-                      fontSize: '0.85rem',
-                      color: 'var(--text-primary)',
-                      outline: 'none'
-                    }}
+                    className="w-full rounded-lg border border-border bg-input px-[0.85rem] py-[0.65rem] text-[0.85rem] text-foreground outline-none"
                   />
                 </div>
               </div>
 
               {/* Multi-Role Tag Builder */}
               <div>
-                <label style={{ display: 'block', fontSize: '0.825rem', fontWeight: 500, color: 'var(--text-primary)', marginBottom: '0.4rem' }}>
+                <label className="mb-[0.4rem] block text-[0.825rem] font-medium text-foreground">
                   Assigned Roles
                 </label>
 
                 {/* Role Selector + Add Role Button */}
-                <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.6rem' }}>
+                <div className="mb-[0.6rem] flex gap-2">
                   <select
                     value={newUser.selectedRoleToAdd || ''}
                     onChange={(e) => setNewUser(prev => ({ ...prev, selectedRoleToAdd: e.target.value }))}
-                    style={{
-                      flex: 1,
-                      padding: '0.65rem 0.85rem',
-                      backgroundColor: 'var(--input-bg)',
-                      border: '1px solid var(--border-color)',
-                      borderRadius: '8px',
-                      fontSize: '0.85rem',
-                      color: 'var(--text-primary)',
-                      outline: 'none'
-                    }}
+                    className="flex-1 rounded-lg border border-border bg-input px-[0.85rem] py-[0.65rem] text-[0.85rem] text-foreground outline-none"
                   >
                     <option value="" disabled>Select a role</option>
                     {ALL_ASSIGNABLE_ROLES.map(r => (
@@ -786,20 +701,9 @@ function SettingsPage({ user }) {
                       }
                     }}
                     disabled={!newUser.selectedRoleToAdd}
-                    style={{
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: '0.35rem',
-                      padding: '0.65rem 1rem',
-                      backgroundColor: !newUser.selectedRoleToAdd ? 'var(--input-bg)' : 'var(--brand-primary)',
-                      color: !newUser.selectedRoleToAdd ? 'var(--text-secondary)' : '#FFFFFF',
-                      border: 'none',
-                      borderRadius: '8px',
-                      fontSize: '0.825rem',
-                      fontWeight: 600,
-                      cursor: !newUser.selectedRoleToAdd ? 'not-allowed' : 'pointer',
-                      whiteSpace: 'nowrap'
-                    }}
+                    className={`inline-flex items-center gap-[0.35rem] whitespace-nowrap rounded-lg border-0 px-4 py-[0.65rem] text-[0.825rem] font-semibold ${
+                      !newUser.selectedRoleToAdd ? 'cursor-not-allowed bg-input text-muted-foreground' : 'cursor-pointer bg-primary text-[#FFFFFF]'
+                    }`}
                   >
                     <Plus size={15} />
                     <span>Add Role</span>
@@ -807,24 +711,12 @@ function SettingsPage({ user }) {
                 </div>
 
                 {/* Active Role Tags with Cross Icon to Delete */}
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.45rem', minHeight: '34px', padding: '0.45rem', backgroundColor: 'var(--input-bg)', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
+                <div className="flex min-h-[34px] flex-wrap gap-[0.45rem] rounded-lg border border-border bg-input p-[0.45rem]">
                   {newUser.roles && newUser.roles.length > 0 ? (
                     newUser.roles.map(rName => (
                       <span
                         key={rName}
-                        style={{
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: '0.35rem',
-                          padding: '0.25rem 0.6rem',
-                          backgroundColor: '#FFFFFF',
-                          border: '1px solid #CBD5E1',
-                          borderRadius: '6px',
-                          fontSize: '0.8rem',
-                          fontWeight: 600,
-                          color: 'var(--text-primary)',
-                          boxShadow: '0 1px 2px rgba(0,0,0,0.05)'
-                        }}
+                        className="inline-flex items-center gap-[0.35rem] rounded-[6px] border border-[#CBD5E1] bg-[#FFFFFF] px-[0.6rem] py-1 text-[0.8rem] font-semibold text-foreground shadow-[0_1px_2px_rgba(0,0,0,0.05)]"
                       >
                         <span>{rName}</span>
                         <button
@@ -835,15 +727,7 @@ function SettingsPage({ user }) {
                               roles: prev.roles.filter(r => r !== rName)
                             }));
                           }}
-                          style={{
-                            background: 'none',
-                            border: 'none',
-                            color: '#94A3B8',
-                            cursor: 'pointer',
-                            padding: '0.1rem',
-                            display: 'flex',
-                            alignItems: 'center'
-                          }}
+                          className="flex cursor-pointer items-center border-0 bg-transparent p-[0.1rem] text-[#94A3B8]"
                           onMouseEnter={(e) => e.currentTarget.style.color = '#DC2626'}
                           onMouseLeave={(e) => e.currentTarget.style.color = '#94A3B8'}
                         >
@@ -852,7 +736,7 @@ function SettingsPage({ user }) {
                       </span>
                     ))
                   ) : (
-                    <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', alignSelf: 'center', padding: '0.2rem' }}>
+                    <span className="self-center p-[0.2rem] text-[0.8rem] text-muted-foreground">
                       No extra roles assigned. User will be created as standard Requester.
                     </span>
                   )}
@@ -861,15 +745,15 @@ function SettingsPage({ user }) {
 
               {/* Category Assignment Box for Change Manager */}
               {(newUser.roles?.includes('Change Manager') || newUser.selectedRoleToAdd === 'Change Manager') && (
-                <div style={{ marginBottom: '0.5rem' }}>
-                  <label style={{ display: 'block', fontSize: '0.825rem', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '0.4rem' }}>
+                <div className="mb-2">
+                  <label className="mb-[0.4rem] block text-[0.825rem] font-semibold text-foreground">
                     Appointed Change Manager Categories
                   </label>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem', backgroundColor: 'var(--input-bg)', padding: '0.75rem', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
+                  <div className="grid grid-cols-2 gap-2 rounded-lg border border-border bg-input p-3">
                     {categories.map((cat) => {
                       const isChecked = newUserCmCategories.includes(cat.id);
                       return (
-                        <label key={cat.id} style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.825rem', color: 'var(--text-primary)', cursor: 'pointer' }}>
+                        <label key={cat.id} className="flex cursor-pointer items-center gap-[0.4rem] text-[0.825rem] text-foreground">
                           <input
                             type="checkbox"
                             checked={isChecked}
@@ -891,15 +775,15 @@ function SettingsPage({ user }) {
 
               {/* Category Assignment Box for Change Implementer */}
               {(newUser.roles?.includes('Change Implementer') || newUser.selectedRoleToAdd === 'Change Implementer') && (
-                <div style={{ marginBottom: '0.5rem' }}>
-                  <label style={{ display: 'block', fontSize: '0.825rem', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '0.4rem' }}>
+                <div className="mb-2">
+                  <label className="mb-[0.4rem] block text-[0.825rem] font-semibold text-foreground">
                     Appointed Change Implementer Categories
                   </label>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem', backgroundColor: 'var(--input-bg)', padding: '0.75rem', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
+                  <div className="grid grid-cols-2 gap-2 rounded-lg border border-border bg-input p-3">
                     {categories.map((cat) => {
                       const isChecked = newUserCiCategories.includes(cat.id);
                       return (
-                        <label key={cat.id} style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.825rem', color: 'var(--text-primary)', cursor: 'pointer' }}>
+                        <label key={cat.id} className="flex cursor-pointer items-center gap-[0.4rem] text-[0.825rem] text-foreground">
                           <input
                             type="checkbox"
                             checked={isChecked}
@@ -920,20 +804,11 @@ function SettingsPage({ user }) {
               )}
 
               {/* Modal Footer Actions */}
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid var(--border-color)' }}>
+              <div className="mt-4 flex items-center justify-end gap-3 border-t border-border pt-4">
                 <button
                   type="button"
                   onClick={() => setIsInviteModalOpen(false)}
-                  style={{
-                    padding: '0.65rem 1.25rem',
-                    backgroundColor: 'var(--card-bg)',
-                    border: '1px solid var(--border-color)',
-                    borderRadius: '8px',
-                    fontSize: '0.85rem',
-                    fontWeight: 600,
-                    color: 'var(--text-primary)',
-                    cursor: 'pointer'
-                  }}
+                  className="cursor-pointer rounded-lg border border-border bg-card px-5 py-[0.65rem] text-[0.85rem] font-semibold text-foreground"
                 >
                   Cancel
                 </button>
@@ -941,17 +816,11 @@ function SettingsPage({ user }) {
                 <button
                   type="submit"
                   disabled={!newUser.roles || newUser.roles.length === 0 || Boolean(newUser.selectedRoleToAdd)}
-                  style={{
-                    padding: '0.65rem 1.35rem',
-                    backgroundColor: (!newUser.roles || newUser.roles.length === 0 || Boolean(newUser.selectedRoleToAdd)) ? 'var(--input-bg)' : 'var(--brand-primary)',
-                    color: (!newUser.roles || newUser.roles.length === 0 || Boolean(newUser.selectedRoleToAdd)) ? 'var(--text-secondary)' : '#FFFFFF',
-                    border: 'none',
-                    borderRadius: '8px',
-                    fontSize: '0.85rem',
-                    fontWeight: 500,
-                    cursor: (!newUser.roles || newUser.roles.length === 0 || Boolean(newUser.selectedRoleToAdd)) ? 'not-allowed' : 'pointer',
-                    boxShadow: (!newUser.roles || newUser.roles.length === 0 || Boolean(newUser.selectedRoleToAdd)) ? 'none' : '0 1px 3px rgba(0, 0, 0, 0.2)'
-                  }}
+                  className={`rounded-lg border-0 px-[1.35rem] py-[0.65rem] text-[0.85rem] font-medium ${
+                    (!newUser.roles || newUser.roles.length === 0 || Boolean(newUser.selectedRoleToAdd))
+                      ? 'cursor-not-allowed bg-input text-muted-foreground shadow-none'
+                      : 'cursor-pointer bg-primary text-[#FFFFFF] shadow-[0_1px_3px_rgba(0,0,0,0.2)]'
+                  }`}
                 >
                   Save user
                 </button>
@@ -964,120 +833,69 @@ function SettingsPage({ user }) {
       )}
       {/* Edit User Modal */}
       {editingUser && (
-        <div style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          backgroundColor: 'rgba(15, 23, 42, 0.65)',
-          backdropFilter: 'blur(4px)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          zIndex: 1000,
-          padding: '1rem'
-        }}>
-          <div style={{
-            backgroundColor: 'var(--card-bg)',
-            border: '1px solid var(--border-color)',
-            borderRadius: '16px',
-            width: '100%',
-            maxWidth: '540px',
-            maxHeight: '90vh',
-            boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
-            display: 'flex',
-            flexDirection: 'column',
-            overflow: 'hidden'
-          }}>
+        <div className="fixed inset-0 z-[1000] flex items-center justify-center bg-[rgba(15,23,42,0.65)] p-4 backdrop-blur-sm">
+          <div className="flex w-full max-w-[540px] max-h-[90vh] flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-[0_20px_25px_-5px_rgba(0,0,0,0.1),0_10px_10px_-5px_rgba(0,0,0,0.04)]">
             {/* Header */}
-            <div style={{ padding: '1.25rem 1.75rem 0.75rem 1.75rem', display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', borderBottom: '1px solid var(--border-color)' }}>
+            <div className="flex items-start justify-between border-b border-border px-7 pb-3 pt-5">
               <div>
-                <h2 style={{ fontSize: '1.35rem', fontWeight: 500, color: 'var(--text-primary)', margin: 0 }}>
+                <h2 className="m-0 text-[1.35rem] font-medium text-foreground">
                   Edit User
                 </h2>
-                <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginTop: '0.25rem' }}>
+                <p className="mt-1 text-[0.85rem] text-muted-foreground">
                   Map this user to a defined role
                 </p>
               </div>
               <button
                 type="button"
                 onClick={() => setEditingUser(null)}
-                style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', padding: '0.2rem' }}
+                className="cursor-pointer border-0 bg-transparent p-[0.2rem] text-muted-foreground"
               >
                 <X size={20} />
               </button>
             </div>
 
-            <form onSubmit={handleSaveManageUser} style={{ display: 'flex', flexDirection: 'column', gap: '1rem', padding: '1.25rem 1.75rem', overflowY: 'auto', flex: 1 }}>
+            <form onSubmit={handleSaveManageUser} className="flex flex-1 flex-col gap-4 overflow-y-auto px-7 py-5">
               {/* Row 1: Full name & Employee ID */}
               <div className="cd-responsive-inner-grid">
                 <div>
-                  <label style={{ display: 'block', fontSize: '0.825rem', fontWeight: 500, color: 'var(--text-primary)', marginBottom: '0.4rem' }}>
+                  <label className="mb-[0.4rem] block text-[0.825rem] font-medium text-foreground">
                     Full name
                   </label>
                   <input
                     type="text"
                     value={editingUser.name}
                     onChange={(e) => setEditingUser(prev => ({ ...prev, name: e.target.value }))}
-                    style={{
-                      width: '100%',
-                      padding: '0.65rem 0.85rem',
-                      backgroundColor: 'var(--input-bg)',
-                      border: '1px solid var(--border-color)',
-                      borderRadius: '8px',
-                      fontSize: '0.85rem',
-                      color: 'var(--text-primary)',
-                      outline: 'none'
-                    }}
+                    className="w-full rounded-lg border border-border bg-input px-[0.85rem] py-[0.65rem] text-[0.85rem] text-foreground outline-none"
                   />
                 </div>
                 <div>
-                  <label style={{ display: 'block', fontSize: '0.825rem', fontWeight: 500, color: 'var(--text-primary)', marginBottom: '0.4rem' }}>
+                  <label className="mb-[0.4rem] block text-[0.825rem] font-medium text-foreground">
                     Employee ID
                   </label>
                   <input
                     type="text"
                     value={editingUser.empId}
                     onChange={(e) => setEditingUser(prev => ({ ...prev, empId: e.target.value }))}
-                    style={{
-                      width: '100%',
-                      padding: '0.65rem 0.85rem',
-                      backgroundColor: 'var(--input-bg)',
-                      border: '1px solid var(--border-color)',
-                      borderRadius: '8px',
-                      fontSize: '0.85rem',
-                      color: 'var(--text-primary)',
-                      outline: 'none'
-                    }}
+                    className="w-full rounded-lg border border-border bg-input px-[0.85rem] py-[0.65rem] text-[0.85rem] text-foreground outline-none"
                   />
                 </div>
               </div>
 
               {/* Multi-Role Tag Builder for Edit Modal */}
               <div>
-                <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.35rem', marginBottom: '0.4rem' }}>
-                  <label style={{ fontSize: '0.825rem', fontWeight: 500, color: 'var(--text-primary)' }}>
+                <div className="mb-[0.4rem] flex items-baseline gap-[0.35rem]">
+                  <label className="text-[0.825rem] font-medium text-foreground">
                     Assigned Roles *
                   </label>
-                  <span style={{ fontSize: '0.725rem', color: 'var(--text-secondary)' }}>(Add one or more roles)</span>
+                  <span className="text-[0.725rem] text-muted-foreground">(Add one or more roles)</span>
                 </div>
 
                 {/* Role Selector + Add Role Button */}
-                <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.6rem' }}>
+                <div className="mb-[0.6rem] flex gap-2">
                   <select
                     value={editingUser.selectedRoleToAdd || ''}
                     onChange={(e) => setEditingUser(prev => ({ ...prev, selectedRoleToAdd: e.target.value }))}
-                    style={{
-                      flex: 1,
-                      padding: '0.65rem 0.85rem',
-                      backgroundColor: 'var(--input-bg)',
-                      border: '1px solid var(--border-color)',
-                      borderRadius: '8px',
-                      fontSize: '0.85rem',
-                      color: 'var(--text-primary)',
-                      outline: 'none'
-                    }}
+                    className="flex-1 rounded-lg border border-border bg-input px-[0.85rem] py-[0.65rem] text-[0.85rem] text-foreground outline-none"
                   >
                     <option value="" disabled>Select a role</option>
                     {ALL_ASSIGNABLE_ROLES.map(r => (
@@ -1098,20 +916,9 @@ function SettingsPage({ user }) {
                       }
                     }}
                     disabled={!editingUser.selectedRoleToAdd}
-                    style={{
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: '0.35rem',
-                      padding: '0.65rem 1rem',
-                      backgroundColor: !editingUser.selectedRoleToAdd ? 'var(--input-bg)' : 'var(--brand-primary)',
-                      color: !editingUser.selectedRoleToAdd ? 'var(--text-secondary)' : '#FFFFFF',
-                      border: 'none',
-                      borderRadius: '8px',
-                      fontSize: '0.825rem',
-                      fontWeight: 600,
-                      cursor: !editingUser.selectedRoleToAdd ? 'not-allowed' : 'pointer',
-                      whiteSpace: 'nowrap'
-                    }}
+                    className={`inline-flex items-center gap-[0.35rem] whitespace-nowrap rounded-lg border-0 px-4 py-[0.65rem] text-[0.825rem] font-semibold ${
+                      !editingUser.selectedRoleToAdd ? 'cursor-not-allowed bg-input text-muted-foreground' : 'cursor-pointer bg-primary text-[#FFFFFF]'
+                    }`}
                   >
                     <Plus size={15} />
                     <span>Add Role</span>
@@ -1119,24 +926,12 @@ function SettingsPage({ user }) {
                 </div>
 
                 {/* Active Role Tags with Cross Icon to Delete */}
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.45rem', minHeight: '34px', padding: '0.45rem', backgroundColor: 'var(--input-bg)', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
+                <div className="flex min-h-[34px] flex-wrap gap-[0.45rem] rounded-lg border border-border bg-input p-[0.45rem]">
                   {editingUser.roles && editingUser.roles.length > 0 ? (
                     editingUser.roles.map(rName => (
                       <span
                         key={rName}
-                        style={{
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: '0.35rem',
-                          padding: '0.25rem 0.6rem',
-                          backgroundColor: '#FFFFFF',
-                          border: '1px solid #CBD5E1',
-                          borderRadius: '6px',
-                          fontSize: '0.8rem',
-                          fontWeight: 600,
-                          color: 'var(--text-primary)',
-                          boxShadow: '0 1px 2px rgba(0,0,0,0.05)'
-                        }}
+                        className="inline-flex items-center gap-[0.35rem] rounded-[6px] border border-[#CBD5E1] bg-[#FFFFFF] px-[0.6rem] py-1 text-[0.8rem] font-semibold text-foreground shadow-[0_1px_2px_rgba(0,0,0,0.05)]"
                       >
                         <span>{rName}</span>
                         <button
@@ -1151,15 +946,7 @@ function SettingsPage({ user }) {
                               roles: prev.roles.filter(r => r !== rName)
                             }));
                           }}
-                          style={{
-                            background: 'none',
-                            border: 'none',
-                            color: '#94A3B8',
-                            cursor: 'pointer',
-                            padding: '0.1rem',
-                            display: 'flex',
-                            alignItems: 'center'
-                          }}
+                          className="flex cursor-pointer items-center border-0 bg-transparent p-[0.1rem] text-[#94A3B8]"
                           onMouseEnter={(e) => e.currentTarget.style.color = '#DC2626'}
                           onMouseLeave={(e) => e.currentTarget.style.color = '#94A3B8'}
                         >
@@ -1168,7 +955,7 @@ function SettingsPage({ user }) {
                       </span>
                     ))
                   ) : (
-                    <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', alignSelf: 'center', padding: '0.2rem' }}>
+                    <span className="self-center p-[0.2rem] text-[0.8rem] text-muted-foreground">
                       No roles added yet. Please select a role above and click "+ Add Role".
                     </span>
                   )}
@@ -1177,20 +964,20 @@ function SettingsPage({ user }) {
 
               {/* Category Assignment Box for Change Manager */}
               {(editingUser.roles?.includes('Change Manager') || editingUser.selectedRoleToAdd === 'Change Manager') && (
-                <div style={{ marginBottom: '0.5rem' }}>
-                  <label style={{ display: 'block', fontSize: '0.825rem', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '0.4rem' }}>
+                <div className="mb-2">
+                  <label className="mb-[0.4rem] block text-[0.825rem] font-semibold text-foreground">
                     Appointed Change Manager Categories
                   </label>
                   {isLoadingCategories ? (
-                    <div style={{ padding: '1rem', display: 'flex', justifyContent: 'center', backgroundColor: 'var(--input-bg)', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
+                    <div className="flex justify-center rounded-lg border border-border bg-input p-4">
                       <LoadingSpinner size="xs" message="Loading categories..." />
                     </div>
                   ) : (
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem', backgroundColor: 'var(--input-bg)', padding: '0.75rem', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
+                    <div className="grid grid-cols-2 gap-2 rounded-lg border border-border bg-input p-3">
                       {categories.map((cat) => {
                         const isChecked = editingUserCmCategories.includes(cat.id);
                         return (
-                          <label key={cat.id} style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.825rem', color: 'var(--text-primary)', cursor: 'pointer' }}>
+                          <label key={cat.id} className="flex cursor-pointer items-center gap-[0.4rem] text-[0.825rem] text-foreground">
                             <input
                               type="checkbox"
                               checked={isChecked}
@@ -1214,20 +1001,20 @@ function SettingsPage({ user }) {
 
               {/* Category Assignment Box for Change Implementer */}
               {(editingUser.roles?.includes('Change Implementer') || editingUser.selectedRoleToAdd === 'Change Implementer') && (
-                <div style={{ marginBottom: '0.5rem' }}>
-                  <label style={{ display: 'block', fontSize: '0.825rem', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '0.4rem' }}>
+                <div className="mb-2">
+                  <label className="mb-[0.4rem] block text-[0.825rem] font-semibold text-foreground">
                     Appointed Change Implementer Categories
                   </label>
                   {isLoadingCategories ? (
-                    <div style={{ padding: '1rem', display: 'flex', justifyContent: 'center', backgroundColor: 'var(--input-bg)', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
+                    <div className="flex justify-center rounded-lg border border-border bg-input p-4">
                       <LoadingSpinner size="xs" message="Loading categories..." />
                     </div>
                   ) : (
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem', backgroundColor: 'var(--input-bg)', padding: '0.75rem', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
+                    <div className="grid grid-cols-2 gap-2 rounded-lg border border-border bg-input p-3">
                       {categories.map((cat) => {
                         const isChecked = editingUserCiCategories.includes(cat.id);
                         return (
-                          <label key={cat.id} style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.825rem', color: 'var(--text-primary)', cursor: 'pointer' }}>
+                          <label key={cat.id} className="flex cursor-pointer items-center gap-[0.4rem] text-[0.825rem] text-foreground">
                             <input
                               type="checkbox"
                               checked={isChecked}
@@ -1250,42 +1037,25 @@ function SettingsPage({ user }) {
               )}
 
               {/* Actions Footer */}
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '0.5rem' }}>
+              <div className="mt-2 flex justify-end gap-3">
                 <button
                   type="button"
                   onClick={() => setEditingUser(null)}
                   disabled={isSavingUser}
-                  style={{
-                    padding: '0.6rem 1.25rem',
-                    backgroundColor: 'var(--input-bg)',
-                    color: 'var(--text-primary)',
-                    border: '1px solid var(--border-color)',
-                    borderRadius: '8px',
-                    fontSize: '0.85rem',
-                    fontWeight: 600,
-                    cursor: isSavingUser ? 'not-allowed' : 'pointer',
-                    opacity: isSavingUser ? 0.6 : 1
-                  }}
+                  className={`rounded-lg border border-border bg-input px-5 py-[0.6rem] text-[0.85rem] font-semibold text-foreground ${
+                    isSavingUser ? 'cursor-not-allowed opacity-60' : 'cursor-pointer opacity-100'
+                  }`}
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={isSavingUser || !editingUser.roles || editingUser.roles.length === 0 || Boolean(editingUser.selectedRoleToAdd)}
-                  style={{
-                    padding: '0.6rem 1.25rem',
-                    backgroundColor: (isSavingUser || !editingUser.roles || editingUser.roles.length === 0 || Boolean(editingUser.selectedRoleToAdd)) ? 'var(--input-bg)' : 'var(--brand-primary)',
-                    color: (isSavingUser || !editingUser.roles || editingUser.roles.length === 0 || Boolean(editingUser.selectedRoleToAdd)) ? 'var(--text-secondary)' : '#FFFFFF',
-                    border: 'none',
-                    borderRadius: '8px',
-                    fontSize: '0.85rem',
-                    fontWeight: 500,
-                    cursor: (isSavingUser || !editingUser.roles || editingUser.roles.length === 0 || Boolean(editingUser.selectedRoleToAdd)) ? 'not-allowed' : 'pointer',
-                    opacity: isSavingUser ? 0.8 : 1,
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '0.5rem'
-                  }}
+                  className={`inline-flex items-center gap-2 rounded-lg border-0 px-5 py-[0.6rem] text-[0.85rem] font-medium ${
+                    (isSavingUser || !editingUser.roles || editingUser.roles.length === 0 || Boolean(editingUser.selectedRoleToAdd))
+                      ? 'cursor-not-allowed bg-input text-muted-foreground'
+                      : 'cursor-pointer bg-primary text-[#FFFFFF]'
+                  } ${isSavingUser ? 'opacity-80' : 'opacity-100'}`}
                 >
                   {isSavingUser ? (
                     <>

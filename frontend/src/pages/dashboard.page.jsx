@@ -389,46 +389,47 @@ function DashboardPage({ onNavigate, user, isOrgDashboard = false, searchQuery =
   ];
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', width: '100%' }}>
+    <div className="flex w-full flex-col gap-5">
 
       {/* Top Header */}
-      <div style={{ width: '100%' }}>
-        <h1 style={{ fontSize: '1.55rem', fontWeight: 700, color: 'var(--text-primary)', lineHeight: 1.2, margin: 0 }}>
+      <div className="w-full">
+        <h1 className="m-0 text-[1.55rem] font-bold leading-[1.2] text-foreground">
           {isOrgDashboard ? 'Organization Dashboard' : `${greetingText}${firstName ? `, ${firstName}` : ''}`}
         </h1>
-        <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginTop: '0.25rem', marginBottom: 0 }}>
+        <p className="mt-1 mb-0 text-[0.85rem] text-muted-foreground">
           {isOrgDashboard ? 'Company-wide requests and analytics across all modules' : 'Your requests across all modules'}
         </p>
       </div>
 
       {/* 3 Vertically Stacked Module Cards */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', width: '100%' }}>
+      <div className="flex w-full flex-col gap-5">
         {moduleCards.map((card) => {
           const isExpanded = expandedModule === card.key;
 
           return (
             <div
               key={card.key}
-              style={{
-                backgroundColor: 'var(--card-bg)',
-                border: '1px solid var(--border-color)',
-                borderRadius: 'var(--radius-lg)',
-                padding: '1.25rem 1.5rem',
-                boxShadow: 'var(--shadow-card)',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '1.25rem',
-                transition: 'all 0.2s ease'
-              }}
+              className="flex flex-col gap-5 rounded-[var(--radius-lg)] border border-border bg-card px-6 py-5 shadow-[var(--shadow-card)] [transition:all_0.2s_ease]"
             >
               {/* Card Header: Title on Left, Action Button (optional) on Right */}
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.75rem' }}>
-                <h3 style={{ fontSize: '1rem', fontWeight: 600, color: 'var(--text-primary)', margin: 0 }}>
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <h3 className="m-0 text-base font-semibold text-foreground">
                   {card.title}
                 </h3>
 
-                {isOrgDashboard && isExpanded && (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                <div className="flex items-center gap-3">
+                  {!isOrgDashboard && (
+                    <button
+                      type="button"
+                      onClick={() => onNavigate?.(card.newButtonNav)}
+                      className="inline-flex cursor-pointer items-center gap-[0.4rem] rounded-lg border-0 bg-primary px-[0.85rem] py-[0.45rem] text-[0.8rem] font-semibold text-white"
+                    >
+                      <Plus size={14} />
+                      <span>{card.newButtonLabel}</span>
+                    </button>
+                  )}
+
+                  {isOrgDashboard && isExpanded && (
                     <ExportButtonGroup
                       onExportCsv={() => handleExport('csv')}
                       onExportPdf={() => handleExport('pdf')}
@@ -436,16 +437,15 @@ function DashboardPage({ onNavigate, user, isOrgDashboard = false, searchQuery =
                       csvLabel={isExporting ? 'Exporting...' : 'Export CSV'}
                       pdfLabel={isExporting ? 'Exporting...' : 'Export PDF'}
                     />
-                  </div>
-                )}
+                  )}
+                </div>
               </div>
 
               {/* Horizontal Metric Badges */}
-              <div style={{
-                display: 'grid',
-                gridTemplateColumns: `repeat(${card.metrics.length}, minmax(0, 1fr))`,
-                gap: '0.85rem'
-              }}>
+              <div
+                className="grid gap-[0.85rem]"
+                style={{ gridTemplateColumns: `repeat(${card.metrics.length}, minmax(0, 1fr))` }}
+              >
                 {card.metrics.map((m, idx) => {
                   const style = getMetricStyle(m);
                   const Icon = style.icon;
@@ -453,35 +453,20 @@ function DashboardPage({ onNavigate, user, isOrgDashboard = false, searchQuery =
                   return (
                     <div
                       key={idx}
-                      style={{
-                        backgroundColor: 'var(--card-bg)',
-                        border: '1px solid var(--border-color)',
-                        borderRadius: 'var(--radius-md)',
-                        padding: '0.85rem 1rem',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '0.85rem',
-                        boxShadow: '0 1px 2px rgba(0, 0, 0, 0.04)'
-                      }}
+                      className="flex items-center gap-[0.85rem] rounded-[var(--radius-md)] border border-border bg-card px-4 py-[0.85rem] shadow-[0_1px_2px_rgba(0,0,0,0.04)]"
                     >
-                      <div style={{
-                        width: '36px',
-                        height: '36px',
-                        borderRadius: '8px',
-                        backgroundColor: style.tint,
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        flexShrink: 0
-                      }}>
+                      <div
+                        className="flex size-9 shrink-0 items-center justify-center rounded-lg"
+                        style={{ backgroundColor: style.tint }}
+                      >
                         <Icon size={18} color={style.color} />
                       </div>
 
-                      <div style={{ minWidth: 0, display: 'flex', flexDirection: 'column' }}>
-                        <span style={{ fontSize: '0.75rem', fontWeight: 500, color: 'var(--text-secondary)', lineHeight: 1.2 }}>
+                      <div className="flex min-w-0 flex-col">
+                        <span className="text-xs font-medium leading-[1.2] text-muted-foreground">
                           {m.title}
                         </span>
-                        <span style={{ fontSize: '1.35rem', fontWeight: 700, color: 'var(--text-primary)', lineHeight: 1.2, marginTop: '0.15rem' }}>
+                        <span className="mt-[0.15rem] text-[1.35rem] font-bold leading-[1.2] text-foreground">
                           {m.count ?? 0}
                         </span>
                       </div>
@@ -491,24 +476,13 @@ function DashboardPage({ onNavigate, user, isOrgDashboard = false, searchQuery =
               </div>
 
               {/* View / Hide Details Toggle Button at Bottom Right */}
-              <div style={{ display: 'flex', justifyContent: 'flex-end', paddingTop: isExpanded ? '0' : '0.25rem' }}>
+              <div className={`flex justify-end ${isExpanded ? 'pt-0' : 'pt-1'}`}>
                 <button
                   type="button"
                   onClick={() => handleToggleExpand(card.key)}
-                  style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '0.35rem',
-                    padding: '0.4rem 0.85rem',
-                    borderRadius: 'var(--radius-md)',
-                    border: '1px solid var(--brand-primary)',
-                    backgroundColor: isExpanded ? 'rgba(37, 99, 235, 0.06)' : '#FFFFFF',
-                    color: 'var(--brand-primary)',
-                    fontSize: '0.825rem',
-                    fontWeight: 600,
-                    cursor: 'pointer',
-                    transition: 'all 0.15s ease'
-                  }}
+                  className={`inline-flex cursor-pointer items-center gap-[0.35rem] rounded-[var(--radius-md)] border border-primary px-[0.85rem] py-[0.4rem] text-[0.825rem] font-semibold text-primary [transition:all_0.15s_ease] ${
+                    isExpanded ? 'bg-[#EFF6FF]' : 'bg-white'
+                  }`}
                 >
                   <span>{isExpanded ? 'Hide details' : 'View details'}</span>
                   {isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
@@ -517,7 +491,7 @@ function DashboardPage({ onNavigate, user, isOrgDashboard = false, searchQuery =
 
               {/* EXPANDED CONTENT: FilterBar, Charts, and Table */}
               {isExpanded && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', marginTop: '0.5rem', borderTop: '1px solid var(--border-color)', paddingTop: '1.25rem' }}>
+                <div className="mt-2 flex flex-col gap-5 border-t border-border pt-5">
 
                   {/* Filter Bar */}
                   <FilterBar
@@ -541,35 +515,26 @@ function DashboardPage({ onNavigate, user, isOrgDashboard = false, searchQuery =
                   />
 
                   {/* Side-by-Side Charts */}
-                  <div className="cd-responsive-2col" style={{ alignItems: 'stretch' }}>
+                  <div className="cd-responsive-2col items-stretch">
 
                     {/* Chart 1: Tickets/Spend/Travel by Category */}
-                    <div style={{
-                      backgroundColor: 'var(--card-bg)',
-                      border: '1px solid var(--border-color)',
-                      borderRadius: 'var(--radius-lg)',
-                      padding: '1.35rem 1.5rem',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      justifyContent: 'space-between',
-                      boxShadow: 'var(--shadow-card)'
-                    }}>
+                    <div className="flex flex-col justify-between rounded-[var(--radius-lg)] border border-border bg-card px-6 py-[1.35rem] shadow-[var(--shadow-card)]">
                       <div>
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.25rem' }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.55rem' }}>
-                            <div style={{ width: '30px', height: '30px', borderRadius: 'var(--radius-md)', backgroundColor: 'var(--input-bg)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                              <Layers size={15} style={{ color: 'var(--text-primary)' }} />
+                        <div className="mb-5 flex items-center justify-between">
+                          <div className="flex items-center gap-[0.55rem]">
+                            <div className="flex size-[30px] shrink-0 items-center justify-center rounded-[var(--radius-md)] bg-input">
+                              <Layers size={15} className="text-foreground" />
                             </div>
-                            <h3 style={{ fontSize: '1.05rem', fontWeight: 500, color: 'var(--text-primary)', margin: 0 }}>
+                            <h3 className="m-0 text-[1.05rem] font-medium text-foreground">
                               {expandedModule === 'prespend' ? 'Spend by Category' : expandedModule === 'travel' ? 'Travel by Mode' : 'Tickets by Category'}
                             </h3>
                           </div>
-                          <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', fontWeight: 600 }}>
+                          <span className="text-[0.8rem] font-semibold text-muted-foreground">
                             {totalCategoryCount} Total
                           </span>
                         </div>
 
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.1rem' }}>
+                        <div className="flex flex-col gap-[1.1rem]">
                           {displayCategories.map((cat, catIdx) => {
                             const labelText = cat.category || cat.label || cat.name || cat.title || `Category ${catIdx + 1}`;
                             const count = cat.count || 0;
@@ -578,33 +543,23 @@ function DashboardPage({ onNavigate, user, isOrgDashboard = false, searchQuery =
                               : 0;
                             const barWidth = count > 0 ? Math.max(pct, 5) : 0;
                             return (
-                              <div key={labelText} style={{ display: 'grid', gridTemplateColumns: '200px 1fr 80px', alignItems: 'center', gap: '1rem' }}>
+                              <div key={labelText} className="grid grid-cols-[200px_1fr_80px] items-center gap-4">
                                 <span
                                   title={labelText}
-                                  style={{
-                                    fontSize: '0.875rem',
-                                    fontWeight: 500,
-                                    color: 'var(--text-primary)',
-                                    whiteSpace: 'nowrap',
-                                    overflow: 'hidden',
-                                    textOverflow: 'ellipsis'
-                                  }}
+                                  className="truncate text-sm font-medium text-foreground"
                                 >
                                   {labelText}
                                 </span>
 
-                                <div style={{ width: '100%', height: '8px', backgroundColor: 'var(--border-color)', borderRadius: '99px', overflow: 'hidden' }}>
-                                  <div style={{
-                                    height: '100%',
-                                    width: `${barWidth}%`,
-                                    backgroundColor: cat.color || '#2563EB',
-                                    borderRadius: '99px',
-                                    transition: 'width 0.5s ease'
-                                  }} />
+                                <div className="h-2 w-full overflow-hidden rounded-full bg-border">
+                                  <div
+                                    className="h-full rounded-full [transition:width_0.5s_ease]"
+                                    style={{ width: `${barWidth}%`, backgroundColor: cat.color || '#2563EB' }}
+                                  />
                                 </div>
 
-                                <span style={{ fontSize: '0.875rem', fontWeight: 600, color: 'var(--text-primary)', textAlign: 'right', whiteSpace: 'nowrap' }}>
-                                  {count} <span style={{ color: 'var(--text-secondary)', fontWeight: 500, fontSize: '0.8rem' }}>({pct}%)</span>
+                                <span className="whitespace-nowrap text-right text-sm font-semibold text-foreground">
+                                  {count} <span className="text-[0.8rem] font-medium text-muted-foreground">({pct}%)</span>
                                 </span>
                               </div>
                             );
@@ -614,34 +569,25 @@ function DashboardPage({ onNavigate, user, isOrgDashboard = false, searchQuery =
                     </div>
 
                     {/* Chart 2: Status Breakdown */}
-                    <div style={{
-                      backgroundColor: 'var(--card-bg)',
-                      border: '1px solid var(--border-color)',
-                      borderRadius: 'var(--radius-lg)',
-                      padding: '1.35rem 1.5rem',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      justifyContent: 'space-between',
-                      boxShadow: 'var(--shadow-card)'
-                    }}>
+                    <div className="flex flex-col justify-between rounded-[var(--radius-lg)] border border-border bg-card px-6 py-[1.35rem] shadow-[var(--shadow-card)]">
                       <div>
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem' }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.55rem' }}>
-                            <div style={{ width: '30px', height: '30px', borderRadius: 'var(--radius-md)', backgroundColor: 'var(--input-bg)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                              <PieChart size={15} style={{ color: 'var(--text-primary)' }} />
+                        <div className="mb-4 flex items-center justify-between">
+                          <div className="flex items-center gap-[0.55rem]">
+                            <div className="flex size-[30px] shrink-0 items-center justify-center rounded-[var(--radius-md)] bg-input">
+                              <PieChart size={15} className="text-foreground" />
                             </div>
-                            <h3 style={{ fontSize: '1.05rem', fontWeight: 500, color: 'var(--text-primary)', margin: 0 }}>
+                            <h3 className="m-0 text-[1.05rem] font-medium text-foreground">
                               Status Breakdown
                             </h3>
                           </div>
-                          <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', fontWeight: 600 }}>
+                          <span className="text-[0.8rem] font-semibold text-muted-foreground">
                             {totalCRs} Total
                           </span>
                         </div>
 
                         {/* Donut Chart and Legend */}
-                        <div className="cd-responsive-breakdown" style={{ marginTop: '0.85rem' }}>
-                          <div style={{ position: 'relative', width: '140px', height: '140px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                        <div className="cd-responsive-breakdown mt-[0.85rem]">
+                          <div className="relative flex size-[140px] shrink-0 items-center justify-center">
                             <svg width="140" height="140" viewBox="0 0 42 42">
                               <circle cx="21" cy="21" r="15.91549430918954" fill="transparent" stroke="var(--border-color)" strokeWidth="4.5" />
                               {(() => {
@@ -664,26 +610,23 @@ function DashboardPage({ onNavigate, user, isOrgDashboard = false, searchQuery =
                                       stroke={sb.color || 'var(--brand-primary)'}
                                       strokeDasharray={`${pct} ${100 - pct}`}
                                       strokeDashoffset={offset}
-                                      style={{
-                                        strokeWidth: isHovered ? 6.5 : 4.5,
-                                        opacity: isDimmed ? 0.35 : 1,
-                                        transition: 'stroke-width 0.15s ease, opacity 0.15s ease'
-                                      }}
+                                      strokeWidth={isHovered ? 6.5 : 4.5}
+                                      className={`[transition:stroke-width_0.15s_ease,opacity_0.15s_ease] ${isDimmed ? 'opacity-35' : 'opacity-100'}`}
                                     />
                                   );
                                 });
                               })()}
                             </svg>
 
-                            <div style={{ position: 'absolute', textAlign: 'center' }}>
-                              <div style={{ fontSize: '1.45rem', fontWeight: 700, color: 'var(--text-primary)', lineHeight: 1 }}>{totalCRs}</div>
-                              <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', fontWeight: 500, marginTop: '0.15rem' }}>
+                            <div className="absolute text-center">
+                              <div className="text-[1.45rem] font-bold leading-none text-foreground">{totalCRs}</div>
+                              <div className="mt-[0.15rem] text-[0.7rem] font-medium text-muted-foreground">
                                 {expandedModule === 'travel' ? 'Total Trips' : expandedModule === 'prespend' ? 'Total Reqs' : 'Total CRs'}
                               </div>
                             </div>
                           </div>
 
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', flex: 1, minWidth: 0 }}>
+                          <div className="flex min-w-0 flex-1 flex-col gap-3">
                             {displayStatuses.map((sb, sbIdx) => {
                               const statusText = sb.label || sb.status || sb.name || `Status ${sbIdx + 1}`;
                               const pct = totalCRs > 0 ? Math.round((sb.count / totalCRs) * 100) : 0;
@@ -693,24 +636,19 @@ function DashboardPage({ onNavigate, user, isOrgDashboard = false, searchQuery =
                                   onMouseEnter={() => setHoveredStatus(sb.status || sb.label)}
                                   onMouseLeave={() => setHoveredStatus(null)}
                                   onClick={() => setActiveFilter(sb.status)}
-                                  style={{
-                                    display: 'grid',
-                                    gridTemplateColumns: '14px 1fr auto',
-                                    alignItems: 'center',
-                                    gap: '0.65rem',
-                                    padding: '0.35rem 0.5rem',
-                                    borderRadius: 'var(--radius-md)',
-                                    backgroundColor: hoveredStatus === (sb.status || sb.label) ? 'var(--input-bg)' : 'transparent',
-                                    transition: 'background-color 0.15s ease',
-                                    cursor: 'pointer'
-                                  }}
+                                  className={`grid cursor-pointer grid-cols-[14px_1fr_auto] items-center gap-[0.65rem] rounded-[var(--radius-md)] px-2 py-[0.35rem] [transition:background-color_0.15s_ease] ${
+                                    hoveredStatus === (sb.status || sb.label) ? 'bg-input' : 'bg-transparent'
+                                  }`}
                                 >
-                                  <div style={{ width: '10px', height: '10px', borderRadius: '3px', backgroundColor: sb.color || 'var(--brand-primary)', flexShrink: 0 }} />
-                                  <span style={{ color: 'var(--text-primary)', fontSize: '0.85rem', fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                  <div
+                                    className="size-2.5 shrink-0 rounded-[3px]"
+                                    style={{ backgroundColor: sb.color || 'var(--brand-primary)' }}
+                                  />
+                                  <span className="truncate text-[0.85rem] font-medium text-foreground">
                                     {statusText}
                                   </span>
-                                  <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-primary)', textAlign: 'right', whiteSpace: 'nowrap' }}>
-                                    {sb.count} <span style={{ color: 'var(--text-secondary)', fontWeight: 500, fontSize: '0.775rem' }}>({pct}%)</span>
+                                  <span className="whitespace-nowrap text-right text-[0.85rem] font-semibold text-foreground">
+                                    {sb.count} <span className="text-[0.775rem] font-medium text-muted-foreground">({pct}%)</span>
                                   </span>
                                 </div>
                               );
@@ -722,64 +660,52 @@ function DashboardPage({ onNavigate, user, isOrgDashboard = false, searchQuery =
                   </div>
 
                   {/* Requests Table */}
-                  <div style={{
-                    backgroundColor: 'var(--card-bg)',
-                    border: '1px solid var(--border-color)',
-                    borderRadius: 'var(--radius-lg)',
-                    overflow: 'hidden',
-                    boxShadow: 'var(--shadow-card)'
-                  }}>
-                    <div style={{
-                      padding: '1rem 1.25rem',
-                      borderBottom: '1px solid var(--border-color)',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between'
-                    }}>
+                  <div className="overflow-hidden rounded-[var(--radius-lg)] border border-border bg-card shadow-[var(--shadow-card)]">
+                    <div className="flex items-center justify-between border-b border-border px-5 py-4">
                       <div>
-                        <h3 style={{ fontSize: '1rem', fontWeight: 600, color: 'var(--text-primary)', margin: 0 }}>
+                        <h3 className="m-0 text-base font-semibold text-foreground">
                           {expandedModule === 'prespend'
                             ? (isOrgDashboard ? 'Organization Pre-Spend Requests' : 'My Pre-Spend Requests')
                             : expandedModule === 'travel'
                             ? (isOrgDashboard ? 'Organization Travel Bookings' : 'My Travel Bookings')
                             : (isOrgDashboard ? 'Organization Change Requests' : 'My Change Requests')}
                         </h3>
-                        <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', margin: '0.2rem 0 0 0' }}>
+                        <p className="mt-[0.2rem] mb-0 text-[0.8rem] text-muted-foreground">
                           Showing {requests.length} {expandedModule === 'travel' ? 'booking' : 'request'}{requests.length === 1 ? '' : 's'} matching current filters
                         </p>
                       </div>
                     </div>
 
-                    <div style={{ overflowX: 'auto', width: '100%' }}>
-                      <table style={{ width: '100%', minWidth: isOrgDashboard ? '1060px' : '920px', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.85rem' }}>
+                    <div className="w-full overflow-x-auto">
+                      <table className={`w-full border-collapse text-left text-[0.85rem] ${isOrgDashboard ? 'min-w-[1060px]' : 'min-w-[920px]'}`}>
                         <thead>
-                          <tr style={{ backgroundColor: 'var(--input-bg)', borderBottom: '1px solid var(--border-color)' }}>
-                            <th style={{ padding: '0.85rem 1rem', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', fontSize: '0.725rem', letterSpacing: '0.05em', width: '90px', minWidth: '90px', whiteSpace: 'nowrap' }}>
+                          <tr className="border-b border-border bg-input">
+                            <th className="w-[90px] min-w-[90px] whitespace-nowrap px-4 py-[0.85rem] text-[0.725rem] font-semibold uppercase tracking-[0.05em] text-muted-foreground">
                               {expandedModule === 'travel' ? 'TR ID' : expandedModule === 'prespend' ? 'PS ID' : 'CR ID'}
                             </th>
-                            <th style={{ padding: '0.85rem 1rem', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', fontSize: '0.725rem', letterSpacing: '0.05em', minWidth: '220px' }}>
+                            <th className="min-w-[220px] px-4 py-[0.85rem] text-[0.725rem] font-semibold uppercase tracking-[0.05em] text-muted-foreground">
                               {expandedModule === 'travel' ? 'Route / Location' : expandedModule === 'prespend' ? 'Item / Description' : 'Title'}
                             </th>
-                            <th style={{ padding: '0.85rem 1rem', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', fontSize: '0.725rem', letterSpacing: '0.05em', minWidth: '140px', width: '160px' }}>
+                            <th className="w-[160px] min-w-[140px] px-4 py-[0.85rem] text-[0.725rem] font-semibold uppercase tracking-[0.05em] text-muted-foreground">
                               {expandedModule === 'travel' ? 'Mode' : 'Category'}
                             </th>
                             {isOrgDashboard && (
-                              <th style={{ padding: '0.85rem 1rem', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', fontSize: '0.725rem', letterSpacing: '0.05em', minWidth: '160px', width: '180px' }}>Requester Details</th>
+                              <th className="w-[180px] min-w-[160px] px-4 py-[0.85rem] text-[0.725rem] font-semibold uppercase tracking-[0.05em] text-muted-foreground">Requester Details</th>
                             )}
-                            <th style={{ padding: '0.85rem 1rem', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', fontSize: '0.725rem', letterSpacing: '0.05em', width: '110px', minWidth: '110px', whiteSpace: 'nowrap' }}>
+                            <th className="w-[110px] min-w-[110px] whitespace-nowrap px-4 py-[0.85rem] text-[0.725rem] font-semibold uppercase tracking-[0.05em] text-muted-foreground">
                               Requested On
                             </th>
                             {expandedModule === 'travel' && (
-                              <th style={{ padding: '0.85rem 1rem', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', fontSize: '0.725rem', letterSpacing: '0.05em', width: '110px', minWidth: '110px', whiteSpace: 'nowrap' }}>
+                              <th className="w-[110px] min-w-[110px] whitespace-nowrap px-4 py-[0.85rem] text-[0.725rem] font-semibold uppercase tracking-[0.05em] text-muted-foreground">
                                 Travel Date
                               </th>
                             )}
-                            <th style={{ padding: '0.85rem 1rem', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', fontSize: '0.725rem', letterSpacing: '0.05em', width: '110px', minWidth: '110px', whiteSpace: 'nowrap' }}>Closed Date</th>
+                            <th className="w-[110px] min-w-[110px] whitespace-nowrap px-4 py-[0.85rem] text-[0.725rem] font-semibold uppercase tracking-[0.05em] text-muted-foreground">Closed Date</th>
                             {isOrgDashboard && (
-                              <th style={{ padding: '0.85rem 1rem', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', fontSize: '0.725rem', letterSpacing: '0.05em', minWidth: '140px', width: '150px' }}>Approved By</th>
+                              <th className="w-[150px] min-w-[140px] px-4 py-[0.85rem] text-[0.725rem] font-semibold uppercase tracking-[0.05em] text-muted-foreground">Approved By</th>
                             )}
-                            <th style={{ padding: '0.85rem 1rem', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', fontSize: '0.725rem', letterSpacing: '0.05em', width: '130px', minWidth: '130px', whiteSpace: 'nowrap' }}>Status</th>
-                            <th style={{ padding: '0.85rem 1rem', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', fontSize: '0.725rem', letterSpacing: '0.05em', textAlign: 'right', width: '90px', minWidth: '90px', whiteSpace: 'nowrap' }}>Actions</th>
+                            <th className="w-[130px] min-w-[130px] whitespace-nowrap px-4 py-[0.85rem] text-[0.725rem] font-semibold uppercase tracking-[0.05em] text-muted-foreground">Status</th>
+                            <th className="w-[90px] min-w-[90px] whitespace-nowrap px-4 py-[0.85rem] text-right text-[0.725rem] font-semibold uppercase tracking-[0.05em] text-muted-foreground">Actions</th>
                           </tr>
                         </thead>
                         <tbody>
@@ -798,101 +724,77 @@ function DashboardPage({ onNavigate, user, isOrgDashboard = false, searchQuery =
                               const requestedOnDate = cr.raisedDate || (cr.submittedAt ? new Date(cr.submittedAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : (cr.createdAt ? new Date(cr.createdAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'));
 
                               return (
-                                <tr key={cr.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
-                                  <td style={{ padding: '0.85rem 1rem', fontWeight: 500, color: 'var(--text-primary)', fontFamily: 'var(--font-mono)', whiteSpace: 'nowrap' }}>{cr.requestCode || cr.id}</td>
-                                  <td style={{ padding: '0.85rem 1rem', fontWeight: 500, color: 'var(--text-primary)', minWidth: '260px', lineHeight: 1.4 }}>{cr.title}</td>
-                                  <td style={{ padding: '0.85rem 1rem', color: 'var(--text-secondary)', minWidth: '160px' }}>{cr.category}</td>
+                                <tr key={cr.id} className="border-b border-border">
+                                  <td className="whitespace-nowrap px-4 py-[0.85rem] font-medium text-foreground [font-family:var(--font-mono)]">{cr.requestCode || cr.id}</td>
+                                  <td className="min-w-[260px] px-4 py-[0.85rem] font-medium leading-[1.4] text-foreground">{cr.title}</td>
+                                  <td className="min-w-[160px] px-4 py-[0.85rem] text-muted-foreground">{cr.category}</td>
                                   {isOrgDashboard && (
-                                    <td style={{ padding: '0.85rem 1rem', minWidth: '180px' }}>
-                                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.15rem' }}>
-                                        <span style={{ fontWeight: 600, color: 'var(--text-primary)', fontSize: '0.825rem' }}>
+                                    <td className="min-w-[180px] px-4 py-[0.85rem]">
+                                      <div className="flex flex-col gap-[0.15rem]">
+                                        <span className="text-[0.825rem] font-semibold text-foreground">
                                           {requesterName}
                                         </span>
                                         {requesterEmail && (
-                                          <span style={{ fontSize: '0.725rem', color: 'var(--text-secondary)' }}>
+                                          <span className="text-[0.725rem] text-muted-foreground">
                                             {requesterEmail}
                                           </span>
                                         )}
                                       </div>
                                     </td>
                                   )}
-                                  <td style={{ padding: '0.85rem 1rem', color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>{requestedOnDate}</td>
+                                  <td className="whitespace-nowrap px-4 py-[0.85rem] text-muted-foreground">{requestedOnDate}</td>
                                   {expandedModule === 'travel' && (
-                                    <td style={{ padding: '0.85rem 1rem', color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>
+                                    <td className="whitespace-nowrap px-4 py-[0.85rem] text-muted-foreground">
                                       {cr.departureDate ? new Date(cr.departureDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'}
                                     </td>
                                   )}
-                                  <td style={{ padding: '0.85rem 1rem', color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>{cr.closedDate || '—'}</td>
+                                  <td className="whitespace-nowrap px-4 py-[0.85rem] text-muted-foreground">{cr.closedDate || '—'}</td>
                                   {isOrgDashboard && (
-                                    <td style={{ padding: '0.85rem 1rem', minWidth: '140px' }}>
+                                    <td className="min-w-[140px] px-4 py-[0.85rem]">
                                       {approverDisplayName ? (
-                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.15rem' }}>
-                                          <span style={{ fontWeight: 600, color: 'var(--text-primary)', fontSize: '0.825rem' }}>
+                                        <div className="flex flex-col gap-[0.15rem]">
+                                          <span className="text-[0.825rem] font-semibold text-foreground">
                                             {approverDisplayName}
                                           </span>
                                           {approverEmail && approverEmail !== approverDisplayName && (
-                                            <span style={{ fontSize: '0.725rem', color: 'var(--text-secondary)' }}>
+                                            <span className="text-[0.725rem] text-muted-foreground">
                                               {approverEmail}
                                             </span>
                                           )}
                                         </div>
                                       ) : (
-                                        <span style={{ color: 'var(--text-secondary)' }}>—</span>
+                                        <span className="text-muted-foreground">—</span>
                                       )}
                                     </td>
                                   )}
-                                  <td style={{ padding: '0.85rem 1rem', whiteSpace: 'nowrap' }}>
-                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem', alignItems: 'flex-start' }}>
-                                      <div style={{
-                                        display: 'inline-flex',
-                                        alignItems: 'center',
-                                        gap: '0.35rem',
-                                        padding: '0.2rem 0.65rem',
-                                        borderRadius: 'var(--radius-lg)',
-                                        backgroundColor: cr.statusBg || '#FEF3C7',
-                                        color: cr.statusColor || '#D97706',
-                                        fontSize: '0.775rem',
-                                        fontWeight: 500,
-                                        whiteSpace: 'nowrap'
-                                      }}>
-                                        <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: cr.statusDot || '#D97706' }} />
-                                        <span style={{ whiteSpace: 'nowrap' }}>
+                                  <td className="whitespace-nowrap px-4 py-[0.85rem]">
+                                    <div className="flex flex-col items-start gap-[0.3rem]">
+                                      <div
+                                        className="inline-flex items-center gap-[0.35rem] whitespace-nowrap rounded-[var(--radius-lg)] px-[0.65rem] py-[0.2rem] text-[0.775rem] font-medium"
+                                        style={{ backgroundColor: cr.statusBg || '#FEF3C7', color: cr.statusColor || '#D97706' }}
+                                      >
+                                        <span
+                                          className="size-1.5 rounded-full"
+                                          style={{ backgroundColor: cr.statusDot || '#D97706' }}
+                                        />
+                                        <span className="whitespace-nowrap">
                                           {(cr.status || '').toLowerCase() === 'pending' ? 'Pending Approvals' : cr.status}
                                         </span>
                                       </div>
                                       {isUrgentPreSpend && (
-                                        <div style={{
-                                          display: 'inline-flex',
-                                          alignItems: 'center',
-                                          gap: '0.25rem',
-                                          padding: '0.15rem 0.5rem',
-                                          borderRadius: '4px',
-                                          backgroundColor: '#FEF2F2',
-                                          color: '#DC2626',
-                                          border: '1px solid #FECACA',
-                                          fontSize: '0.7rem',
-                                          fontWeight: 700,
-                                          whiteSpace: 'nowrap'
-                                        }}>
+                                        <div className="inline-flex items-center gap-1 whitespace-nowrap rounded border border-[#FECACA] bg-[#FEF2F2] px-2 py-[0.15rem] text-[0.7rem] font-bold text-[#DC2626]">
                                           <AlertTriangle size={11} strokeWidth={2.5} />
                                           <span>Urgent</span>
                                         </div>
                                       )}
                                     </div>
                                   </td>
-                                  <td style={{ padding: '0.85rem 1rem', textAlign: 'right', whiteSpace: 'nowrap' }}>
-                                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '0.6rem' }}>
+                                  <td className="whitespace-nowrap px-4 py-[0.85rem] text-right">
+                                    <div className="flex items-center justify-end gap-[0.6rem]">
                                       <button
                                         type="button"
                                         onClick={() => setSelectedRequest(cr)}
-                                        style={{
-                                          background: 'none',
-                                          border: 'none',
-                                          color: 'var(--brand-primary)',
-                                          fontWeight: 500,
-                                          cursor: 'pointer',
-                                          fontSize: '0.825rem'
-                                        }}
+                                        className="cursor-pointer border-0 bg-transparent text-[0.825rem] font-medium text-info"
                                       >
                                         Details
                                       </button>
@@ -903,14 +805,14 @@ function DashboardPage({ onNavigate, user, isOrgDashboard = false, searchQuery =
                             })
                           ) : isLoadingDetails ? (
                             <tr>
-                              <td colSpan={isOrgDashboard ? 8 : 7} style={{ padding: '3rem', textAlign: 'center' }}>
+                              <td colSpan={isOrgDashboard ? 8 : 7} className="p-12 text-center">
                                 <LoadingSpinner size="md" message="Loading..." />
                               </td>
                             </tr>
                           ) : (
                             <tr>
-                              <td colSpan={isOrgDashboard ? 8 : 7} style={{ padding: '2.5rem', textAlign: 'center', color: 'var(--text-secondary)' }}>
-                                <span style={{ fontSize: '0.875rem' }}>
+                              <td colSpan={isOrgDashboard ? 8 : 7} className="p-10 text-center text-muted-foreground">
+                                <span className="text-sm">
                                   {expandedModule === 'prespend'
                                     ? 'No pre-spend requests found.'
                                     : expandedModule === 'travel'
@@ -979,4 +881,3 @@ function DashboardPage({ onNavigate, user, isOrgDashboard = false, searchQuery =
 }
 
 export default React.memo(DashboardPage);
-

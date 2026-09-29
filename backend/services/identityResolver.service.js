@@ -171,6 +171,13 @@ export class IdentityResolver {
    * Helper to fetch role assignment and construct normalized DTO from ChangeUser record.
    */
   static async _buildIdentityDTO(changeUser, employeeRecord = null) {
+    if (changeUser.status === 'Inactive' || changeUser.status === 'Suspended') {
+      return {
+        status: 'USER_INACTIVE',
+        message: 'Access Denied: Your account is deactivated.'
+      };
+    }
+
     const email = changeUser.email.trim().toLowerCase();
     const roleId = changeUser.roleId || 'role-4';
     const roleName = changeUser.roleName || ROLE_NAME_MAP[roleId] || 'Requester';
@@ -183,6 +190,13 @@ export class IdentityResolver {
       emp = await Employee.findOne({
         where: sequelize.where(sequelize.fn('LOWER', sequelize.col('email')), email)
       });
+    }
+
+    if (emp && (emp.leftAt || emp.leftReason || emp.leftBy)) {
+      return {
+        status: 'USER_INACTIVE',
+        message: 'Access Denied: Your account is deactivated as you are no longer with the organization.'
+      };
     }
 
     const authoritativeEmpId = emp?.empId || changeUser.metadata?.empId || changeUser.id;

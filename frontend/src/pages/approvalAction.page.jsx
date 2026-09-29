@@ -227,74 +227,46 @@ export default function ApprovalActionPage() {
         : 'Change Manager Authorization Portal';
 
   return (
-    <div style={{
-      minHeight: '100vh',
-      backgroundColor: '#F8FAFC',
-      display: 'flex',
-      flexDirection: 'column',
-      alignItems: 'center',
-      justifyContent: 'center',
-      padding: '2rem 1rem',
-      fontFamily: 'var(--font-family, Montserrat, sans-serif)'
-    }}>
+    <div className="flex min-h-screen flex-col items-center justify-center bg-[#F8FAFC] p-[2rem_1rem] [font-family:var(--font-family,Montserrat,sans-serif)]">
       {/* Header Brand Bar */}
-      <div style={{ marginBottom: '1.5rem', textAlign: 'center' }}>
-        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.65rem' }}>
-          <div style={{ width: '32px', height: '32px', borderRadius: '8px', backgroundColor: 'var(--brand-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#FFFFFF' }}>
+      <div className="mb-6 text-center">
+        <div className="inline-flex items-center gap-[0.65rem]">
+          <div className="flex size-8 items-center justify-center rounded-lg bg-[var(--brand-primary)] text-white">
             <ShieldCheck size={18} />
           </div>
-          <span style={{ fontSize: '1.25rem', fontWeight: 600, color: 'var(--text-primary)', letterSpacing: '-0.02em' }}>
+          <span className="text-xl font-semibold tracking-[-0.02em] text-[var(--text-primary)]">
             ChangeDesk
           </span>
         </div>
-        <div style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)', letterSpacing: '0.06em', textTransform: 'uppercase', marginTop: '0.25rem' }}>
+        <div className="mt-1 text-xs font-semibold uppercase tracking-[0.06em] text-[var(--text-secondary)]">
           {portalTitle}
         </div>
       </div>
 
       {/* Main Container */}
-      <div style={{
-        width: '100%',
-        maxWidth: '680px',
-        backgroundColor: '#FFFFFF',
-        border: '1px solid #E2E8F0',
-        borderRadius: '16px',
-        boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.08), 0 8px 10px -6px rgba(0, 0, 0, 0.04)',
-        overflow: 'hidden'
-      }}>
+      <div className="w-full max-w-[680px] overflow-hidden rounded-2xl border border-[#E2E8F0] bg-white shadow-[0_10px_25px_-5px_rgba(0,0,0,0.08),0_8px_10px_-6px_rgba(0,0,0,0.04)]">
         {/* Loading State */}
         {loading && (
-          <div style={{ padding: '4rem 2rem', textAlign: 'center' }}>
+          <div className="p-[4rem_2rem] text-center">
             <LoadingSpinner size="lg" message="Verifying secure token and fetching request details..." />
           </div>
         )}
 
         {/* Error State */}
         {!loading && error && (
-          <div style={{ padding: '3rem 2rem', textAlign: 'center' }}>
-            <div style={{ width: '56px', height: '56px', borderRadius: '50%', backgroundColor: '#FEE2E2', color: '#DC2626', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', marginBottom: '1.25rem' }}>
+          <div className="p-[3rem_2rem] text-center">
+            <div className="mb-5 inline-flex size-14 items-center justify-center rounded-full bg-[#FEE2E2] text-[#DC2626]">
               <AlertCircle size={28} />
             </div>
-            <h2 style={{ fontSize: '1.2rem', fontWeight: 700, color: '#0F172A', margin: '0 0 0.5rem' }}>
+            <h2 className="m-0 mb-2 text-[1.2rem] font-bold text-[#0F172A]">
               Action Link Unavailable
             </h2>
-            <p style={{ fontSize: '0.875rem', color: '#64748B', maxWidth: '420px', margin: '0 auto 1.5rem', lineHeight: 1.5 }}>
+            <p className="m-0 mx-auto mb-6 max-w-[420px] text-sm leading-normal text-[#64748B]">
               {error}
             </p>
             <a
               href="/"
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '0.5rem',
-                padding: '0.65rem 1.25rem',
-                backgroundColor: '#0F172A',
-                color: '#FFFFFF',
-                borderRadius: '8px',
-                fontSize: '0.85rem',
-                fontWeight: 600,
-                textDecoration: 'none'
-              }}
+              className="inline-flex items-center gap-2 rounded-lg bg-[#0F172A] px-5 py-[0.65rem] text-[0.85rem] font-semibold text-white no-underline"
             >
               Go to ChangeDesk Portal
             </a>
@@ -303,46 +275,32 @@ export default function ApprovalActionPage() {
 
         {/* Success State */}
         {!loading && successResult && (
-          <div style={{ padding: '3.5rem 2rem', textAlign: 'center' }}>
-            <div style={{
-              width: '64px',
-              height: '64px',
-              borderRadius: '50%',
-              backgroundColor: successResult.action === 'implement' ? '#CCFBF1' : successResult.action === 'approve' ? '#D1FAE5' : '#FEE2E2',
-              color: successResult.action === 'implement' ? '#0D9488' : successResult.action === 'approve' ? '#059669' : '#DC2626',
-              display: 'inline-flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              marginBottom: '1.25rem'
-            }}>
+          <div className="px-8 py-14 text-center">
+            <div
+              className={`mb-5 inline-flex size-16 items-center justify-center rounded-full ${
+                successResult.action === 'implement'
+                  ? 'bg-[#CCFBF1] text-[#0D9488]'
+                  : successResult.action === 'approve'
+                    ? 'bg-[#D1FAE5] text-[#059669]'
+                    : 'bg-[#FEE2E2] text-[#DC2626]'
+              }`}
+            >
               {successResult.action === 'reject' ? <XCircle size={36} /> : <CheckCircle2 size={36} />}
             </div>
-            <h2 style={{ fontSize: '1.35rem', fontWeight: 800, color: '#0F172A', margin: '0 0 0.5rem' }}>
+            <h2 className="m-0 mb-2 text-[1.35rem] font-extrabold text-[#0F172A]">
               {successResult.action === 'implement'
                 ? 'Request Implemented & Closed'
                 : successResult.action === 'approve'
                   ? 'Request Approved'
                   : 'Request Rejected'}
             </h2>
-            <p style={{ fontSize: '0.9rem', color: '#475569', maxWidth: '440px', margin: '0 auto 1.75rem', lineHeight: 1.55 }}>
+            <p className="m-0 mx-auto mb-7 max-w-[440px] text-[0.9rem] leading-[1.55] text-[#475569]">
               Request <strong>{successResult.crId}</strong> has been marked as <strong>{successResult.action === 'implement' ? 'Implemented' : successResult.action === 'approve' ? 'Approved' : 'Rejected'}</strong>. The database, audit records, and notification emails have been dispatched.
             </p>
             {!isManagerReview && (
               <a
                 href="/"
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '0.5rem',
-                  padding: '0.7rem 1.5rem',
-                  backgroundColor: '#0F172A',
-                  color: '#FFFFFF',
-                  borderRadius: '8px',
-                  fontSize: '0.875rem',
-                  fontWeight: 600,
-                  textDecoration: 'none',
-                  boxShadow: '0 2px 5px rgba(0,0,0,0.15)'
-                }}
+                className="inline-flex items-center gap-2 rounded-lg bg-[#0F172A] px-6 py-[0.7rem] text-sm font-semibold text-white no-underline shadow-[0_2px_5px_rgba(0,0,0,0.15)]"
               >
                 <span>Go to ChangeDesk Dashboard</span>
                 <ArrowRight size={16} />
@@ -353,21 +311,21 @@ export default function ApprovalActionPage() {
 
         {/* Already Processed State */}
         {!loading && !error && !successResult && isProcessed && (
-          <div style={{ padding: '3.5rem 2rem', textAlign: 'center' }}>
-            <div style={{
-              width: '64px',
-              height: '64px',
-              borderRadius: '50%',
-              backgroundColor: (processedDetails?.status === 'Approved' || crData?.status === 'Approved') ? '#D1FAE5' : (processedDetails?.status === 'Implemented' || crData?.status === 'Implemented') ? '#CCFBF1' : (processedDetails?.status === 'Rejected' || crData?.status === 'Rejected') ? '#FEE2E2' : '#FEF3C7',
-              color: (processedDetails?.status === 'Approved' || crData?.status === 'Approved') ? '#059669' : (processedDetails?.status === 'Implemented' || crData?.status === 'Implemented') ? '#0D9488' : (processedDetails?.status === 'Rejected' || crData?.status === 'Rejected') ? '#DC2626' : '#D97706',
-              display: 'inline-flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              marginBottom: '1.25rem'
-            }}>
+          <div className="px-8 py-14 text-center">
+            <div
+              className={`mb-5 inline-flex size-16 items-center justify-center rounded-full ${
+                (processedDetails?.status === 'Approved' || crData?.status === 'Approved')
+                  ? 'bg-[#D1FAE5] text-[#059669]'
+                  : (processedDetails?.status === 'Implemented' || crData?.status === 'Implemented')
+                    ? 'bg-[#CCFBF1] text-[#0D9488]'
+                    : (processedDetails?.status === 'Rejected' || crData?.status === 'Rejected')
+                      ? 'bg-[#FEE2E2] text-[#DC2626]'
+                      : 'bg-[#FEF3C7] text-[#D97706]'
+              }`}
+            >
               {(processedDetails?.status === 'Rejected' || crData?.status === 'Rejected') ? <XCircle size={36} /> : <CheckCircle2 size={36} />}
             </div>
-            <h2 style={{ fontSize: '1.35rem', fontWeight: 800, color: '#0F172A', margin: '0 0 0.5rem' }}>
+            <h2 className="m-0 mb-2 text-[1.35rem] font-extrabold text-[#0F172A]">
               {(processedDetails?.status === 'Approved' || crData?.status === 'Approved')
                 ? 'Request Already Approved'
                 : (processedDetails?.status === 'Implemented' || crData?.status === 'Implemented')
@@ -376,59 +334,39 @@ export default function ApprovalActionPage() {
                     ? 'Request Already Rejected'
                     : 'Request Already Processed'}
             </h2>
-            <p style={{ fontSize: '0.9rem', color: '#475569', maxWidth: '460px', margin: '0 auto 1.5rem', lineHeight: 1.55 }}>
+            <p className="m-0 mx-auto mb-6 max-w-[460px] text-[0.9rem] leading-[1.55] text-[#475569]">
               This request (<strong>{crData?.requestCode || crData?.id}</strong>) is currently in <strong>{crData?.status || processedDetails?.status || 'Finalized'}</strong> status. The action link in your email has already been executed.
             </p>
 
             {/* Decision Details Card */}
             {(processedDetails?.decidedBy || processedDetails?.comment || crData?.approvedComment || crData?.rejectedComment || crData?.rejectionReason) && (
-              <div style={{
-                backgroundColor: '#F8FAFC',
-                border: '1px solid #E2E8F0',
-                borderRadius: '10px',
-                padding: '1.25rem',
-                maxWidth: '480px',
-                margin: '0 auto 1.75rem',
-                textAlign: 'left'
-              }}>
-                <div style={{ fontSize: '0.75rem', fontWeight: 800, color: '#0F172A', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '0.5rem' }}>
+              <div className="mx-auto mb-7 max-w-[480px] rounded-[10px] border border-[#E2E8F0] bg-[#F8FAFC] p-5 text-left">
+                <div className="mb-2 text-xs font-extrabold uppercase tracking-[0.04em] text-[#0F172A]">
                   Recorded Decision Information
                 </div>
                 {processedDetails?.decidedBy && (
-                  <div style={{ fontSize: '0.825rem', color: '#334155', marginBottom: '0.35rem' }}>
-                    <span style={{ fontWeight: 600, color: '#64748B' }}>Processed By: </span>
-                    <span style={{ fontWeight: 700 }}>{processedDetails.decidedBy}</span>
-                    {processedDetails.decidedByEmail && <span style={{ color: '#64748B' }}> ({processedDetails.decidedByEmail})</span>}
+                  <div className="mb-[0.35rem] text-[0.825rem] text-[#334155]">
+                    <span className="font-semibold text-[#64748B]">Processed By: </span>
+                    <span className="font-bold">{processedDetails.decidedBy}</span>
+                    {processedDetails.decidedByEmail && <span className="text-[#64748B]"> ({processedDetails.decidedByEmail})</span>}
                   </div>
                 )}
                 {processedDetails?.timestamp && (
-                  <div style={{ fontSize: '0.825rem', color: '#334155', marginBottom: '0.35rem' }}>
-                    <span style={{ fontWeight: 600, color: '#64748B' }}>Timestamp: </span>
+                  <div className="mb-[0.35rem] text-[0.825rem] text-[#334155]">
+                    <span className="font-semibold text-[#64748B]">Timestamp: </span>
                     <span>{formatLongDate(processedDetails.timestamp)} at {formatCleanTime(processedDetails.timestamp)}</span>
                   </div>
                 )}
                 {(processedDetails?.comment || crData?.approvedComment || crData?.rejectedComment || crData?.rejectionReason) && (
-                  <div style={{ fontSize: '0.825rem', color: '#334155', marginTop: '0.5rem', paddingTop: '0.5rem', borderTop: '1px dashed #CBD5E1' }}>
-                    <span style={{ fontWeight: 600, color: '#64748B' }}>Note / Comment: </span>
-                    <span style={{ fontStyle: 'italic', color: '#0F172A' }}>"{processedDetails?.comment || crData?.approvedComment || crData?.rejectedComment || crData?.rejectionReason}"</span>
+                  <div className="mt-2 border-t border-dashed border-[#CBD5E1] pt-2 text-[0.825rem] text-[#334155]">
+                    <span className="font-semibold text-[#64748B]">Note / Comment: </span>
+                    <span className="italic text-[#0F172A]">"{processedDetails?.comment || crData?.approvedComment || crData?.rejectedComment || crData?.rejectionReason}"</span>
                   </div>
                 )}
               </div>
             )}
 
-            <div style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '0.45rem',
-              backgroundColor: '#EFF6FF',
-              border: '1px solid #BFDBFE',
-              borderRadius: '8px',
-              padding: '0.6rem 1rem',
-              color: '#1E40AF',
-              fontSize: '0.8rem',
-              fontWeight: 600,
-              marginBottom: '1.75rem'
-            }}>
+            <div className="mb-7 inline-flex items-center gap-[0.45rem] rounded-lg border border-[#BFDBFE] bg-[#EFF6FF] px-4 py-[0.6rem] text-[0.8rem] font-semibold text-[#1E40AF]">
               <span>ℹ Form submission is disabled as no further action is required.</span>
             </div>
 
@@ -436,19 +374,7 @@ export default function ApprovalActionPage() {
               <div>
                 <a
                   href="/"
-                  style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '0.5rem',
-                    padding: '0.7rem 1.5rem',
-                    backgroundColor: '#0F172A',
-                    color: '#FFFFFF',
-                    borderRadius: '8px',
-                    fontSize: '0.875rem',
-                    fontWeight: 600,
-                    textDecoration: 'none',
-                    boxShadow: '0 2px 5px rgba(0,0,0,0.15)'
-                  }}
+                  className="inline-flex items-center gap-2 rounded-lg bg-[#0F172A] px-6 py-[0.7rem] text-sm font-semibold text-white no-underline shadow-[0_2px_5px_rgba(0,0,0,0.15)]"
                 >
                   <span>Go to ChangeDesk Dashboard</span>
                   <ArrowRight size={16} />
@@ -462,34 +388,28 @@ export default function ApprovalActionPage() {
         {!loading && !error && !successResult && !isProcessed && crData && (
           <div>
             {/* Top Banner indicating current action */}
-            <div style={{
-              padding: '1.25rem 1.75rem',
-              backgroundColor: isImplement ? '#F0FDFA' : isApprove ? '#F0FDF4' : '#FEF2F2',
-              borderBottom: isImplement ? '1px solid #99F6E4' : isApprove ? '1px solid #BBF7D0' : '1px solid #FECACA',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              flexWrap: 'wrap',
-              gap: '0.75rem'
-            }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
-                <div style={{
-                  width: '32px',
-                  height: '32px',
-                  borderRadius: '50%',
-                  backgroundColor: isImplement ? '#CCFBF1' : isApprove ? '#DCFCE7' : '#FEE2E2',
-                  color: isImplement ? '#0D9488' : isApprove ? '#059669' : '#DC2626',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center'
-                }}>
+            <div
+              className={`flex flex-wrap items-center justify-between gap-3 px-7 py-5 ${
+                isImplement
+                  ? 'border-b border-[#99F6E4] bg-[#F0FDFA]'
+                  : isApprove
+                    ? 'border-b border-[#BBF7D0] bg-[#F0FDF4]'
+                    : 'border-b border-[#FECACA] bg-[#FEF2F2]'
+              }`}
+            >
+              <div className="flex items-center gap-[0.65rem]">
+                <div
+                  className={`flex size-8 items-center justify-center rounded-full ${
+                    isImplement ? 'bg-[#CCFBF1] text-[#0D9488]' : isApprove ? 'bg-[#DCFCE7] text-[#059669]' : 'bg-[#FEE2E2] text-[#DC2626]'
+                  }`}
+                >
                   {isReject ? <XCircle size={18} /> : <CheckCircle2 size={18} />}
                 </div>
                 <div>
-                  <h3 style={{ fontSize: '1rem', fontWeight: 700, color: isImplement ? '#115E59' : isApprove ? '#166534' : '#991B1B', margin: 0 }}>
+                  <h3 className={`m-0 text-base font-bold ${isImplement ? 'text-[#115E59]' : isApprove ? 'text-[#166534]' : 'text-[#991B1B]'}`}>
                     {isImplement ? 'Mark Request as Implemented' : isApprove ? 'Approve Request' : 'Reject Request'}
                   </h3>
-                  <span style={{ fontSize: '0.775rem', color: isImplement ? '#0F766E' : isApprove ? '#15803D' : '#B91C1C' }}>
+                  <span className={`text-[0.775rem] ${isImplement ? 'text-[#0F766E]' : isApprove ? 'text-[#15803D]' : 'text-[#B91C1C]'}`}>
                     Confirm your decision for {crData.requestCode || crData.id}
                   </span>
                 </div>
@@ -503,15 +423,7 @@ export default function ApprovalActionPage() {
                     setAction(isApprove ? 'reject' : 'approve');
                     setFormError('');
                   }}
-                  style={{
-                    background: 'none',
-                    border: 'none',
-                    color: '#475569',
-                    fontSize: '0.8rem',
-                    fontWeight: 600,
-                    textDecoration: 'underline',
-                    cursor: 'pointer'
-                  }}
+                  className="cursor-pointer border-0 bg-transparent text-[0.8rem] font-semibold text-[#475569] underline"
                 >
                   Switch to {isApprove ? 'Reject' : 'Approve'}
                 </button>
@@ -519,16 +431,16 @@ export default function ApprovalActionPage() {
             </div>
 
             {/* Request Summary Card */}
-            <div style={{ padding: '1.5rem 1.75rem', borderBottom: '1px solid #E2E8F0' }}>
-              <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '1rem', marginBottom: '1.25rem' }}>
+            <div className="border-b border-[#E2E8F0] px-7 py-6">
+              <div className="mb-5 flex items-start justify-between gap-4">
                 <div>
-                  <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#2563EB', fontFamily: 'monospace', letterSpacing: '0.05em' }}>
+                  <span className="font-mono text-xs font-bold tracking-[0.05em] text-[#2563EB]">
                     {crData.requestCode || crData.id}
                   </span>
-                  <h2 style={{ fontSize: '1.2rem', fontWeight: 700, color: '#0F172A', margin: '0.2rem 0 0.3rem', lineHeight: 1.3 }}>
+                  <h2 className="mt-[0.2rem] mb-[0.3rem] text-[1.2rem] font-bold leading-[1.3] text-[#0F172A]">
                     {isPreSpend ? (crData.itemDescription || crData.category) : isTravel ? `${crData.travelMode}: ${crData.fromLocation} → ${crData.toLocation}` : crData.title}
                   </h2>
-                  <span style={{ fontSize: '0.825rem', color: '#64748B' }}>
+                  <span className="text-[0.825rem] text-[#64748B]">
                     {isPreSpend
                       ? `${crData.category} ${crData.subcategory ? `· ${crData.subcategory}` : ''}`
                       : isTravel
@@ -536,18 +448,11 @@ export default function ApprovalActionPage() {
                         : `${crData.category} ${crData.subCategory ? `· ${crData.subCategory}` : ''}`}
                   </span>
                 </div>
-                <div style={{
-                  padding: '0.35rem 0.8rem',
-                  borderRadius: '99px',
-                  backgroundColor: crData.status === 'Approved' ? '#ECFDF5' : crData.status === 'Implemented' ? '#F5F3FF' : '#FEF3C7',
-                  color: crData.status === 'Approved' ? '#059669' : crData.status === 'Implemented' ? '#7C3AED' : '#D97706',
-                  fontSize: '0.75rem',
-                  fontWeight: 700,
-                  whiteSpace: 'nowrap',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.35rem'
-                }}>
+                <div
+                  className={`flex items-center gap-[0.35rem] whitespace-nowrap rounded-full px-[0.8rem] py-[0.35rem] text-xs font-bold ${
+                    crData.status === 'Approved' ? 'bg-[#ECFDF5] text-[#059669]' : crData.status === 'Implemented' ? 'bg-[#F5F3FF] text-[#7C3AED]' : 'bg-[#FEF3C7] text-[#D97706]'
+                  }`}
+                >
                   {crData.status === 'Approved' ? <CheckCircle2 size={13} /> : <Clock size={13} />}
                   <span>{crData.status}</span>
                 </div>
@@ -555,71 +460,71 @@ export default function ApprovalActionPage() {
 
               {/* Dynamic Overview Section depending on Module */}
               {isPreSpend && (
-                <div style={{ borderTop: '1px solid #E2E8F0', paddingTop: '1rem', marginTop: '0.75rem' }}>
-                  <div style={{ fontSize: '0.825rem', fontWeight: 700, color: '#0F172A', marginBottom: '0.65rem' }}>
+                <div className="mt-3 border-t border-[#E2E8F0] pt-4">
+                  <div className="mb-[0.65rem] text-[0.825rem] font-bold text-[#0F172A]">
                     Requisition &amp; Financial Overview
                   </div>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '0.75rem', marginBottom: '1rem' }}>
+                  <div className="mb-4 grid grid-cols-[repeat(auto-fit,minmax(160px,1fr))] gap-3">
                     <div>
-                      <div style={{ fontSize: '0.7rem', fontWeight: 600, color: '#64748B' }}>Requester</div>
-                      <div style={{ fontSize: '0.85rem', fontWeight: 600, color: '#0F172A', marginTop: '0.15rem' }}>{crData.requesterName}</div>
+                      <div className="text-[0.7rem] font-semibold text-[#64748B]">Requester</div>
+                      <div className="mt-[0.15rem] text-[0.85rem] font-semibold text-[#0F172A]">{crData.requesterName}</div>
                     </div>
                     <div>
-                      <div style={{ fontSize: '0.7rem', fontWeight: 600, color: '#64748B' }}>Estimated Amount</div>
-                      <div style={{ fontSize: '0.9rem', fontWeight: 700, color: '#059669', marginTop: '0.15rem' }}>
+                      <div className="text-[0.7rem] font-semibold text-[#64748B]">Estimated Amount</div>
+                      <div className="mt-[0.15rem] text-[0.9rem] font-bold text-[#059669]">
                         {Number(crData.estimatedAmount || 0).toLocaleString('en-IN', { style: 'currency', currency: 'INR' })}
                       </div>
                     </div>
                     <div>
-                      <div style={{ fontSize: '0.7rem', fontWeight: 600, color: '#64748B' }}>Cost Centre</div>
-                      <div style={{ fontSize: '0.85rem', fontWeight: 600, color: '#0F172A', marginTop: '0.15rem' }}>{crData.costCentre || 'Corporate'}</div>
+                      <div className="text-[0.7rem] font-semibold text-[#64748B]">Cost Centre</div>
+                      <div className="mt-[0.15rem] text-[0.85rem] font-semibold text-[#0F172A]">{crData.costCentre || 'Corporate'}</div>
                     </div>
                     <div>
-                      <div style={{ fontSize: '0.7rem', fontWeight: 600, color: '#64748B' }}>Budget Line</div>
-                      <div style={{ fontSize: '0.85rem', fontWeight: 600, color: '#0F172A', marginTop: '0.15rem' }}>{crData.budgetLine || '—'}</div>
+                      <div className="text-[0.7rem] font-semibold text-[#64748B]">Budget Line</div>
+                      <div className="mt-[0.15rem] text-[0.85rem] font-semibold text-[#0F172A]">{crData.budgetLine || '—'}</div>
                     </div>
                     <div>
-                      <div style={{ fontSize: '0.7rem', fontWeight: 600, color: '#64748B' }}>Needed By</div>
-                      <div style={{ fontSize: '0.85rem', fontWeight: 600, color: '#0F172A', marginTop: '0.15rem' }}>{formatCleanDate(crData.neededByDate)}</div>
+                      <div className="text-[0.7rem] font-semibold text-[#64748B]">Needed By</div>
+                      <div className="mt-[0.15rem] text-[0.85rem] font-semibold text-[#0F172A]">{formatCleanDate(crData.neededByDate)}</div>
                     </div>
                     <div>
-                      <div style={{ fontSize: '0.7rem', fontWeight: 600, color: '#64748B' }}>Selected Vendor</div>
-                      <div style={{ fontSize: '0.85rem', fontWeight: 700, color: '#2563EB', marginTop: '0.15rem' }}>{crData.selectedVendor || 'Primary Quote'}</div>
+                      <div className="text-[0.7rem] font-semibold text-[#64748B]">Selected Vendor</div>
+                      <div className="mt-[0.15rem] text-[0.85rem] font-bold text-[#2563EB]">{crData.selectedVendor || 'Primary Quote'}</div>
                     </div>
                   </div>
                 </div>
               )}
 
               {isTravel && (
-                <div style={{ borderTop: '1px solid #E2E8F0', paddingTop: '1rem', marginTop: '0.75rem' }}>
-                  <div style={{ fontSize: '0.825rem', fontWeight: 700, color: '#0F172A', marginBottom: '0.65rem' }}>
+                <div className="mt-3 border-t border-[#E2E8F0] pt-4">
+                  <div className="mb-[0.65rem] text-[0.825rem] font-bold text-[#0F172A]">
                     Traveller &amp; Journey Overview
                   </div>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '0.75rem', marginBottom: '1rem' }}>
+                  <div className="mb-4 grid grid-cols-[repeat(auto-fit,minmax(160px,1fr))] gap-3">
                     <div>
-                      <div style={{ fontSize: '0.7rem', fontWeight: 600, color: '#64748B' }}>Traveller Name</div>
-                      <div style={{ fontSize: '0.85rem', fontWeight: 600, color: '#0F172A', marginTop: '0.15rem' }}>{crData.travellerName}</div>
+                      <div className="text-[0.7rem] font-semibold text-[#64748B]">Traveller Name</div>
+                      <div className="mt-[0.15rem] text-[0.85rem] font-semibold text-[#0F172A]">{crData.travellerName}</div>
                     </div>
                     <div>
-                      <div style={{ fontSize: '0.7rem', fontWeight: 600, color: '#64748B' }}>Departure Date</div>
-                      <div style={{ fontSize: '0.85rem', fontWeight: 700, color: '#2563EB', marginTop: '0.15rem' }}>{formatCleanDate(crData.departureDate)}</div>
+                      <div className="text-[0.7rem] font-semibold text-[#64748B]">Departure Date</div>
+                      <div className="mt-[0.15rem] text-[0.85rem] font-bold text-[#2563EB]">{formatCleanDate(crData.departureDate)}</div>
                     </div>
                     <div>
-                      <div style={{ fontSize: '0.7rem', fontWeight: 600, color: '#64748B' }}>Return Date</div>
-                      <div style={{ fontSize: '0.85rem', fontWeight: 600, color: '#0F172A', marginTop: '0.15rem' }}>{formatCleanDate(crData.returnDate)}</div>
+                      <div className="text-[0.7rem] font-semibold text-[#64748B]">Return Date</div>
+                      <div className="mt-[0.15rem] text-[0.85rem] font-semibold text-[#0F172A]">{formatCleanDate(crData.returnDate)}</div>
                     </div>
                     <div>
-                      <div style={{ fontSize: '0.7rem', fontWeight: 600, color: '#64748B' }}>Department</div>
-                      <div style={{ fontSize: '0.85rem', fontWeight: 600, color: '#0F172A', marginTop: '0.15rem' }}>{crData.department || 'Corporate'}</div>
+                      <div className="text-[0.7rem] font-semibold text-[#64748B]">Department</div>
+                      <div className="mt-[0.15rem] text-[0.85rem] font-semibold text-[#0F172A]">{crData.department || 'Corporate'}</div>
                     </div>
                     <div>
-                      <div style={{ fontSize: '0.7rem', fontWeight: 600, color: '#64748B' }}>Time Slot</div>
-                      <div style={{ fontSize: '0.85rem', fontWeight: 600, color: '#0F172A', marginTop: '0.15rem' }}>{crData.preferredTimeSlot || 'Anytime'}</div>
+                      <div className="text-[0.7rem] font-semibold text-[#64748B]">Time Slot</div>
+                      <div className="mt-[0.15rem] text-[0.85rem] font-semibold text-[#0F172A]">{crData.preferredTimeSlot || 'Anytime'}</div>
                     </div>
                     {crData.isShortNotice && (
                       <div>
-                        <div style={{ fontSize: '0.7rem', fontWeight: 600, color: '#DC2626' }}>Notice Status</div>
-                        <div style={{ fontSize: '0.8rem', fontWeight: 700, color: '#DC2626', marginTop: '0.15rem' }}>Short Notice (&lt; 7 Days)</div>
+                        <div className="text-[0.7rem] font-semibold text-[#DC2626]">Notice Status</div>
+                        <div className="mt-[0.15rem] text-[0.8rem] font-bold text-[#DC2626]">Short Notice (&lt; 7 Days)</div>
                       </div>
                     )}
                   </div>
@@ -629,34 +534,34 @@ export default function ApprovalActionPage() {
               {!isPreSpend && !isTravel && (
                 <>
                   {/* Change Desk Section 1 */}
-                  <div style={{ borderTop: '1px solid #E2E8F0', paddingTop: '1rem', marginTop: '0.75rem' }}>
-                    <div style={{ fontSize: '0.825rem', fontWeight: 700, color: '#0F172A', marginBottom: '0.65rem' }}>
+                  <div className="mt-3 border-t border-[#E2E8F0] pt-4">
+                    <div className="mb-[0.65rem] text-[0.825rem] font-bold text-[#0F172A]">
                       Section 1: Requester Details
                     </div>
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '0.75rem', marginBottom: '1rem' }}>
+                    <div className="mb-4 grid grid-cols-[repeat(auto-fit,minmax(160px,1fr))] gap-3">
                       <div>
-                        <div style={{ fontSize: '0.7rem', fontWeight: 600, color: '#64748B' }}>Requester / Employee</div>
-                        <div style={{ fontSize: '0.85rem', fontWeight: 600, color: '#0F172A', marginTop: '0.15rem' }}>{crData.employeeName || crData.requester || 'Requester'}</div>
+                        <div className="text-[0.7rem] font-semibold text-[#64748B]">Requester / Employee</div>
+                        <div className="mt-[0.15rem] text-[0.85rem] font-semibold text-[#0F172A]">{crData.employeeName || crData.requester || 'Requester'}</div>
                       </div>
                       <div>
-                        <div style={{ fontSize: '0.7rem', fontWeight: 600, color: '#64748B' }}>Approver</div>
-                        <div style={{ fontSize: '0.85rem', fontWeight: 600, color: '#0F172A', marginTop: '0.15rem' }}>{crData.decidedBy || crData.approver || '—'}</div>
+                        <div className="text-[0.7rem] font-semibold text-[#64748B]">Approver</div>
+                        <div className="mt-[0.15rem] text-[0.85rem] font-semibold text-[#0F172A]">{crData.decidedBy || crData.approver || '—'}</div>
                       </div>
                       <div>
-                        <div style={{ fontSize: '0.7rem', fontWeight: 600, color: '#64748B' }}>Employee ID</div>
-                        <div style={{ fontSize: '0.85rem', fontWeight: 600, color: '#0F172A', fontFamily: 'monospace', marginTop: '0.15rem' }}>{crData.employeeId || crData.empId || 'N/A'}</div>
+                        <div className="text-[0.7rem] font-semibold text-[#64748B]">Employee ID</div>
+                        <div className="mt-[0.15rem] font-mono text-[0.85rem] font-semibold text-[#0F172A]">{crData.employeeId || crData.empId || 'N/A'}</div>
                       </div>
                       <div>
-                        <div style={{ fontSize: '0.7rem', fontWeight: 600, color: '#64748B' }}>Employee Email</div>
-                        <div style={{ fontSize: '0.85rem', fontWeight: 600, color: '#0F172A', marginTop: '0.15rem' }}>{crData.employeeEmail || crData.requesterEmail || '—'}</div>
+                        <div className="text-[0.7rem] font-semibold text-[#64748B]">Employee Email</div>
+                        <div className="mt-[0.15rem] text-[0.85rem] font-semibold text-[#0F172A]">{crData.employeeEmail || crData.requesterEmail || '—'}</div>
                       </div>
                       <div>
-                        <div style={{ fontSize: '0.7rem', fontWeight: 600, color: '#64748B' }}>Location</div>
-                        <div style={{ fontSize: '0.85rem', fontWeight: 600, color: '#0F172A', marginTop: '0.15rem' }}>{crData.location || 'Not specified'}</div>
+                        <div className="text-[0.7rem] font-semibold text-[#64748B]">Location</div>
+                        <div className="mt-[0.15rem] text-[0.85rem] font-semibold text-[#0F172A]">{crData.location || 'Not specified'}</div>
                       </div>
                       <div>
-                        <div style={{ fontSize: '0.7rem', fontWeight: 600, color: '#64748B' }}>Manager Email</div>
-                        <div style={{ fontSize: '0.85rem', fontWeight: 600, color: '#0F172A', marginTop: '0.15rem' }}>{crData.managerEmail || '—'}</div>
+                        <div className="text-[0.7rem] font-semibold text-[#64748B]">Manager Email</div>
+                        <div className="mt-[0.15rem] text-[0.85rem] font-semibold text-[#0F172A]">{crData.managerEmail || '—'}</div>
                       </div>
                     </div>
                   </div>
@@ -666,21 +571,15 @@ export default function ApprovalActionPage() {
                     const customFields = getCustomFields(crData);
                     if (!customFields.length) return null;
                     return (
-                      <div style={{
-                        backgroundColor: '#F8FAFC',
-                        border: '1px solid #E2E8F0',
-                        borderRadius: '10px',
-                        padding: '1rem 1.25rem',
-                        margin: '1rem 0'
-                      }}>
-                        <div style={{ fontSize: '0.75rem', fontWeight: 800, color: '#0F172A', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '0.75rem' }}>
+                      <div className="my-4 rounded-[10px] border border-[#E2E8F0] bg-[#F8FAFC] px-5 py-4">
+                        <div className="mb-3 text-xs font-extrabold uppercase tracking-[0.04em] text-[#0F172A]">
                           Action &amp; Specification Details
                         </div>
-                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '0.85rem' }}>
+                        <div className="grid grid-cols-[repeat(auto-fit,minmax(180px,1fr))] gap-[0.85rem]">
                           {customFields.map(([k, v]) => (
                             <div key={k}>
-                              <div style={{ fontSize: '0.7rem', fontWeight: 600, color: '#64748B' }}>{formatFieldLabel(k)}</div>
-                              <div style={{ fontSize: '0.85rem', fontWeight: 700, color: '#0F172A', marginTop: '0.15rem', wordBreak: 'break-word' }}>{v}</div>
+                              <div className="text-[0.7rem] font-semibold text-[#64748B]">{formatFieldLabel(k)}</div>
+                              <div className="mt-[0.15rem] break-words text-[0.85rem] font-bold text-[#0F172A]">{v}</div>
                             </div>
                           ))}
                         </div>
@@ -691,20 +590,20 @@ export default function ApprovalActionPage() {
               )}
 
               {/* Justification Section */}
-              <div style={{ marginTop: '0.75rem' }}>
-                <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#0F172A', marginBottom: '0.35rem' }}>
+              <div className="mt-3">
+                <div className="mb-[0.35rem] text-xs font-bold text-[#0F172A]">
                   {isPreSpend ? 'Business & Selection Justification' : isTravel ? 'Purpose of Visit' : 'Business Justification'}
                 </div>
-                <div style={{ fontSize: '0.85rem', color: '#1E293B', backgroundColor: '#F8FAFC', border: '1px solid #E2E8F0', padding: '0.75rem 1rem', borderRadius: '8px', lineHeight: 1.55 }}>
+                <div className="rounded-lg border border-[#E2E8F0] bg-[#F8FAFC] px-4 py-3 text-[0.85rem] leading-[1.55] text-[#1E293B]">
                   {crData.businessJustification || crData.purpose || crData.justification || 'No justification entered.'}
                 </div>
               </div>
             </div>
 
             {/* Decision Confirmation Form */}
-            <form onSubmit={handleSubmitDecision} style={{ padding: '1.5rem 1.75rem' }}>
-              <div style={{ marginBottom: '1.25rem' }}>
-                <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: '#0F172A', marginBottom: '0.5rem' }}>
+            <form onSubmit={handleSubmitDecision} className="px-7 py-6">
+              <div className="mb-5">
+                <label className="mb-2 block text-[0.85rem] font-semibold text-[#0F172A]">
                   {isImplement
                     ? 'Implementation Remarks / Execution Notes *'
                     : isApprove
@@ -723,44 +622,30 @@ export default function ApprovalActionPage() {
                         ? 'Add comments, review notes, or instructions for the next stage...'
                         : 'Please explain why this request cannot be approved...'
                   }
-                  style={{
-                    width: '100%',
-                    padding: '0.75rem 0.95rem',
-                    borderRadius: '8px',
-                    border: formError ? '1.5px solid #DC2626' : '1px solid #CBD5E1',
-                    fontSize: '0.875rem',
-                    fontFamily: 'inherit',
-                    outline: 'none',
-                    backgroundColor: '#F8FAFC',
-                    boxSizing: 'border-box'
-                  }}
+                  className={`box-border w-full rounded-lg bg-[#F8FAFC] px-[0.95rem] py-3 font-[inherit] text-sm outline-none ${
+                    formError ? 'border-[1.5px] border-[#DC2626]' : 'border border-[#CBD5E1]'
+                  }`}
                 />
                 {formError && (
-                  <div style={{ color: '#DC2626', fontSize: '0.8rem', marginTop: '0.4rem', fontWeight: 600 }}>
+                  <div className="mt-[0.4rem] text-[0.8rem] font-semibold text-[#DC2626]">
                     {formError}
                   </div>
                 )}
               </div>
 
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '0.85rem' }}>
+              <div className="flex items-center justify-end gap-[0.85rem]">
                 <button
                   type="submit"
                   disabled={submitting}
-                  style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '0.5rem',
-                    padding: '0.75rem 1.75rem',
-                    backgroundColor: isImplement ? '#0D9488' : isApprove ? '#059669' : '#DC2626',
-                    color: '#FFFFFF',
-                    border: 'none',
-                    borderRadius: '8px',
-                    fontSize: '0.9rem',
-                    fontWeight: 700,
-                    cursor: submitting ? 'not-allowed' : 'pointer',
-                    opacity: submitting ? 0.7 : 1,
-                    boxShadow: isImplement ? '0 2px 6px rgba(13, 148, 136, 0.3)' : isApprove ? '0 2px 6px rgba(5, 150, 105, 0.3)' : '0 2px 6px rgba(220, 38, 38, 0.3)'
-                  }}
+                  className={`inline-flex items-center gap-2 rounded-lg border-0 px-7 py-3 text-[0.9rem] font-bold text-white ${
+                    submitting ? 'cursor-not-allowed opacity-70' : 'cursor-pointer opacity-100'
+                  } ${
+                    isImplement
+                      ? 'bg-[#0D9488] shadow-[0_2px_6px_rgba(13,148,136,0.3)]'
+                      : isApprove
+                        ? 'bg-[#059669] shadow-[0_2px_6px_rgba(5,150,105,0.3)]'
+                        : 'bg-[#DC2626] shadow-[0_2px_6px_rgba(220,38,38,0.3)]'
+                  }`}
                 >
                   <Send size={16} />
                   <span>

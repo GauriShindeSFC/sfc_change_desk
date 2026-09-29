@@ -2,31 +2,8 @@ import React from 'react';
 
 export default function ComingSoonPage() {
   return (
-    <div
-      style={{
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        minHeight: 'calc(100vh - 160px)',
-        width: '100%'
-      }}
-    >
-      <div
-        style={{
-          display: 'inline-flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          padding: '0.45rem 1rem',
-          backgroundColor: '#F1F5F9',
-          color: '#64748B',
-          border: '1px solid #E2E8F0',
-          borderRadius: '8px',
-          fontSize: '0.85rem',
-          fontWeight: 600,
-          letterSpacing: '0.02em',
-          boxShadow: '0 1px 2px rgba(0, 0, 0, 0.04)'
-        }}
-      >
+    <div className="flex w-full items-center justify-center min-h-[calc(100vh-160px)]">
+      <div className="inline-flex items-center justify-center rounded-lg border border-[#E2E8F0] bg-[#F1F5F9] px-4 py-[0.45rem] text-[0.85rem] font-semibold tracking-[0.02em] text-[#64748B] shadow-[0_1px_2px_rgba(0,0,0,0.04)]">
         Coming Soon
       </div>
     </div>

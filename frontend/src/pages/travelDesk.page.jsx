@@ -1,18 +1,15 @@
-import React, { useId, useState, useEffect, useRef } from 'react';
+import React, { useId, useState, useEffect } from 'react';
 import {
   Plane,
   Car,
   Bus,
   Train,
   Building2,
-  Check,
   ArrowLeft,
   ArrowRight,
   Send,
   CheckCircle2,
   Luggage,
-  ChevronDown,
-  Search,
   AlertTriangle,
   Plus,
   Trash2,
@@ -22,6 +19,8 @@ import {
 } from 'lucide-react';
 import { TRAVEL_MODES, TRAVEL_DESK_FIELDS } from '../lib/travelDesk.config.js';
 import { FormLabel } from '../components/ui/primitives.component';
+import FormStepper from '../components/ui/FormStepper.component';
+import ManagerCombobox from '../components/ui/ManagerCombobox.component';
 import { apiFetch } from '../lib/apiFetch.lib';
 
 const ICON_MAP = {
@@ -32,31 +31,9 @@ const ICON_MAP = {
   Hotel: Building2
 };
 
-const ACTIVE_FIELD_STYLE = {
-  width: '100%',
-  padding: '0.65rem 0.85rem',
-  backgroundColor: 'var(--input-bg)',
-  border: '1px solid var(--border-color)',
-  borderRadius: '8px',
-  fontSize: '0.85rem',
-  fontFamily: 'inherit',
-  color: 'var(--text-primary)',
-  outline: 'none',
-  boxSizing: 'border-box'
-};
+const ACTIVE_FIELD_BASE_CLASS = 'w-full box-border rounded-lg border bg-input px-[0.85rem] py-[0.65rem] text-[0.85rem] text-foreground outline-none';
 
-const READONLY_FIELD_STYLE = {
-  width: '100%',
-  padding: '0.65rem 0.85rem',
-  backgroundColor: 'var(--input-bg, #F8FAFC)',
-  border: '1px solid var(--border-color, #E2E8F0)',
-  borderRadius: '8px',
-  fontSize: '0.85rem',
-  fontFamily: 'inherit',
-  color: 'var(--text-secondary, #64748B)',
-  cursor: 'not-allowed',
-  boxSizing: 'border-box'
-};
+const READONLY_FIELD_CLASS = 'w-full box-border cursor-not-allowed rounded-lg border border-border bg-input px-[0.85rem] py-[0.65rem] text-[0.85rem] text-muted-foreground';
 
 const PREFERRED_TIME_OPTIONS = [
   { value: '', label: 'Select time' },
@@ -199,19 +176,6 @@ export default function TravelDeskPage({ onNavigate, user, travellerName = '', d
 
   const [availableUsers, setAvailableUsers] = useState([]);
   const [loadingUsers, setLoadingUsers] = useState(false);
-  const [managerDropdownOpen, setManagerDropdownOpen] = useState(false);
-  const [managerSearchTerm, setManagerSearchTerm] = useState('');
-  const managerDropdownRef = useRef(null);
-
-  useEffect(() => {
-    const handleClickOutside = (e) => {
-      if (managerDropdownRef.current && !managerDropdownRef.current.contains(e.target)) {
-        setManagerDropdownOpen(false);
-      }
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
 
   useEffect(() => {
     const fetchUsers = async () => {
@@ -580,108 +544,34 @@ export default function TravelDeskPage({ onNavigate, user, travellerName = '', d
   const journeySummary = isMultiCityFlight ? buildJourneySummary(multiCityLegs) : '';
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', width: '100%', paddingBottom: '3rem' }}>
-      
+    <div className="flex w-full flex-col gap-5 pb-12">
+
       {/* Top Header */}
       <div>
-        <h1 style={{ fontSize: '1.45rem', fontWeight: 700, color: 'var(--text-primary)', lineHeight: 1.2, margin: 0 }}>
+        <h1 className="m-0 text-[1.45rem] font-bold leading-[1.2] text-foreground">
           Travel &amp; Stay Desk
         </h1>
-        <p style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', marginTop: '0.25rem', margin: 0 }}>
+        <p className="m-0 mt-1 text-sm text-muted-foreground">
           Book corporate flights, trains, cabs, buses, and hotel accommodations
         </p>
       </div>
 
       {/* Stepper */}
-      <div style={{
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        padding: '0.85rem 1.25rem',
-        backgroundColor: 'var(--card-bg)',
-        border: '1px solid var(--border-color)',
-        borderRadius: '12px',
-        overflowX: 'auto',
-        gap: '0.75rem'
-      }}>
-        {stepsList.map((label, index) => {
-          const stepNum = index + 1;
-          const isActive = step === stepNum;
-          const isDone = step > stepNum;
-          return (
-            <div
-              key={label}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.6rem'
-              }}
-            >
-              <div
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.5rem',
-                  fontSize: '0.825rem',
-                  fontWeight: isActive || isDone ? 600 : 500,
-                  color: isActive ? '#FFFFFF' : isDone ? '#059669' : 'var(--text-secondary)',
-                  whiteSpace: 'nowrap',
-                  padding: isActive ? '0.3rem 0.85rem 0.3rem 0.3rem' : 0,
-                  borderRadius: isActive ? 'var(--radius-full)' : 0,
-                  backgroundColor: isActive ? 'var(--brand-primary)' : 'transparent'
-                }}
-              >
-                <div
-                  style={{
-                    width: '24px',
-                    height: '24px',
-                    borderRadius: '50%',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    fontSize: '0.75rem',
-                    fontWeight: 700,
-                    flexShrink: 0,
-                    backgroundColor: isActive ? 'rgba(255, 255, 255, 0.2)' : isDone ? '#059669' : 'var(--input-bg)',
-                    color: isActive || isDone ? '#FFFFFF' : 'var(--text-secondary)',
-                    border: isActive || isDone ? 'none' : '1px solid var(--border-color)'
-                  }}
-                >
-                  {isDone ? <Check size={13} strokeWidth={3} /> : stepNum}
-                </div>
-                <span>{label}</span>
-              </div>
-              {index < stepsList.length - 1 && (
-                <span style={{ color: 'var(--border-color)' }}>/</span>
-              )}
-            </div>
-          );
-        })}
-      </div>
+      <FormStepper steps={stepsList} currentStep={step} />
 
       {/* Success Banner */}
       {submitted && (
-        <div style={{
-          backgroundColor: '#ECFDF5',
-          border: '1px solid #A7F3D0',
-          borderRadius: '12px',
-          padding: '2rem',
-          textAlign: 'center',
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          gap: '0.75rem'
-        }}>
-          <div style={{ width: '48px', height: '48px', borderRadius: '50%', backgroundColor: '#D1FAE5', color: '#059669', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <div className="flex flex-col items-center gap-3 rounded-xl border border-[#A7F3D0] bg-[#ECFDF5] p-8 text-center">
+          <div className="flex h-12 w-12 items-center justify-center rounded-full bg-[#D1FAE5] text-[#059669]">
             <CheckCircle2 size={28} />
           </div>
-          <h3 style={{ fontSize: '1.25rem', fontWeight: 700, color: '#065F46', margin: 0 }}>
+          <h3 className="m-0 text-xl font-bold text-[#065F46]">
             Travel Request Submitted Successfully
           </h3>
-          <p style={{ fontSize: '0.85rem', color: '#047857', maxWidth: '480px', margin: 0, lineHeight: 1.5 }}>
+          <p className="m-0 max-w-[480px] text-[0.85rem] leading-normal text-[#047857]">
             Your <strong>{category}</strong> reservation request <strong>{createdCode || ''}</strong> for <strong>{valueOf({ name: 'Traveller' })}</strong> has been submitted and sent for approval.
           </p>
-          <div style={{ display: 'flex', gap: '0.75rem', marginTop: '0.5rem' }}>
+          <div className="mt-2 flex gap-3">
             <button
               type="button"
               onClick={() => {
@@ -690,32 +580,14 @@ export default function TravelDeskPage({ onNavigate, user, travellerName = '', d
                 setCategory('');
                 setMultiCityLegs([{ id: 'leg-1', travelDate: '', preferredTime: '', from: '', to: '' }]);
               }}
-              style={{
-                padding: '0.65rem 1.35rem',
-                backgroundColor: '#047857',
-                color: '#FFFFFF',
-                border: 'none',
-                borderRadius: '8px',
-                fontSize: '0.85rem',
-                fontWeight: 600,
-                cursor: 'pointer'
-              }}
+              className="cursor-pointer rounded-lg border-none bg-[#047857] px-[1.35rem] py-[0.65rem] text-[0.85rem] font-semibold text-white"
             >
               Book Another Trip
             </button>
             <button
               type="button"
               onClick={() => onNavigate?.('Dashboard')}
-              style={{
-                padding: '0.65rem 1.35rem',
-                backgroundColor: 'transparent',
-                color: '#065F46',
-                border: '1px solid #A7F3D0',
-                borderRadius: '8px',
-                fontSize: '0.85rem',
-                fontWeight: 600,
-                cursor: 'pointer'
-              }}
+              className="cursor-pointer rounded-lg border border-[#A7F3D0] bg-transparent px-[1.35rem] py-[0.65rem] text-[0.85rem] font-semibold text-[#065F46]"
             >
               Back to Dashboard
             </button>
@@ -725,27 +597,18 @@ export default function TravelDeskPage({ onNavigate, user, travellerName = '', d
 
       {/* STEP 1: Select Travel Category */}
       {!submitted && step === 1 && (
-        <div style={{
-          backgroundColor: 'var(--card-bg)',
-          border: '1px solid var(--border-color)',
-          borderRadius: '12px',
-          padding: '1.75rem',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: '1.5rem',
-          boxShadow: '0 1px 3px rgba(16, 21, 30, 0.04)'
-        }}>
+        <div className="flex flex-col gap-6 rounded-xl border border-border bg-card p-7 shadow-[0_1px_3px_rgba(16,21,30,0.04)]">
           <div>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem' }}>
-              <h3 style={{ fontSize: '1rem', fontWeight: 600, color: 'var(--text-primary)', margin: 0 }}>
+            <div className="mb-4 flex items-center justify-between">
+              <h3 className="m-0 text-base font-semibold text-foreground">
                 1. Select Booking Type
               </h3>
-              <span style={{ fontSize: '0.775rem', fontWeight: 600, color: 'var(--text-secondary)' }}>
+              <span className="text-[0.775rem] font-semibold text-muted-foreground">
                 Step 1 of 3
               </span>
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1rem' }}>
+            <div className="grid gap-4 [grid-template-columns:repeat(auto-fit,minmax(240px,1fr))]">
               {TRAVEL_MODES.map(mode => {
                 const IconComponent = ICON_MAP[mode.id] || Luggage;
                 const selected = category === mode.id;
@@ -757,52 +620,32 @@ export default function TravelDeskPage({ onNavigate, user, travellerName = '', d
                     onClick={() => setCategory(mode.id)}
                     onMouseEnter={() => setHoveredCategory(mode.id)}
                     onMouseLeave={() => setHoveredCategory(null)}
-                    style={{
-                      padding: '1.25rem',
-                      borderRadius: '12px',
-                      textAlign: 'left',
-                      border: selected
-                        ? '2px solid var(--brand-primary, #173C4E)'
+                    className={`flex cursor-pointer items-start gap-4 rounded-xl p-5 text-left transition-[transform,border-color,box-shadow,background-color] duration-200 ${
+                      isHovered ? '-translate-y-[5px]' : 'translate-y-0'
+                    } ${
+                      selected
+                        ? 'border-2 border-primary bg-input shadow-[0_0_0_3px_rgba(23,60,78,0.12)]'
                         : isHovered
-                        ? '1.5px solid var(--brand-primary, #173C4E)'
-                        : '1px solid var(--border-color)',
-                      backgroundColor: selected ? 'var(--input-bg, #F4F5F7)' : 'var(--card-bg)',
-                      boxShadow: selected
-                        ? '0 0 0 3px rgba(23, 60, 78, 0.12)'
-                        : isHovered
-                        ? '0 12px 24px -4px rgba(23, 60, 78, 0.14), 0 4px 12px -2px rgba(0, 0, 0, 0.06)'
-                        : '0 1px 3px rgba(16, 21, 30, 0.04)',
-                      display: 'flex',
-                      alignItems: 'flex-start',
-                      gap: '1rem',
-                      transform: isHovered ? 'translateY(-5px)' : 'translateY(0)',
-                      cursor: 'pointer',
-                      transition: 'transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease'
-                    }}
+                        ? 'border-[1.5px] border-primary bg-card shadow-[0_12px_24px_-4px_rgba(23,60,78,0.14),0_4px_12px_-2px_rgba(0,0,0,0.06)]'
+                        : 'border border-border bg-card shadow-[0_1px_3px_rgba(16,21,30,0.04)]'
+                    }`}
                   >
                     <div
-                      style={{
-                        padding: '0.65rem',
-                        borderRadius: '10px',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        backgroundColor: selected
-                          ? 'var(--brand-primary, #173C4E)'
+                      className={`flex shrink-0 items-center justify-center rounded-[10px] p-[0.65rem] transition-[transform,background-color,color] duration-200 ${
+                        isHovered ? 'scale-[1.08]' : 'scale-100'
+                      } ${
+                        selected
+                          ? 'bg-primary text-white'
                           : isHovered
-                          ? 'rgba(23, 60, 78, 0.08)'
-                          : 'var(--input-bg)',
-                        color: selected ? '#FFFFFF' : 'var(--brand-primary, #173C4E)',
-                        flexShrink: 0,
-                        transform: isHovered ? 'scale(1.08)' : 'scale(1)',
-                        transition: 'transform 0.2s ease, background-color 0.2s ease, color 0.2s ease'
-                      }}
+                          ? 'bg-primary/8 text-info'
+                          : 'bg-input text-info'
+                      }`}
                     >
                       <IconComponent size={20} />
                     </div>
                     <div>
-                      <div style={{ fontSize: '0.875rem', fontWeight: 600, color: 'var(--text-primary)' }}>{mode.label}</div>
-                      <div style={{ fontSize: '0.775rem', color: 'var(--text-secondary)', marginTop: '0.25rem', lineHeight: 1.4 }}>{mode.description}</div>
+                      <div className="text-sm font-semibold text-foreground">{mode.label}</div>
+                      <div className="mt-1 text-[0.775rem] leading-[1.4] text-muted-foreground">{mode.description}</div>
                     </div>
                   </button>
                 );
@@ -810,25 +653,14 @@ export default function TravelDeskPage({ onNavigate, user, travellerName = '', d
             </div>
           </div>
 
-          <div style={{ display: 'flex', justifyContent: 'flex-end', paddingTop: '1rem', borderTop: '1px solid var(--border-color)' }}>
+          <div className="flex justify-end border-t border-border pt-4">
             <button
               type="button"
               disabled={!category}
               onClick={() => setStep(2)}
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '0.45rem',
-                padding: '0.65rem 1.35rem',
-                backgroundColor: 'var(--brand-primary)',
-                color: '#FFFFFF',
-                border: 'none',
-                borderRadius: '8px',
-                fontSize: '0.85rem',
-                fontWeight: 600,
-                cursor: !category ? 'not-allowed' : 'pointer',
-                opacity: !category ? 0.5 : 1
-              }}
+              className={`inline-flex items-center gap-[0.45rem] rounded-lg border-none bg-primary px-[1.35rem] py-[0.65rem] text-[0.85rem] font-semibold text-white ${
+                !category ? 'cursor-not-allowed opacity-50' : 'cursor-pointer opacity-100'
+              }`}
             >
               <span>Next: Travel Details</span>
               <ArrowRight size={14} />
@@ -839,23 +671,14 @@ export default function TravelDeskPage({ onNavigate, user, travellerName = '', d
 
       {/* STEP 2: Travel Details Form */}
       {!submitted && step === 2 && (
-        <form onSubmit={handleProceedToReview} style={{
-          backgroundColor: 'var(--card-bg)',
-          border: '1px solid var(--border-color)',
-          borderRadius: '12px',
-          padding: '1.75rem',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: '1.5rem',
-          boxShadow: '0 1px 3px rgba(16, 21, 30, 0.04)'
-        }}>
+        <form onSubmit={handleProceedToReview} className="flex flex-col gap-6 rounded-xl border border-border bg-card p-7 shadow-[0_1px_3px_rgba(16,21,30,0.04)]">
           {/* Section 1: Requester Details */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <h3 style={{ fontSize: '1rem', fontWeight: 600, color: 'var(--text-primary)', margin: 0 }}>
+          <div className="flex flex-col gap-5">
+            <div className="flex items-center justify-between">
+              <h3 className="m-0 text-base font-semibold text-foreground">
                 Requester Details
               </h3>
-              <span style={{ fontSize: '0.775rem', fontWeight: 600, color: 'var(--text-secondary)' }}>
+              <span className="text-[0.775rem] font-semibold text-muted-foreground">
                 Section 1 of 2
               </span>
             </div>
@@ -868,7 +691,7 @@ export default function TravelDeskPage({ onNavigate, user, travellerName = '', d
                   readOnly
                   disabled
                   value={requesterDetails.employeeName}
-                  style={READONLY_FIELD_STYLE}
+                  className={READONLY_FIELD_CLASS}
                 />
               </div>
               <div>
@@ -879,7 +702,7 @@ export default function TravelDeskPage({ onNavigate, user, travellerName = '', d
                   disabled
                   placeholder="e.g. employee@company.com"
                   value={requesterDetails.employeeEmail}
-                  style={READONLY_FIELD_STYLE}
+                  className={READONLY_FIELD_CLASS}
                 />
               </div>
               <div>
@@ -890,7 +713,7 @@ export default function TravelDeskPage({ onNavigate, user, travellerName = '', d
                   disabled
                   placeholder="e.g. SFC-0083"
                   value={requesterDetails.employeeId}
-                  style={READONLY_FIELD_STYLE}
+                  className={READONLY_FIELD_CLASS}
                 />
               </div>
               <div>
@@ -901,121 +724,18 @@ export default function TravelDeskPage({ onNavigate, user, travellerName = '', d
                   disabled
                   placeholder="Enter Location"
                   value={requesterDetails.location || resolveEmpLocation(activeSessionUser) || ''}
-                  style={READONLY_FIELD_STYLE}
+                  className={READONLY_FIELD_CLASS}
                 />
               </div>
 
               {/* Searchable Manager Combobox Dropdown */}
-              <div ref={managerDropdownRef} style={{ position: 'relative' }}>
-                <FormLabel required>Manager Name</FormLabel>
-                <div
-                  tabIndex={0}
-                  onClick={() => setManagerDropdownOpen(prev => !prev)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' || e.key === ' ') {
-                      e.preventDefault();
-                      setManagerDropdownOpen(prev => !prev);
-                    }
-                  }}
-                  style={{
-                    ...ACTIVE_FIELD_STYLE,
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    userSelect: 'none'
-                  }}
-                >
-                  <span style={{ color: requesterDetails.managerName ? 'var(--text-primary)' : 'var(--text-secondary)' }}>
-                    {requesterDetails.managerName || (loadingUsers ? 'Loading employees...' : 'Select Reporting Manager...')}
-                  </span>
-                  <ChevronDown size={16} style={{ color: 'var(--text-secondary)', transition: 'transform 0.2s', transform: managerDropdownOpen ? 'rotate(180deg)' : 'none' }} />
-                </div>
-
-                {managerDropdownOpen && (
-                  <div style={{
-                    position: 'absolute',
-                    top: '100%',
-                    left: 0,
-                    right: 0,
-                    zIndex: 50,
-                    marginTop: '0.35rem',
-                    backgroundColor: 'var(--card-bg)',
-                    border: '1px solid var(--border-color)',
-                    borderRadius: '10px',
-                    boxShadow: '0 8px 24px rgba(15, 23, 42, 0.12)',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    overflow: 'hidden'
-                  }}>
-                    <div style={{ padding: '0.65rem', borderBottom: '1px solid var(--border-color)', backgroundColor: 'var(--input-bg)' }}>
-                      <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
-                        <Search size={14} style={{ position: 'absolute', left: '0.65rem', color: 'var(--text-secondary)' }} />
-                        <input
-                          type="text"
-                          autoFocus
-                          value={managerSearchTerm}
-                          onChange={(e) => setManagerSearchTerm(e.target.value)}
-                          placeholder="Search manager by name or email..."
-                          style={{
-                            width: '100%',
-                            padding: '0.45rem 0.65rem 0.45rem 2rem',
-                            fontSize: '0.8rem',
-                            border: '1px solid var(--border-color)',
-                            borderRadius: '6px',
-                            outline: 'none',
-                            backgroundColor: 'var(--card-bg)',
-                            color: 'var(--text-primary)',
-                            boxSizing: 'border-box'
-                          }}
-                        />
-                      </div>
-                    </div>
-
-                    <div style={{ maxHeight: '200px', overflowY: 'auto' }}>
-                      {availableUsers
-                        .filter(u => {
-                          if (!managerSearchTerm.trim()) return true;
-                          const term = managerSearchTerm.toLowerCase();
-                          return (u.name && u.name.toLowerCase().includes(term)) || (u.email && u.email.toLowerCase().includes(term));
-                        })
-                        .map(u => (
-                          <div
-                            key={u.id || u.email}
-                            onClick={() => {
-                              setRequesterDetails(prev => ({
-                                ...prev,
-                                managerName: u.name,
-                                managerEmail: u.email
-                              }));
-                              setManagerDropdownOpen(false);
-                              setManagerSearchTerm('');
-                            }}
-                            style={{
-                              padding: '0.6rem 0.85rem',
-                              cursor: 'pointer',
-                              display: 'flex',
-                              flexDirection: 'column',
-                              gap: '0.15rem',
-                              borderBottom: '1px solid var(--border-color)',
-                              backgroundColor: requesterDetails.managerEmail === u.email ? 'var(--input-bg)' : 'transparent',
-                              transition: 'background-color 0.15s'
-                            }}
-                            onMouseEnter={(e) => {
-                              if (requesterDetails.managerEmail !== u.email) e.currentTarget.style.backgroundColor = 'var(--input-bg)';
-                            }}
-                            onMouseLeave={(e) => {
-                              if (requesterDetails.managerEmail !== u.email) e.currentTarget.style.backgroundColor = 'transparent';
-                            }}
-                          >
-                            <span style={{ fontSize: '0.825rem', fontWeight: 600, color: 'var(--text-primary)' }}>{u.name}</span>
-                            <span style={{ fontSize: '0.725rem', color: 'var(--text-secondary)' }}>{u.email}</span>
-                          </div>
-                        ))}
-                    </div>
-                  </div>
-                )}
-              </div>
+              <ManagerCombobox
+                managerName={requesterDetails.managerName}
+                managerEmail={requesterDetails.managerEmail}
+                onSelect={(u) => setRequesterDetails(prev => ({ ...prev, managerName: u.name, managerEmail: u.email }))}
+                users={availableUsers}
+                loading={loadingUsers}
+              />
 
               <div>
                 <FormLabel>Manager Email</FormLabel>
@@ -1025,20 +745,20 @@ export default function TravelDeskPage({ onNavigate, user, travellerName = '', d
                   disabled
                   placeholder="Selected manager's email"
                   value={requesterDetails.managerEmail}
-                  style={READONLY_FIELD_STYLE}
+                  className={READONLY_FIELD_CLASS}
                 />
               </div>
             </div>
           </div>
 
-          <div style={{ height: '1px', backgroundColor: 'var(--border-color)' }} />
+          <div className="h-px bg-border" />
 
           {/* Section 2: Reservation Details */}
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <h3 style={{ fontSize: '1rem', fontWeight: 600, color: 'var(--text-primary)', margin: 0 }}>
+          <div className="flex items-center justify-between">
+            <h3 className="m-0 text-base font-semibold text-foreground">
               {category} Reservation Details
             </h3>
-            <span style={{ fontSize: '0.775rem', fontWeight: 600, color: 'var(--text-secondary)' }}>
+            <span className="text-[0.775rem] font-semibold text-muted-foreground">
               Section 2 of 2
             </span>
           </div>
@@ -1056,7 +776,7 @@ export default function TravelDeskPage({ onNavigate, user, travellerName = '', d
               }
 
               return (
-                <div key={field.name} style={{ gridColumn: field.full ? '1 / -1' : undefined }}>
+                <div key={field.name} className={field.full ? 'col-span-full' : undefined}>
                   <FormLabel required={field.required} htmlFor={fieldId}>
                     {field.label}
                   </FormLabel>
@@ -1067,7 +787,7 @@ export default function TravelDeskPage({ onNavigate, user, travellerName = '', d
                       required={field.required}
                       value={valueOf(field)}
                       onChange={e => update(field, e.target.value)}
-                      style={ACTIVE_FIELD_STYLE}
+                      className={`${ACTIVE_FIELD_BASE_CLASS} border-border`}
                     >
                       {(field.options || []).map(opt => (
                         <option key={opt.value} value={opt.value}>{opt.label}</option>
@@ -1081,7 +801,7 @@ export default function TravelDeskPage({ onNavigate, user, travellerName = '', d
                       value={valueOf(field)}
                       onChange={e => update(field, e.target.value)}
                       placeholder={field.placeholder}
-                      style={{ ...ACTIVE_FIELD_STYLE, resize: 'vertical' }}
+                      className={`${ACTIVE_FIELD_BASE_CLASS} border-border resize-y`}
                     />
                   ) : (
                     <input
@@ -1092,7 +812,7 @@ export default function TravelDeskPage({ onNavigate, user, travellerName = '', d
                       value={valueOf(field)}
                       onChange={e => update(field, e.target.value)}
                       placeholder={field.placeholder}
-                      style={ACTIVE_FIELD_STYLE}
+                      className={`${ACTIVE_FIELD_BASE_CLASS} border-border`}
                     />
                   )}
                 </div>
@@ -1102,58 +822,31 @@ export default function TravelDeskPage({ onNavigate, user, travellerName = '', d
 
           {/* MULTI-CITY FLIGHT SECTION (Stacked Flight Cards & Journey Summary) */}
           {isMultiCityFlight && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', marginTop: '0.25rem' }}>
-              
+            <div className="mt-1 flex flex-col gap-5">
+
               {/* 1. Journey Summary Banner */}
-              <div style={{
-                padding: '0.85rem 1.25rem',
-                backgroundColor: 'var(--input-bg, #F8FAFC)',
-                border: '1px solid var(--border-color)',
-                borderRadius: '10px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                flexWrap: 'wrap',
-                gap: '0.75rem'
-              }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
-                  <div style={{
-                    width: '32px',
-                    height: '32px',
-                    borderRadius: '8px',
-                    backgroundColor: 'rgba(23, 60, 78, 0.08)',
-                    color: 'var(--brand-primary)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center'
-                  }}>
+              <div className="flex flex-wrap items-center justify-between gap-3 rounded-[10px] border border-border bg-input px-5 py-[0.85rem]">
+                <div className="flex items-center gap-[0.65rem]">
+                  <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/8 text-info">
                     <Plane size={17} />
                   </div>
                   <div>
-                    <div style={{ fontSize: '0.725rem', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                    <div className="text-[0.725rem] font-semibold uppercase tracking-[0.04em] text-muted-foreground">
                       Multi-City Journey Route
                     </div>
-                    <div style={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--text-primary)', marginTop: '0.1rem' }}>
+                    <div className="mt-[0.1rem] text-[0.95rem] font-bold text-foreground">
                       {journeySummary || 'Enter your flight origins and destinations below'}
                     </div>
                   </div>
                 </div>
 
-                <div style={{
-                  fontSize: '0.75rem',
-                  fontWeight: 600,
-                  color: 'var(--brand-primary)',
-                  backgroundColor: '#FFFFFF',
-                  padding: '0.25rem 0.65rem',
-                  borderRadius: '6px',
-                  border: '1px solid var(--border-color)'
-                }}>
+                <div className="rounded-md border border-border bg-white px-[0.65rem] py-1 text-xs font-semibold text-primary">
                   {multiCityLegs.length} {multiCityLegs.length === 1 ? 'Flight Leg' : 'Flight Legs'}
                 </div>
               </div>
 
               {/* 2. Stacked Flight Cards */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              <div className="flex flex-col gap-4">
                 {multiCityLegs.map((leg, index) => {
                   const legNum = index + 1;
                   const prevLeg = index > 0 ? multiCityLegs[index - 1] : null;
@@ -1163,36 +856,15 @@ export default function TravelDeskPage({ onNavigate, user, travellerName = '', d
                   return (
                     <div
                       key={leg.id}
-                      style={{
-                        backgroundColor: 'var(--card-bg, #FFFFFF)',
-                        border: '1px solid var(--border-color)',
-                        borderRadius: '12px',
-                        padding: '1.25rem 1.5rem',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        gap: '1rem',
-                        boxShadow: '0 1px 2px rgba(16, 21, 30, 0.03)',
-                        position: 'relative'
-                      }}
+                      className="relative flex flex-col gap-4 rounded-xl border border-border bg-card px-6 py-5 shadow-[0_1px_2px_rgba(16,21,30,0.03)]"
                     >
                       {/* Card Top Bar */}
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-                          <span style={{
-                            fontSize: '0.75rem',
-                            fontWeight: 700,
-                            backgroundColor: 'var(--brand-primary)',
-                            color: '#FFFFFF',
-                            width: '22px',
-                            height: '22px',
-                            borderRadius: '50%',
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            justifyContent: 'center'
-                          }}>
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-[0.6rem]">
+                          <span className="inline-flex h-[22px] w-[22px] items-center justify-center rounded-full bg-primary text-xs font-bold text-white">
                             {legNum}
                           </span>
-                          <h4 style={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--text-primary)', margin: 0 }}>
+                          <h4 className="m-0 text-[0.95rem] font-bold text-foreground">
                             Flight {legNum}
                           </h4>
                         </div>
@@ -1202,20 +874,7 @@ export default function TravelDeskPage({ onNavigate, user, travellerName = '', d
                             type="button"
                             aria-label={`Remove Flight ${legNum}`}
                             onClick={() => handleRemoveLeg(leg.id)}
-                            style={{
-                              background: 'none',
-                              border: '1px solid #FECACA',
-                              backgroundColor: '#FEF2F2',
-                              color: '#DC2626',
-                              borderRadius: '6px',
-                              padding: '0.35rem 0.65rem',
-                              fontSize: '0.775rem',
-                              fontWeight: 600,
-                              cursor: 'pointer',
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              gap: '0.35rem'
-                            }}
+                            className="inline-flex cursor-pointer items-center gap-[0.35rem] rounded-md border border-[#FECACA] bg-[#FEF2F2] px-[0.65rem] py-[0.35rem] text-[0.775rem] font-semibold text-[#DC2626]"
                           >
                             <Trash2 size={13} />
                             <span>Remove</span>
@@ -1225,7 +884,7 @@ export default function TravelDeskPage({ onNavigate, user, travellerName = '', d
 
                       {/* 2-Column Desktop / 1-Column Mobile Layout */}
                       <div className="cd-responsive-form-grid" style={{ gap: '0.85rem' }}>
-                        
+
                         {/* Travel Date */}
                         <div>
                           <FormLabel required htmlFor={`leg-date-${leg.id}`}>Travel date</FormLabel>
@@ -1236,13 +895,10 @@ export default function TravelDeskPage({ onNavigate, user, travellerName = '', d
                             required
                             value={leg.travelDate}
                             onChange={(e) => handleUpdateLeg(leg.id, 'travelDate', e.target.value)}
-                            style={{
-                              ...ACTIVE_FIELD_STYLE,
-                              borderColor: legError.travelDate ? '#DC2626' : 'var(--border-color)'
-                            }}
+                            className={`${ACTIVE_FIELD_BASE_CLASS} ${legError.travelDate ? 'border-[#DC2626]' : 'border-border'}`}
                           />
                           {legError.travelDate && (
-                            <div style={{ fontSize: '0.725rem', color: '#DC2626', marginTop: '0.25rem', fontWeight: 500 }}>
+                            <div className="mt-1 text-[0.725rem] font-medium text-[#DC2626]">
                               {legError.travelDate}
                             </div>
                           )}
@@ -1256,17 +912,14 @@ export default function TravelDeskPage({ onNavigate, user, travellerName = '', d
                             required
                             value={leg.preferredTime}
                             onChange={(e) => handleUpdateLeg(leg.id, 'preferredTime', e.target.value)}
-                            style={{
-                              ...ACTIVE_FIELD_STYLE,
-                              borderColor: legError.preferredTime ? '#DC2626' : 'var(--border-color)'
-                            }}
+                            className={`${ACTIVE_FIELD_BASE_CLASS} ${legError.preferredTime ? 'border-[#DC2626]' : 'border-border'}`}
                           >
                             {PREFERRED_TIME_OPTIONS.map(opt => (
                               <option key={opt.value} value={opt.value}>{opt.label}</option>
                             ))}
                           </select>
                           {legError.preferredTime && (
-                            <div style={{ fontSize: '0.725rem', color: '#DC2626', marginTop: '0.25rem', fontWeight: 500 }}>
+                            <div className="mt-1 text-[0.725rem] font-medium text-[#DC2626]">
                               {legError.preferredTime}
                             </div>
                           )}
@@ -1282,13 +935,10 @@ export default function TravelDeskPage({ onNavigate, user, travellerName = '', d
                             placeholder="City or airport"
                             value={leg.from}
                             onChange={(e) => handleUpdateLeg(leg.id, 'from', e.target.value)}
-                            style={{
-                              ...ACTIVE_FIELD_STYLE,
-                              borderColor: legError.from ? '#DC2626' : 'var(--border-color)'
-                            }}
+                            className={`${ACTIVE_FIELD_BASE_CLASS} ${legError.from ? 'border-[#DC2626]' : 'border-border'}`}
                           />
                           {legError.from && (
-                            <div style={{ fontSize: '0.725rem', color: '#DC2626', marginTop: '0.25rem', fontWeight: 500 }}>
+                            <div className="mt-1 text-[0.725rem] font-medium text-[#DC2626]">
                               {legError.from}
                             </div>
                           )}
@@ -1304,13 +954,10 @@ export default function TravelDeskPage({ onNavigate, user, travellerName = '', d
                             placeholder="City or airport"
                             value={leg.to}
                             onChange={(e) => handleUpdateLeg(leg.id, 'to', e.target.value)}
-                            style={{
-                              ...ACTIVE_FIELD_STYLE,
-                              borderColor: legError.to ? '#DC2626' : 'var(--border-color)'
-                            }}
+                            className={`${ACTIVE_FIELD_BASE_CLASS} ${legError.to ? 'border-[#DC2626]' : 'border-border'}`}
                           />
                           {legError.to && (
-                            <div style={{ fontSize: '0.725rem', color: '#DC2626', marginTop: '0.25rem', fontWeight: 500 }}>
+                            <div className="mt-1 text-[0.725rem] font-medium text-[#DC2626]">
                               {legError.to}
                             </div>
                           )}
@@ -1327,21 +974,8 @@ export default function TravelDeskPage({ onNavigate, user, travellerName = '', d
                 <button
                   type="button"
                   onClick={handleAddLeg}
-                  style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '0.45rem',
-                    padding: '0.6rem 1.1rem',
-                    backgroundColor: 'var(--card-bg)',
-                    border: '1.5px dashed var(--brand-primary)',
-                    borderRadius: '8px',
-                    color: 'var(--brand-primary)',
-                    fontSize: '0.85rem',
-                    fontWeight: 600,
-                    cursor: 'pointer',
-                    transition: 'background-color 0.15s ease'
-                  }}
-                  onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'rgba(23, 60, 78, 0.08)'}
+                  className="inline-flex cursor-pointer items-center gap-[0.45rem] rounded-lg border-[1.5px] border-dashed border-info bg-card px-[1.1rem] py-[0.6rem] text-[0.85rem] font-semibold text-info transition-colors duration-150"
+                  onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'color-mix(in srgb, var(--info) 10%, transparent)'}
                   onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'var(--card-bg)'}
                 >
                   <Plus size={16} />
@@ -1355,25 +989,16 @@ export default function TravelDeskPage({ onNavigate, user, travellerName = '', d
           {isShortNotice && (
             <div
               role="alert"
-              style={{
-                borderRadius: '10px',
-                padding: '1rem 1.25rem',
-                display: 'flex',
-                alignItems: 'flex-start',
-                gap: '0.75rem',
-                backgroundColor: '#FEFCE8',
-                border: '1px solid #FDE047',
-                borderLeft: '5px solid #CA8A04'
-              }}
+              className="flex items-start gap-3 rounded-[10px] border border-[#FDE047] border-l-[5px] border-l-[#CA8A04] bg-[#FEFCE8] px-5 py-4"
             >
-              <div style={{ color: '#854D0E', flexShrink: 0, marginTop: '2px' }}>
+              <div className="mt-[2px] shrink-0 text-[#854D0E]">
                 <AlertTriangle size={18} />
               </div>
               <div>
-                <div style={{ color: '#854D0E', fontWeight: 700, fontSize: '0.85rem', lineHeight: 1.3 }}>
+                <div className="text-[0.85rem] font-bold leading-[1.3] text-[#854D0E]">
                   Board approval will be required
                 </div>
-                <p style={{ color: '#713F12', fontSize: '0.8rem', marginTop: '0.2rem', lineHeight: 1.45, margin: 0 }}>
+                <p className="m-0 mt-[0.2rem] text-[0.8rem] leading-[1.45] text-[#713F12]">
                   {boardApprovalInfo.reason || 'This booking requires additional Board member sign-off per corporate travel policy.'}
                 </p>
               </div>
@@ -1381,55 +1006,23 @@ export default function TravelDeskPage({ onNavigate, user, travellerName = '', d
           )}
 
           {message && (
-            <div style={{
-              padding: '0.75rem 1rem',
-              backgroundColor: '#FEF2F2',
-              border: '1px solid #FECACA',
-              borderRadius: '8px',
-              fontSize: '0.825rem',
-              color: '#DC2626',
-              fontWeight: 600
-            }}>
+            <div className="rounded-lg border border-[#FECACA] bg-[#FEF2F2] px-4 py-3 text-[0.825rem] font-semibold text-[#DC2626]">
               {message}
             </div>
           )}
 
-          <div style={{ display: 'flex', justifyContent: 'space-between', paddingTop: '1rem', borderTop: '1px solid var(--border-color)' }}>
+          <div className="flex justify-between border-t border-border pt-4">
             <button
               type="button"
               onClick={() => setStep(1)}
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '0.45rem',
-                padding: '0.55rem 1rem',
-                backgroundColor: 'var(--card-bg)',
-                color: 'var(--text-primary)',
-                border: '1px solid var(--border-color)',
-                borderRadius: '8px',
-                fontSize: '0.825rem',
-                fontWeight: 600,
-                cursor: 'pointer'
-              }}
+              className="inline-flex cursor-pointer items-center gap-[0.45rem] rounded-lg border border-border bg-card px-4 py-[0.55rem] text-[0.825rem] font-semibold text-foreground"
             >
               <ArrowLeft size={14} />
               <span>Back</span>
             </button>
             <button
               type="submit"
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '0.45rem',
-                padding: '0.65rem 1.35rem',
-                backgroundColor: 'var(--brand-primary)',
-                color: '#FFFFFF',
-                border: 'none',
-                borderRadius: '8px',
-                fontSize: '0.85rem',
-                fontWeight: 600,
-                cursor: 'pointer'
-              }}
+              className="inline-flex cursor-pointer items-center gap-[0.45rem] rounded-lg border-none bg-primary px-[1.35rem] py-[0.65rem] text-[0.85rem] font-semibold text-white"
             >
               <span>Next: Review &amp; Submit</span>
               <ArrowRight size={14} />
@@ -1440,39 +1033,21 @@ export default function TravelDeskPage({ onNavigate, user, travellerName = '', d
 
       {/* STEP 3: Review & Submit */}
       {!submitted && step === 3 && (
-        <form onSubmit={handleSubmit} style={{
-          backgroundColor: 'var(--card-bg)',
-          border: '1px solid var(--border-color)',
-          borderRadius: '12px',
-          padding: '1.75rem',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: '1.5rem',
-          boxShadow: '0 1px 3px rgba(16, 21, 30, 0.04)'
-        }}>
+        <form onSubmit={handleSubmit} className="flex flex-col gap-6 rounded-xl border border-border bg-card p-7 shadow-[0_1px_3px_rgba(16,21,30,0.04)]">
           {/* Header Row with Edit details Action */}
-          <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: '1rem' }}>
+          <div className="flex flex-wrap items-start justify-between gap-4">
             <div>
-              <h2 style={{ fontSize: '1.25rem', fontWeight: 600, color: 'var(--text-primary)', margin: 0 }}>
+              <h2 className="m-0 text-xl font-semibold text-foreground">
                 Review &amp; Submit
               </h2>
-              <p style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', marginTop: '0.25rem', margin: 0 }}>
+              <p className="m-0 mt-1 text-sm text-muted-foreground">
                 Confirm the details before submitting.
               </p>
             </div>
             <button
               type="button"
               onClick={() => setStep(2)}
-              style={{
-                background: 'none',
-                border: 'none',
-                color: 'var(--brand-primary)',
-                fontSize: '0.875rem',
-                fontWeight: 600,
-                cursor: 'pointer',
-                padding: '0.25rem 0.5rem',
-                borderRadius: '6px'
-              }}
+              className="cursor-pointer rounded-md border-none bg-transparent px-2 py-1 text-sm font-semibold text-info"
             >
               Edit details
             </button>
@@ -1481,25 +1056,16 @@ export default function TravelDeskPage({ onNavigate, user, travellerName = '', d
           {isShortNotice && (
             <div
               role="alert"
-              style={{
-                borderRadius: '10px',
-                padding: '1rem 1.25rem',
-                display: 'flex',
-                alignItems: 'flex-start',
-                gap: '0.75rem',
-                backgroundColor: '#FEFCE8',
-                border: '1px solid #FDE047',
-                borderLeft: '5px solid #CA8A04'
-              }}
+              className="flex items-start gap-3 rounded-[10px] border border-[#FDE047] border-l-[5px] border-l-[#CA8A04] bg-[#FEFCE8] px-5 py-4"
             >
-              <div style={{ color: '#854D0E', flexShrink: 0, marginTop: '2px', fontSize: '1rem' }}>
+              <div className="mt-[2px] shrink-0 text-base text-[#854D0E]">
                 ⚠️
               </div>
               <div>
-                <div style={{ color: '#854D0E', fontWeight: 700, fontSize: '0.85rem', lineHeight: 1.3 }}>
+                <div className="text-[0.85rem] font-bold leading-[1.3] text-[#854D0E]">
                   Board approval will be required
                 </div>
-                <p style={{ color: '#713F12', fontSize: '0.8rem', marginTop: '0.2rem', lineHeight: 1.45, margin: 0 }}>
+                <p className="m-0 mt-[0.2rem] text-[0.8rem] leading-[1.45] text-[#713F12]">
                   {boardApprovalInfo.reason || 'This booking requires additional Board member sign-off per corporate travel policy.'}
                 </p>
               </div>
@@ -1507,57 +1073,49 @@ export default function TravelDeskPage({ onNavigate, user, travellerName = '', d
           )}
 
           {/* Travel Request Summary Card */}
-          <div style={{
-            backgroundColor: 'var(--card-bg)',
-            border: '1px solid var(--border-color)',
-            borderRadius: '10px',
-            padding: '1.25rem 1.5rem',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '1rem'
-          }}>
-            <h3 style={{ fontSize: '1rem', fontWeight: 600, color: 'var(--text-primary)', margin: 0 }}>
+          <div className="flex flex-col gap-4 rounded-[10px] border border-border bg-card px-6 py-5">
+            <h3 className="m-0 text-base font-semibold text-foreground">
               Travel request summary
             </h3>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
+            <div className="flex flex-col gap-[0.65rem]">
               {/* Category */}
-              <div style={{ display: 'grid', gridTemplateColumns: 'minmax(180px, 240px) 1fr', alignItems: 'baseline', gap: '1rem' }}>
-                <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', fontWeight: 500 }}>Category</span>
-                <span style={{ fontSize: '0.85rem', color: 'var(--text-primary)', fontWeight: 600 }}>{category}</span>
+              <div className="grid items-baseline gap-4 [grid-template-columns:minmax(180px,240px)_1fr]">
+                <span className="text-[0.85rem] font-medium text-muted-foreground">Category</span>
+                <span className="text-[0.85rem] font-semibold text-foreground">{category}</span>
               </div>
 
               {/* Traveller */}
-              <div style={{ display: 'grid', gridTemplateColumns: 'minmax(180px, 240px) 1fr', alignItems: 'baseline', gap: '1rem' }}>
-                <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', fontWeight: 500 }}>Traveller</span>
-                <span style={{ fontSize: '0.85rem', color: 'var(--text-primary)', fontWeight: 600 }}>
+              <div className="grid items-baseline gap-4 [grid-template-columns:minmax(180px,240px)_1fr]">
+                <span className="text-[0.85rem] font-medium text-muted-foreground">Traveller</span>
+                <span className="text-[0.85rem] font-semibold text-foreground">
                   {valueOf({ name: 'Traveller' }) || effectiveTraveller || '—'}
                 </span>
               </div>
 
               {/* Purpose */}
               {valueOf({ name: 'Purpose of visit' }) && (
-                <div style={{ display: 'grid', gridTemplateColumns: 'minmax(180px, 240px) 1fr', alignItems: 'baseline', gap: '1rem' }}>
-                  <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', fontWeight: 500 }}>Purpose of visit</span>
-                  <span style={{ fontSize: '0.85rem', color: 'var(--text-primary)', fontWeight: 600, wordBreak: 'break-word' }}>
+                <div className="grid items-baseline gap-4 [grid-template-columns:minmax(180px,240px)_1fr]">
+                  <span className="text-[0.85rem] font-medium text-muted-foreground">Purpose of visit</span>
+                  <span className="break-words text-[0.85rem] font-semibold text-foreground">
                     {valueOf({ name: 'Purpose of visit' })}
                   </span>
                 </div>
               )}
 
               {/* Trip Type */}
-              <div style={{ display: 'grid', gridTemplateColumns: 'minmax(180px, 240px) 1fr', alignItems: 'baseline', gap: '1rem' }}>
-                <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', fontWeight: 500 }}>Trip type</span>
-                <span style={{ fontSize: '0.85rem', color: 'var(--text-primary)', fontWeight: 600 }}>
+              <div className="grid items-baseline gap-4 [grid-template-columns:minmax(180px,240px)_1fr]">
+                <span className="text-[0.85rem] font-medium text-muted-foreground">Trip type</span>
+                <span className="text-[0.85rem] font-semibold text-foreground">
                   {valueOf({ name: 'Trip type' }) || '—'}
                 </span>
               </div>
 
               {/* Travel Class */}
               {valueOf({ name: 'Travel class' }) && (
-                <div style={{ display: 'grid', gridTemplateColumns: 'minmax(180px, 240px) 1fr', alignItems: 'baseline', gap: '1rem' }}>
-                  <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', fontWeight: 500 }}>Travel class</span>
-                  <span style={{ fontSize: '0.85rem', color: 'var(--text-primary)', fontWeight: 600 }}>
+                <div className="grid items-baseline gap-4 [grid-template-columns:minmax(180px,240px)_1fr]">
+                  <span className="text-[0.85rem] font-medium text-muted-foreground">Travel class</span>
+                  <span className="text-[0.85rem] font-semibold text-foreground">
                     {valueOf({ name: 'Travel class' })}
                   </span>
                 </div>
@@ -1565,53 +1123,32 @@ export default function TravelDeskPage({ onNavigate, user, travellerName = '', d
 
               {/* Multi-City Itinerary Leg List */}
               {isMultiCityFlight ? (
-                <div style={{ marginTop: '0.5rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                  <div style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-primary)', textTransform: 'uppercase', letterSpacing: '0.03em' }}>
+                <div className="mt-2 flex flex-col gap-3">
+                  <div className="text-[0.85rem] font-bold uppercase tracking-[0.03em] text-foreground">
                     Multi-City Flight Itinerary ({journeySummary})
                   </div>
 
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                  <div className="flex flex-col gap-2">
                     {multiCityLegs.map((leg, idx) => (
                       <div
                         key={leg.id}
-                        style={{
-                          padding: '0.75rem 1rem',
-                          backgroundColor: 'var(--input-bg, #F8FAFC)',
-                          borderRadius: '8px',
-                          border: '1px solid var(--border-color)',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'space-between',
-                          flexWrap: 'wrap',
-                          gap: '0.75rem'
-                        }}
+                        className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border bg-input px-4 py-3"
                       >
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
-                          <span style={{
-                            fontSize: '0.75rem',
-                            fontWeight: 700,
-                            backgroundColor: 'var(--brand-primary)',
-                            color: '#FFFFFF',
-                            width: '20px',
-                            height: '20px',
-                            borderRadius: '50%',
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            justifyContent: 'center'
-                          }}>
+                        <div className="flex items-center gap-[0.65rem]">
+                          <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-primary text-xs font-bold text-white">
                             {idx + 1}
                           </span>
-                          <span style={{ fontSize: '0.875rem', fontWeight: 700, color: 'var(--text-primary)' }}>
+                          <span className="text-sm font-bold text-foreground">
                             {leg.from} → {leg.to}
                           </span>
                         </div>
 
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '1.25rem', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                        <div className="flex items-center gap-5 text-[0.8rem] text-muted-foreground">
+                          <div className="flex items-center gap-[0.35rem]">
                             <Calendar size={13} />
-                            <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{formatDateDisplay(leg.travelDate)}</span>
+                            <span className="font-semibold text-foreground">{formatDateDisplay(leg.travelDate)}</span>
                           </div>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                          <div className="flex items-center gap-[0.35rem]">
                             <Clock size={13} />
                             <span>{leg.preferredTime}</span>
                           </div>
@@ -1630,11 +1167,11 @@ export default function TravelDeskPage({ onNavigate, user, travellerName = '', d
                     const displayVal = field.type === 'date' ? formatDateDisplay(val) : String(val);
 
                     return (
-                      <div key={field.name} style={{ display: 'grid', gridTemplateColumns: 'minmax(180px, 240px) 1fr', alignItems: 'baseline', gap: '1rem' }}>
-                        <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', fontWeight: 500 }}>
+                      <div key={field.name} className="grid items-baseline gap-4 [grid-template-columns:minmax(180px,240px)_1fr]">
+                        <span className="text-[0.85rem] font-medium text-muted-foreground">
                           {field.name || field.label}
                         </span>
-                        <span style={{ fontSize: '0.85rem', color: 'var(--text-primary)', fontWeight: 600, wordBreak: 'break-word' }}>
+                        <span className="break-words text-[0.85rem] font-semibold text-foreground">
                           {displayVal}
                         </span>
                       </div>
@@ -1645,8 +1182,8 @@ export default function TravelDeskPage({ onNavigate, user, travellerName = '', d
           </div>
 
           {/* Policy Compliance Checkbox */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', paddingTop: '0.5rem' }}>
-            <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.65rem' }}>
+          <div className="flex flex-col gap-[0.35rem] pt-2">
+            <div className="flex items-start gap-[0.65rem]">
               <input
                 id="certify-travel"
                 type="checkbox"
@@ -1656,33 +1193,21 @@ export default function TravelDeskPage({ onNavigate, user, travellerName = '', d
                   setCertified(e.target.checked);
                   setMessage('');
                 }}
-                style={{ marginTop: '0.2rem', cursor: 'pointer', width: '16px', height: '16px' }}
+                className="mt-[0.2rem] h-4 w-4 cursor-pointer"
               />
-              <label htmlFor="certify-travel" style={{ fontSize: '0.85rem', color: 'var(--text-primary)', fontWeight: 500, cursor: 'pointer', lineHeight: 1.45 }}>
+              <label htmlFor="certify-travel" className="cursor-pointer text-[0.85rem] font-medium leading-[1.45] text-foreground">
                 I confirm that the information is correct and no booking or financial commitment has been made for this request.
               </label>
             </div>
-            {message && <div style={{ fontSize: '0.775rem', fontWeight: 600, color: '#DC2626', paddingLeft: '1.75rem' }}>{message}</div>}
+            {message && <div className="pl-7 text-[0.775rem] font-semibold text-[#DC2626]">{message}</div>}
           </div>
 
           {/* Bottom Actions */}
-          <div style={{ display: 'flex', justifyContent: 'space-between', paddingTop: '1rem', borderTop: '1px solid var(--border-color)' }}>
+          <div className="flex justify-between border-t border-border pt-4">
             <button
               type="button"
               onClick={() => setStep(2)}
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '0.45rem',
-                padding: '0.55rem 1rem',
-                backgroundColor: 'var(--card-bg)',
-                color: 'var(--text-primary)',
-                border: '1px solid var(--border-color)',
-                borderRadius: '8px',
-                fontSize: '0.825rem',
-                fontWeight: 600,
-                cursor: 'pointer'
-              }}
+              className="inline-flex cursor-pointer items-center gap-[0.45rem] rounded-lg border border-border bg-card px-4 py-[0.55rem] text-[0.825rem] font-semibold text-foreground"
             >
               <ArrowLeft size={14} />
               <span>Back</span>
@@ -1690,20 +1215,9 @@ export default function TravelDeskPage({ onNavigate, user, travellerName = '', d
             <button
               type="submit"
               disabled={!certified || isSubmitting}
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '0.45rem',
-                padding: '0.65rem 1.35rem',
-                backgroundColor: 'var(--brand-primary)',
-                color: '#FFFFFF',
-                border: 'none',
-                borderRadius: '8px',
-                fontSize: '0.85rem',
-                fontWeight: 600,
-                cursor: (!certified || isSubmitting) ? 'not-allowed' : 'pointer',
-                opacity: (!certified || isSubmitting) ? 0.5 : 1
-              }}
+              className={`inline-flex items-center gap-[0.45rem] rounded-lg border-none bg-primary px-[1.35rem] py-[0.65rem] text-[0.85rem] font-semibold text-white ${
+                (!certified || isSubmitting) ? 'cursor-not-allowed opacity-50' : 'cursor-pointer opacity-100'
+              }`}
             >
               <Send size={14} />
               <span>{isSubmitting ? 'Submitting...' : 'Submit Travel Booking Request'}</span>
@@ -1714,4 +1228,3 @@ export default function TravelDeskPage({ onNavigate, user, travellerName = '', d
     </div>
   );
 }
-

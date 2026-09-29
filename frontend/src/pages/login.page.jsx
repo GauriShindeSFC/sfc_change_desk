@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { login, MICROSOFT_LOGIN_URL, fetchMe, saveSession } from '../lib/auth.lib';
+import { login, MICROSOFT_LOGIN_URL, fetchMe, saveSession, exchangeSsoCode } from '../lib/auth.lib';
 import { useTheme } from '../context/ThemeContext';
 
 export default function LoginPage({ onLogin, onLoginSuccess }) {
@@ -10,10 +10,10 @@ export default function LoginPage({ onLogin, onLoginSuccess }) {
   const logoSrc = theme === 'dark' ? '/images/white-stfox-logo.png' : '/images/black-stfox-logo.png';
   const faviconSrc = theme === 'dark' ? '/images/white-favicon.png' : '/images/black-favicon.png';
 
-  // Capture Microsoft SSO callback token or error from URL
+  // Capture Microsoft SSO callback (a single-use exchange code, never the JWT itself) or error from URL
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    const ssoToken = params.get('token');
+    const ssoCode = params.get('ssoCode');
     const ssoError = params.get('error');
 
     if (ssoError) {
@@ -22,14 +22,15 @@ export default function LoginPage({ onLogin, onLoginSuccess }) {
       return;
     }
 
-    if (ssoToken) {
+    if (ssoCode) {
       setIsLoading(true);
-      fetchMe(ssoToken)
-        .then((user) => {
+      window.history.replaceState({}, document.title, window.location.pathname);
+      exchangeSsoCode(ssoCode)
+        .then((ssoToken) => fetchMe(ssoToken).then((user) => ({ ssoToken, user })))
+        .then(({ ssoToken, user }) => {
           if (user) {
             const session = { token: ssoToken, user };
             saveSession(session);
-            window.history.replaceState({}, document.title, window.location.pathname);
             if (onLogin) onLogin(session);
             else if (onLoginSuccess) onLoginSuccess(session);
           } else {
@@ -66,30 +67,12 @@ export default function LoginPage({ onLogin, onLoginSuccess }) {
   };
 
   return (
-    <div style={{
-      minHeight: '100vh',
-      display: 'flex',
-      flexDirection: 'column',
-      alignItems: 'center',
-      justifyContent: 'center',
-      backgroundColor: 'var(--page-bg)',
-      color: 'var(--text-primary)',
-      fontFamily: 'var(--font-family)',
-      padding: '1.5rem',
-      position: 'relative'
-    }}>
+    <div className="relative flex min-h-screen flex-col items-center justify-center bg-background p-6 text-foreground [font-family:var(--font-family)]">
 
-      <div style={{
-        width: '100%',
-        maxWidth: '380px',
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        gap: '1.5rem'
-      }}>
+      <div className="flex w-full max-w-[380px] flex-col items-center gap-6">
 
         {/* Company logo */}
-        <div style={{ marginBottom: '0.75rem', display: 'flex', justifyContent: 'center' }}>
+        <div className="mb-3 flex justify-center">
           <img
             src={logoSrc}
             alt="ST FOX"
@@ -97,7 +80,7 @@ export default function LoginPage({ onLogin, onLoginSuccess }) {
               e.target.onerror = null;
               e.target.src = faviconSrc;
             }}
-            style={{ height: '52px', width: 'auto', maxWidth: '100%', objectFit: 'contain', display: 'block' }}
+            className="block h-[52px] w-auto max-w-full object-contain"
           />
         </div>
 
@@ -106,65 +89,35 @@ export default function LoginPage({ onLogin, onLoginSuccess }) {
           type="button"
           onClick={handleMicrosoftSignIn}
           disabled={isLoading}
-          style={{
-            width: '100%',
-            padding: '0.85rem 1rem',
-            backgroundColor: 'var(--card-bg)',
-            border: '1px solid var(--border-color)',
-            borderRadius: 'var(--radius-md)',
-            color: 'var(--text-primary)',
-            fontSize: '0.925rem',
-            fontWeight: 600,
-            cursor: isLoading ? 'not-allowed' : 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: '0.75rem',
-            boxShadow: 'var(--shadow-soft)',
-            transition: 'all 0.15s ease'
-          }}
+          className={`flex w-full items-center justify-center gap-3 rounded-[var(--radius-md)] border border-border bg-card px-4 py-[0.85rem] text-[0.925rem] font-semibold text-foreground shadow-[var(--shadow-soft)] [transition:all_0.15s_ease] ${
+            isLoading ? 'cursor-not-allowed' : 'cursor-pointer'
+          }`}
         >
           {/* 4-Color Microsoft Square Icon */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2px', width: '16px', height: '16px', flexShrink: 0 }}>
-            <div style={{ backgroundColor: '#F25022', width: '7px', height: '7px' }} />
-            <div style={{ backgroundColor: '#7FBA00', width: '7px', height: '7px' }} />
-            <div style={{ backgroundColor: '#00A4EF', width: '7px', height: '7px' }} />
-            <div style={{ backgroundColor: '#FFB900', width: '7px', height: '7px' }} />
+          <div className="grid h-4 w-4 shrink-0 grid-cols-2 gap-0.5">
+            <div className="h-[7px] w-[7px] bg-[#F25022]" />
+            <div className="h-[7px] w-[7px] bg-[#7FBA00]" />
+            <div className="h-[7px] w-[7px] bg-[#00A4EF]" />
+            <div className="h-[7px] w-[7px] bg-[#FFB900]" />
           </div>
           <span>Sign in with Microsoft</span>
         </button>
 
         {/* Divider Line */}
-        <div style={{
-          width: '100%',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '1rem',
-          margin: '0.15rem 0'
-        }}>
-          <div style={{ flex: 1, height: '1px', backgroundColor: 'var(--border-color)' }} />
-          <span style={{ fontSize: '0.725rem', fontWeight: 600, letterSpacing: '0.08em', color: 'var(--text-secondary)', textTransform: 'uppercase' }}>
+        <div className="my-[0.15rem] flex w-full items-center gap-4">
+          <div className="h-px flex-1 bg-border" />
+          <span className="text-[0.725rem] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
             OR WITH EMAIL
           </span>
-          <div style={{ flex: 1, height: '1px', backgroundColor: 'var(--border-color)' }} />
+          <div className="h-px flex-1 bg-border" />
         </div>
 
         {/* Email Sign-in Form (Development Email-Only) */}
-        <form onSubmit={handleLogin} style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
+        <form onSubmit={handleLogin} className="flex w-full flex-col gap-[0.85rem]">
           {error && (
             <div
               role="alert"
-              style={{
-                width: '100%',
-                padding: '0.6rem 0.85rem',
-                borderRadius: 'var(--radius-md)',
-                backgroundColor: 'color-mix(in srgb, var(--error-color) 12%, transparent)',
-                border: '1px solid color-mix(in srgb, var(--error-color) 45%, transparent)',
-                color: 'var(--error-color)',
-                fontSize: '0.8rem',
-                fontWeight: 600,
-                textAlign: 'left'
-              }}
+              className="w-full rounded-[var(--radius-md)] border border-destructive/45 bg-destructive/12 px-[0.85rem] py-[0.6rem] text-left text-[0.8rem] font-semibold text-destructive"
             >
               {error}
             </div>
@@ -179,36 +132,15 @@ export default function LoginPage({ onLogin, onLoginSuccess }) {
             placeholder="you@stfox.com"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            style={{
-              width: '100%',
-              padding: '0.85rem 1rem',
-              backgroundColor: 'var(--input-bg)',
-              border: '1px solid var(--border-color)',
-              borderRadius: 'var(--radius-md)',
-              fontSize: '0.9rem',
-              fontFamily: 'var(--font-family)',
-              color: 'var(--text-primary)',
-              outline: 'none'
-            }}
+            className="w-full rounded-[var(--radius-md)] border border-border bg-input px-4 py-[0.85rem] text-[0.9rem] text-foreground outline-none [font-family:var(--font-family)]"
           />
 
           <button
             type="submit"
             disabled={isLoading}
-            style={{
-              width: '100%',
-              padding: '0.85rem 1rem',
-              backgroundColor: 'var(--brand-primary)',
-              color: '#FFFFFF',
-              border: 'none',
-              borderRadius: 'var(--radius-md)',
-              fontSize: '0.95rem',
-              fontWeight: 600,
-              cursor: isLoading ? 'not-allowed' : 'pointer',
-              opacity: isLoading ? 0.7 : 1,
-              boxShadow: 'var(--shadow-soft)',
-              transition: 'opacity 0.15s ease'
-            }}
+            className={`w-full rounded-[var(--radius-md)] border-none bg-primary px-4 py-[0.85rem] text-[0.95rem] font-semibold text-white shadow-[var(--shadow-soft)] [transition:opacity_0.15s_ease] ${
+              isLoading ? 'cursor-not-allowed opacity-70' : 'cursor-pointer opacity-100'
+            }`}
           >
             {isLoading ? 'Signing in...' : 'Sign In'}
           </button>

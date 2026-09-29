@@ -4,7 +4,6 @@ import cors from 'cors';
 import dashboardRoutes from './routes/dashboard.routes.js';
 import authRoutes from './routes/auth.routes.js';
 import { errorHandler, notFoundHandler } from './middlewares/error.middleware.js';
-import { Op } from 'sequelize';
 import { sequelize, Role } from './models/index.js';
 import { roles } from './data/seed.js';
 import { verifyMailTransport } from './services/mail.service.js';
@@ -16,13 +15,40 @@ const app = express();
 const PORT = process.env.PORT || 5001;
 const NODE_ENV = process.env.NODE_ENV || 'development';
 
-app.use(cors());
-app.use(express.json({ limit: '50mb' }));
-app.use(express.urlencoded({ limit: '50mb', extended: true }));
+const allowedOrigins = String(process.env.CORS_ORIGIN || '')
+  .split(',')
+  .map((o) => o.trim())
+  .filter(Boolean);
+const allowAllOrigins = allowedOrigins.includes('*');
 
-// Health check
+app.use(cors({
+  origin: (origin, callback) => {
+    // Same-origin requests, curl, health checks, etc. send no Origin header — allow those through.
+    if (!origin || allowAllOrigins || allowedOrigins.includes(origin)) {
+      return callback(null, true);
+    }
+    return callback(new Error(`Origin "${origin}" is not allowed by CORS policy`));
+  }
+}));
+// Vendor quotation / travel document attachments are sent as base64 JSON, not multipart —
+// keep enough headroom for a few-MB PDF (base64 inflates size ~33%) while still well short of the old 50mb ceiling.
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ limit: '10mb', extended: true }));
+
+// Liveness: process is up and serving HTTP, regardless of DB state.
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', service: 'ChangeDesk Backend API', env: NODE_ENV });
+});
+
+// Readiness: only "ok" once the database is actually reachable — a deploy should not
+// be marked healthy while every data-backed route would just return 500s.
+app.get('/api/health/ready', async (req, res) => {
+  try {
+    await sequelize.authenticate();
+    res.json({ status: 'ok', service: 'ChangeDesk Backend API', env: NODE_ENV, database: 'connected' });
+  } catch (err) {
+    res.status(503).json({ status: 'unavailable', service: 'ChangeDesk Backend API', env: NODE_ENV, database: 'unreachable' });
+  }
 });
 
 // Mount modular routes
@@ -36,9 +62,9 @@ app.use(errorHandler);
 
 const syncRolesInDb = async () => {
   try {
-    const validRoleIds = roles.map((r) => r.id);
-    await Role.destroy({ where: { id: { [Op.notIn]: validRoleIds } } }).catch(() => {});
-
+    // Additive-only: a routine deploy should never delete role rows a prior migration or
+    // admin action created. Removing an obsolete role is a deliberate, reviewed migration,
+    // not something a web server's startup path should do on every boot.
     for (const r of roles) {
       await Role.upsert(r).catch(() => {});
     }

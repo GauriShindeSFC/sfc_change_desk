@@ -147,9 +147,8 @@ export const getSubcategoryFieldsService = async (subcategoryId) => {
         key === 'replacementpurposereason' ||
         f.id === 'f-dev-replreason';
 
-      if (isDuplicateReason && f.id) {
-        CatalogSubcategoryField.destroy({ where: { id: f.id } }).catch(() => {});
-      }
+      // Filtered out of the response only — deleting rows belongs in a migration,
+      // not in the read path that serves this catalog to every requester.
       return !isDuplicateReason;
     })
     .map((f) => {
@@ -200,13 +199,9 @@ export const getSubcategoryFieldsService = async (subcategoryId) => {
         dbNeedsUpdate = true;
       }
     }
-    if (dbNeedsUpdate) {
-      f.update({
-        fieldLabel: plain.fieldLabel,
-        options: plain.options,
-        appliesToActions: plain.appliesToActions
-      }).catch(() => {});
-    }
+    // Corrections above are applied to the response object only; persisting them is a
+    // migration's job, not something a GET should do as a side effect on every call.
+    void dbNeedsUpdate;
     return plain;
   });
 

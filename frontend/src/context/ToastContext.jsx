@@ -34,18 +34,7 @@ export const ToastProvider = ({ children }) => {
     <ToastContext.Provider value={toast}>
       {children}
       {/* Toast Render Container */}
-      <div style={{
-        position: 'fixed',
-        top: '20px',
-        right: '20px',
-        zIndex: 9999,
-        display: 'flex',
-        flexDirection: 'column',
-        gap: '10px',
-        maxWidth: '380px',
-        width: 'calc(100% - 40px)',
-        pointerEvents: 'none'
-      }}>
+      <div className="pointer-events-none fixed top-5 right-5 z-[9999] flex w-[calc(100%-40px)] max-w-[380px] flex-col gap-2.5">
         {toasts.map((t) => {
           const isError = t.type === 'error';
           const isSuccess = t.type === 'success';
@@ -59,46 +48,23 @@ export const ToastProvider = ({ children }) => {
           return (
             <div
               key={t.id}
-              style={{
-                pointerEvents: 'auto',
-                display: 'flex',
-                alignItems: 'flex-start',
-                gap: '10px',
-                padding: '12px 14px',
-                backgroundColor: bg,
-                border: `1px solid ${border}`,
-                borderRadius: '10px',
-                boxShadow: '0 8px 16px -4px rgba(0, 0, 0, 0.1)',
-                color: text,
-                fontSize: '0.85rem',
-                fontWeight: 500,
-                lineHeight: 1.4,
-                animation: 'slideIn 0.25s ease-out'
-              }}
+              className="pointer-events-auto flex items-start gap-2.5 rounded-[10px] border px-3.5 py-3 text-[0.85rem] font-medium leading-[1.4] shadow-[0_8px_16px_-4px_rgba(0,0,0,0.1)] [animation:slideIn_0.25s_ease-out]"
+              style={{ backgroundColor: bg, borderColor: border, color: text }}
             >
-              <div style={{ flexShrink: 0, marginTop: '1px', color: iconColor }}>
+              <div className="mt-px shrink-0" style={{ color: iconColor }}>
                 {isError && <AlertCircle size={18} />}
                 {isSuccess && <CheckCircle2 size={18} />}
                 {isWarning && <AlertTriangle size={18} />}
                 {!isError && !isSuccess && !isWarning && <Info size={18} />}
               </div>
-              <div style={{ flex: 1, wordBreak: 'break-word' }}>
+              <div className="flex-1 break-words">
                 {t.message}
               </div>
               <button
                 type="button"
                 onClick={() => removeToast(t.id)}
-                style={{
-                  background: 'none',
-                  border: 'none',
-                  color: text,
-                  opacity: 0.65,
-                  cursor: 'pointer',
-                  padding: 0,
-                  marginLeft: '4px',
-                  display: 'flex',
-                  alignItems: 'center'
-                }}
+                className="ml-1 flex cursor-pointer items-center border-none bg-transparent p-0 opacity-[0.65]"
+                style={{ color: text }}
               >
                 <X size={15} />
               </button>

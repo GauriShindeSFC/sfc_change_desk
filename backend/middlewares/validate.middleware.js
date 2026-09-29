@@ -5,8 +5,11 @@ export const validate = (schema) => (req, res, next) => {
     if (schema[target]) {
       const { error, value } = schema[target].validate(req[target], {
         abortEarly: false,
-        stripUnknown: false, // Never strip dynamic custom fields
-        allowUnknown: true
+        // Reject unexpected keys by default. Schemas that genuinely need a dynamic map
+        // (e.g. createChangeRequestSchema's customFieldValues) opt in with their own
+        // `.unknown(true)` on that specific sub-object instead of a blanket allowance here.
+        stripUnknown: false,
+        allowUnknown: false
       });
 
       if (error) {

@@ -152,15 +152,15 @@ function ChangeCatalogPage({ onNavigate, searchQuery = '', initialData }) {
   });
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-      
+    <div className="flex flex-col gap-5">
+
       {/* Header Row */}
-      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: '1rem' }}>
+      <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h1 style={{ fontSize: '1.45rem', fontWeight: 700, color: 'var(--text-primary)', lineHeight: 1.2, margin: 0 }}>
+          <h1 className="m-0 text-[1.45rem] font-bold leading-[1.2] text-foreground">
             Change Request
           </h1>
-          <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginTop: '0.2rem' }}>
+          <p className="mt-[0.2rem] text-[0.85rem] text-muted-foreground">
             {isSearching ? `Showing search results for "${searchQuery}" across all categories` : 'Select a category to start your request'}
           </p>
         </div>
@@ -168,36 +168,14 @@ function ChangeCatalogPage({ onNavigate, searchQuery = '', initialData }) {
 
       {/* Load Failure Warning Banner */}
       {loadFailed && (
-        <div style={{
-          backgroundColor: '#FEF2F2',
-          border: '1px solid #FCA5A5',
-          color: '#991B1B',
-          borderRadius: '10px',
-          padding: '0.85rem 1.15rem',
-          fontSize: '0.85rem',
-          fontWeight: 600,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          gap: '0.75rem'
-        }}>
+        <div className="flex items-center justify-between gap-3 rounded-[10px] border border-[#FCA5A5] bg-[#FEF2F2] px-[1.15rem] py-[0.85rem] text-[0.85rem] font-semibold text-[#991B1B]">
           <span>
             Could not load the latest live catalog from the database. Showing fallback items — values may be outdated.
           </span>
           <button
             type="button"
             onClick={() => window.location.reload()}
-            style={{
-              backgroundColor: '#DC2626',
-              color: '#FFFFFF',
-              border: 'none',
-              borderRadius: '6px',
-              padding: '0.35rem 0.75rem',
-              fontSize: '0.775rem',
-              fontWeight: 500,
-              cursor: 'pointer',
-              whiteSpace: 'nowrap'
-            }}
+            className="cursor-pointer whitespace-nowrap rounded-md border-0 bg-[#DC2626] px-3 py-[0.35rem] text-[0.775rem] font-medium text-[#FFFFFF]"
           >
             Refresh to retry
           </button>
@@ -216,18 +194,11 @@ function ChangeCatalogPage({ onNavigate, searchQuery = '', initialData }) {
 
       {/* Empty State when Search has no results */}
       {filteredItems.length === 0 && (
-        <div style={{
-          backgroundColor: 'var(--card-bg)',
-          border: '1px solid var(--border-color)',
-          borderRadius: '12px',
-          padding: '3rem 1.5rem',
-          textAlign: 'center',
-          color: 'var(--text-secondary)'
-        }}>
-          <p style={{ fontSize: '1rem', fontWeight: 600, color: 'var(--text-primary)', margin: '0 0 0.5rem' }}>
+        <div className="rounded-xl border border-border bg-card px-6 py-12 text-center text-muted-foreground">
+          <p className="m-0 mb-2 text-base font-semibold text-foreground">
             No subcategories found matching "{searchQuery}"
           </p>
-          <p style={{ fontSize: '0.85rem', margin: 0 }}>
+          <p className="m-0 text-[0.85rem]">
             Try searching with a different keyword or browse by category.
           </p>
         </div>
@@ -256,28 +227,17 @@ function ChangeCatalogPage({ onNavigate, searchQuery = '', initialData }) {
               onClick={handleCardClick}
               onMouseEnter={() => setHoveredCardId(item.id)}
               onMouseLeave={() => setHoveredCardId(null)}
-              style={{
-                backgroundColor: 'var(--card-bg)',
-                border: isHovered ? '1.5px solid var(--brand-primary, #173C4E)' : '1px solid var(--border-color)',
-                borderRadius: '12px',
-                padding: '1.25rem',
-                display: 'flex',
-                flexDirection: 'column',
-                justifyContent: 'space-between',
-                boxShadow: isHovered
-                  ? '0 12px 24px -4px rgba(23, 60, 78, 0.14), 0 4px 12px -2px rgba(0, 0, 0, 0.06)'
-                  : '0 1px 3px rgba(16, 21, 30, 0.04)',
-                minHeight: '130px',
-                cursor: 'pointer',
-                transform: isHovered ? 'translateY(-5px)' : 'translateY(0)',
-                transition: 'transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease'
-              }}
+              className={`flex min-h-[130px] cursor-pointer flex-col justify-between rounded-xl bg-card p-5 [transition:transform_0.2s_ease,border-color_0.2s_ease,box-shadow_0.2s_ease,background-color_0.2s_ease] ${
+                isHovered
+                  ? 'border-[1.5px] border-[color:var(--brand-primary,_#173C4E)] shadow-[0_12px_24px_-4px_rgba(23,60,78,0.14),0_4px_12px_-2px_rgba(0,0,0,0.06)] -translate-y-[5px]'
+                  : 'border border-border shadow-[0_1px_3px_rgba(16,21,30,0.04)] translate-y-0'
+              }`}
             >
               <div>
-                <div style={{ fontSize: '0.95rem', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '0.35rem', lineHeight: 1.35 }}>
+                <div className="mb-[0.35rem] text-[0.95rem] font-semibold leading-[1.35] text-foreground">
                   {item.title}
                 </div>
-                <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', lineHeight: 1.45, margin: 0 }}>
+                <div className="m-0 text-[0.8rem] leading-[1.45] text-muted-foreground">
                   {item.description}
                 </div>
               </div>

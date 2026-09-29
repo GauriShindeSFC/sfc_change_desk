@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useLocation } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import {
   LayoutGrid,
@@ -30,6 +31,7 @@ function Sidebar({
 }) {
   const [isHovered, setIsHovered] = useState(false);
   const [worklistExpanded, setWorklistExpanded] = useState(true);
+  const location = useLocation();
   const { theme } = useTheme();
   const faviconSrc = theme === 'dark' ? '/images/white-favicon.png' : '/images/black-favicon.png';
 
@@ -92,29 +94,21 @@ function Sidebar({
         key={item.id}
         onClick={() => handleSelect(item)}
         title={mini ? item.label : undefined}
-        className={`cd-nav-item${isActive ? ' cd-nav-item--active' : ''}`}
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: '0.75rem',
-          width: '100%',
-          padding: mini ? '0.65rem' : '0.65rem 0.85rem',
-          justifyContent: mini ? 'center' : 'flex-start',
-          borderRadius: 'var(--radius-lg)',
-          border: 'none',
-          color: isActive ? 'var(--primary-foreground)' : 'var(--sidebar-text)',
-          fontWeight: isActive ? 600 : 500,
-          fontSize: '0.85rem',
-          cursor: 'pointer',
-          position: 'relative',
-          ...(isActive
-            ? { backgroundColor: 'var(--primary)', boxShadow: 'var(--shadow-card)' }
-            : {})
-        }}
+        className={`cd-nav-item relative flex w-full cursor-pointer items-center gap-3 rounded-[var(--radius-lg)] border-0 text-[0.85rem] ${
+          mini ? 'justify-center py-[0.45rem]' : 'justify-start px-[0.65rem] py-[0.45rem]'
+        } ${
+          isActive
+            ? 'cd-nav-item--active bg-primary font-semibold text-primary-foreground shadow-[var(--shadow-card)]'
+            : 'font-medium text-sidebar-foreground'
+        }`}
       >
-        <Icon size={18} style={{ color: isActive ? 'var(--primary-foreground)' : 'var(--text-secondary)', flexShrink: 0, strokeWidth: isActive ? 2.25 : 2 }} />
+        <Icon
+          size={18}
+          strokeWidth={isActive ? 2.25 : 2}
+          className={`shrink-0 ${isActive ? 'text-primary-foreground' : 'text-muted-foreground'}`}
+        />
         {!mini && (
-          <span style={{ flex: 1, textAlign: 'left', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          <span className="flex-1 overflow-hidden text-ellipsis whitespace-nowrap text-left">
             {item.label}
           </span>
         )}
@@ -122,23 +116,10 @@ function Sidebar({
           <Plus size={15} style={{ color: isActive ? 'var(--primary-foreground)' : 'var(--text-secondary)', flexShrink: 0, marginLeft: 'auto', strokeWidth: 2.25 }} />
         )}
         {!mini && item.externalUrl && (
-          <ExternalLink size={13} style={{ color: 'var(--text-secondary)', flexShrink: 0, marginLeft: 'auto' }} />
+          <ExternalLink size={13} className="ml-auto shrink-0 text-muted-foreground" />
         )}
         {!mini && item.comingSoon && (
-          <span
-            style={{
-              padding: '0.15rem 0.45rem',
-              borderRadius: '4px',
-              fontSize: '0.625rem',
-              fontWeight: 600,
-              backgroundColor: 'var(--sidebar-border)',
-              color: 'var(--text-secondary)',
-              border: '1px solid var(--sidebar-border)',
-              whiteSpace: 'nowrap',
-              letterSpacing: '0.02em',
-              lineHeight: 1.2
-            }}
-          >
+          <span className="whitespace-nowrap rounded-[4px] border border-sidebar-border bg-sidebar-border px-[0.45rem] py-[0.15rem] text-[0.625rem] font-semibold leading-tight tracking-[0.02em] text-muted-foreground">
             Coming Soon
           </span>
         )}
@@ -150,41 +131,17 @@ function Sidebar({
     <aside
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
-      style={{
-        width: `${width}px`,
-        backgroundColor: 'var(--sidebar-bg)',
-        color: 'var(--sidebar-text)',
-        display: 'flex',
-        flexDirection: 'column',
-        minHeight: '100vh',
-        height: '100vh',
-        position: 'fixed',
-        top: 0,
-        left: 0,
-        zIndex: isMobile ? 120 : 100,
-        transform: isMobile ? `translateX(${mobileOpen ? '0' : '-110%'})` : 'none',
-        transition: 'transform 0.22s ease, width 0.2s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.2s ease',
-        boxShadow: !isMobile && isHovered ? 'var(--shadow-pop)' : 'none',
-        overflowX: 'hidden',
-        overflowY: 'auto',
-        padding: mini ? '1.25rem 0' : '1.25rem 0.85rem',
-        flexShrink: 0,
-        userSelect: 'none',
-        borderRight: '1px solid var(--sidebar-border)'
-      }}
+      className={`fixed top-0 left-0 flex h-screen min-h-screen shrink-0 select-none flex-col overflow-y-auto overflow-x-hidden border-r border-sidebar-border bg-sidebar text-sidebar-foreground transition-[transform,width,box-shadow] duration-200 ${
+        isMobile ? (mobileOpen ? 'translate-x-0' : '-translate-x-[110%]') : 'translate-x-0'
+      } ${width === 270 ? 'w-[270px]' : 'w-[68px]'} ${isMobile ? 'z-[120]' : 'z-[100]'} ${
+        !isMobile && isHovered ? 'shadow-[var(--shadow-pop)]' : 'shadow-none'
+      } ${mini ? 'px-0 py-5' : 'px-[0.85rem] py-5'}`}
     >
       {/* Brand Header */}
       <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: mini ? 0 : '0.5rem',
-          padding: mini ? '0.25rem 0 1.25rem 0' : '0.25rem 0.2rem 1.5rem 0.4rem',
-          justifyContent: mini ? 'center' : 'space-between',
-          width: '100%'
-        }}
+        className={`flex w-full items-center ${mini ? 'justify-center gap-0 px-0 pt-1 pb-5' : 'justify-between gap-2 pt-1 pr-[0.2rem] pb-6 pl-[0.4rem]'}`}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: mini ? 0 : '0.85rem', justifyContent: mini ? 'center' : 'flex-start', width: mini ? '100%' : 'auto', flex: mini ? 'none' : 1, minWidth: 0 }}>
+        <div className={`flex items-center ${mini ? 'w-full flex-none min-w-0 justify-center gap-0' : 'w-auto flex-1 min-w-0 justify-start gap-[0.85rem]'}`}>
           <img
             src={faviconSrc}
             alt="Logo"
@@ -192,34 +149,14 @@ function Sidebar({
               e.target.onerror = null;
               e.target.src = '/images/Favicon.png';
             }}
-            style={{ width: '32px', height: '32px', objectFit: 'contain', display: 'block', flexShrink: 0, margin: mini ? '0 auto' : undefined }}
+            className={`block h-8 w-8 shrink-0 object-contain ${mini ? 'mx-auto' : ''}`}
           />
           {!mini && (
-            <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minWidth: 0 }}>
-              <span
-                style={{
-                  fontSize: '1.05rem',
-                  fontWeight: 700,
-                  color: 'var(--sidebar-text)',
-                  lineHeight: 1.15,
-                  letterSpacing: '-0.01em',
-                  whiteSpace: 'nowrap',
-                  overflow: 'hidden',
-                  textOverflow: 'ellipsis'
-                }}
-              >
+            <div className="flex min-w-0 flex-1 flex-col">
+              <span className="overflow-hidden text-ellipsis whitespace-nowrap text-[1.05rem] font-bold leading-[1.15] tracking-[-0.01em] text-sidebar-foreground">
                 ChangeDesk
               </span>
-              <span
-                style={{
-                  fontSize: '0.6rem',
-                  fontWeight: 500,
-                  color: 'var(--text-secondary)',
-                  letterSpacing: '0.08em',
-                  marginTop: '0.15rem',
-                  whiteSpace: 'nowrap'
-                }}
-              >
+              <span className="mt-[0.15rem] whitespace-nowrap text-[0.6rem] font-medium tracking-[0.08em] text-muted-foreground">
                 IT CHANGE MGMT
               </span>
             </div>
@@ -231,7 +168,7 @@ function Sidebar({
             type="button"
             onClick={onCloseMobile}
             aria-label="Close menu"
-            style={iconBtnStyle}
+            className="flex h-[30px] w-[30px] shrink-0 cursor-pointer items-center justify-center rounded-[7px] border border-sidebar-border bg-sidebar text-muted-foreground"
           >
             <X size={16} />
           </button>
@@ -245,7 +182,6 @@ function Sidebar({
         ))}
       </nav>
 
-      {/* Management section (Visible to Approvers & Admins, Hidden for standard requesters) */}
       {(() => {
         if (!isApprover || allowedWorklistModuleIds.length === 0) return null;
 
@@ -273,15 +209,9 @@ function Sidebar({
         return (
           <>
             <div
-              style={{
-                fontSize: '0.6875rem',
-                fontWeight: 500,
-                color: 'var(--text-secondary)',
-                letterSpacing: '0.08em',
-                textTransform: 'uppercase',
-                margin: mini ? '1.25rem 0 0.5rem 0' : '1.5rem 0 0.5rem 0.85rem',
-                textAlign: mini ? 'center' : 'left'
-              }}
+              className={`text-[0.6875rem] font-medium uppercase tracking-[0.08em] text-muted-foreground ${
+                mini ? 'mt-5 mb-2 mx-0 text-center' : 'mt-6 mb-2 mr-0 ml-[0.85rem] text-left'
+              }`}
             >
               {mini ? '•••' : 'MANAGEMENT'}
             </div>
@@ -291,7 +221,7 @@ function Sidebar({
               {!hasMultipleWorklistSub ? (
                 <NavButton item={{ id: 'My Worklist', path: allowedWorklistModules[0]?.path || '/worklist', label: 'My Worklist', icon: CheckCircle2 }} />
               ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
+                <div className="flex flex-col gap-[0.2rem]">
                   <button
                     type="button"
                     onClick={() => {
@@ -302,42 +232,36 @@ function Sidebar({
                       }
                     }}
                     title={mini ? 'My Worklist' : undefined}
-                    className={`cd-nav-item${isWorklistActive ? ' cd-nav-item--active' : ''}`}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '0.75rem',
-                      width: '100%',
-                      padding: mini ? '0.65rem' : '0.65rem 0.85rem',
-                      justifyContent: mini ? 'center' : 'flex-start',
-                      borderRadius: 'var(--radius-lg)',
-                      border: 'none',
-                      color: isWorklistActive ? 'var(--primary-foreground)' : 'var(--sidebar-text)',
-                      fontWeight: isWorklistActive ? 600 : 500,
-                      fontSize: '0.85rem',
-                      cursor: 'pointer',
-                      position: 'relative',
-                      ...(isWorklistActive ? { backgroundColor: 'var(--primary)', boxShadow: 'var(--shadow-card)' } : { backgroundColor: 'transparent' })
-                    }}
+                    className={`cd-nav-item relative flex w-full cursor-pointer items-center gap-3 rounded-[var(--radius-lg)] border-0 text-[0.85rem] ${
+                      mini ? 'justify-center px-[0.5rem] py-[0.45rem]' : 'justify-start px-[0.65rem] py-[0.45rem]'
+                    } ${
+                      isWorklistActive
+                        ? 'cd-nav-item--active bg-primary font-semibold text-primary-foreground shadow-[var(--shadow-card)]'
+                        : 'bg-transparent font-medium text-sidebar-foreground'
+                    }`}
                   >
-                    <CheckCircle2 size={18} style={{ color: isWorklistActive ? 'var(--primary-foreground)' : 'var(--text-secondary)', flexShrink: 0, strokeWidth: isWorklistActive ? 2.25 : 2 }} />
+                    <CheckCircle2
+                      size={18}
+                      strokeWidth={isWorklistActive ? 2.25 : 2}
+                      className={`shrink-0 ${isWorklistActive ? 'text-primary-foreground' : 'text-muted-foreground'}`}
+                    />
                     {!mini && (
                       <>
-                        <span style={{ flex: 1, textAlign: 'left', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        <span className="flex-1 overflow-hidden text-ellipsis whitespace-nowrap text-left">
                           My Worklist
                         </span>
-                        {worklistExpanded ? <ChevronDown size={14} style={{ color: 'var(--text-secondary)' }} /> : <ChevronRight size={14} style={{ color: 'var(--text-secondary)' }} />}
+                        {worklistExpanded ? <ChevronDown size={14} className="text-muted-foreground" /> : <ChevronRight size={14} className="text-muted-foreground" />}
                       </>
                     )}
                   </button>
 
                   {!mini && worklistExpanded && (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.15rem', paddingLeft: '0.85rem', borderLeft: '1.5px solid var(--sidebar-border)', marginLeft: '1.1rem', marginTop: '0.2rem' }}>
+                    <div className="mt-[0.2rem] ml-[1.1rem] flex flex-col gap-[0.15rem] border-l-[1.5px] border-sidebar-border pl-[0.85rem]">
                       {allowedWorklistModules.map(subItem => {
                         const SubIcon = subItem.icon;
-                        const isSubActive = typeof window !== 'undefined' && window.location.pathname.startsWith('/worklist') && (
-                          (subItem.id === 'change_request' && (!window.location.search || window.location.search.includes('module=change_request'))) ||
-                          (window.location.search.includes(`module=${subItem.id}`))
+                        const isSubActive = location.pathname.startsWith('/worklist') && (
+                          (subItem.id === 'change_request' && (!location.search || location.search.includes('module=change_request'))) ||
+                          location.search.includes(`module=${subItem.id}`)
                         );
 
                         const hasPending = Boolean(pendingDots && pendingDots[subItem.id] > 0);
@@ -347,37 +271,19 @@ function Sidebar({
                             key={subItem.id}
                             type="button"
                             onClick={() => handleSelect(subItem)}
-                            style={{
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: '0.6rem',
-                              width: '100%',
-                              padding: '0.45rem 0.65rem',
-                              borderRadius: '6px',
-                              border: 'none',
-                              backgroundColor: isSubActive ? 'rgba(37, 99, 235, 0.12)' : 'transparent',
-                              color: isSubActive ? 'var(--brand-primary, #2563EB)' : 'var(--sidebar-text)',
-                              fontWeight: isSubActive ? 600 : 500,
-                              fontSize: '0.785rem',
-                              cursor: 'pointer',
-                              transition: 'all 0.15s ease',
-                              textAlign: 'left'
-                            }}
+                            className={`flex w-full cursor-pointer items-center gap-2.5 rounded-[6px] border-0 px-2.5 py-2 text-left text-[0.785rem] transition-all duration-150 ${
+                              isSubActive
+                                ? 'bg-info/10 font-semibold text-info'
+                                : 'bg-transparent font-medium text-sidebar-foreground'
+                            }`}
                           >
-                            <SubIcon size={14} style={{ color: isSubActive ? 'var(--brand-primary, #2563EB)' : 'var(--text-secondary)', flexShrink: 0 }} />
-                            <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}>
+                            <SubIcon size={14} className={`shrink-0 ${isSubActive ? 'text-info' : 'text-muted-foreground'}`} />
+                            <span className="inline-flex flex-1 items-center gap-[0.35rem] overflow-hidden text-ellipsis whitespace-nowrap">
                               {subItem.label}
                               {hasPending && (
                                 <span
                                   title={`${pendingDots[subItem.id]} pending request${pendingDots[subItem.id] > 1 ? 's' : ''}`}
-                                  style={{
-                                    width: '6px',
-                                    height: '6px',
-                                    borderRadius: '50%',
-                                    backgroundColor: '#D97706',
-                                    display: 'inline-block',
-                                    flexShrink: 0
-                                  }}
+                                  className="inline-block h-1.5 w-1.5 shrink-0 rounded-full bg-warning"
                                 />
                               )}
                             </span>
@@ -406,26 +312,12 @@ function Sidebar({
       {mobileOpen && (
         <div
           onClick={onCloseMobile}
-          style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 110 }}
+          className="fixed inset-0 z-[110] bg-black/50"
         />
       )}
       {aside}
     </>
   );
 }
-
-const iconBtnStyle = {
-  width: '30px',
-  height: '30px',
-  borderRadius: '7px',
-  border: '1px solid var(--sidebar-border)',
-  backgroundColor: 'var(--sidebar-bg)',
-  color: 'var(--text-secondary)',
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  cursor: 'pointer',
-  flexShrink: 0
-};
 
 export default React.memo(Sidebar);
