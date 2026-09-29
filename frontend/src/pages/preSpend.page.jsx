@@ -340,7 +340,7 @@ export default function PreSpendPage({ onNavigate, user, initialCostCentre = '',
                     }}
                     onMouseEnter={() => setHoveredCat(item.name)}
                     onMouseLeave={() => setHoveredCat(null)}
-                    className={`cursor-pointer rounded-[12px] p-[1.1rem] text-left transition-[transform,border-color,box-shadow,background-color] duration-200 ${
+                    className={`flex min-h-[92px] cursor-pointer flex-col justify-center rounded-[12px] p-[1.1rem] text-left transition-[transform,border-color,box-shadow,background-color] duration-200 ${
                       isHovered ? '-translate-y-[5px]' : 'translate-y-0'
                     } ${
                       selected
@@ -753,7 +753,7 @@ export default function PreSpendPage({ onNavigate, user, initialCostCentre = '',
                   </div>
 
                   <div>
-                    <FormLabel required={!usePastVendor} htmlFor="vendor-0-file">Upload quotation</FormLabel>
+                    <FormLabel htmlFor="vendor-0-file">Upload quotation</FormLabel>
                     <input
                       id="vendor-0-file"
                       type="file"

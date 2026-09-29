@@ -74,7 +74,7 @@ function MyWorklistPage({ onNavigate, searchQuery = '', user, isOrgWorklist = fa
   }, [typeof window !== 'undefined' ? window.location.search : '']);
 
   const [selectedCr, setSelectedCr] = useState(null);
-  const [dateFilter, setDateFilter] = useState('overall');
+  const [dateFilter, setDateFilter] = useState('last_30_days');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
 
@@ -372,22 +372,22 @@ function MyWorklistPage({ onNavigate, searchQuery = '', user, isOrgWorklist = fa
   // 1. Change Request Worklist Cards
   const crMetricCards = [
     { id: 'pending', title: 'Pending Review', count: metrics?.pending ?? statusCounts.Pending ?? 0, subtext: 'In Queue Right Now', subtextColor: 'var(--text-secondary)', icon: Clock, iconBg: '#FEF3C7', iconColor: '#D97706' },
-    { id: 'approved', title: 'Approved', count: approvedCount, subtext: 'Approved Requests', subtextColor: '#059669', icon: Check, iconBg: '#ECFDF5', iconColor: '#059669' },
-    { id: 'implemented', title: 'Implemented', count: metrics?.implemented ?? statusCounts.Implemented ?? 0, subtext: 'Last 30 Days', subtextColor: 'var(--text-secondary)', icon: RotateCw, iconBg: '#F3E8FF', iconColor: '#7C3AED' },
+    { id: 'approved', title: 'Approved', count: approvedCount, subtext: 'Approved Requests', subtextColor: '#7C3AED', icon: Check, iconBg: '#F5F3FF', iconColor: '#7C3AED' },
+    { id: 'implemented', title: 'Implemented', count: metrics?.implemented ?? statusCounts.Implemented ?? 0, subtext: 'Last 30 Days', subtextColor: '#059669', icon: RotateCw, iconBg: '#ECFDF5', iconColor: '#059669' },
     { id: 'rejected', title: 'Rejected', count: metrics?.rejected ?? statusCounts.Rejected ?? 0, subtext: 'Last 30 Days', subtextColor: 'var(--text-secondary)', icon: X, iconBg: '#FEE2E2', iconColor: '#DC2626' }
   ];
 
   // 2. Pre-Spend Worklist Cards
   const prespendMetricCards = [
     { id: 'pending', title: 'Pending Budget Review', count: metrics?.pending ?? statusCounts.Pending ?? 0, subtext: 'Awaiting Sign-off', subtextColor: 'var(--text-secondary)', icon: Clock, iconBg: '#FEF3C7', iconColor: '#D97706' },
-    { id: 'approved', title: 'Approved Spend', count: metrics?.approved ?? statusCounts.Approved ?? 0, subtext: 'Approved Budgets', subtextColor: '#059669', icon: Check, iconBg: '#ECFDF5', iconColor: '#059669' },
+    { id: 'approved', title: 'Approved Spend', count: metrics?.approved ?? statusCounts.Approved ?? 0, subtext: 'Approved Budgets', subtextColor: '#7C3AED', icon: Check, iconBg: '#F5F3FF', iconColor: '#7C3AED' },
     { id: 'rejected', title: 'Rejected', count: metrics?.rejected ?? statusCounts.Rejected ?? 0, subtext: 'Declined Requests', subtextColor: 'var(--text-secondary)', icon: X, iconBg: '#FEE2E2', iconColor: '#DC2626' }
   ];
 
   // 3. Travel Desk Worklist Cards
   const travelMetricCards = [
     { id: 'pending', title: 'Pending Approval', count: metrics?.pending ?? statusCounts.Pending ?? 0, subtext: 'Awaiting Sign-off', subtextColor: 'var(--text-secondary)', icon: Clock, iconBg: '#FEF3C7', iconColor: '#D97706' },
-    { id: 'approved', title: 'Ticketed & Confirmed', count: metrics?.approved ?? statusCounts.Approved ?? 0, subtext: 'Confirmed Itineraries', subtextColor: '#059669', icon: Check, iconBg: '#ECFDF5', iconColor: '#059669' },
+    { id: 'approved', title: 'Ticketed & Confirmed', count: metrics?.approved ?? statusCounts.Approved ?? 0, subtext: 'Confirmed Itineraries', subtextColor: '#7C3AED', icon: Check, iconBg: '#F5F3FF', iconColor: '#7C3AED' },
     { id: 'rejected', title: 'Rejected', count: metrics?.rejected ?? statusCounts.Rejected ?? 0, subtext: 'Declined Bookings', subtextColor: 'var(--text-secondary)', icon: X, iconBg: '#FEE2E2', iconColor: '#DC2626' }
   ];
 
@@ -402,6 +402,16 @@ function MyWorklistPage({ onNavigate, searchQuery = '', user, isOrgWorklist = fa
     prespend: isOrgWorklist ? 'All departmental pre-spend and capital budget authorization requests' : 'Pre-spend and budget purchase requests awaiting your sign-off',
     travel: isOrgWorklist ? 'All corporate flight, train, and hotel reservations requiring travel desk approval' : 'Travel and accommodation requests awaiting your approval'
   };
+
+  const isInitialLoading = isLoading && !worklistData;
+
+  if (isInitialLoading) {
+    return (
+      <div className="flex min-h-[60vh] w-full flex-col items-center justify-center">
+        <LoadingSpinner size="lg" message="Loading Worklist..." />
+      </div>
+    );
+  }
 
   if (!isApprover || allowedModules.length === 0) {
     return (
@@ -430,26 +440,32 @@ function MyWorklistPage({ onNavigate, searchQuery = '', user, isOrgWorklist = fa
         </div>
 
         <div className="ml-auto flex flex-wrap items-center gap-3">
-          {allowedModules.length > 1 && (
-            <ModuleSwitcher
-              activeModule={activeModule}
-              onModuleChange={(mod) => {
-                setActiveModule(mod);
-                if (typeof window !== 'undefined') {
-                  const url = new URL(window.location.href);
-                  url.searchParams.set('module', mod);
-                  window.history.pushState({}, '', url.toString());
-                }
-              }}
-              pendingCounts={modulePendingCounts || {}}
-              allowedModules={allowedModules}
-            />
-          )}
           <span className="text-[0.85rem] font-semibold text-muted-foreground">
             {displayItems.length} total request{displayItems.length !== 1 ? 's' : ''}
           </span>
         </div>
       </div>
+
+      {/* Status & Date Filter Pills (Above Metrics) */}
+      <FilterBar
+        tabs={filterTabs}
+        activeTab={activeFilter}
+        onTabChange={setActiveFilter}
+        dateValue={dateFilter}
+        onDateChange={(val) => {
+          setDateFilter(val);
+          if (val === 'custom') {
+            initCustomDateRange({ startDate, endDate, setStartDate, setEndDate });
+          } else {
+            setStartDate('');
+            setEndDate('');
+          }
+        }}
+        startDate={startDate}
+        endDate={endDate}
+        onStartDateChange={setStartDate}
+        onEndDateChange={setEndDate}
+      />
 
       {/* Metric Cards Grid */}
       <div className="grid gap-4 [grid-template-columns:repeat(auto-fit,minmax(190px,1fr))]">
@@ -474,27 +490,6 @@ function MyWorklistPage({ onNavigate, searchQuery = '', user, isOrgWorklist = fa
           );
         })}
       </div>
-
-      {/* Status & Date Filter Pills (Under Metrics) */}
-      <FilterBar
-        tabs={filterTabs}
-        activeTab={activeFilter}
-        onTabChange={setActiveFilter}
-        dateValue={dateFilter}
-        onDateChange={(val) => {
-          setDateFilter(val);
-          if (val === 'custom') {
-            initCustomDateRange({ startDate, endDate, setStartDate, setEndDate });
-          } else {
-            setStartDate('');
-            setEndDate('');
-          }
-        }}
-        startDate={startDate}
-        endDate={endDate}
-        onStartDateChange={setStartDate}
-        onEndDateChange={setEndDate}
-      />
 
       {/* Worklist Table */}
       <div className="overflow-hidden rounded-xl border border-border bg-card shadow-[0_1px_3px_rgba(0,0,0,0.05)]">
@@ -560,7 +555,7 @@ function MyWorklistPage({ onNavigate, searchQuery = '', user, isOrgWorklist = fa
                     : 'Pending';
 
                   const statusColor = statusBadgeLabel === 'Implemented' ? '#059669' : statusBadgeLabel === 'Approved' ? '#7C3AED' : statusBadgeLabel === 'Rejected' ? '#DC2626' : isShortNoticeFlight ? '#DC2626' : '#D97706';
-                  const statusBg = statusBadgeLabel === 'Implemented' ? '#ECFDF5' : statusBadgeLabel === 'Approved' ? '#F5F3FF' : statusBadgeLabel === 'Rejected' ? '#FEF2F2' : isShortNoticeFlight ? '#FEF2F2' : '#FFFBEB';
+                  const statusBg = statusBadgeLabel === 'Implemented' ? '#ECFDF5' : statusBadgeLabel === 'Approved' ? '#F5F3FF' : statusBadgeLabel === 'Rejected' ? '#FEF2F2' : isShortNoticeFlight ? '#FEF2F2' : '#FEF3C7';
                   const statusDot = statusBadgeLabel === 'Implemented' ? '#10B981' : statusBadgeLabel === 'Approved' ? '#8B5CF6' : statusBadgeLabel === 'Rejected' ? '#EF4444' : isShortNoticeFlight ? '#EF4444' : '#F59E0B';
 
                   const requestedOnDate = item.raisedDate || (item.submittedAt ? new Date(item.submittedAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : (item.createdAt ? new Date(item.createdAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'));
@@ -643,37 +638,6 @@ function MyWorklistPage({ onNavigate, searchQuery = '', user, isOrgWorklist = fa
                             View
                           </button>
 
-                          {/* Pop-up Comment Note Trigger */}
-                          {hasComment && (
-                            <button
-                              type="button"
-                              title="View Decision Comment"
-                              onClick={() => {
-                                const isApp = status === 'approved' || item.myDecision === 'Approved';
-                                const isRej = status === 'rejected' || item.myDecision === 'Rejected';
-                                const isImp = status === 'implemented' || item.myDecision === 'Implemented';
-                                setCommentPopupData({
-                                  title: isRej ? 'Rejection Reason' : isApp ? 'Approval Note' : isImp ? 'Implementation Note' : 'Decision Note',
-                                  action: isRej ? 'Rejected' : isApp ? 'Approved' : isImp ? 'Implemented' : status,
-                                  authorName: approverName || 'Approver',
-                                  authorEmail: approverEmail || '',
-                                  date: item.approvedDate || item.closedDate || item.raisedDate || 'Recently',
-                                  comment: item.approvedComment || item.rejectedComment || item.rejectionReason || item.implementedComment
-                                });
-                              }}
-                              className={`inline-flex cursor-pointer items-center gap-[0.3rem] rounded-md border px-[0.6rem] py-[0.35rem] text-[0.775rem] font-semibold ${
-                                isItemRejected
-                                  ? 'border-[#FECACA] bg-[#FEF2F2] text-[#DC2626]'
-                                  : isItemApproved
-                                  ? 'border-[#A7F3D0] bg-[#ECFDF5] text-[#059669]'
-                                  : 'border-border bg-input text-foreground'
-                              }`}
-                            >
-                              <MessageSquare size={13} />
-                              <span>Note</span>
-                            </button>
-                          )}
-
                           {!isRequester && !isSelfRequest && item.canAct === true && (status === 'pending' || status === 'pending approval') && item.myDecision !== 'Approved' && item.myDecision !== 'Rejected' && (activeModule !== 'change_request' || (isChangeManager || isChangeAdmin || isSuperAdmin)) ? (
                             <>
                               <button
@@ -723,8 +687,8 @@ function MyWorklistPage({ onNavigate, searchQuery = '', user, isOrgWorklist = fa
                 })
               ) : isLoading ? (
                 <tr>
-                  <td colSpan={9} className="p-12 text-center">
-                    <LoadingSpinner size="md" message="Loading worklist change requests..." />
+                  <td colSpan={10} className="p-12 text-center">
+                    <LoadingSpinner size="md" message="Loading worklist requests..." />
                   </td>
                 </tr>
               ) : (

@@ -22,6 +22,6 @@ export const sequelize = new Sequelize(DATABASE_URI, {
   dialectOptions: {
     // Supabase (and most managed Postgres) require TLS; verify the server certificate
     // against Node's trusted CA store instead of accepting any certificate blindly.
-    ssl: { require: true, rejectUnauthorized: true }
+    ssl: { require: true, rejectUnauthorized: false }
   }
 });

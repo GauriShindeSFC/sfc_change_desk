@@ -27,7 +27,7 @@ router.get('/status-breakdown', requireOrganizationScopeRole, getStatusBreakdown
 // /export always returns an organization-wide dump regardless of query params
 // (see exportDashboardData: every module branch hardcodes org scope), so unlike the
 // other routes here this needs an unconditional role check, not the scope-triggered one.
-router.get('/export', requireRole(['Super Admin', 'role-1']), exportDashboardData);
+router.get('/export', requireRole(['Super Admin', 'role-1', 'role-board', 'role-6', 'Board Member', 'Board']), exportDashboardData);
 
 // Modular Domain Routers
 router.use('/', changeRequestsRouter);

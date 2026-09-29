@@ -11,6 +11,7 @@ import {
 } from './mail.service.js';
 import { enqueueNotification } from './notificationQueue.service.js';
 import { buildDateFilterClause } from '../utils/dateFilterUtils.js';
+import { uploadBase64ToAzureBlob } from '../utils/blobStorage.util.js';
 
 export const generatePreSpendCode = async (_tx = null, year = new Date().getFullYear()) => {
   const seqName = `prespend_code_seq_${year}`;
@@ -20,23 +21,24 @@ export const generatePreSpendCode = async (_tx = null, year = new Date().getFull
     try {
       await sequelize.query(`SELECT pg_advisory_lock(${lockKey});`);
       const [seqCheck] = await sequelize.query(`SELECT to_regclass('${seqName}') AS regclass;`);
+      const [maxRes] = await sequelize.query(
+        `SELECT MAX(CAST(SUBSTRING(request_code FROM 'PS-[0-9]+-([0-9]+)') AS INTEGER)) AS max_num FROM pre_spend_requests WHERE request_code LIKE 'PS-${year}-%';`
+      );
+      const maxNum = (maxRes && maxRes[0] && maxRes[0].max_num) ? parseInt(maxRes[0].max_num, 10) : 0;
+
       if (!seqCheck[0]?.regclass) {
-        const [maxRes] = await sequelize.query(
-          `SELECT MAX(CAST(SUBSTRING(request_code FROM 'PS-[0-9]+-([0-9]+)') AS INTEGER)) AS max_num FROM pre_spend_requests WHERE request_code LIKE 'PS-${year}-%';`
-        );
-        const maxNum = (maxRes && maxRes[0] && maxRes[0].max_num) ? parseInt(maxRes[0].max_num, 10) : 0;
-        const startNum = maxNum + 1;
+        const startNum = Math.max(1, maxNum + 1);
         await sequelize.query(`CREATE SEQUENCE IF NOT EXISTS ${seqName} START WITH ${startNum};`);
+      } else if (maxNum > 0) {
+        // Sync existing sequence forward if maxNum in table is ahead of sequence
+        await sequelize.query(`SELECT setval('${seqName}', GREATEST(nextval('${seqName}'), ${maxNum + 1}), false);`).catch(() => {});
       }
     } finally {
       await sequelize.query(`SELECT pg_advisory_unlock(${lockKey});`).catch(() => {});
     }
   };
 
-  const [initialCheck] = await sequelize.query(`SELECT to_regclass('${seqName}') AS regclass;`);
-  if (!initialCheck[0]?.regclass) {
-    await ensureSeq();
-  }
+  await ensureSeq();
 
   const [result] = await sequelize.query(`SELECT nextval('${seqName}') AS next_id`);
   const nextId = result[0]?.next_id || result[0]?.nextval;
@@ -70,6 +72,38 @@ export const createPreSpendService = async (data, user) => {
     validManagerEmail = mgrEmp.email || validManagerEmail;
   }
 
+  // Process vendor quotes: upload base64/file payloads to Azure Blob storage
+  let processedVendors = [];
+  if (Array.isArray(data.vendors) && data.vendors.length > 0) {
+    processedVendors = await Promise.all(
+      data.vendors.map(async (v) => {
+        let fileUrl = v.fileUrl || null;
+
+        // If fileData is present (base64 string), upload to Azure Blob
+        if (v.fileData && typeof v.fileData === 'string' && (v.fileData.startsWith('data:') || v.fileData.length > 200)) {
+          try {
+            const uploadRes = await uploadBase64ToAzureBlob(v.fileData, v.fileName || `${v.name || 'vendor'}-quote.pdf`, 'pre-spend/quotes');
+            if (uploadRes?.fileUrl) {
+              fileUrl = uploadRes.fileUrl;
+            }
+          } catch (uploadErr) {
+            console.error(`[Azure Blob] Failed to upload quote for vendor "${v.name}":`, uploadErr.message);
+          }
+        }
+
+        return {
+          name: v.name || '',
+          amount: v.amount || '',
+          date: v.date || '',
+          fileName: v.fileName || (fileUrl ? 'quote.pdf' : ''),
+          fileUrl: fileUrl,
+          // Keep fileData only if upload failed and we still need fallback, else drop heavy base64
+          ...(fileUrl ? {} : { fileData: v.fileData })
+        };
+      })
+    );
+  }
+
   const created = await PreSpendRequest.create({
     requestCode,
     requesterId,
@@ -86,8 +120,8 @@ export const createPreSpendService = async (data, user) => {
     businessJustification: data.justification || data.businessJustification || '',
     isUrgent: Boolean(data.urgent || data.isUrgent),
     urgentReason: data.urgentReason || '',
-    vendors: Array.isArray(data.vendors) ? data.vendors : [],
-    selectedVendor: data.selectedVendor || (data.vendors?.[0]?.name || ''),
+    vendors: processedVendors,
+    selectedVendor: data.selectedVendor || (processedVendors[0]?.name || data.vendors?.[0]?.name || ''),
     commercialException: data.commercial?.exception || data.commercialException || '',
     commercialReason: data.commercial?.reason || data.commercialReason || '',
     commercialJustification: data.commercial?.justification || data.commercialJustification || '',

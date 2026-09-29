@@ -19,6 +19,7 @@ export const createChangeRequestSchema = {
     employeeEmail: Joi.string().trim().allow('', null).optional(),
     employeeId: Joi.string().trim().allow('', null).optional(),
     location: Joi.string().trim().allow('', null).optional(),
+    managerName: Joi.string().trim().allow('', null).optional(),
     managerEmail: Joi.string().trim().allow('', null).optional(),
     actionRequired: Joi.string().trim().allow('', null).optional(),
     customFieldValues: Joi.object().unknown(true).optional()

@@ -112,6 +112,14 @@ export function computeDateBoundaries(dateFilter, startDate, endDate, referenceD
     return { start, end };
   }
 
+  if (dateFilter === 'last_30_days') {
+    // 29 days before today at 00:00:00
+    const start = zonedDateTimeToUtc(parts.year, parts.month, parts.day - 29, 0, 0, 0, 0, timeZone);
+    // Tomorrow at 00:00:00 (exclusive)
+    const end = zonedDateTimeToUtc(parts.year, parts.month, parts.day + 1, 0, 0, 0, 0, timeZone);
+    return { start, end };
+  }
+
   if (dateFilter === 'this_month') {
     const start = zonedDateTimeToUtc(parts.year, parts.month, 1, 0, 0, 0, 0, timeZone);
     const end = zonedDateTimeToUtc(parts.year, parts.month + 1, 1, 0, 0, 0, 0, timeZone);

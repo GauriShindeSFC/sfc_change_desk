@@ -633,9 +633,9 @@ export const CommentPopupModal = ({ isOpen, onClose, data }) => {
   const isRejected = data.action === 'Rejected';
   const isImplemented = data.action === 'Implemented';
 
-  const badgeBg = isRejected ? '#FEF2F2' : isApproved ? '#ECFDF5' : isImplemented ? '#F3E8FF' : '#FEF3C7';
-  const badgeColor = isRejected ? '#DC2626' : isApproved ? '#059669' : isImplemented ? '#7C3AED' : '#D97706';
-  const badgeBorder = isRejected ? '#FECACA' : isApproved ? '#A7F3D0' : isImplemented ? '#E9D5FF' : '#FDE68A';
+  const badgeBg = isRejected ? '#FEF2F2' : isApproved ? '#F5F3FF' : isImplemented ? '#ECFDF5' : '#FEF3C7';
+  const badgeColor = isRejected ? '#DC2626' : isApproved ? '#7C3AED' : isImplemented ? '#059669' : '#D97706';
+  const badgeBorder = isRejected ? '#FECACA' : isApproved ? '#DDD6FE' : isImplemented ? '#A7F3D0' : '#FDE68A';
 
   return (
     <div

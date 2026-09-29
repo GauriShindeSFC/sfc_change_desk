@@ -19,9 +19,12 @@ function DashboardRoute({ isOrg = false }) {
   const location = useLocation();
 
   const roleName = (user?.role || '').toLowerCase();
-  const isSuperAdmin = user?.roleId === 'role-1' || roleName.includes('super');
+  const roleId = user?.roleId || '';
+  const rawRoleIds = Array.isArray(user?.rolesList) ? user.rolesList : [];
+  const isSuperAdmin = Boolean(user?.isSuperAdmin || roleId === 'role-1' || rawRoleIds.includes('role-1') || roleName.includes('super'));
+  const isBoardUser = Boolean(user?.isBoardMember || roleId === 'role-board' || roleId === 'role-6' || rawRoleIds.includes('role-6') || rawRoleIds.includes('role-board') || roleName.includes('board'));
 
-  if (isOrg && !isSuperAdmin) {
+  if (isOrg && !isSuperAdmin && !isBoardUser) {
     return <Navigate to="/dashboard" replace />;
   }
 

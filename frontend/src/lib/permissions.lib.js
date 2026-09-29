@@ -52,11 +52,16 @@ export function getAllowedWorklistModules(user) {
     hasRole('board', 'role-board', 'role-6')
   );
 
-  if (isSuperAdmin || isBoardUser) {
+  if (isSuperAdmin) {
     return ['change_request', 'prespend', 'travel'];
   }
 
   const modulesSet = new Set();
+
+  if (isBoardUser) {
+    modulesSet.add('prespend');
+    modulesSet.add('travel');
+  }
 
   // 1. Change Request Module Checks
   const isChangeAdmin = Boolean(

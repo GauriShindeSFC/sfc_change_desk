@@ -450,10 +450,10 @@ export default function ApprovalActionPage() {
                 </div>
                 <div
                   className={`flex items-center gap-[0.35rem] whitespace-nowrap rounded-full px-[0.8rem] py-[0.35rem] text-xs font-bold ${
-                    crData.status === 'Approved' ? 'bg-[#ECFDF5] text-[#059669]' : crData.status === 'Implemented' ? 'bg-[#F5F3FF] text-[#7C3AED]' : 'bg-[#FEF3C7] text-[#D97706]'
+                    crData.status === 'Approved' ? 'bg-[#F5F3FF] text-[#7C3AED]' : crData.status === 'Implemented' ? 'bg-[#ECFDF5] text-[#059669]' : crData.status === 'Rejected' ? 'bg-[#FEF2F2] text-[#DC2626]' : 'bg-[#FEF3C7] text-[#D97706]'
                   }`}
                 >
-                  {crData.status === 'Approved' ? <CheckCircle2 size={13} /> : <Clock size={13} />}
+                  {crData.status === 'Approved' || crData.status === 'Implemented' ? <CheckCircle2 size={13} /> : crData.status === 'Rejected' ? <XCircle size={13} /> : <Clock size={13} />}
                   <span>{crData.status}</span>
                 </div>
               </div>

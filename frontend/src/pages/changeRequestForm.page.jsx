@@ -43,6 +43,15 @@ export const getFieldOptions = (field, currentUser) => {
   return opts;
 };
 
+const CATEGORY_DESCRIPTIONS = {
+  'IT Asset': 'Computers, hardware, software and licences',
+  'Office 365 & Collaboration': 'Mailboxes, Microsoft 365 licences and email services',
+  'Access & Security': 'Application permissions and physical access',
+  'Network & Connectivity': 'Firewall rules, website access and VPN connections',
+  'Security Tools & Policies': 'Endpoint protection and security changes',
+  'Server & Infra': 'Server setup, lifecycle changes and OS patching'
+};
+
 const READONLY_FIELD_CLASS = 'box-border w-full cursor-not-allowed rounded-lg border border-border bg-input px-[0.85rem] py-[0.65rem] text-[0.85rem] text-muted-foreground outline-none';
 
 const ACTIVE_FIELD_CLASS = 'box-border w-full rounded-lg border border-border bg-input px-[0.85rem] py-[0.65rem] text-[0.85rem] text-foreground outline-none';
@@ -466,8 +475,7 @@ function ChangeRequestFormPage({ onNavigate, user, initialData, searchQuery = ''
       subCategory: selectedSubcategory?.name || formData.subCategory || '',
       subcategoryId: selectedSubcategoryId,
       actionRequired: finalCustomValues.actionRequired || '',
-      customFieldValues: sanitizedCustomValues,
-      isDraft: false
+      customFieldValues: sanitizedCustomValues
     };
 
     try {
@@ -599,7 +607,7 @@ function ChangeRequestFormPage({ onNavigate, user, initialData, searchQuery = ''
                     onClick={() => handleCategoryChange(cat.id)}
                     onMouseEnter={() => setHoveredCatId(cat.id)}
                     onMouseLeave={() => setHoveredCatId(null)}
-                    className={`cursor-pointer rounded-xl p-[1.1rem] text-left transition-[transform,background-color,border-color,box-shadow] duration-200 ease ${
+                    className={`flex min-h-[92px] cursor-pointer flex-col justify-center rounded-xl p-[1.1rem] text-left transition-[transform,background-color,border-color,box-shadow] duration-200 ease ${
                       isHovered ? '-translate-y-[5px]' : 'translate-y-0'
                     } ${
                       selected
@@ -611,7 +619,7 @@ function ChangeRequestFormPage({ onNavigate, user, initialData, searchQuery = ''
                   >
                     <div className="text-sm font-semibold text-foreground">{cat.name}</div>
                     <div className="mt-1 text-[0.775rem] leading-[1.4] text-muted-foreground">
-                      {cat.subcategories?.length || 0} subcategories available
+                      {CATEGORY_DESCRIPTIONS[cat.name] || (cat.subcategories?.length ? `${cat.subcategories.length} subcategories available` : '')}
                     </div>
                   </button>
                 );

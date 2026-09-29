@@ -14,9 +14,9 @@ import { apiFetch } from '../lib/apiFetch.lib';
 
 const METRIC_STYLES = [
   { id: 'total', match: (m) => m?.isTotal || m?.title?.includes('Total'), icon: FileText, color: '#2563EB', tint: '#EFF6FF', filterKey: 'All' },
-  { id: 'pending', match: (m) => m?.isPending || m?.title?.includes('Pending'), icon: Clock, color: '#D97706', tint: '#FFFBEB', filterKey: 'Pending' },
-  { id: 'approved', match: (m) => m?.id === 'approved' || m?.isApproved || m?.title === 'Approved' || m?.title === 'In Process' || m?.title?.includes('Ticketed'), icon: Check, color: '#059669', tint: '#ECFDF5', filterKey: 'Approved' },
-  { id: 'implemented', match: (m) => m?.isInProgress || m?.isImplemented || m?.title?.includes('Progress') || m?.title?.includes('Implemented') || m?.title?.includes('Processed') || m?.title?.includes('Board'), icon: RotateCw, color: '#7C3AED', tint: '#F5F3FF', filterKey: 'Implemented' },
+  { id: 'pending', match: (m) => m?.isPending || m?.title?.includes('Pending') || m?.title?.includes('Requested'), icon: Clock, color: '#D97706', tint: '#FEF3C7', filterKey: 'Pending' },
+  { id: 'approved', match: (m) => m?.id === 'approved' || m?.isApproved || m?.title === 'Approved' || m?.title === 'In Process' || m?.title?.includes('Ticketed'), icon: Check, color: '#7C3AED', tint: '#F5F3FF', filterKey: 'Approved' },
+  { id: 'implemented', match: (m) => m?.isInProgress || m?.isImplemented || m?.title?.includes('Progress') || m?.title?.includes('Implemented') || m?.title?.includes('Processed') || m?.title?.includes('Completed'), icon: RotateCw, color: '#059669', tint: '#ECFDF5', filterKey: 'Implemented' },
   { id: 'rejected', match: () => true, icon: XCircle, color: '#DC2626', tint: '#FEF2F2', filterKey: 'Rejected' }
 ];
 const getMetricStyle = (m) => METRIC_STYLES.find((s) => s.match(m)) || METRIC_STYLES[METRIC_STYLES.length - 1];
@@ -56,8 +56,8 @@ const CANONICAL_CATEGORIES = [
 
 const CANONICAL_STATUSES = [
   { status: 'Pending', label: 'Pending Approvals', count: 0, color: '#D97706' },
-  { status: 'Approved', label: 'Approved', count: 0, color: '#059669' },
-  { status: 'Implemented', label: 'Implemented', count: 0, color: '#7C3AED' },
+  { status: 'Approved', label: 'Approved', count: 0, color: '#7C3AED' },
+  { status: 'Implemented', label: 'Implemented', count: 0, color: '#059669' },
   { status: 'Rejected', label: 'Rejected', count: 0, color: '#DC2626' }
 ];
 
@@ -68,7 +68,7 @@ function DashboardPage({ onNavigate, user, isOrgDashboard = false, searchQuery =
 
   // Unified Filter State
   const [activeFilter, setActiveFilter] = useState('All');
-  const [dateFilter, setDateFilter] = useState('overall');
+  const [dateFilter, setDateFilter] = useState('last_30_days');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
 
@@ -88,12 +88,20 @@ function DashboardPage({ onNavigate, user, isOrgDashboard = false, searchQuery =
   const isCustomDateIncomplete = dateFilter === 'custom' && (!startDate || !endDate);
   const scopeParam = isOrgDashboard ? 'scope=org' : 'scope=my';
 
-  // 1. Fetch summary metrics for all 3 cards simultaneously
+  // 1. Fetch summary metrics for all 3 cards simultaneously (filtered by global date/search filter)
+  const summaryFilterParams = new URLSearchParams({
+    ...(isOrgDashboard ? { scope: 'organization' } : { scope: 'my' }),
+    ...(dateFilter !== 'overall' && { dateFilter }),
+    ...(dateFilter === 'custom' && startDate && { startDate }),
+    ...(dateFilter === 'custom' && endDate && { endDate }),
+    ...(searchQuery && { search: searchQuery })
+  }).toString();
+
   const { data: prespendSummary } = useQuery({
-    queryKey: ['prespend-summary-card', isOrgDashboard, user?.id],
+    queryKey: ['prespend-summary-card', isOrgDashboard, user?.id, dateFilter, startDate, endDate, searchQuery],
     queryFn: async () => {
       try {
-        const res = await apiFetch(`/pre-spend?${scopeParam}`, { headers });
+        const res = await apiFetch(`/pre-spend?${summaryFilterParams}`, { headers });
         if (!res.ok) return null;
         return await res.json();
       } catch {
@@ -104,15 +112,12 @@ function DashboardPage({ onNavigate, user, isOrgDashboard = false, searchQuery =
   });
 
   const { data: crSummary } = useQuery({
-    queryKey: ['cr-summary-card', isOrgDashboard, user?.id],
+    queryKey: ['cr-summary-card', isOrgDashboard, user?.id, dateFilter, startDate, endDate, searchQuery],
     queryFn: async () => {
       try {
-        const params = new URLSearchParams({
-          ...(isOrgDashboard && { scope: 'organization' })
-        }).toString();
         const [mRes, rRes] = await Promise.all([
-          apiFetch(`/metrics?${params}`, { headers }),
-          apiFetch(`/my-requests?${params}`, { headers })
+          apiFetch(`/metrics?${summaryFilterParams}`, { headers }),
+          apiFetch(`/my-requests?${summaryFilterParams}`, { headers })
         ]);
         const mData = mRes.ok ? await mRes.json() : {};
         const rData = rRes.ok ? await rRes.json() : {};
@@ -128,10 +133,10 @@ function DashboardPage({ onNavigate, user, isOrgDashboard = false, searchQuery =
   });
 
   const { data: travelSummary } = useQuery({
-    queryKey: ['travel-summary-card', isOrgDashboard, user?.id],
+    queryKey: ['travel-summary-card', isOrgDashboard, user?.id, dateFilter, startDate, endDate, searchQuery],
     queryFn: async () => {
       try {
-        const res = await apiFetch(`/travel-desk?${scopeParam}`, { headers });
+        const res = await apiFetch(`/travel-desk?${summaryFilterParams}`, { headers });
         if (!res.ok) return null;
         return await res.json();
       } catch {
@@ -388,6 +393,19 @@ function DashboardPage({ onNavigate, user, isOrgDashboard = false, searchQuery =
     }
   ];
 
+  const isInitialSummaryLoading = !prespendSummary && !crSummary && !travelSummary;
+
+  if (isInitialSummaryLoading) {
+    return (
+      <div className="flex min-h-[60vh] w-full flex-col items-center justify-center">
+        <LoadingSpinner
+          size="lg"
+          message={isOrgDashboard ? 'Loading Organization Dashboard...' : 'Loading Dashboard...'}
+        />
+      </div>
+    );
+  }
+
   return (
     <div className="flex w-full flex-col gap-5">
 
@@ -400,6 +418,16 @@ function DashboardPage({ onNavigate, user, isOrgDashboard = false, searchQuery =
           {isOrgDashboard ? 'Company-wide requests and analytics across all modules' : 'Your requests across all modules'}
         </p>
       </div>
+
+      {/* Global Date Filter above all cards */}
+      <FilterBar
+        dateValue={dateFilter}
+        onDateChange={setDateFilter}
+        startDate={startDate}
+        endDate={endDate}
+        onStartDateChange={setStartDate}
+        onEndDateChange={setEndDate}
+      />
 
       {/* 3 Vertically Stacked Module Cards */}
       <div className="flex w-full flex-col gap-5">
@@ -418,17 +446,6 @@ function DashboardPage({ onNavigate, user, isOrgDashboard = false, searchQuery =
                 </h3>
 
                 <div className="flex items-center gap-3">
-                  {!isOrgDashboard && (
-                    <button
-                      type="button"
-                      onClick={() => onNavigate?.(card.newButtonNav)}
-                      className="inline-flex cursor-pointer items-center gap-[0.4rem] rounded-lg border-0 bg-primary px-[0.85rem] py-[0.45rem] text-[0.8rem] font-semibold text-white"
-                    >
-                      <Plus size={14} />
-                      <span>{card.newButtonLabel}</span>
-                    </button>
-                  )}
-
                   {isOrgDashboard && isExpanded && (
                     <ExportButtonGroup
                       onExportCsv={() => handleExport('csv')}
@@ -805,13 +822,13 @@ function DashboardPage({ onNavigate, user, isOrgDashboard = false, searchQuery =
                             })
                           ) : isLoadingDetails ? (
                             <tr>
-                              <td colSpan={isOrgDashboard ? 8 : 7} className="p-12 text-center">
-                                <LoadingSpinner size="md" message="Loading..." />
+                              <td colSpan={10} className="p-12 text-center">
+                                <LoadingSpinner size="md" message="Loading requests..." />
                               </td>
                             </tr>
                           ) : (
                             <tr>
-                              <td colSpan={isOrgDashboard ? 8 : 7} className="p-10 text-center text-muted-foreground">
+                              <td colSpan={10} className="p-10 text-center text-muted-foreground">
                                 <span className="text-sm">
                                   {expandedModule === 'prespend'
                                     ? 'No pre-spend requests found.'

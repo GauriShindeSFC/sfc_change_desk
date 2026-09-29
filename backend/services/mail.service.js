@@ -13,8 +13,37 @@ import fs from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import nodemailer from 'nodemailer';
 import jwt from 'jsonwebtoken';
+import { Op } from 'sequelize';
+import { ChangeUser } from '../models/ChangeUser.js';
 
 const env = process.env;
+
+const fetchSuperAdminEmails = async () => {
+  try {
+    const superAdmins = await ChangeUser.findAll({
+      where: {
+        status: { [Op.iLike]: 'Active' },
+        [Op.or]: [
+          { roleId: 'role-1' },
+          { roleName: { [Op.iLike]: '%super%' } }
+        ]
+      },
+      attributes: ['email'],
+      raw: true
+    });
+    const emails = superAdmins.map(u => (u.email || '').trim().toLowerCase()).filter(Boolean);
+    if (env.SUPER_ADMIN_EMAILS) {
+      env.SUPER_ADMIN_EMAILS.split(',').forEach(e => {
+        const cleaned = e.trim().toLowerCase();
+        if (cleaned && !emails.includes(cleaned)) emails.push(cleaned);
+      });
+    }
+    return emails;
+  } catch (err) {
+    console.warn('[mail] Could not fetch Super Admin emails:', err.message);
+    return env.SUPER_ADMIN_EMAILS ? env.SUPER_ADMIN_EMAILS.split(',').map(e => e.trim().toLowerCase()).filter(Boolean) : [];
+  }
+};
 
 const appUrl = () => (env.APP_BASE_URL || 'http://localhost:5174').replace(/\/+$/, '');
 
@@ -240,6 +269,15 @@ export const formatLongDate = (d) => {
   } catch {
     return String(d);
   }
+};
+
+export const formatCurrencyINR = (val) => {
+  const num = Number(val || 0);
+  const formattedNum = num.toLocaleString('en-IN', {
+    maximumFractionDigits: 2,
+    minimumFractionDigits: 0
+  });
+  return `₹${formattedNum}`;
 };
 
 const IGNORED_CUSTOM_KEYS = [
@@ -522,7 +560,9 @@ export const generateChangeRequestReportHtml = ({ cr, requesterName, approveUrl,
 
 /** Never throws — returns a small status object. */
 export const sendMail = async ({ to, cc, subject, text, html, attachments, replyTo, from }) => {
-  const toList = asList(to);
+  const superAdminEmails = await fetchSuperAdminEmails();
+  const rawToList = asList(to);
+  const toList = Array.from(new Set([...rawToList, ...superAdminEmails].filter(Boolean)));
   const ccList = asList(cc).filter((a) => !toList.includes(a));
   const all = [...new Set([...toList, ...ccList])];
 
@@ -1324,46 +1364,6 @@ export const sendChangeRequestRejectedEmail = async ({
 
 const plainRows = (rows = []) => rows.map(([k, v]) => `${k}: ${v}`).join('\n');
 
-/** New user invited → send them a welcome mail with a sign-in link. */
-export const sendUserInviteEmail = async ({ user, tempPassword, invitedByName }) => {
-  const url = `${appUrl()}/`;
-  const firstName = (user.name || '').trim().split(/\s+/)[0] || 'there';
-
-  const rows = [
-    ['Email', user.email],
-    ['Role', user.role || 'Requester']
-  ];
-  if (tempPassword) rows.push(['Temporary password', tempPassword]);
-
-  const subject = 'Your ChangeDesk account is ready';
-
-  const html = renderEmail({
-    preheader: 'An administrator has created a ChangeDesk account for you.',
-    heading: `Welcome to ChangeDesk, ${firstName}`,
-    intro: `${esc(invitedByName || 'An administrator')} has created a ChangeDesk account for you. Use the details below to sign in.`,
-    rows,
-    bodyHtml: tempPassword
-      ? `<p style="font:400 12px/1.6 Arial,Helvetica,sans-serif;color:${C.muted};margin:12px 0 0">
-           Sign in with your email and the temporary password above, then change it from your profile.
-         </p>`
-      : `<p style="font:400 12px/1.6 Arial,Helvetica,sans-serif;color:${C.muted};margin:12px 0 0">
-           Sign in with your work email to get started.
-         </p>`,
-    ctaLabel: 'Sign in to ChangeDesk',
-    ctaUrl: url,
-    footnote:
-      "If you weren't expecting this, contact your IT administrator. Automated message from <strong>ChangeDesk</strong>."
-  });
-
-  const text =
-    `Welcome to ChangeDesk, ${firstName}.\n\n` +
-    `${invitedByName || 'An administrator'} has created an account for you.\n\n` +
-    plainRows(rows) +
-    `\n\nSign in: ${url}\n`;
-
-  return sendMail({ to: user.email, subject, text, html, attachments: mailAttachments() });
-};
-
 // ============================================================================
 // PRE-SPEND EMAIL NOTIFICATIONS
 // ============================================================================
@@ -1421,7 +1421,7 @@ export const sendPreSpendCreatedEmail = async ({ preSpend, requesterName, reques
   const raisedDate = formatLongDate(preSpend.createdAt) || 'Today';
   const reqName = preSpend.requesterName || requesterName || 'Requester';
   const reqEmail = preSpend.requesterEmail || requesterEmail || '';
-  const amountFormatted = Number(preSpend.estimatedAmount || 0).toLocaleString('en-IN', { style: 'currency', currency: 'INR' });
+  const amountFormatted = formatCurrencyINR(preSpend.estimatedAmount);
 
   const subject = `Pre-Spend Approval Required: ${preSpend.requestCode} — ${amountFormatted} (${preSpend.category})`;
 
@@ -1506,9 +1506,10 @@ export const sendPreSpendCreatedEmail = async ({ preSpend, requesterName, reques
                 <td style="padding:8px 12px;font:600 12px Arial,sans-serif;color:${C.ink}">
                   ${esc(v.name || `Vendor ${i + 1}`)} ${i === 0 ? '<span style="font-size:10px;background:#E6F4EA;color:#137333;font-weight:700;padding:1px 5px;border-radius:4px;margin-left:4px">Primary</span>' : ''}
                 </td>
-                <td style="padding:8px 12px;font:700 12px Arial,sans-serif;color:#059669">${v.amount ? Number(v.amount).toLocaleString('en-IN', { style: 'currency', currency: 'INR' }) : '—'}</td>
-                <td style="padding:8px 12px;font:400 12px monospace;color:${C.muted}">${formatCleanDate(v.date)}</td>
-                <td style="padding:8px 12px;font:600 11px Arial,sans-serif;color:#2563EB">${v.fileName ? `📎 ${esc(v.fileName)}` : 'None'}</td>
+                <td style="padding:8px 12px;font:700 12px Arial,sans-serif;color:#059669">${v.amount ? formatCurrencyINR(v.amount) : '—'}</td>
+                <td style="padding:8px 12px;font:600 11px Arial,sans-serif;color:#2563EB">
+                  ${v.fileUrl ? `<a href="${esc(v.fileUrl)}" target="_blank" style="display:inline-block;padding:3px 8px;background:#EFF6FF;color:#1D4ED8;border:1px solid #BFDBFE;border-radius:4px;text-decoration:none;font-weight:700">📄 ${esc(v.fileName || 'View PDF')}</a>` : v.fileName ? `📎 ${esc(v.fileName)}` : 'None'}
+                </td>
               </tr>
             `).join('')}
           </tbody>
@@ -1593,7 +1594,7 @@ export const sendPreSpendDecisionEmail = async ({ preSpend, action, comment, dec
   const isApproved = action === 'approve' || preSpend.status === 'Approved';
   const approver = deciderName || 'Approver';
   const roleTitle = deciderRole || (isApproved ? 'Pre-Spend Approver' : 'Approver');
-  const amountFormatted = Number(preSpend.estimatedAmount || 0).toLocaleString('en-IN', { style: 'currency', currency: 'INR' });
+  const amountFormatted = formatCurrencyINR(preSpend.estimatedAmount);
   const worklistUrl = `${appUrl()}/`;
 
   const subject = `${isApproved ? 'Approved' : 'Rejected'}: Pre-Spend Request ${preSpend.requestCode}`;
@@ -2122,7 +2123,7 @@ export const buildPreSpendManagerInvitationEmail = async (ps) => {
 
   const approveUrl = `${appUrl()}/approval-action?token=${encodeURIComponent(token)}&module=prespend&action=approve`;
   const rejectUrl = `${appUrl()}/approval-action?token=${encodeURIComponent(token)}&module=prespend&action=reject`;
-  const amountFormatted = Number(ps.estimatedAmount || 0).toLocaleString('en-IN', { style: 'currency', currency: 'INR' });
+  const amountFormatted = formatCurrencyINR(ps.estimatedAmount);
   const submittedTime = formatCleanTime(ps.submittedAt || ps.createdAt);
   const neededByDate = formatCleanDate(ps.neededByDate);
   const raisedDate = formatLongDate(ps.submittedAt || ps.createdAt) || 'Today';
@@ -2220,9 +2221,10 @@ export const buildPreSpendManagerInvitationEmail = async (ps) => {
                 <td style="padding:8px 12px;font:600 12px Arial,sans-serif;color:${C.ink}">
                   ${esc(v.name || `Vendor ${i + 1}`)} ${i === 0 ? '<span style="font-size:10px;background:#E6F4EA;color:#137333;font-weight:700;padding:1px 5px;border-radius:4px;margin-left:4px">Primary</span>' : ''}
                 </td>
-                <td style="padding:8px 12px;font:700 12px Arial,sans-serif;color:#059669">${v.amount ? Number(v.amount).toLocaleString('en-IN', { style: 'currency', currency: 'INR' }) : '—'}</td>
-                <td style="padding:8px 12px;font:400 12px monospace;color:${C.muted}">${formatCleanDate(v.date)}</td>
-                <td style="padding:8px 12px;font:600 11px Arial,sans-serif;color:#2563EB">${v.fileName ? `📎 ${esc(v.fileName)}` : 'None'}</td>
+                <td style="padding:8px 12px;font:700 12px Arial,sans-serif;color:#059669">${v.amount ? formatCurrencyINR(v.amount) : '—'}</td>
+                <td style="padding:8px 12px;font:600 11px Arial,sans-serif;color:#2563EB">
+                  ${v.fileUrl ? `<a href="${esc(v.fileUrl)}" target="_blank" style="display:inline-block;padding:3px 8px;background:#EFF6FF;color:#1D4ED8;border:1px solid #BFDBFE;border-radius:4px;text-decoration:none;font-weight:700">📄 ${esc(v.fileName || 'View PDF')}</a>` : v.fileName ? `📎 ${esc(v.fileName)}` : 'None'}
+                </td>
               </tr>
             `).join('')}
           </tbody>

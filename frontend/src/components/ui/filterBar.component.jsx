@@ -2,10 +2,11 @@ import React from 'react';
 import { Calendar } from 'lucide-react';
 
 const DATE_OPTIONS = [
-  { value: 'overall', label: 'Overall' },
-  { value: 'last_7_days', label: '7 Days' },
-  { value: 'this_month', label: 'This Month' },
-  { value: 'last_month', label: 'Last Month' },
+  { value: 'overall', label: 'Lifetime' },
+  { value: 'last_7_days', label: 'Last 7 days' },
+  { value: 'last_30_days', label: 'Last 30 days' },
+  { value: 'this_month', label: 'This month' },
+  { value: 'last_month', label: 'Last month' },
   { value: 'custom', label: 'Custom' }
 ];
 

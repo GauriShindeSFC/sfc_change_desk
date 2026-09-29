@@ -411,9 +411,34 @@ export default function ChangeRequestModal({ cr, onClose, onApprove, onReject, o
                 isCurrentPending = !isFinished && !isRejected && isApproved;
               }
 
-              const circleBg = isStepRejected ? '#DC2626' : isFinished ? '#10B981' : isCurrentPending ? '#FFFBEB' : 'var(--card-bg)';
-              const circleBorder = isStepRejected ? '2px solid #DC2626' : isFinished ? '2px solid #10B981' : isCurrentPending ? '2px solid #F59E0B' : '2px solid var(--border-color)';
-              const textColor = isStepRejected ? '#DC2626' : isFinished ? '#10B981' : isCurrentPending ? '#D97706' : 'var(--text-secondary)';
+              // State 1 (Rejected): Red (#DC2626) with '✖'
+              // State 2 (Done / Completed / Approved): Green (#10B981) with '✔'
+              // State 3 (Waiting for Approval / Pending): Yellow (#FEF3C7 bg, #F59E0B border) with Amber Dot '•' (No tick)
+              // State 4 (Rest / Upcoming): Greyed out (border-border, bg-card, muted text)
+
+              const circleBg = isStepRejected
+                ? '#DC2626'
+                : isFinished
+                ? '#10B981'
+                : isCurrentPending
+                ? '#FEF3C7'
+                : 'var(--card-bg)';
+
+              const circleBorder = isStepRejected
+                ? 'border-[#DC2626]'
+                : isFinished
+                ? 'border-[#10B981]'
+                : isCurrentPending
+                ? 'border-[#F59E0B]'
+                : 'border-border';
+
+              const textColor = isStepRejected
+                ? 'text-[#DC2626]'
+                : isFinished
+                ? 'text-[#059669]'
+                : isCurrentPending
+                ? 'text-[#D97706]'
+                : 'text-[#94A3B8]';
 
               // Connector line color to next step
               const nextStepFinished = (idx + 1 < steps.length) && (
@@ -423,11 +448,26 @@ export default function ChangeRequestModal({ cr, onClose, onApprove, onReject, o
                 : false
               );
               const nextStepRejected = isRejected && (idx + 1) === currentStepIdx;
-              const connectorColor = nextStepRejected ? '#DC2626' : nextStepFinished ? '#10B981' : 'var(--border-color)';
+              const connectorColor = nextStepRejected
+                ? '#DC2626'
+                : nextStepFinished
+                ? '#10B981'
+                : 'var(--border-color)';
 
               const stepDate = isFinished ? getStepDate(step) : '';
               const stepTime = isFinished ? getStepTime(step) : '';
               const tooltipInfo = getStepTooltipInfo(step);
+
+              const getStepLabel = () => {
+                if (step === 'Requested') return 'Requested';
+                if (step === 'Manager Review') return isFinished ? 'Manager Approved' : 'Manager Review';
+                if (step === 'Approved') return isFinished ? 'Approved' : isCurrentPending ? 'Pending Approval' : 'Approval';
+                if (step === 'Implemented') return isFinished ? 'Implemented' : isCurrentPending ? 'Pending Implementation' : 'Implementation';
+                if (step === 'Rejected') return 'Rejected';
+                return step;
+              };
+
+              const displayStepLabel = getStepLabel();
 
               return (
                 <React.Fragment key={step}>
@@ -439,17 +479,10 @@ export default function ChangeRequestModal({ cr, onClose, onApprove, onReject, o
                   >
                     {/* Circle Node */}
                     <div
-                      className={`flex h-8 w-8 items-center justify-center rounded-full border-2 transition-transform duration-150 [transition-timing-function:ease] ${
+                      className={`flex h-8 w-8 items-center justify-center rounded-full border-2 transition-transform duration-150 [transition-timing-function:ease] ${circleBorder} ${
                         hoveredStepIdx === idx ? 'scale-[1.15]' : 'scale-100'
-                      } ${
-                        isStepRejected
-                          ? 'border-[#DC2626] bg-[#DC2626] shadow-none'
-                          : isFinished
-                          ? 'border-[#10B981] bg-[#10B981] shadow-[0_0_12px_rgba(16,185,129,0.25)]'
-                          : isCurrentPending
-                          ? 'border-[#F59E0B] bg-[#FFFBEB] shadow-[0_0_10px_rgba(245,158,11,0.2)]'
-                          : 'border-border bg-card shadow-none'
                       }`}
+                      style={{ backgroundColor: circleBg }}
                     >
                       {isStepRejected ? (
                         <X size={18} color="#FFFFFF" strokeWidth={3} />
@@ -461,22 +494,18 @@ export default function ChangeRequestModal({ cr, onClose, onApprove, onReject, o
                     </div>
 
                     {/* Step Title */}
-                    <span
-                      className={`mt-2 text-center text-[0.825rem] font-extrabold ${
-                        isStepRejected ? 'text-[#DC2626]' : isFinished ? 'text-[#10B981]' : isCurrentPending ? 'text-[#D97706]' : 'text-muted-foreground'
-                      }`}
-                    >
-                      {step}
+                    <span className={`mt-2 text-center text-[0.825rem] font-extrabold ${textColor}`}>
+                      {displayStepLabel}
                     </span>
 
                     {/* Step Date & Time */}
                     {stepDate && (
-                      <span className={`mt-[0.2rem] text-center font-mono text-[0.725rem] font-semibold ${isFinished ? 'text-[#10B981]' : 'text-muted-foreground'}`}>
+                      <span className={`mt-[0.2rem] text-center font-mono text-[0.725rem] font-semibold ${textColor}`}>
                         {stepDate}
                       </span>
                     )}
                     {stepTime && (
-                      <span className={`mt-[0.1rem] text-center font-mono text-[0.7rem] font-medium ${isFinished ? 'text-[#059669]' : 'text-muted-foreground'}`}>
+                      <span className={`mt-[0.1rem] text-center font-mono text-[0.7rem] font-medium ${textColor}`}>
                         {stepTime}
                       </span>
                     )}
@@ -490,8 +519,9 @@ export default function ChangeRequestModal({ cr, onClose, onApprove, onReject, o
                       >
                         <div className="mb-[0.3rem] border-b border-border pb-1">
                           <span
-                            className="text-[0.725rem] font-extrabold uppercase tracking-[0.04em]"
-                            style={{ color: stepColor }}
+                            className={`text-[0.725rem] font-extrabold uppercase tracking-[0.04em] ${
+                              isStepRejected ? 'text-[#DC2626]' : isFinished ? 'text-[#10B981]' : isCurrentPending ? 'text-[#D97706]' : 'text-foreground'
+                            }`}
                           >
                             {tooltipInfo.title}
                           </span>

@@ -66,12 +66,12 @@ export const requireRole = (allowedRoles = []) => {
 };
 
 /**
- * Restricts organization-scoped queries to Super Admin
+ * Restricts organization-scoped queries to Super Admin and Board Members
  */
 export const requireOrganizationScopeRole = (req, res, next) => {
   const scope = String(req.query.scope || '').toLowerCase();
   if (scope !== 'organization' && scope !== 'org') return next();
-  return requireRole(['Super Admin', 'role-1'])(req, res, next);
+  return requireRole(['Super Admin', 'role-1', 'role-board', 'role-6', 'Board Member', 'Board'])(req, res, next);
 };
 
 /**

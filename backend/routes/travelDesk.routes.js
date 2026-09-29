@@ -11,7 +11,7 @@ const router = express.Router();
 
 router.get(
   '/',
-  requireWorklistViewRole(['Admin', 'Super Admin', 'Travel Admin', 'role-1', 'role-2', 'role-2-travel', 'role-board']),
+  requireWorklistViewRole(['Admin', 'Super Admin', 'Travel Admin', 'role-1', 'role-2', 'role-2-travel', 'role-board', 'role-6', 'Board Member', 'Board']),
   requireOrganizationScopeRole,
   asyncHandler(async (req, res) => {
     const isWorklist = req.query.view === 'worklist';

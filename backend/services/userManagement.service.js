@@ -5,7 +5,6 @@ import { Employee } from '../models/Employee.js';
 import { IdentityResolver } from './identityResolver.service.js';
 import { addAuditLog } from './auditLog.service.js';
 import { normalizeRole } from '../config/constants.js';
-import { sendUserInviteEmail } from './mail.service.js';
 
 // ---------- Category Assignments for Change Managers ----------
 

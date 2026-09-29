@@ -14,7 +14,8 @@ import {
   ExternalLink,
   ChevronDown,
   ChevronRight,
-  Plus
+  Plus,
+  Receipt
 } from 'lucide-react';
 import { useTheme } from '../../context/ThemeContext';
 import { useWorklistActionableDots } from '../../queries/worklist.queries';
@@ -39,6 +40,7 @@ function Sidebar({
   const roleId = user?.roleId || '';
   const rawRoleIds = Array.isArray(user?.rolesList) ? user.rolesList : [];
   const isSuperAdmin = Boolean(user?.isSuperAdmin || roleId === 'role-1' || rawRoleIds.includes('role-1') || roleName.includes('super'));
+  const isBoardUser = Boolean(user?.isBoardMember || roleId === 'role-board' || roleId === 'role-6' || rawRoleIds.includes('role-6') || rawRoleIds.includes('role-board') || roleName.includes('board'));
 
   const allowedWorklistModuleIds = getAllowedWorklistModules(user);
   const isApprover = allowedWorklistModuleIds.length > 0;
@@ -67,7 +69,8 @@ function Sidebar({
     { id: 'Change Request', path: '/change-requests/new', label: 'Change Request', icon: FileText, showPlus: true },
     { id: 'Pre-Spend Request', path: '/pre-spend', label: 'Pre-Spend Request', icon: IndianRupee, showPlus: true },
     { id: 'Travel Desk', path: '/travel-desk', label: 'Travel Desk', icon: Plane, showPlus: true },
-    { id: 'Tribe CRM', label: 'Tribe CRM', icon: Users, externalUrl: 'https://tribe.stfox.com/jsp/iamlogin.jsp' }
+    { id: 'Tribe CRM', label: 'Tribe CRM', icon: Users, externalUrl: 'https://tribe.stfox.com/jsp/iamlogin.jsp' },
+    { id: 'Reimbursement', label: 'Reimbursement', icon: Receipt, externalUrl: 'https://expense.stfox.com/login?serviceurl=%2Fhome' }
   ];
 
   // On desktop: compact rail by default, expands to full width on hover.
@@ -108,12 +111,16 @@ function Sidebar({
           className={`shrink-0 ${isActive ? 'text-primary-foreground' : 'text-muted-foreground'}`}
         />
         {!mini && (
-          <span className="flex-1 overflow-hidden text-ellipsis whitespace-nowrap text-left">
-            {item.label}
+          <span className="flex-1 flex items-center gap-1.5 overflow-hidden text-ellipsis whitespace-nowrap text-left">
+            {item.showPlus && (
+              <Plus
+                size={13}
+                strokeWidth={2.5}
+                className={`shrink-0 ${isActive ? 'text-primary-foreground' : 'text-muted-foreground'}`}
+              />
+            )}
+            <span className="truncate">{item.label}</span>
           </span>
-        )}
-        {!mini && item.showPlus && (
-          <Plus size={15} style={{ color: isActive ? 'var(--primary-foreground)' : 'var(--text-secondary)', flexShrink: 0, marginLeft: 'auto', strokeWidth: 2.25 }} />
         )}
         {!mini && item.externalUrl && (
           <ExternalLink size={13} className="ml-auto shrink-0 text-muted-foreground" />
@@ -196,7 +203,7 @@ function Sidebar({
 
         const visibleMgmtItems = [];
 
-        if (isSuperAdmin) {
+        if (isSuperAdmin || isBoardUser) {
           visibleMgmtItems.push({ id: 'Organization Dashboard', path: '/org-dashboard', label: 'Organization Dashboard', icon: LayoutGrid });
         }
 

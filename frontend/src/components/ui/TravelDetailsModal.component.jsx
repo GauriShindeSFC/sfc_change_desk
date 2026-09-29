@@ -158,14 +158,14 @@ export default function TravelDetailsModal({ item, onClose, onApprove, onReject,
   );
 
   const statusBadgeClass = isApproved
-    ? 'bg-[#ECFDF5] text-[#059669]'
+    ? 'bg-[#F5F3FF] text-[#7C3AED]'
     : isRejected
       ? 'bg-[#FEF2F2] text-[#DC2626]'
       : isShortNoticeFlight
         ? 'bg-[#FEF2F2] text-[#DC2626]'
-        : 'bg-[#FFFBEB] text-[#D97706]';
+        : 'bg-[#FEF3C7] text-[#D97706]';
   const statusDotClass = isApproved
-    ? 'bg-[#10B981]'
+    ? 'bg-[#8B5CF6]'
     : isRejected
       ? 'bg-[#EF4444]'
       : isShortNoticeFlight
@@ -290,19 +290,73 @@ export default function TravelDetailsModal({ item, onClose, onApprove, onReject,
             <div className="flex w-full items-start px-2">
               {steps.map((step, idx) => {
                 const isLast = idx === steps.length - 1;
-                const isStepCompleted = idx <= currentStepIdx;
                 const isStepRejected = isRejected && idx === currentStepIdx;
 
-                const stepAccentClass = isStepRejected ? 'text-[#DC2626]' : isStepCompleted ? 'text-[#10B981]' : 'text-border';
-                const circleBgClass = isStepRejected ? 'bg-[#DC2626]' : isStepCompleted ? 'bg-[#10B981]' : 'bg-card';
-                const circleBorderClass = isStepRejected ? 'border-[#DC2626]' : isStepCompleted ? 'border-[#10B981]' : 'border-border';
+                let isFinished = false;
+                let isCurrentPending = false;
 
-                const nextStepCompleted = (idx + 1) <= currentStepIdx;
+                if (step === 'Requested') {
+                  isFinished = true;
+                } else if (step === 'Manager Review') {
+                  isFinished = hasManagerApproved || isApproved;
+                  isCurrentPending = !isFinished && !isRejected && (isStage1Pending || currentStepIdx === 1);
+                } else if (step === 'Approved') {
+                  isFinished = isApproved;
+                  isCurrentPending = !isFinished && !isRejected && hasManagerApproved;
+                }
+
+                // State 1 (Rejected): Red (#DC2626) with '✖'
+                // State 2 (Done / Completed / Approved): Green (#10B981) with '✔'
+                // State 3 (Waiting for Approval / Pending): Yellow (#FEF3C7 bg, #F59E0B border) with Amber Dot '•' (No tick)
+                // State 4 (Rest / Upcoming): Greyed out (border-border, bg-card, muted text)
+
+                const circleBg = isStepRejected
+                  ? '#DC2626'
+                  : isFinished
+                  ? '#10B981'
+                  : isCurrentPending
+                  ? '#FEF3C7'
+                  : 'var(--card-bg)';
+
+                const circleBorder = isStepRejected
+                  ? 'border-[#DC2626]'
+                  : isFinished
+                  ? 'border-[#10B981]'
+                  : isCurrentPending
+                  ? 'border-[#F59E0B]'
+                  : 'border-border';
+
+                const textColor = isStepRejected
+                  ? 'text-[#DC2626]'
+                  : isFinished
+                  ? 'text-[#059669]'
+                  : isCurrentPending
+                  ? 'text-[#D97706]'
+                  : 'text-[#94A3B8]';
+
+                const nextStepFinished = (idx + 1 < steps.length) && (
+                  steps[idx + 1] === 'Manager Review' ? (hasManagerApproved || isApproved)
+                  : steps[idx + 1] === 'Approved' ? isApproved
+                  : false
+                );
                 const nextStepRejected = isRejected && (idx + 1) === currentStepIdx;
-                const connectorBgClass = nextStepRejected ? 'bg-[#DC2626]' : nextStepCompleted ? 'bg-[#10B981]' : 'bg-border';
+                const connectorBgClass = nextStepRejected
+                  ? 'bg-[#DC2626]'
+                  : nextStepFinished
+                  ? 'bg-[#10B981]'
+                  : 'bg-border';
 
-                const stepDate = getStepDate(step);
-                const stepTime = getStepTime(step);
+                const getStepLabel = () => {
+                  if (step === 'Requested') return 'Requested';
+                  if (step === 'Manager Review') return isFinished ? 'Manager Approved' : 'Manager Review';
+                  if (step === 'Approved') return isFinished ? 'Approved' : isCurrentPending ? 'Pending Approval' : 'Approval';
+                  if (step === 'Rejected') return 'Rejected';
+                  return step;
+                };
+
+                const displayStepLabel = getStepLabel();
+                const stepDate = isFinished ? getStepDate(step) : '';
+                const stepTime = isFinished ? getStepTime(step) : '';
                 const tooltipInfo = getStepTooltipInfo(step);
 
                 return (
@@ -310,41 +364,46 @@ export default function TravelDetailsModal({ item, onClose, onApprove, onReject,
                     <div
                       onMouseEnter={() => setHoveredStepIdx(idx)}
                       onMouseLeave={() => setHoveredStepIdx(null)}
-                      className={`relative z-[3] flex min-w-[100px] flex-col items-center ${isStepCompleted ? 'cursor-pointer' : 'cursor-default'}`}
+                      className={`relative z-[3] flex min-w-[100px] flex-col items-center ${isFinished ? 'cursor-pointer' : 'cursor-default'}`}
                     >
                       <div
-                        className={`flex h-8 w-8 items-center justify-center rounded-full border-2 transition-transform duration-150 ease-[ease] ${circleBgClass} ${circleBorderClass} ${hoveredStepIdx === idx ? 'scale-[1.15]' : 'scale-100'} ${isStepCompleted && !isStepRejected ? 'shadow-[0_0_12px_rgba(16,185,129,0.25)]' : 'shadow-none'}`}
+                        className={`flex h-8 w-8 items-center justify-center rounded-full border-2 transition-transform duration-150 ease-[ease] ${circleBorder} ${
+                          hoveredStepIdx === idx ? 'scale-[1.15]' : 'scale-100'
+                        }`}
+                        style={{ backgroundColor: circleBg }}
                       >
                         {isStepRejected ? (
                           <X size={18} strokeWidth={3} className="text-white" />
-                        ) : isStepCompleted ? (
+                        ) : isFinished ? (
                           <Check size={18} strokeWidth={3} className="text-white" />
+                        ) : isCurrentPending ? (
+                          <span className="h-2 w-2 rounded-full bg-[#F59E0B]" />
                         ) : null}
                       </div>
 
-                      <span className={`mt-2 text-center text-[0.825rem] font-extrabold ${stepAccentClass}`}>
-                        {step}
+                      <span className={`mt-2 text-center text-[0.825rem] font-extrabold ${textColor}`}>
+                        {displayStepLabel}
                       </span>
 
                       {stepDate && (
-                        <span className={`mt-[0.2rem] text-center text-[0.725rem] font-semibold font-[var(--font-mono)] ${isStepCompleted ? 'text-[#10B981]' : 'text-muted-foreground'}`}>
+                        <span className={`mt-[0.2rem] text-center text-[0.725rem] font-semibold font-[var(--font-mono)] ${textColor}`}>
                           {stepDate}
                         </span>
                       )}
                       {stepTime && (
-                        <span className={`mt-[0.1rem] text-center text-[0.7rem] font-medium font-[var(--font-mono)] ${isStepCompleted ? 'text-[#059669]' : 'text-muted-foreground'}`}>
+                        <span className={`mt-[0.1rem] text-center text-[0.7rem] font-medium font-[var(--font-mono)] ${textColor}`}>
                           {stepTime}
                         </span>
                       )}
 
-                      {hoveredStepIdx === idx && tooltipInfo && isStepCompleted && (
+                      {hoveredStepIdx === idx && tooltipInfo && isFinished && (
                         <div
                           className={`pointer-events-none absolute bottom-[115%] z-[300] w-[220px] rounded-[10px] border border-border bg-card px-[0.85rem] py-[0.65rem] shadow-[0_10px_25px_rgba(0,0,0,0.25)] ${
                             idx === 0 ? 'left-0' : isLast ? 'right-0 left-auto' : 'left-1/2 -translate-x-1/2'
                           }`}
                         >
                           <div className="mb-[0.3rem] border-b border-border pb-1">
-                            <span className={`text-[0.725rem] font-extrabold uppercase tracking-[0.04em] ${stepAccentClass}`}>
+                            <span className={`text-[0.725rem] font-extrabold uppercase tracking-[0.04em] ${textColor}`}>
                               {tooltipInfo.title}
                             </span>
                           </div>
@@ -559,7 +618,7 @@ export default function TravelDetailsModal({ item, onClose, onApprove, onReject,
                 </div>
               )}
 
-              {(item.approvedComment || item.rejectedComment || item.rejectionReason) && (
+              {(!Array.isArray(item.comments) || item.comments.length === 0) && (item.approvedComment || item.rejectedComment || item.rejectionReason) && (
                 <div className="break-words rounded-md border border-border bg-card px-[0.85rem] py-[0.65rem] text-[0.825rem] leading-[1.45] text-foreground">
                   <div className="mb-[0.2rem] text-[0.725rem] font-bold uppercase text-muted-foreground">
                     Decision Comment / Reason:

@@ -18,7 +18,7 @@ router.get('/past-vendor', asyncHandler(async (req, res) => {
 
 router.get(
   '/',
-  requireWorklistViewRole(['Admin', 'Super Admin', 'PreSpend Admin', 'role-1', 'role-2', 'role-2-prespend', 'role-board']),
+  requireWorklistViewRole(['Admin', 'Super Admin', 'PreSpend Admin', 'role-1', 'role-2', 'role-2-prespend', 'role-board', 'role-6', 'Board Member', 'Board']),
   requireOrganizationScopeRole,
   asyncHandler(async (req, res) => {
     const isWorklist = req.query.view === 'worklist';

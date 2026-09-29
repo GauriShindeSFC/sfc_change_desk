@@ -38,9 +38,10 @@ export default function PreSpendDetailsModal({ item, onClose, onApprove, onRejec
 
   const roleName = (user?.role || '').toLowerCase();
   const roleId = user?.roleId || '';
-  const isSuperAdmin = roleId === 'role-1' || roleName.includes('super');
-  const isBoardUser = roleId === 'role-board' || roleName.includes('board');
-  const isPreSpendAdmin = roleId === 'role-2-prespend' || (roleName.includes('admin') && (roleName.includes('spend') || roleName.includes('prespend')));
+  const rawRoleIds = Array.isArray(user?.rolesList) ? user.rolesList : [];
+  const isSuperAdmin = Boolean(user?.isSuperAdmin || roleId === 'role-1' || rawRoleIds.includes('role-1') || roleName.includes('super'));
+  const isBoardUser = Boolean(user?.isBoardMember || roleId === 'role-board' || roleId === 'role-6' || rawRoleIds.includes('role-6') || rawRoleIds.includes('role-board') || roleName.includes('board'));
+  const isPreSpendAdmin = Boolean(user?.isPreSpendAdmin || roleId === 'role-2-prespend' || rawRoleIds.includes('role-2-prespend') || (roleName.includes('admin') && (roleName.includes('spend') || roleName.includes('prespend'))));
 
   const status = item.status || 'Pending Approval';
   const isApproved = status.toLowerCase().includes('approved') || status.toLowerCase().includes('procured');
@@ -63,17 +64,17 @@ export default function PreSpendDetailsModal({ item, onClose, onApprove, onRejec
           : status;
 
   const statusBadgeClass = isApproved
-    ? 'bg-[#ECFDF5] text-[#059669]'
+    ? 'bg-[#F5F3FF] text-[#7C3AED]'
     : isRejected
       ? 'bg-[#FEF2F2] text-[#DC2626]'
-      : 'bg-[#FFFBEB] text-[#D97706]';
-  const statusDotClass = isApproved ? 'bg-[#10B981]' : isRejected ? 'bg-[#EF4444]' : 'bg-[#F59E0B]';
+      : 'bg-[#FEF3C7] text-[#D97706]';
+  const statusDotClass = isApproved ? 'bg-[#8B5CF6]' : isRejected ? 'bg-[#EF4444]' : 'bg-[#F59E0B]';
 
   const steps = isRejected
     ? ['Requested', 'Rejected']
     : ['Requested', 'Manager Review', 'Approved'];
 
-  const currentStepIdx = isRejected ? 1 : isApproved ? 2 : hasManagerApproved ? 2 : 1;
+  const currentStepIdx = isRejected ? 1 : isApproved ? 2 : hasManagerApproved ? 1 : 0;
 
   const getStepDate = (stepName) => {
     const todayFormatted = new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
@@ -243,19 +244,77 @@ export default function PreSpendDetailsModal({ item, onClose, onApprove, onRejec
             <div className="flex w-full items-start px-2">
               {steps.map((step, idx) => {
                 const isLast = idx === steps.length - 1;
-                const isStepCompleted = idx <= currentStepIdx;
                 const isStepRejected = isRejected && idx === currentStepIdx;
 
-                const stepAccentClass = isStepRejected ? 'text-[#DC2626]' : isStepCompleted ? 'text-[#10B981]' : 'text-border';
-                const circleBgClass = isStepRejected ? 'bg-[#DC2626]' : isStepCompleted ? 'bg-[#10B981]' : 'bg-card';
-                const circleBorderClass = isStepRejected ? 'border-[#DC2626]' : isStepCompleted ? 'border-[#10B981]' : 'border-border';
+                // Step completion logic:
+                // Step 0: 'Requested' is always completed
+                // Step 1: 'Manager Review' is completed if hasManagerApproved or isApproved
+                // Step 2: 'Approved' is completed if isApproved
+                let isFinished = false;
+                let isCurrentPending = false;
 
-                const nextStepCompleted = (idx + 1) <= currentStepIdx;
+                if (step === 'Requested') {
+                  isFinished = true;
+                } else if (step === 'Manager Review') {
+                  isFinished = hasManagerApproved || isApproved;
+                  isCurrentPending = !isFinished && !isRejected && (isStage1Pending || currentStepIdx === 1);
+                } else if (step === 'Approved') {
+                  isFinished = isApproved;
+                  isCurrentPending = !isFinished && !isRejected && hasManagerApproved;
+                }
+
+                // State 1 (Rejected): Red (#DC2626) with '✖'
+                // State 2 (Done / Completed / Approved): Green (#10B981) with '✔'
+                // State 3 (Waiting for Approval / Pending): Yellow (#FEF3C7 bg, #F59E0B border) with Amber Dot '•' (No tick)
+                // State 4 (Rest / Upcoming): Greyed out (border-border, bg-card, muted text)
+
+                const circleBg = isStepRejected
+                  ? '#DC2626'
+                  : isFinished
+                  ? '#10B981'
+                  : isCurrentPending
+                  ? '#FEF3C7'
+                  : 'var(--card-bg)';
+
+                const circleBorder = isStepRejected
+                  ? 'border-[#DC2626]'
+                  : isFinished
+                  ? 'border-[#10B981]'
+                  : isCurrentPending
+                  ? 'border-[#F59E0B]'
+                  : 'border-border';
+
+                const textColor = isStepRejected
+                  ? 'text-[#DC2626]'
+                  : isFinished
+                  ? 'text-[#059669]'
+                  : isCurrentPending
+                  ? 'text-[#D97706]'
+                  : 'text-[#94A3B8]';
+
+                const nextStepFinished = (idx + 1 < steps.length) && (
+                  steps[idx + 1] === 'Manager Review' ? (hasManagerApproved || isApproved)
+                  : steps[idx + 1] === 'Approved' ? isApproved
+                  : false
+                );
                 const nextStepRejected = isRejected && (idx + 1) === currentStepIdx;
-                const connectorBgClass = nextStepRejected ? 'bg-[#DC2626]' : nextStepCompleted ? 'bg-[#10B981]' : 'bg-border';
+                const connectorBgClass = nextStepRejected
+                  ? 'bg-[#DC2626]'
+                  : nextStepFinished
+                  ? 'bg-[#10B981]'
+                  : 'bg-border';
 
-                const stepDate = getStepDate(step);
-                const stepTime = getStepTime(step);
+                const getStepLabel = () => {
+                  if (step === 'Requested') return 'Requested';
+                  if (step === 'Manager Review') return isFinished ? 'Manager Approved' : 'Manager Review';
+                  if (step === 'Approved') return isFinished ? 'Approved' : isCurrentPending ? 'Pending Approval' : 'Approval';
+                  if (step === 'Rejected') return 'Rejected';
+                  return step;
+                };
+
+                const displayStepLabel = getStepLabel();
+                const stepDate = isFinished ? getStepDate(step) : '';
+                const stepTime = isFinished ? getStepTime(step) : '';
                 const tooltipInfo = getStepTooltipInfo(step);
 
                 return (
@@ -263,41 +322,46 @@ export default function PreSpendDetailsModal({ item, onClose, onApprove, onRejec
                     <div
                       onMouseEnter={() => setHoveredStepIdx(idx)}
                       onMouseLeave={() => setHoveredStepIdx(null)}
-                      className={`relative z-[3] flex min-w-[100px] flex-col items-center ${isStepCompleted ? 'cursor-pointer' : 'cursor-default'}`}
+                      className={`relative z-[3] flex min-w-[100px] flex-col items-center ${isFinished ? 'cursor-pointer' : 'cursor-default'}`}
                     >
                       <div
-                        className={`flex h-8 w-8 items-center justify-center rounded-full border-2 transition-transform duration-150 ease-[ease] ${circleBgClass} ${circleBorderClass} ${hoveredStepIdx === idx ? 'scale-[1.15]' : 'scale-100'} ${isStepCompleted && !isStepRejected ? 'shadow-[0_0_12px_rgba(16,185,129,0.25)]' : 'shadow-none'}`}
+                        className={`flex h-8 w-8 items-center justify-center rounded-full border-2 transition-transform duration-150 ease-[ease] ${circleBorder} ${
+                          hoveredStepIdx === idx ? 'scale-[1.15]' : 'scale-100'
+                        }`}
+                        style={{ backgroundColor: circleBg }}
                       >
                         {isStepRejected ? (
                           <X size={18} strokeWidth={3} className="text-white" />
-                        ) : isStepCompleted ? (
+                        ) : isFinished ? (
                           <Check size={18} strokeWidth={3} className="text-white" />
+                        ) : isCurrentPending ? (
+                          <span className="h-2 w-2 rounded-full bg-[#F59E0B]" />
                         ) : null}
                       </div>
 
-                      <span className={`mt-2 text-center text-[0.825rem] font-extrabold ${stepAccentClass}`}>
-                        {step}
+                      <span className={`mt-2 text-center text-[0.825rem] font-extrabold ${textColor}`}>
+                        {displayStepLabel}
                       </span>
 
                       {stepDate && (
-                        <span className={`mt-[0.2rem] text-center text-[0.725rem] font-semibold font-[var(--font-mono)] ${isStepCompleted ? 'text-[#10B981]' : 'text-muted-foreground'}`}>
+                        <span className={`mt-[0.2rem] text-center text-[0.725rem] font-semibold font-[var(--font-mono)] ${textColor}`}>
                           {stepDate}
                         </span>
                       )}
                       {stepTime && (
-                        <span className={`mt-[0.1rem] text-center text-[0.7rem] font-medium font-[var(--font-mono)] ${isStepCompleted ? 'text-[#059669]' : 'text-muted-foreground'}`}>
+                        <span className={`mt-[0.1rem] text-center text-[0.7rem] font-medium font-[var(--font-mono)] ${textColor}`}>
                           {stepTime}
                         </span>
                       )}
 
-                      {hoveredStepIdx === idx && tooltipInfo && isStepCompleted && (
+                      {hoveredStepIdx === idx && tooltipInfo && isFinished && (
                         <div
                           className={`pointer-events-none absolute bottom-[115%] z-[300] w-[220px] rounded-[10px] border border-border bg-card px-[0.85rem] py-[0.65rem] shadow-[0_10px_25px_rgba(0,0,0,0.25)] ${
                             idx === 0 ? 'left-0' : isLast ? 'right-0 left-auto' : 'left-1/2 -translate-x-1/2'
                           }`}
                         >
                           <div className="mb-[0.3rem] border-b border-border pb-1">
-                            <span className={`text-[0.725rem] font-extrabold uppercase tracking-[0.04em] ${stepAccentClass}`}>
+                            <span className={`text-[0.725rem] font-extrabold uppercase tracking-[0.04em] ${textColor}`}>
                               {tooltipInfo.title}
                             </span>
                           </div>
@@ -530,7 +594,7 @@ export default function PreSpendDetailsModal({ item, onClose, onApprove, onRejec
                 </div>
               )}
 
-              {(item.approvedComment || item.rejectedComment || item.rejectionReason) && (
+              {(!Array.isArray(item.comments) || item.comments.length === 0) && (item.approvedComment || item.rejectedComment || item.rejectionReason) && (
                 <div className="break-words rounded-md border border-border bg-card px-[0.85rem] py-[0.65rem] text-[0.825rem] leading-[1.45] text-foreground">
                   <div className="mb-[0.2rem] text-[0.725rem] font-bold uppercase text-muted-foreground">
                     Decision Comment / Reason:

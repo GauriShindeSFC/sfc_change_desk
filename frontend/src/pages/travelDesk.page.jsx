@@ -620,7 +620,7 @@ export default function TravelDeskPage({ onNavigate, user, travellerName = '', d
                     onClick={() => setCategory(mode.id)}
                     onMouseEnter={() => setHoveredCategory(mode.id)}
                     onMouseLeave={() => setHoveredCategory(null)}
-                    className={`flex cursor-pointer items-start gap-4 rounded-xl p-5 text-left transition-[transform,border-color,box-shadow,background-color] duration-200 ${
+                    className={`flex min-h-[92px] cursor-pointer items-center gap-4 rounded-xl p-[1.1rem] text-left transition-[transform,border-color,box-shadow,background-color] duration-200 ${
                       isHovered ? '-translate-y-[5px]' : 'translate-y-0'
                     } ${
                       selected
