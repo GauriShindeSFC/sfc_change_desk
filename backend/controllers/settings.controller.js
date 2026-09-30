@@ -55,15 +55,18 @@ export const updateRolePermissions = asyncHandler(async (req, res) => {
 });
 
 export const getSettingsAuditLogs = asyncHandler(async (req, res) => {
-  const data = await getSettingsAuditLogsService(req.query.filter || 'All activity');
-  res.json({ success: true, count: data.length, data });
+  const result = await getSettingsAuditLogsService(req.query.filter || 'All activity', {
+    page: req.query.page,
+    limit: req.query.limit
+  });
+  res.json({ success: true, ...result });
 });
 
 export const exportAuditLogs = asyncHandler(async (req, res) => {
   const format = (req.body?.format || req.query?.format || 'excel').toLowerCase();
   const filter = req.body?.filter || req.query?.filter || 'All activity';
 
-  const logs = await getSettingsAuditLogsService(filter);
+  const logs = await getSettingsAuditLogsService(filter, { all: true });
 
   if (format === 'excel' || format === 'xlsx' || format === 'csv') {
     const headers = ['Log ID', 'Timestamp', 'Actor', 'Action', 'Reference', 'Employee Email', 'Category'];

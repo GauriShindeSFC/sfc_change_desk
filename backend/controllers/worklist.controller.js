@@ -4,6 +4,8 @@ import {
   applyWorklistActionService,
   addChangeRequestCommentService
 } from '../services/dashboard.service.js';
+import { getPreSpendRequestsService } from '../services/preSpend.service.js';
+import { getTravelRequestsService } from '../services/travelDesk.service.js';
 
 export const getWorklist = asyncHandler(async (req, res) => {
   const userId = req.user?.userKey || req.user?.id;
@@ -31,6 +33,30 @@ export const getWorklist = asyncHandler(async (req, res) => {
     limit
   });
   res.json({ success: true, ...result });
+});
+
+// Sidebar pending-count dots for all 3 modules in one round-trip, instead of the
+// frontend hitting /worklist, /pre-spend and /travel-desk separately. `limit: 1`
+// keeps the row payload minimal — actionableCount itself is always computed from
+// a full, unpaginated query inside each service, so it stays accurate regardless
+// of the page size requested here.
+export const getWorklistCounts = asyncHandler(async (req, res) => {
+  const userId = req.user?.userKey || req.user?.id;
+
+  const [crResult, psResult, trResult] = await Promise.all([
+    getFilteredChangeRequests({ userId: null, currentUser: req.user, isWorklist: true, actingUserId: userId, page: 1, limit: 1 }),
+    getPreSpendRequestsService({ user: req.user, isWorklist: true, page: 1, limit: 1 }),
+    getTravelRequestsService({ user: req.user, isWorklist: true, page: 1, limit: 1 })
+  ]);
+
+  res.json({
+    success: true,
+    data: {
+      change_request: crResult.actionableCount || 0,
+      prespend: psResult.actionableCount || 0,
+      travel: trResult.actionableCount || 0
+    }
+  });
 });
 
 export const handleWorklistAction = asyncHandler(async (req, res) => {

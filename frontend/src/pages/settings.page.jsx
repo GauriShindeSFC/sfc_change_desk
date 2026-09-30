@@ -111,17 +111,22 @@ function SettingsPage({ user }) {
   const users = usersData || defaultUsers;
 
   const { data: auditLogsData, isLoading: isLoadingAuditLogs } = useQuery({
-    queryKey: ['settings-audit-logs', auditFilter],
+    queryKey: ['settings-audit-logs', auditFilter, auditPage, auditPageSize],
     enabled: activeTab === 'audit',
     queryFn: async () => {
-      const queryParam = auditFilter && auditFilter !== 'All activity' ? `?filter=${encodeURIComponent(auditFilter)}` : '';
-      const res = await apiFetch(`/settings/audit-logs${queryParam}`);
-      if (!res.ok) return [];
+      const params = new URLSearchParams({ page: auditPage, limit: auditPageSize });
+      if (auditFilter && auditFilter !== 'All activity') params.set('filter', auditFilter);
+      const res = await apiFetch(`/settings/audit-logs?${params}`);
+      if (!res.ok) return { data: [], total: 0 };
       const body = await res.json();
-      return body.data && Array.isArray(body.data) ? body.data : [];
+      return {
+        data: body.data && Array.isArray(body.data) ? body.data : [],
+        total: typeof body.total === 'number' ? body.total : 0
+      };
     }
   });
-  const auditLogs = auditLogsData || [];
+  const auditLogs = auditLogsData?.data || [];
+  const auditLogsTotal = auditLogsData?.total || 0;
   const ROLE_TO_ID = {
     'Super Admin': 'role-1',
     'Change Desk Admin': 'role-2-change',
@@ -603,7 +608,7 @@ function SettingsPage({ user }) {
                       </td>
                     </tr>
                   ) : (
-                    auditLogs.slice((auditPage - 1) * auditPageSize, auditPage * auditPageSize).map((log, idx, arr) => (
+                    auditLogs.map((log, idx, arr) => (
                       <tr key={log.id} className={idx === arr.length - 1 ? '' : 'border-b border-border'}>
                         <td className="px-4 py-[0.85rem] font-[var(--font-mono)] text-[0.825rem] text-muted-foreground">
                           {formatAuditTimestamp(log.timestamp)}
@@ -633,7 +638,7 @@ function SettingsPage({ user }) {
             <Pagination
               currentPage={auditPage}
               pageSize={auditPageSize}
-              totalItems={auditLogs.length}
+              totalItems={auditLogsTotal}
               onPageChange={setAuditPage}
               onPageSizeChange={(size) => {
                 setAuditPageSize(size);

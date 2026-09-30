@@ -234,7 +234,7 @@ export default function TravelDetailsModal({ item, onClose, onApprove, onReject,
         </div>
 
         {/* Scrollable Content */}
-        <div className="flex flex-col gap-6 overflow-y-auto px-7 py-6">
+        <div className="flex min-h-0 flex-1 flex-col gap-6 overflow-y-auto px-7 py-6">
 
           {/* Section 1: Route Spotlight */}
           <div className="flex flex-wrap items-center justify-between gap-4 rounded-xl border border-border bg-input p-5">

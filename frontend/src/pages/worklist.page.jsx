@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Clock, Check, X, RotateCw, FileText, IndianRupee, Plane, MessageSquare, AlertTriangle } from 'lucide-react';
 import ChangeRequestModal from '../components/ui/changeRequestModal.component';
 import PreSpendDetailsModal from '../components/ui/PreSpendDetailsModal.component';
@@ -111,10 +111,8 @@ function MyWorklistPage({ onNavigate, searchQuery = '', user, isOrgWorklist = fa
         ...(isOrgWorklist && { scope: 'organization' })
       });
 
-      const headers = user?.id ? { 'x-user-id': user.id } : {};
-
       if (activeModule === 'prespend') {
-        const res = await apiFetch(`/pre-spend?${params}`, { headers });
+        const res = await apiFetch(`/pre-spend?${params}`);
         if (!res.ok) throw new Error('Failed to fetch pre-spend worklist');
         const body = await res.json();
         const userEmailLower = (user?.email || '').trim().toLowerCase();
@@ -147,7 +145,7 @@ function MyWorklistPage({ onNavigate, searchQuery = '', user, isOrgWorklist = fa
       }
 
       if (activeModule === 'travel') {
-        const res = await apiFetch(`/travel-desk?${params}`, { headers });
+        const res = await apiFetch(`/travel-desk?${params}`);
         if (!res.ok) throw new Error('Failed to fetch travel worklist');
         const body = await res.json();
         const userEmailLower = (user?.email || '').trim().toLowerCase();
@@ -184,7 +182,7 @@ function MyWorklistPage({ onNavigate, searchQuery = '', user, isOrgWorklist = fa
         };
       }
 
-      const res = await apiFetch(`/worklist?${params}`, { headers });
+      const res = await apiFetch(`/worklist?${params}`);
       if (!res.ok) throw new Error('Failed to fetch worklist');
       const body = await res.json();
       return {
@@ -209,10 +207,8 @@ function MyWorklistPage({ onNavigate, searchQuery = '', user, isOrgWorklist = fa
         ...(isOrgWorklist && { scope: 'organization' })
       });
 
-      const headers = user?.id ? { 'x-user-id': user.id } : {};
-
       if (activeModule === 'prespend') {
-        const res = await apiFetch(`/pre-spend?${params}`, { headers });
+        const res = await apiFetch(`/pre-spend?${params}`);
         if (!res.ok) return { statusCounts: { All: 0, Pending: 0, Approved: 0, Rejected: 0 }, metrics: { pending: 0, approved: 0, rejected: 0 } };
         const body = await res.json();
         return {
@@ -222,7 +218,7 @@ function MyWorklistPage({ onNavigate, searchQuery = '', user, isOrgWorklist = fa
       }
 
       if (activeModule === 'travel') {
-        const res = await apiFetch(`/travel-desk?${params}`, { headers });
+        const res = await apiFetch(`/travel-desk?${params}`);
         if (!res.ok) return { statusCounts: { All: 0, Pending: 0, Approved: 0, Rejected: 0 }, metrics: { pending: 0, approved: 0, rejected: 0 } };
         const body = await res.json();
         return {
@@ -231,7 +227,7 @@ function MyWorklistPage({ onNavigate, searchQuery = '', user, isOrgWorklist = fa
         };
       }
 
-      const res = await apiFetch(`/worklist?${params}`, { headers });
+      const res = await apiFetch(`/worklist?${params}`);
       if (!res.ok) return { statusCounts: { All: 0, Pending: 0, Approved: 0, InProcess: 0, Implemented: 0, Rejected: 0 }, metrics: { pending: 0, approved: 0, inProcess: 0, rejected: 0, implemented: 0 } };
       const body = await res.json();
       return {
@@ -332,10 +328,17 @@ function MyWorklistPage({ onNavigate, searchQuery = '', user, isOrgWorklist = fa
           return prev;
         });
 
-        // Invalidate react-query cache so fresh metrics & lists update cleanly
+        // Invalidate react-query cache so fresh metrics & lists update cleanly.
+        // These keys must match the actual queryKeys the pages register with —
+        // 'change-requests' and 'dashboard_metrics' below matched nothing real
+        // and were silent no-ops; the dashboard's summary cards and the
+        // sidebar's pending-count dots are the ones that actually need a nudge.
         queryClient.invalidateQueries({ queryKey: ['worklist'] });
-        queryClient.invalidateQueries({ queryKey: ['change-requests'] });
-        queryClient.invalidateQueries({ queryKey: ['dashboard_metrics'] });
+        queryClient.invalidateQueries({ queryKey: ['worklist-actionable-dots'] });
+        queryClient.invalidateQueries({ queryKey: ['prespend-summary-card'] });
+        queryClient.invalidateQueries({ queryKey: ['cr-summary-card'] });
+        queryClient.invalidateQueries({ queryKey: ['travel-summary-card'] });
+        queryClient.invalidateQueries({ queryKey: ['dashboard-expanded'] });
       } else {
         const errData = await res.json().catch(() => ({}));
         console.warn('Backend action request failed:', errData.message || res.statusText);

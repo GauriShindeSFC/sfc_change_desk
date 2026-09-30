@@ -333,7 +333,7 @@ export default function ChangeRequestModal({ cr, onClose, onApprove, onReject, o
 
   return (
     <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/50 p-4">
-      <div className="flex max-h-[88vh] w-full max-w-[680px] flex-col overflow-y-auto rounded-2xl border border-border bg-card shadow-[0_20px_40px_rgba(0,0,0,0.2)]">
+      <div className="flex max-h-[88vh] w-full max-w-[680px] flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-[0_20px_40px_rgba(0,0,0,0.2)]">
 
         {/* Header */}
         <div className="flex items-start justify-between border-b border-border px-7 pb-4 pt-6">
@@ -349,6 +349,9 @@ export default function ChangeRequestModal({ cr, onClose, onApprove, onReject, o
             <X size={20} />
           </button>
         </div>
+
+        {/* Scrollable Content */}
+        <div className="min-h-0 flex-1 overflow-y-auto">
 
         {/* Status */}
         <div className="flex items-center gap-12 px-7 pb-2 pt-5">
@@ -804,8 +807,10 @@ export default function ChangeRequestModal({ cr, onClose, onApprove, onReject, o
           </div>
         )}
 
+        </div>
+
         {/* Footer Actions */}
-        <div className="sticky bottom-0 flex items-center justify-end gap-3 border-t border-border bg-card px-7 pb-6 pt-4">
+        <div className="flex items-center justify-end gap-3 border-t border-border bg-card px-7 pb-6 pt-4">
             <button onClick={onClose} className="cursor-pointer rounded-lg border border-border bg-card px-[1.1rem] py-[0.55rem] text-[0.825rem] font-semibold text-foreground">Close</button>
 
             {canAct ? (

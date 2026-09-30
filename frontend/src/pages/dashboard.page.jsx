@@ -84,7 +84,6 @@ function DashboardPage({ onNavigate, user, isOrgDashboard = false, searchQuery =
   const [selectedRequest, setSelectedRequest] = useState(null);
   const [isExporting, setIsExporting] = useState(false);
 
-  const headers = user?.id ? { 'x-user-id': user.id } : {};
   const isCustomDateIncomplete = dateFilter === 'custom' && (!startDate || !endDate);
   const scopeParam = isOrgDashboard ? 'scope=org' : 'scope=my';
 
@@ -97,54 +96,39 @@ function DashboardPage({ onNavigate, user, isOrgDashboard = false, searchQuery =
     ...(searchQuery && { search: searchQuery })
   }).toString();
 
-  const { data: prespendSummary } = useQuery({
-    queryKey: ['prespend-summary-card', isOrgDashboard, user?.id, dateFilter, startDate, endDate, searchQuery],
+  // One request per domain, but one shared query/cache-entry/refetch-interval instead
+  // of three independent ones — the three cards always render together, so there's
+  // no reason for each to poll on its own clock.
+  const { data: summaryCardsData } = useQuery({
+    queryKey: ['dashboard-summary-cards', isOrgDashboard, user?.id, dateFilter, startDate, endDate, searchQuery],
     queryFn: async () => {
-      try {
-        const res = await apiFetch(`/pre-spend?${summaryFilterParams}`, { headers });
-        if (!res.ok) return null;
-        return await res.json();
-      } catch {
-        return null;
-      }
-    },
-    refetchInterval: 1000 * 60 * 5 // 5 minutes
-  });
+      const [psRes, mRes, rRes, trRes] = await Promise.all([
+        apiFetch(`/pre-spend?${summaryFilterParams}`).catch(() => null),
+        apiFetch(`/metrics?${summaryFilterParams}`).catch(() => null),
+        apiFetch(`/my-requests?${summaryFilterParams}`).catch(() => null),
+        apiFetch(`/travel-desk?${summaryFilterParams}`).catch(() => null)
+      ]);
 
-  const { data: crSummary } = useQuery({
-    queryKey: ['cr-summary-card', isOrgDashboard, user?.id, dateFilter, startDate, endDate, searchQuery],
-    queryFn: async () => {
-      try {
-        const [mRes, rRes] = await Promise.all([
-          apiFetch(`/metrics?${summaryFilterParams}`, { headers }),
-          apiFetch(`/my-requests?${summaryFilterParams}`, { headers })
-        ]);
-        const mData = mRes.ok ? await mRes.json() : {};
-        const rData = rRes.ok ? await rRes.json() : {};
-        return {
+      const psData = psRes && psRes.ok ? await psRes.json() : null;
+      const mData = mRes && mRes.ok ? await mRes.json() : {};
+      const rData = rRes && rRes.ok ? await rRes.json() : {};
+      const trData = trRes && trRes.ok ? await trRes.json() : null;
+
+      return {
+        prespendSummary: psData,
+        crSummary: {
           metrics: mData.data && Array.isArray(mData.data) ? mData.data : [],
           statusCounts: rData.statusCounts || {}
-        };
-      } catch {
-        return null;
-      }
+        },
+        travelSummary: trData
+      };
     },
     refetchInterval: 1000 * 60 * 5 // 5 minutes
   });
 
-  const { data: travelSummary } = useQuery({
-    queryKey: ['travel-summary-card', isOrgDashboard, user?.id, dateFilter, startDate, endDate, searchQuery],
-    queryFn: async () => {
-      try {
-        const res = await apiFetch(`/travel-desk?${summaryFilterParams}`, { headers });
-        if (!res.ok) return null;
-        return await res.json();
-      } catch {
-        return null;
-      }
-    },
-    refetchInterval: 1000 * 60 * 5 // 5 minutes
-  });
+  const prespendSummary = summaryCardsData?.prespendSummary || null;
+  const crSummary = summaryCardsData?.crSummary || null;
+  const travelSummary = summaryCardsData?.travelSummary || null;
 
   // 2. Fetch full detailed charts + requests only when a card is expanded
   const commonParams = new URLSearchParams({
@@ -180,8 +164,8 @@ function DashboardPage({ onNavigate, user, isOrgDashboard = false, searchQuery =
 
       if (expandedModule === 'prespend') {
         const [psSummaryRes, psReqRes] = await Promise.all([
-          apiFetch(`/pre-spend?${commonParams}`, { headers }),
-          activeFilter === 'All' ? null : apiFetch(`/pre-spend?${requestParams}`, { headers })
+          apiFetch(`/pre-spend?${commonParams}`),
+          activeFilter === 'All' ? null : apiFetch(`/pre-spend?${requestParams}`)
         ]);
         const psSummaryData = psSummaryRes.ok ? await psSummaryRes.json() : {};
         const psReqData = psReqRes && psReqRes.ok ? await psReqRes.json() : psSummaryData;
@@ -196,8 +180,8 @@ function DashboardPage({ onNavigate, user, isOrgDashboard = false, searchQuery =
 
       if (expandedModule === 'travel') {
         const [trSummaryRes, trReqRes] = await Promise.all([
-          apiFetch(`/travel-desk?${commonParams}`, { headers }),
-          activeFilter === 'All' ? null : apiFetch(`/travel-desk?${requestParams}`, { headers })
+          apiFetch(`/travel-desk?${commonParams}`),
+          activeFilter === 'All' ? null : apiFetch(`/travel-desk?${requestParams}`)
         ]);
         const trSummaryData = trSummaryRes.ok ? await trSummaryRes.json() : {};
         const trReqData = trReqRes && trReqRes.ok ? await trReqRes.json() : trSummaryData;
@@ -212,9 +196,9 @@ function DashboardPage({ onNavigate, user, isOrgDashboard = false, searchQuery =
 
       // change_request
       const [cRes, sRes, rRes] = await Promise.all([
-        apiFetch(`/categories?${commonParams}`, { headers }),
-        apiFetch(`/status-breakdown?${commonParams}`, { headers }),
-        apiFetch(`/my-requests?${requestParams}`, { headers })
+        apiFetch(`/categories?${commonParams}`),
+        apiFetch(`/status-breakdown?${commonParams}`),
+        apiFetch(`/my-requests?${requestParams}`)
       ]);
       const cData = cRes.ok ? await cRes.json() : {};
       const sData = sRes.ok ? await sRes.json() : {};
@@ -261,7 +245,7 @@ function DashboardPage({ onNavigate, user, isOrgDashboard = false, searchQuery =
         ...(searchQuery && { search: searchQuery })
       });
 
-      const res = await apiFetch(`/export?${exportParams}`, { headers });
+      const res = await apiFetch(`/export?${exportParams}`);
       if (!res.ok) {
         throw new Error(`Export failed with status ${res.status}`);
       }

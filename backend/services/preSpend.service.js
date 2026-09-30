@@ -337,19 +337,22 @@ export const getPreSpendRequestsService = async ({ user, userId, isWorklist = fa
 
   const totalCount = count || (pending + approved + rejected);
 
-  // Calculate actionable count for worklist mode
+  // Calculate actionable count for worklist mode — over the FULL matching set, not
+  // just the current page, so it doesn't silently undercount past the page size.
   let actionableCount = 0;
   if (isWorklist) {
     const isSuperAdmin = user?.isSuperAdmin || user?.roleId === 'role-1' || (user?.role || '').toLowerCase().includes('super');
     const isBoardUser = user?.isBoardUser || user?.roleId === 'role-board' || (user?.role || '').toLowerCase().includes('board');
-    
+
     // View-only pre-spend admin has no direct approval action rights unless super admin or board member
     if (isSuperAdmin || isBoardUser) {
-      actionableCount = formattedItems.filter(i => {
-        const isPending = (i.status || '').toLowerCase().includes('pending');
-        const isSelf = (i.requesterId && (String(i.requesterId) === String(currentUserId))) || (i.requesterEmail && currentUserEmail && i.requesterEmail.toLowerCase() === currentUserEmail);
-        return isPending && !isSelf;
-      }).length;
+      const actionableWhere = { status: { [Op.iLike]: '%Pending%' } };
+      const exclusions = [];
+      if (currentUserId) exclusions.push({ requesterId: { [Op.ne]: currentUserId } });
+      if (currentUserEmail) exclusions.push({ requesterEmail: { [Op.notILike]: currentUserEmail } });
+      if (exclusions.length > 0) actionableWhere[Op.and] = exclusions;
+
+      actionableCount = await PreSpendRequest.count({ where: actionableWhere });
     }
   }
 

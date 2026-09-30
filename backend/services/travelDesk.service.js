@@ -326,17 +326,29 @@ export const getTravelRequestsService = async ({ user, userId, isWorklist = fals
       Approved: approved,
       Rejected: rejected
     },
-    actionableCount: isWorklist ? formattedItems.filter(i => {
-      const isPending = (i.status || '').toLowerCase().includes('pending');
-      const isSelf = (i.requesterId && String(i.requesterId) === String(currentUserId)) || (i.travellerEmail && currentUserEmail && i.travellerEmail.toLowerCase() === currentUserEmail);
+    actionableCount: await (async () => {
+      // Over the FULL matching set, not just the current page, so it doesn't
+      // silently undercount past the page size.
+      if (!isWorklist) return 0;
+
       const isSuperAdmin = user?.isSuperAdmin || user?.roleId === 'role-1' || (user?.role || '').toLowerCase().includes('super');
       const isBoardUser = user?.isBoardUser || user?.roleId === 'role-board' || (user?.role || '').toLowerCase().includes('board');
       const isTravelAdmin = user?.isTravelAdmin || user?.roleId === 'role-2-travel' || ((user?.role || '').toLowerCase().includes('admin') && (user?.role || '').toLowerCase().includes('travel'));
 
-      if (!isPending || isSelf) return false;
-      if (i.isShortNotice) return isBoardUser;
-      return isSuperAdmin || isBoardUser || isTravelAdmin;
-    }).length : 0
+      if (!isBoardUser && !isSuperAdmin && !isTravelAdmin) return 0;
+
+      const exclusions = [];
+      if (currentUserId) exclusions.push({ requesterId: { [Op.ne]: currentUserId } });
+      if (currentUserEmail) exclusions.push({ travellerEmail: { [Op.notILike]: currentUserEmail } });
+
+      const actionableWhere = { status: { [Op.iLike]: '%Pending%' } };
+      if (exclusions.length > 0) actionableWhere[Op.and] = exclusions;
+      // Board members can act on short-notice requests too; Super/Travel Admins
+      // can only act on non-short-notice ones.
+      if (!isBoardUser) actionableWhere.isShortNotice = false;
+
+      return TravelRequest.count({ where: actionableWhere });
+    })()
   };
 };
 

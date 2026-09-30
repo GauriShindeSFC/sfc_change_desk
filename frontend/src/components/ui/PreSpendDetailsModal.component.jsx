@@ -198,7 +198,7 @@ export default function PreSpendDetailsModal({ item, onClose, onApprove, onRejec
         </div>
 
         {/* Scrollable Content */}
-        <div className="flex flex-col gap-6 overflow-y-auto px-7 py-6">
+        <div className="flex min-h-0 flex-1 flex-col gap-6 overflow-y-auto px-7 py-6">
 
           {/* Section 1: Item & Amount Spotlight */}
           <div className="flex items-start justify-between gap-4 rounded-xl border border-border bg-input p-5">
