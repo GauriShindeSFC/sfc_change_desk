@@ -153,6 +153,7 @@ function SettingsPage({ user }) {
     setEditingUser({
       id: targetUser.id,
       name: targetUser.name || '',
+      email: targetUser.email || '',
       empId: targetUser.empId || targetUser.employeeId || '',
       roles: existingRoles,
       selectedRoleToAdd: ''
@@ -253,6 +254,35 @@ function SettingsPage({ user }) {
     } catch (err) {
       console.error('Failed to update user via API:', err);
       toast.error(`Error updating user: ${err.message}`);
+    } finally {
+      setIsSavingUser(false);
+    }
+  };
+
+  const handleDeleteManageUser = async () => {
+    if (!editingUser || isSavingUser) return;
+    const confirmDelete = window.confirm(
+      `Are you sure you want to deactivate ${editingUser.name || editingUser.email} and revoke all their appointed roles?`
+    );
+    if (!confirmDelete) return;
+
+    setIsSavingUser(true);
+    try {
+      const res = await apiFetch(`/settings/users/${editingUser.id}`, {
+        method: 'DELETE'
+      });
+
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}));
+        throw new Error(errorData.message || errorData.error || `Failed to deactivate user (${res.status})`);
+      }
+
+      queryClient.invalidateQueries({ queryKey: ['settings-users'] });
+      toast.success('User deactivated and roles revoked successfully');
+      setEditingUser(null);
+    } catch (err) {
+      console.error('Failed to deactivate user via API:', err);
+      toast.error(`Error deactivating user: ${err.message}`);
     } finally {
       setIsSavingUser(false);
     }
@@ -1037,7 +1067,7 @@ function SettingsPage({ user }) {
               )}
 
               {/* Actions Footer */}
-              <div className="mt-2 flex justify-end gap-3">
+              <div className="mt-2 flex items-center justify-between gap-3">
                 <button
                   type="button"
                   onClick={() => setEditingUser(null)}
@@ -1048,24 +1078,39 @@ function SettingsPage({ user }) {
                 >
                   Cancel
                 </button>
-                <button
-                  type="submit"
-                  disabled={isSavingUser || !editingUser.roles || editingUser.roles.length === 0 || Boolean(editingUser.selectedRoleToAdd)}
-                  className={`inline-flex items-center gap-2 rounded-lg border-0 px-5 py-[0.6rem] text-[0.85rem] font-medium ${
-                    (isSavingUser || !editingUser.roles || editingUser.roles.length === 0 || Boolean(editingUser.selectedRoleToAdd))
-                      ? 'cursor-not-allowed bg-input text-muted-foreground'
-                      : 'cursor-pointer bg-primary text-[#FFFFFF]'
-                  } ${isSavingUser ? 'opacity-80' : 'opacity-100'}`}
-                >
-                  {isSavingUser ? (
-                    <>
-                      <LoadingSpinner size="xs" color="#FFFFFF" center={false} />
-                      <span>Saving changes...</span>
-                    </>
-                  ) : (
-                    <span>Save user</span>
-                  )}
-                </button>
+
+                <div className="flex items-center gap-2">
+                  {/* Delete Button */}
+                  <button
+                    type="button"
+                    onClick={handleDeleteManageUser}
+                    disabled={isSavingUser}
+                    className={`rounded-lg border border-[#FCA5A5] bg-[#FEF2F2] px-5 py-[0.6rem] text-[0.85rem] font-bold text-[#DC2626] transition-colors hover:bg-[#FEE2E2] ${
+                      isSavingUser ? 'cursor-not-allowed opacity-60' : 'cursor-pointer opacity-100'
+                    }`}
+                  >
+                    Delete
+                  </button>
+
+                  <button
+                    type="submit"
+                    disabled={isSavingUser || !editingUser.roles || editingUser.roles.length === 0 || Boolean(editingUser.selectedRoleToAdd)}
+                    className={`inline-flex items-center gap-2 rounded-lg border-0 px-5 py-[0.6rem] text-[0.85rem] font-medium ${
+                      (isSavingUser || !editingUser.roles || editingUser.roles.length === 0 || Boolean(editingUser.selectedRoleToAdd))
+                        ? 'cursor-not-allowed bg-input text-muted-foreground'
+                        : 'cursor-pointer bg-primary text-[#FFFFFF]'
+                    } ${isSavingUser ? 'opacity-80' : 'opacity-100'}`}
+                  >
+                    {isSavingUser ? (
+                      <>
+                        <LoadingSpinner size="xs" color="#FFFFFF" center={false} />
+                        <span>Saving changes...</span>
+                      </>
+                    ) : (
+                      <span>Save user</span>
+                    )}
+                  </button>
+                </div>
               </div>
             </form>
           </div>

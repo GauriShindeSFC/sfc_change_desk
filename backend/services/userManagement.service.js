@@ -371,7 +371,8 @@ export const getSettingsUsersService = async () => {
 
   const users = await ChangeUser.findAll({
     where: {
-      roleId: { [Op.in]: PRIVILEGED_ROLE_IDS }
+      roleId: { [Op.in]: PRIVILEGED_ROLE_IDS },
+      status: { [Op.ne]: 'Inactive' }
     },
     order: [['createdAt', 'DESC']]
   });
@@ -416,7 +417,16 @@ export const getSettingsUsersService = async () => {
       rolesList.unshift({ roleId: u.roleId, roleName: u.roleName });
     }
 
-    const authoritativeEmpId = u.metadata?.empId || u.id;
+    // Fetch authoritative employee ID from Employee directory by email
+    let empRecord = null;
+    if (email) {
+      empRecord = await Employee.findOne({
+        where: sequelize.where(sequelize.fn('LOWER', sequelize.col('email')), email),
+        raw: true
+      });
+    }
+
+    const authoritativeEmpId = empRecord?.empId || u.metadata?.empId || (u.metadata?.employeeId ? String(u.metadata.employeeId) : '');
     const userCmCats = cmMap.get(userKey) || cmMap.get(`S8-${u.id}`) || cmMap.get(email) || [];
     const userCiCats = ciMap.get(userKey) || ciMap.get(`S8-${u.id}`) || ciMap.get(email) || [];
 
@@ -610,6 +620,56 @@ export const createSettingsUserService = async (payload = {}, meta = {}) => {
   IdentityResolver.clearCache();
   const resolved = await IdentityResolver.resolveByKey(changeUser.id);
   return resolved.identity;
+};
+
+export const deleteSettingsUserService = async (userKey, meta = {}) => {
+  const rawId = String(userKey).replace(/^(S8-|EMP-|usr-)/, '');
+  let user = await ChangeUser.findByPk(rawId);
+  if (!user && String(userKey).includes('@')) {
+    user = await ChangeUser.findOne({
+      where: sequelize.where(sequelize.fn('LOWER', sequelize.col('email')), String(userKey).trim().toLowerCase())
+    });
+  }
+
+  if (!user) {
+    const err = new Error(`User ${userKey} not found in change_user`);
+    err.statusCode = 404;
+    throw err;
+  }
+
+  // Prevent self-deletion if the caller is the same user
+  if (meta.actorId && (String(meta.actorId) === String(user.id) || String(meta.actorEmail || '').toLowerCase() === String(user.email).toLowerCase())) {
+    const err = new Error('You cannot delete or deactivate your own account.');
+    err.statusCode = 400;
+    throw err;
+  }
+
+  // Set status to Inactive and revoke privileged roles
+  user.status = 'Inactive';
+  user.roleId = 'role-4';
+  user.roleName = 'Requester';
+  const currentMeta = user.metadata && typeof user.metadata === 'object' ? { ...user.metadata } : {};
+  currentMeta.roles = [{ roleId: 'role-4', roleName: 'Requester' }];
+  user.metadata = currentMeta;
+  user.changed('metadata', true);
+  await user.save();
+
+  // Clear any assigned category mappings
+  await Promise.all([
+    updateChangeManagerCategoriesService(user.id, []),
+    updateChangeImplementerCategoriesService(user.id, [])
+  ]);
+
+  const actorStr = meta.actorId ? String(meta.actorId) : 'SYSTEM';
+  await addAuditLog({
+    actorId: actorStr,
+    action: 'User Deactivated',
+    ref: String(user.id),
+    detail: `Deactivated user ${user.name} (${user.email}) and revoked all privileged roles.`
+  }).catch((logErr) => console.warn('[auditLog] Notice:', logErr.message));
+
+  IdentityResolver.clearCache();
+  return { id: user.id, email: user.email, status: 'Inactive' };
 };
 
 export const getSettingsRolesService = async () => {

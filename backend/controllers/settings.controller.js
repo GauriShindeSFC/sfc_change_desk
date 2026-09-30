@@ -4,6 +4,7 @@ import {
   getSettingsUsersService,
   createSettingsUserService,
   updateSettingsUserService,
+  deleteSettingsUserService,
   getSettingsRolesService,
   updateRolePermissionsService,
   getSettingsAuditLogsService,
@@ -31,6 +32,15 @@ export const updateSettingsUser = asyncHandler(async (req, res) => {
     actorId: req.user?.id
   });
   res.json({ success: true, message: 'User updated successfully', data: user });
+});
+
+export const deleteSettingsUser = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  const result = await deleteSettingsUserService(id, {
+    actorId: req.user?.id,
+    actorEmail: req.user?.email
+  });
+  res.json({ success: true, message: 'User deactivated and roles removed successfully', data: result });
 });
 
 export const getSettingsRoles = asyncHandler(async (req, res) => {

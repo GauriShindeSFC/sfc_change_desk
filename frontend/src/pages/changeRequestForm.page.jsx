@@ -541,13 +541,6 @@ function ChangeRequestFormPage({ onNavigate, user, initialData, searchQuery = ''
       {/* Stepper Header */}
       <FormStepper steps={stepsList} currentStep={step} onStepClick={setStep} />
 
-      {/* Error Message Banner */}
-      {errorMessage && (
-        <div className="rounded-lg border border-[#FCA5A5] bg-[#FEE2E2] px-4 py-3 text-[0.85rem] font-semibold text-[#DC2626]">
-          {errorMessage}
-        </div>
-      )}
-
       {/* Success Banner */}
       {submitSuccess && (
         <div className="flex flex-col items-center gap-3 rounded-xl border border-[#A7F3D0] bg-[#ECFDF5] px-8 py-10 text-center shadow-[0_1px_3px_rgba(16,21,30,0.04)]">
@@ -981,7 +974,7 @@ function ChangeRequestFormPage({ onNavigate, user, initialData, searchQuery = ''
                 <textarea
                   rows={4}
                   required
-                  placeholder="Enter business justification..."
+                  placeholder="Enter business justification"
                   value={formData.justification}
                   onChange={(e) => handleInputChange('justification', e.target.value)}
                   className={`${ACTIVE_FIELD_CLASS} resize-y`}
@@ -989,6 +982,13 @@ function ChangeRequestFormPage({ onNavigate, user, initialData, searchQuery = ''
               </div>
             </div>
           </div>
+
+          {/* Warning banner above Back and Next buttons */}
+          {errorMessage && (
+            <div className="rounded-lg border border-[#FCA5A5] bg-[#FEE2E2] px-4 py-3 text-[0.85rem] font-semibold text-[#DC2626]">
+              {errorMessage}
+            </div>
+          )}
 
           {/* Step 2 Action Buttons */}
           <div className="flex items-center justify-between border-t border-border pt-4">
@@ -1132,6 +1132,13 @@ function ChangeRequestFormPage({ onNavigate, user, initialData, searchQuery = ''
               </label>
             </div>
           </div>
+
+          {/* Warning banner above Back and Submit buttons */}
+          {errorMessage && (
+            <div className="rounded-lg border border-[#FCA5A5] bg-[#FEE2E2] px-4 py-3 text-[0.85rem] font-semibold text-[#DC2626]">
+              {errorMessage}
+            </div>
+          )}
 
           {/* Submit Action Footer */}
           <div className="flex items-center justify-between pt-2">

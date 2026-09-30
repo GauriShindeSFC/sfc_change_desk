@@ -410,7 +410,18 @@ export default function PreSpendPage({ onNavigate, user, initialCostCentre = '',
 
       {/* STEP 2: Request Details */}
       {!submitted && step === 2 && (
-        <form onSubmit={(e) => { e.preventDefault(); setStep(3); }} className="flex flex-col gap-6 rounded-[12px] border border-border bg-card p-7 shadow-[0_1px_3px_rgba(16,21,30,0.04)]">
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (!requesterDetails.managerName || !requesterDetails.managerEmail) {
+              setNotice('Please select a Reporting Manager.');
+              return;
+            }
+            setNotice('');
+            setStep(3);
+          }}
+          className="flex flex-col gap-6 rounded-[12px] border border-border bg-card p-7 shadow-[0_1px_3px_rgba(16,21,30,0.04)]"
+        >
           {/* Section 1: Requester Details */}
           <div className="flex flex-col gap-5">
             <div className="flex items-center justify-between">
@@ -517,17 +528,14 @@ export default function PreSpendPage({ onNavigate, user, initialCostCentre = '',
             </div>
 
             <div>
-              <FormLabel required htmlFor={id('location')}>Location</FormLabel>
+              <FormLabel required htmlFor={id('location')}>Location / URL</FormLabel>
               <input
                 id={id('location')}
                 type="text"
                 required
                 value={details.location}
-                onChange={e => {
-                  const val = e.target.value.replace(/\b\w/g, c => c.toUpperCase());
-                  changeDetails('location', val);
-                }}
-                placeholder="Enter Location"
+                onChange={e => changeDetails('location', e.target.value)}
+                placeholder="Enter Location / URL"
                 className={ACTIVE_FIELD_CLASS}
               />
             </div>
@@ -572,10 +580,17 @@ export default function PreSpendPage({ onNavigate, user, initialCostCentre = '',
             </div>
           </div>
 
+          {/* Warning banner above Back and Next buttons */}
+          {notice && (
+            <div className="rounded-lg border border-[#FECACA] bg-[#FEF2F2] px-4 py-3 text-[0.825rem] font-semibold text-[#DC2626]">
+              {notice}
+            </div>
+          )}
+
           <div className="flex justify-between border-t border-border pt-4">
             <button
               type="button"
-              onClick={() => setStep(1)}
+              onClick={() => { setNotice(''); setStep(1); }}
               className="inline-flex cursor-pointer items-center gap-[0.45rem] rounded-[8px] border border-border bg-card px-4 py-[0.55rem] text-[0.825rem] font-semibold text-foreground"
             >
               <ArrowLeft size={14} />
@@ -740,11 +755,10 @@ export default function PreSpendPage({ onNavigate, user, initialCostCentre = '',
                       />
                     </div>
                     <div>
-                      <FormLabel required={!usePastVendor} htmlFor="vendor-0-date">Quote date</FormLabel>
+                      <FormLabel htmlFor="vendor-0-date">Quote date</FormLabel>
                       <input
                         id="vendor-0-date"
                         type="date"
-                        required={!usePastVendor && (!commercial.exception || commercial.exception === 'Not applicable')}
                         value={vendors[0]?.date || ''}
                         onChange={e => changeVendor(0, 'date', e.target.value)}
                         className={ACTIVE_FIELD_CLASS}
@@ -1088,7 +1102,7 @@ export default function PreSpendPage({ onNavigate, user, initialCostCentre = '',
                 <span className="font-semibold text-foreground">{category} — {subcategory}</span>
               </div>
               <div>
-                <span className="block text-[0.75rem] font-semibold text-muted-foreground uppercase">Location</span>
+                <span className="block text-[0.75rem] font-semibold text-muted-foreground uppercase">Location / URL</span>
                 <span className="font-semibold text-foreground">{details.location || '—'}</span>
               </div>
               <div>

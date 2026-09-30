@@ -38,8 +38,31 @@ export const ensureGlobalSequence = async (tx = null) => {
     await sequelize.query(`SELECT pg_advisory_lock(${ADVISORY_LOCK_KEY});`);
     const [seqCheck] = await sequelize.query(`SELECT to_regclass('${GLOBAL_SEQ_NAME}') AS regclass;`);
 
+    const [crRes] = await sequelize.query(
+      `SELECT MAX(CAST(SUBSTRING(id FROM 'CR-([0-9]+)') AS INTEGER)) AS max_num FROM change_requests;`
+    ).catch(() => [[{ max_num: 0 }]]);
+
+    const [trRes] = await sequelize.query(
+      `SELECT MAX(CAST(SUBSTRING(request_code FROM 'TR-([0-9]+)') AS INTEGER)) AS max_num FROM travel_requests;`
+    ).catch(() => [[{ max_num: 0 }]]);
+
+    const [psRes] = await sequelize.query(
+      `SELECT MAX(CAST(SUBSTRING(request_code FROM 'PS-([0-9]+)') AS INTEGER)) AS max_num FROM pre_spend_requests;`
+    ).catch(() => [[{ max_num: 0 }]]);
+
+    const crMax = (crRes && crRes[0] && crRes[0].max_num) ? parseInt(crRes[0].max_num, 10) : 0;
+    const trMax = (trRes && trRes[0] && trRes[0].max_num) ? parseInt(trRes[0].max_num, 10) : 0;
+    const psMax = (psRes && psRes[0] && psRes[0].max_num) ? parseInt(psRes[0].max_num, 10) : 0;
+
+    const highestNum = Math.max(0, crMax, trMax, psMax);
+
     if (!seqCheck[0]?.regclass) {
-      await sequelize.query(`CREATE SEQUENCE IF NOT EXISTS ${GLOBAL_SEQ_NAME} START WITH 1;`);
+      const startNum = Math.max(1, highestNum + 1);
+      await sequelize.query(`CREATE SEQUENCE IF NOT EXISTS ${GLOBAL_SEQ_NAME} START WITH ${startNum};`);
+    } else if (highestNum > 0) {
+      await sequelize.query(
+        `SELECT setval('${GLOBAL_SEQ_NAME}', GREATEST(nextval('${GLOBAL_SEQ_NAME}'), ${highestNum + 1}), false);`
+      ).catch(() => {});
     }
   } finally {
     await sequelize.query(`SELECT pg_advisory_unlock(${ADVISORY_LOCK_KEY});`).catch(() => {});

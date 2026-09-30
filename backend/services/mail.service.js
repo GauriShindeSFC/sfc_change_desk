@@ -612,10 +612,15 @@ export const verifyMailTransport = async () => {
 
 // ---------- Templated emails ------------------------------
 
-/** New change request submitted → notify Change Manager approvers (+ manager as CC). */
+/** New change request submitted → notify Reporting Manager as primary in TO (and approvers in CC). */
 export const sendChangeRequestCreatedEmail = async ({ cr, requesterName, approverEmails, managerEmail }) => {
-  const to = asList(approverEmails);
-  const cc = asList(managerEmail);
+  const managerList = asList(managerEmail);
+  const approverList = asList(approverEmails);
+
+  // If managerEmail is provided, Reporting Manager is the primary TO recipient (Stage 1 Manager Review), approvers in CC
+  // Otherwise, approvers are in TO
+  const to = managerList.length ? managerList : approverList;
+  const cc = managerList.length ? approverList : [];
   const primary = to.length ? to : asList(env.MAIL_APPROVER_FALLBACK || 'approver@changedesk.local');
 
   const secret = process.env.JWT_SECRET || 'sfc-change-desk-secure-jwt-secret-key-2026';

@@ -73,12 +73,11 @@ export class IdentityResolver {
 
     if (changeUser) {
       if (changeUser.status === 'Inactive' || changeUser.status === 'Suspended') {
-        return {
-          status: 'USER_INACTIVE',
-          message: 'Access Denied: Your account is deactivated.'
-        };
+        // If deactivated in ChangeUser (removed from Settings), fall back to standard Employee login
+        // (Roles 1, 2, 3, 5, 6 are revoked, but standard employee login is preserved)
+      } else {
+        return await this._buildIdentityDTO(changeUser, employee);
       }
-      return await this._buildIdentityDTO(changeUser, employee);
     }
 
     // 3. If employee exists and active, return pure Employee identity without mutating ChangeUser
@@ -150,6 +149,10 @@ export class IdentityResolver {
     }
 
     if (changeUser) {
+      if (changeUser.status === 'Inactive' || changeUser.status === 'Suspended') {
+        // Fallback to employee resolution to preserve login access
+        return this.resolveByEmail(changeUser.email);
+      }
       return await this._buildIdentityDTO(changeUser);
     }
 
@@ -171,13 +174,6 @@ export class IdentityResolver {
    * Helper to fetch role assignment and construct normalized DTO from ChangeUser record.
    */
   static async _buildIdentityDTO(changeUser, employeeRecord = null) {
-    if (changeUser.status === 'Inactive' || changeUser.status === 'Suspended') {
-      return {
-        status: 'USER_INACTIVE',
-        message: 'Access Denied: Your account is deactivated.'
-      };
-    }
-
     const email = changeUser.email.trim().toLowerCase();
     const roleId = changeUser.roleId || 'role-4';
     const roleName = changeUser.roleName || ROLE_NAME_MAP[roleId] || 'Requester';

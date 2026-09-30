@@ -15,7 +15,7 @@ import {
   ChevronDown,
   ChevronRight,
   Plus,
-  Receipt
+  ScrollText
 } from 'lucide-react';
 import { useTheme } from '../../context/ThemeContext';
 import { useWorklistActionableDots } from '../../queries/worklist.queries';
@@ -70,7 +70,7 @@ function Sidebar({
     { id: 'Pre-Spend Request', path: '/pre-spend', label: 'Pre-Spend Request', icon: IndianRupee, showPlus: true },
     { id: 'Travel Desk', path: '/travel-desk', label: 'Travel Desk', icon: Plane, showPlus: true },
     { id: 'Tribe CRM', label: 'Tribe CRM', icon: Users, externalUrl: 'https://tribe.stfox.com/jsp/iamlogin.jsp' },
-    { id: 'Reimbursement', label: 'Reimbursement', icon: Receipt, externalUrl: 'https://expense.stfox.com/login?serviceurl=%2Fhome' }
+    { id: 'Reimbursement', label: 'Reimbursement', icon: ScrollText, externalUrl: 'https://expense.stfox.com/login?serviceurl=%2Fhome' }
   ];
 
   // On desktop: compact rail by default, expands to full width on hover.
@@ -111,7 +111,8 @@ function Sidebar({
           className={`shrink-0 ${isActive ? 'text-primary-foreground' : 'text-muted-foreground'}`}
         />
         {!mini && (
-          <span className="flex-1 flex items-center gap-1.5 overflow-hidden text-ellipsis whitespace-nowrap text-left">
+          <span className="flex-1 flex items-center justify-between gap-1.5 overflow-hidden text-ellipsis whitespace-nowrap text-left">
+            <span className="truncate">{item.label}</span>
             {item.showPlus && (
               <Plus
                 size={13}
@@ -119,7 +120,6 @@ function Sidebar({
                 className={`shrink-0 ${isActive ? 'text-primary-foreground' : 'text-muted-foreground'}`}
               />
             )}
-            <span className="truncate">{item.label}</span>
           </span>
         )}
         {!mini && item.externalUrl && (

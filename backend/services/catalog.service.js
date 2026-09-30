@@ -169,6 +169,13 @@ export const getSubcategoryFieldsService = async (subcategoryId) => {
         dbNeedsUpdate = true;
       }
     }
+    if (plain.appliesToActions && Array.isArray(plain.appliesToActions)) {
+      const fixedActs = plain.appliesToActions.map(act => (typeof act === 'string' ? act.replace(/Exisitng/g, 'Existing') : act));
+      if (JSON.stringify(fixedActs) !== JSON.stringify(plain.appliesToActions)) {
+        plain.appliesToActions = fixedActs;
+        dbNeedsUpdate = true;
+      }
+    }
     if (plain.id === 'f-hw-assetid' || (subcategoryId === 'subcat-asset-hw' && plain.fieldKey === 'assetId')) {
       if (!Array.isArray(plain.appliesToActions) || !plain.appliesToActions.includes('Return IT Asset')) {
         const current = Array.isArray(plain.appliesToActions) ? [...plain.appliesToActions] : ['Repair Request', 'Dispose Request'];
@@ -297,6 +304,38 @@ export const getSubcategoryFieldsService = async (subcategoryId) => {
       }
     });
     list.splice(1, 0, existingField[0].get({ plain: true }));
+  }
+
+  if (subcategoryId === 'subcat-asset-dev') {
+    const defaultDevFields = [
+      { id: 'f-dev-act', subcategoryId: 'subcat-asset-dev', fieldKey: 'actionRequired', fieldLabel: 'Action Required', fieldType: 'dropdown', isRequired: true, sortOrder: 0, appliesToActions: null, options: ['Request for Procurement of Laptop / Desktop', 'Replace Existing Laptop / Desktop', 'Repair Request', 'Dispose Request', 'Other'] },
+      { id: 'f-dev-assettype', subcategoryId: 'subcat-asset-dev', fieldKey: 'assetType', fieldLabel: 'Asset Type', fieldType: 'dropdown', isRequired: true, sortOrder: 1, appliesToActions: ['Request for Procurement of Laptop / Desktop'], options: ['Laptop', 'Desktop', 'Workstation'] },
+      { id: 'f-dev-reqcfg', subcategoryId: 'subcat-asset-dev', fieldKey: 'requestedConfiguration', fieldLabel: 'Requested Configuration', fieldType: 'text', isRequired: true, sortOrder: 2, appliesToActions: ['Request for Procurement of Laptop / Desktop', 'Replace Existing Laptop / Desktop'], options: null },
+      { id: 'f-dev-qty', subcategoryId: 'subcat-asset-dev', fieldKey: 'qtyRequired', fieldLabel: 'Qty Required', fieldType: 'text', isRequired: true, sortOrder: 3, appliesToActions: ['Request for Procurement of Laptop / Desktop'], options: null },
+      { id: 'f-dev-loc', subcategoryId: 'subcat-asset-dev', fieldKey: 'location', fieldLabel: 'Location', fieldType: 'text', isRequired: true, sortOrder: 4, appliesToActions: ['Request for Procurement of Laptop / Desktop'], options: null },
+      { id: 'f-dev-stock', subcategoryId: 'subcat-asset-dev', fieldKey: 'currentQtyInStock', fieldLabel: 'Current Qty in Stock', fieldType: 'text', isRequired: true, sortOrder: 5, appliesToActions: ['Request for Procurement of Laptop / Desktop'], options: null },
+      { id: 'f-dev-curcfg', subcategoryId: 'subcat-asset-dev', fieldKey: 'currentConfiguration', fieldLabel: 'Current Configuration', fieldType: 'text', isRequired: true, sortOrder: 7, appliesToActions: ['Replace Existing Laptop / Desktop'], options: null },
+      { id: 'f-dev-assetid', subcategoryId: 'subcat-asset-dev', fieldKey: 'existingAssetId', fieldLabel: 'Existing Asset ID', fieldType: 'text', isRequired: true, sortOrder: 8, appliesToActions: ['Replace Existing Laptop / Desktop', 'Repair Request', 'Dispose Request'], options: null },
+      { id: 'f-dev-repairreason', subcategoryId: 'subcat-asset-dev', fieldKey: 'purposeReason', fieldLabel: 'Purpose / Reason', fieldType: 'text', isRequired: true, sortOrder: 9, appliesToActions: ['Repair Request'], options: null },
+      { id: 'f-dev-purchdate', subcategoryId: 'subcat-asset-dev', fieldKey: 'dateOfPurchase', fieldLabel: 'Date of Purchase', fieldType: 'text', isRequired: true, sortOrder: 10, appliesToActions: ['Dispose Request'], options: null },
+      { id: 'f-dev-dispreason', subcategoryId: 'subcat-asset-dev', fieldKey: 'disposalReason', fieldLabel: 'Disposal Reason', fieldType: 'text', isRequired: true, sortOrder: 11, appliesToActions: ['Dispose Request'], options: null }
+    ];
+
+    for (const defField of defaultDevFields) {
+      const idx = list.findIndex(f => f.fieldKey === defField.fieldKey);
+      if (idx === -1) {
+        list.push(defField);
+      } else {
+        // Ensure appliesToActions and options are correctly synced
+        if (defField.appliesToActions) {
+          list[idx].appliesToActions = defField.appliesToActions;
+        }
+        if (defField.options) {
+          list[idx].options = defField.options;
+        }
+        list[idx].fieldLabel = defField.fieldLabel;
+      }
+    }
   }
 
   return list;
