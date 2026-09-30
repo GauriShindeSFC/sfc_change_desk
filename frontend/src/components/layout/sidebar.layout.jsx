@@ -10,6 +10,7 @@ import {
   X,
   IndianRupee,
   Plane,
+  CalendarDays,
   Users,
   ExternalLink,
   ChevronDown,
@@ -69,6 +70,7 @@ function Sidebar({
     { id: 'Change Request', path: '/change-requests/new', label: 'Change Request', icon: FileText, showPlus: true },
     { id: 'Pre-Spend Request', path: '/pre-spend', label: 'Pre-Spend Request', icon: IndianRupee, showPlus: true },
     { id: 'Travel Desk', path: '/travel-desk', label: 'Travel Desk', icon: Plane, showPlus: true },
+    { id: 'Visitor Appointment', path: '/visitor-appointment', label: 'Visitor Appointment', icon: CalendarDays, showPlus: true },
     { id: 'Tribe CRM', label: 'Tribe CRM', icon: Users, externalUrl: 'https://tribe.stfox.com/jsp/iamlogin.jsp' },
     { id: 'Reimbursement', label: 'Reimbursement', icon: ScrollText, externalUrl: 'https://expense.stfox.com/login?serviceurl=%2Fhome' }
   ];

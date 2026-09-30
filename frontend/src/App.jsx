@@ -10,6 +10,7 @@ import SettingsPage from './pages/settings.page';
 import ComingSoonPage from './pages/comingSoon.page';
 import PreSpendPage from './pages/preSpend.page';
 import TravelDeskPage from './pages/travelDesk.page';
+import VisitorAppointmentPage from './pages/visitorAppointment.page';
 import ApprovalActionPage from './pages/approvalAction.page';
 import { getSession, saveSession, clearSession, fetchMe } from './lib/auth.lib';
 
@@ -126,6 +127,11 @@ function TravelDeskRoute() {
   return <TravelDeskPage user={user} searchQuery={searchQuery} onNavigate={onNavigate} />;
 }
 
+function VisitorAppointmentRoute() {
+  const { user, onNavigate } = useOutletContext();
+  return <VisitorAppointmentPage user={user} onNavigate={onNavigate} />;
+}
+
 /* ── Main App Router ─────────────────────────────────────────── */
 export default function App() {
   const [session, setSession] = useState(() => getSession());
@@ -185,6 +191,7 @@ export default function App() {
           <Route path="/settings" element={<SettingsRoute />} />
           <Route path="/pre-spend" element={<PreSpendRoute />} />
           <Route path="/travel-desk" element={<TravelDeskRoute />} />
+          <Route path="/visitor-appointment" element={<VisitorAppointmentRoute />} />
         </Route>
 
         {/* Catch-All Fallback */}
@@ -193,4 +200,3 @@ export default function App() {
     </BrowserRouter>
   );
 }
-

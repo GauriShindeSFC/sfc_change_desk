@@ -96,7 +96,7 @@ function Header({
 
       {/* Right controls */}
       <div className="flex items-center gap-3">
-        {!isMobile && activeRoute !== 'Dashboard' && !activeRoute?.includes('Change Request') && !['Pre-Spend Request', 'Travel Desk', 'Tribe CRM', 'Settings'].includes(activeRoute) && (
+        {!isMobile && activeRoute !== 'Dashboard' && !activeRoute?.includes('Change Request') && !['Pre-Spend Request', 'Travel Desk', 'Visitor Appointment', 'Tribe CRM', 'Settings'].includes(activeRoute) && (
           <div className="relative w-[280px]">
             <div className="absolute top-1/2 left-[0.85rem] flex -translate-y-1/2 items-center text-muted-foreground">
               <Search size={14} />

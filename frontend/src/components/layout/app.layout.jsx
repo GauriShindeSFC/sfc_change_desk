@@ -39,6 +39,7 @@ export default function AppLayout({ user, onLogout }) {
     if (pathname.startsWith('/settings')) return 'Settings';
     if (pathname.startsWith('/pre-spend')) return 'Pre-Spend Request';
     if (pathname.startsWith('/travel-desk')) return 'Travel Desk';
+    if (pathname.startsWith('/visitor-appointment')) return 'Visitor Appointment';
     if (pathname.startsWith('/org-dashboard')) return 'Organization Dashboard';
     if (pathname.startsWith('/my-requests')) return 'My Requests';
     return 'Dashboard';
@@ -59,7 +60,8 @@ export default function AppLayout({ user, onLogout }) {
         'Organization Dashboard': '/org-dashboard',
         'Settings': '/settings',
         'Pre-Spend Request': '/pre-spend',
-        'Travel Desk': '/travel-desk'
+        'Travel Desk': '/travel-desk',
+        'Visitor Appointment': '/visitor-appointment'
       };
 
       const dest = routeMap[target] || (target.startsWith('/') ? target : `/${target.toLowerCase().replace(/\s+/g, '-')}`);
