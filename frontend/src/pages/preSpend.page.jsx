@@ -1,4 +1,5 @@
 import React, { useId, useState, useEffect } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import {
   ArrowLeft,
   ArrowRight,
@@ -47,6 +48,7 @@ const resolveEmpLocation = (u, initialVal) => {
 };
 
 export default function PreSpendPage({ onNavigate, user, initialCostCentre = '', budgetLines = SAMPLE_BUDGET_LINES }) {
+  const queryClient = useQueryClient();
   const uid = useId();
   const [step, setStep] = useState(1);
   const [category, setCategory] = useState('');
@@ -251,6 +253,10 @@ export default function PreSpendPage({ onNavigate, user, initialCostCentre = '',
         throw new Error(data.message || 'Failed to submit pre-spend request');
       }
       setCreatedCode(data.data?.requestCode || '');
+      queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard-summary-cards'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard-expanded'] });
+      queryClient.invalidateQueries({ queryKey: ['worklist'] });
       setSubmitted(true);
     } catch (err) {
       setNotice(err.message || 'Submission error');

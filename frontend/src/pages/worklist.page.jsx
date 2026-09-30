@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Clock, Check, X, RotateCw, FileText, IndianRupee, Plane, MessageSquare, AlertTriangle } from 'lucide-react';
+import { Clock, Check, X, RotateCw, FileText, IndianRupee, Plane, MessageSquare, AlertTriangle, Loader2 } from 'lucide-react';
 import ChangeRequestModal from '../components/ui/changeRequestModal.component';
 import PreSpendDetailsModal from '../components/ui/PreSpendDetailsModal.component';
 import TravelDetailsModal from '../components/ui/TravelDetailsModal.component';
@@ -59,6 +59,7 @@ function MyWorklistPage({ onNavigate, searchQuery = '', user, isOrgWorklist = fa
       const mod = getModuleFromUrl();
       if (mod !== activeModule) {
         setActiveModule(mod);
+        setActiveFilter('Pending');
       }
     };
     window.addEventListener('popstate', handleUrlChange);
@@ -70,6 +71,7 @@ function MyWorklistPage({ onNavigate, searchQuery = '', user, isOrgWorklist = fa
     const mod = getModuleFromUrl();
     if (mod !== activeModule) {
       setActiveModule(mod);
+      setActiveFilter('Pending');
     }
   }, [typeof window !== 'undefined' ? window.location.search : '']);
 
@@ -88,8 +90,8 @@ function MyWorklistPage({ onNavigate, searchQuery = '', user, isOrgWorklist = fa
   const [isActionSubmitting, setIsActionSubmitting] = useState(false);
   const [commentPopupData, setCommentPopupData] = useState(null);
 
-  // Initial Filter State (Default to 'All' everywhere)
-  const [activeFilter, setActiveFilter] = useState('All');
+  // Initial Filter State (Default to 'Pending' in worklist)
+  const [activeFilter, setActiveFilter] = useState('Pending');
 
   // Reset pagination when filter/date/search/module changes
   useEffect(() => {
@@ -335,6 +337,8 @@ function MyWorklistPage({ onNavigate, searchQuery = '', user, isOrgWorklist = fa
         // sidebar's pending-count dots are the ones that actually need a nudge.
         queryClient.invalidateQueries({ queryKey: ['worklist'] });
         queryClient.invalidateQueries({ queryKey: ['worklist-actionable-dots'] });
+        queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+        queryClient.invalidateQueries({ queryKey: ['dashboard-summary-cards'] });
         queryClient.invalidateQueries({ queryKey: ['prespend-summary-card'] });
         queryClient.invalidateQueries({ queryKey: ['cr-summary-card'] });
         queryClient.invalidateQueries({ queryKey: ['travel-summary-card'] });
@@ -763,7 +767,7 @@ function MyWorklistPage({ onNavigate, searchQuery = '', user, isOrgWorklist = fa
               </span>
             )}
 
-            <div className="flex justify-end gap-[0.65rem]">
+            <div className="flex items-center justify-end gap-2">
               <button
                 type="button"
                 disabled={isActionSubmitting}
@@ -773,7 +777,7 @@ function MyWorklistPage({ onNavigate, searchQuery = '', user, isOrgWorklist = fa
                   setRowActionCommentInput('');
                   setRowActionCommentError('');
                 }}
-                className={`rounded-md border border-border bg-card px-4 py-2 text-[0.825rem] font-semibold ${
+                className={`h-[34px] cursor-pointer rounded-md border border-border bg-card px-3.5 py-1.5 text-[0.8rem] font-semibold text-foreground transition-colors hover:bg-accent ${
                   isActionSubmitting ? 'cursor-not-allowed opacity-60' : 'cursor-pointer opacity-100'
                 }`}
               >
@@ -799,18 +803,24 @@ function MyWorklistPage({ onNavigate, searchQuery = '', user, isOrgWorklist = fa
                   }
                 }}
                 style={{ backgroundColor: rowActionPrompt.color }}
-                className={`inline-flex items-center gap-[0.45rem] rounded-md border-none px-[1.15rem] py-2 text-[0.825rem] font-bold text-white shadow-[0_1px_3px_rgba(0,0,0,0.15)] ${
+                className={`inline-flex h-[34px] items-center justify-center gap-1.5 rounded-md border-none px-3.5 py-1.5 text-[0.8rem] font-bold text-white shadow-sm transition-opacity ${
                   isActionSubmitting ? 'cursor-not-allowed opacity-75' : 'cursor-pointer opacity-100'
                 }`}
               >
-                {isActionSubmitting && <LoadingSpinner size="sm" color="#FFFFFF" />}
-                <span>
-                  {isActionSubmitting
-                    ? 'Submitting...'
-                    : rowActionPrompt.action === 'implement'
-                    ? 'Submit for Implement'
-                    : 'Submit'}
-                </span>
+                {isActionSubmitting ? (
+                  <>
+                    <Loader2 className="h-3.5 w-3.5 animate-spin text-white shrink-0" />
+                    <span>Submitting...</span>
+                  </>
+                ) : (
+                  <span>
+                    {rowActionPrompt.action === 'approve'
+                      ? 'Approve'
+                      : rowActionPrompt.action === 'implement'
+                      ? 'Implement'
+                      : 'Reject'}
+                  </span>
+                )}
               </button>
             </div>
           </div>

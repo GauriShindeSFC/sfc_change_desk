@@ -20,9 +20,8 @@ export function useWorklistActionableDots({ user, allowedModuleIds = [] }) {
       };
     },
     enabled: Boolean(user?.id) && allowedModuleIds.length > 0,
-    staleTime: 1000 * 60 * 5, // 5 minutes cache
-    refetchOnMount: false,
-    refetchOnWindowFocus: false,
-    refetchInterval: 1000 * 60 * 5 // 5 minutes periodic sync
+    staleTime: 0,
+    refetchOnMount: 'always',
+    refetchInterval: 1000 * 30 // 30 seconds periodic sync
   });
 }

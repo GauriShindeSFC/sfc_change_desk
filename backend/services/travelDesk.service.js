@@ -343,7 +343,20 @@ export const getTravelRequestsService = async ({ user, userId, isWorklist = fals
       const isBoardUser = user?.isBoardUser || user?.roleId === 'role-board' || (user?.role || '').toLowerCase().includes('board');
       const isTravelAdmin = user?.isTravelAdmin || user?.roleId === 'role-2-travel' || ((user?.role || '').toLowerCase().includes('admin') && (user?.role || '').toLowerCase().includes('travel'));
 
-      if (!isBoardUser && !isSuperAdmin && !isTravelAdmin) return 0;
+      if (!isBoardUser && !isSuperAdmin && !isTravelAdmin) {
+        if (currentUserEmail) {
+          const managerWhere = {
+            status: { [Op.iLike]: '%Pending%' },
+            managerEmail: { [Op.iLike]: currentUserEmail }
+          };
+          const exclusions = [];
+          if (currentUserId) exclusions.push({ requesterId: { [Op.ne]: currentUserId } });
+          if (currentUserEmail) exclusions.push({ travellerEmail: { [Op.notILike]: currentUserEmail } });
+          if (exclusions.length > 0) managerWhere[Op.and] = exclusions;
+          return TravelRequest.count({ where: managerWhere });
+        }
+        return 0;
+      }
 
       const exclusions = [];
       if (currentUserId) exclusions.push({ requesterId: { [Op.ne]: currentUserId } });

@@ -350,15 +350,23 @@ export const getPreSpendRequestsService = async ({ user, userId, isWorklist = fa
   if (isWorklist) {
     const isSuperAdmin = user?.isSuperAdmin || user?.roleId === 'role-1' || (user?.role || '').toLowerCase().includes('super');
     const isBoardUser = user?.isBoardUser || user?.roleId === 'role-board' || (user?.role || '').toLowerCase().includes('board');
+    const isPreSpendAdmin = user?.isPreSpendAdmin || user?.roleId === 'role-2-prespend' || ((user?.role || '').toLowerCase().includes('admin') && (user?.role || '').toLowerCase().includes('spend'));
 
-    // View-only pre-spend admin has no direct approval action rights unless super admin or board member
-    if (isSuperAdmin || isBoardUser) {
+    const exclusions = [];
+    if (currentUserId) exclusions.push({ requesterId: { [Op.ne]: currentUserId } });
+    if (currentUserEmail) exclusions.push({ requesterEmail: { [Op.notILike]: currentUserEmail } });
+
+    if (isSuperAdmin || isBoardUser || isPreSpendAdmin) {
       const actionableWhere = { status: { [Op.iLike]: '%Pending%' } };
-      const exclusions = [];
-      if (currentUserId) exclusions.push({ requesterId: { [Op.ne]: currentUserId } });
-      if (currentUserEmail) exclusions.push({ requesterEmail: { [Op.notILike]: currentUserEmail } });
       if (exclusions.length > 0) actionableWhere[Op.and] = exclusions;
-
+      actionableCount = await PreSpendRequest.count({ where: actionableWhere });
+    } else if (currentUserEmail) {
+      // Line manager pending stage 1 reviews
+      const actionableWhere = {
+        status: { [Op.iLike]: '%Pending%' },
+        managerEmail: { [Op.iLike]: currentUserEmail }
+      };
+      if (exclusions.length > 0) actionableWhere[Op.and] = exclusions;
       actionableCount = await PreSpendRequest.count({ where: actionableWhere });
     }
   }

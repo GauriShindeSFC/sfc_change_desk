@@ -768,7 +768,7 @@ export default function ChangeRequestModal({ cr, onClose, onApprove, onReject, o
                     setActionCommentInput('');
                     setActionCommentError('');
                   }}
-                  className="cursor-pointer rounded-lg border border-border bg-card px-[1.1rem] py-[0.55rem] text-[0.825rem] font-semibold text-foreground"
+                  className="h-[34px] cursor-pointer rounded-md border border-border bg-card px-3.5 py-1.5 text-[0.8rem] font-semibold text-foreground transition-colors hover:bg-accent"
                 >
                   Cancel
                 </button>
@@ -797,10 +797,14 @@ export default function ChangeRequestModal({ cr, onClose, onApprove, onReject, o
                     setActionCommentInput('');
                     onClose();
                   }}
-                  className="cursor-pointer rounded-lg border-none px-5 py-[0.55rem] text-[0.825rem] font-bold text-white shadow-[0_2px_6px_rgba(0,0,0,0.2)]"
+                  className="inline-flex h-[34px] items-center justify-center gap-1.5 rounded-md border-none px-3.5 py-1.5 text-[0.8rem] font-bold text-white shadow-sm transition-opacity"
                   style={{ backgroundColor: actionPrompt.color }}
                 >
-                  {actionPrompt.action === 'implement' ? 'Submit for Implement' : 'Submit'}
+                  {actionPrompt.action === 'approve'
+                    ? 'Approve'
+                    : actionPrompt.action === 'implement'
+                    ? 'Implement'
+                    : 'Reject'}
                 </button>
               </div>
             </div>

@@ -488,6 +488,8 @@ function ChangeRequestFormPage({ onNavigate, user, initialData, searchQuery = ''
       const data = await res.json();
       if (res.ok) {
         queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+        queryClient.invalidateQueries({ queryKey: ['dashboard-summary-cards'] });
+        queryClient.invalidateQueries({ queryKey: ['dashboard-expanded'] });
         queryClient.invalidateQueries({ queryKey: ['worklist'] });
         setCreatedCode(data.data?.requestCode || data.data?.id || '');
         setSubmitSuccess(true);

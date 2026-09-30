@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Plus, X, Download } from 'lucide-react';
+import { Plus, X, Download, AlertTriangle } from 'lucide-react';
 import FilterBar from '../components/ui/filterBar.component';
 import { ExportButtonGroup, LoadingSpinner, Pagination } from '../components/ui/primitives.component';
 import { apiFetch } from '../lib/apiFetch.lib';
@@ -57,6 +57,7 @@ function SettingsPage({ user }) {
   const [auditFilter, setAuditFilter] = useState('All activity');
   const [isInviteModalOpen, setIsInviteModalOpen] = useState(false);
   const [editingUser, setEditingUser] = useState(null);
+  const [userToDelete, setUserToDelete] = useState(null);
 
   // Pagination states
   const [usersPage, setUsersPage] = useState(1);
@@ -264,16 +265,17 @@ function SettingsPage({ user }) {
     }
   };
 
-  const handleDeleteManageUser = async () => {
+  const handleDeleteManageUser = () => {
     if (!editingUser || isSavingUser) return;
-    const confirmDelete = window.confirm(
-      `Are you sure you want to deactivate ${editingUser.name || editingUser.email} and revoke all their appointed roles?`
-    );
-    if (!confirmDelete) return;
+    setUserToDelete(editingUser);
+  };
+
+  const handleConfirmDeleteUser = async () => {
+    if (!userToDelete || isSavingUser) return;
 
     setIsSavingUser(true);
     try {
-      const res = await apiFetch(`/settings/users/${editingUser.id}`, {
+      const res = await apiFetch(`/settings/users/${userToDelete.id}`, {
         method: 'DELETE'
       });
 
@@ -284,6 +286,7 @@ function SettingsPage({ user }) {
 
       queryClient.invalidateQueries({ queryKey: ['settings-users'] });
       toast.success('User deactivated and roles revoked successfully');
+      setUserToDelete(null);
       setEditingUser(null);
     } catch (err) {
       console.error('Failed to deactivate user via API:', err);
@@ -1126,6 +1129,57 @@ function SettingsPage({ user }) {
                 </div>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirmation Modal (Centered on Screen) */}
+      {userToDelete && (
+        <div className="fixed inset-0 z-[1100] flex items-center justify-center bg-[rgba(15,23,42,0.65)] p-4 backdrop-blur-sm animate-fade-in">
+          <div className="flex w-full max-w-[460px] flex-col overflow-hidden rounded-2xl border border-border bg-card p-6 shadow-[0_25px_50px_-12px_rgba(0,0,0,0.25)]">
+            <div className="flex items-start gap-4">
+              <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full bg-[#FEE2E2] text-[#DC2626]">
+                <AlertTriangle size={24} />
+              </div>
+              <div className="flex-1">
+                <h3 className="m-0 text-[1.15rem] font-bold text-foreground">
+                  Deactivate User Account?
+                </h3>
+                <p className="mt-2 text-[0.875rem] leading-[1.5] text-muted-foreground">
+                  Are you sure you want to deactivate <strong className="text-foreground font-semibold">{userToDelete.name || userToDelete.email}</strong>?
+                </p>
+                <p className="mt-1 text-[0.825rem] text-[#DC2626] font-medium">
+                  This will revoke all assigned roles and prevent this user from accessing the system.
+                </p>
+              </div>
+            </div>
+
+            <div className="mt-6 flex items-center justify-end gap-3 border-t border-border pt-4">
+              <button
+                type="button"
+                onClick={() => setUserToDelete(null)}
+                disabled={isSavingUser}
+                className="cursor-pointer rounded-lg border border-border bg-card px-[1.15rem] py-[0.6rem] text-[0.85rem] font-semibold text-foreground hover:bg-input transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                Cancel
+              </button>
+
+              <button
+                type="button"
+                onClick={handleConfirmDeleteUser}
+                disabled={isSavingUser}
+                className="inline-flex cursor-pointer items-center gap-2 rounded-lg border-0 bg-[#DC2626] px-[1.25rem] py-[0.6rem] text-[0.85rem] font-semibold text-white hover:bg-[#B91C1C] transition-colors shadow-[0_1px_3px_rgba(220,38,38,0.3)] disabled:cursor-not-allowed disabled:opacity-75"
+              >
+                {isSavingUser ? (
+                  <>
+                    <LoadingSpinner size="xs" color="#FFFFFF" center={false} />
+                    <span>Deactivating...</span>
+                  </>
+                ) : (
+                  <span>Yes, Deactivate User</span>
+                )}
+              </button>
+            </div>
           </div>
         </div>
       )}

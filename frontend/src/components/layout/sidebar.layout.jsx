@@ -113,8 +113,14 @@ function Sidebar({
           className={`shrink-0 ${isActive ? 'text-primary-foreground' : 'text-muted-foreground'}`}
         />
         {!mini && (
-          <span className="flex-1 flex items-center justify-between gap-1.5 overflow-hidden text-ellipsis whitespace-nowrap text-left">
+          <span className="flex-1 flex items-center justify-between gap-2 min-w-0 text-left">
             <span className="truncate">{item.label}</span>
+            {item.hasPending && (
+              <span
+                title={`${item.pendingCount || ''} pending request${item.pendingCount > 1 ? 's' : ''}`}
+                className="inline-block h-2 w-2 shrink-0 rounded-full bg-amber-500 shadow-sm"
+              />
+            )}
             {item.showPlus && (
               <Plus
                 size={13}
@@ -123,6 +129,12 @@ function Sidebar({
               />
             )}
           </span>
+        )}
+        {mini && item.hasPending && (
+          <span
+            title={`${item.pendingCount || ''} pending`}
+            className="absolute top-1.5 right-1.5 h-2 w-2 rounded-full bg-amber-500 ring-2 ring-sidebar"
+          />
         )}
         {!mini && item.externalUrl && (
           <ExternalLink size={13} className="ml-auto shrink-0 text-muted-foreground" />
@@ -214,6 +226,19 @@ function Sidebar({
         }
 
         const isWorklistActive = activeItem === 'My Worklist' || activeItem === 'Worklist';
+        const singleMod = allowedWorklistModules[0];
+        const singlePending = singleMod ? (pendingDots?.[singleMod.id] ?? (Number(pendingDots?.prespend || 0) + Number(pendingDots?.change_request || 0) + Number(pendingDots?.travel || 0))) : 0;
+        const totalPendingAcrossAll = Number(pendingDots?.prespend || 0) + Number(pendingDots?.change_request || 0) + Number(pendingDots?.travel || 0);
+        const effectivePending = (singlePending > 0) ? singlePending : totalPendingAcrossAll;
+
+        const singleWorklistItem = {
+          id: 'My Worklist',
+          path: singleMod?.path || '/worklist',
+          label: 'My Worklist',
+          icon: CheckCircle2,
+          hasPending: effectivePending > 0,
+          pendingCount: effectivePending
+        };
 
         return (
           <>
@@ -228,7 +253,7 @@ function Sidebar({
             <nav className={`cd-sidebar-nav cd-sidebar-nav--fill${mini ? ' cd-sidebar-nav--mini' : ''}`}>
               {/* My Worklist with module dropdown */}
               {!hasMultipleWorklistSub ? (
-                <NavButton item={{ id: 'My Worklist', path: allowedWorklistModules[0]?.path || '/worklist', label: 'My Worklist', icon: CheckCircle2 }} />
+                <NavButton item={singleWorklistItem} />
               ) : (
                 <div className="flex flex-col gap-[0.2rem]">
                   <button

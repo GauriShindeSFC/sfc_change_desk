@@ -1,4 +1,5 @@
 import React, { useId, useState, useEffect } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import {
   Plane,
   Car,
@@ -113,6 +114,7 @@ const buildJourneySummary = (legs) => {
 };
 
 export default function TravelDeskPage({ onNavigate, user, travellerName = '', department = '' }) {
+  const queryClient = useQueryClient();
   const uid = useId();
   const [category, setCategory] = useState('');
   const [hoveredCategory, setHoveredCategory] = useState(null);
@@ -532,6 +534,10 @@ export default function TravelDeskPage({ onNavigate, user, travellerName = '', d
         throw new Error(data.message || 'Failed to submit travel request');
       }
       setCreatedCode(data.data?.requestCode || '');
+      queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard-summary-cards'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard-expanded'] });
+      queryClient.invalidateQueries({ queryKey: ['worklist'] });
       setSubmitted(true);
     } catch (err) {
       setMessage(err.message || 'Submission failed');

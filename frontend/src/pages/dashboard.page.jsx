@@ -123,6 +123,8 @@ function DashboardPage({ onNavigate, user, isOrgDashboard = false, searchQuery =
         travelSummary: trData
       };
     },
+    staleTime: 0,
+    refetchOnMount: 'always',
     refetchInterval: 1000 * 60 * 5 // 5 minutes
   });
 
@@ -218,6 +220,8 @@ function DashboardPage({ onNavigate, user, isOrgDashboard = false, searchQuery =
       };
     },
     enabled: Boolean(expandedModule) && !isCustomDateIncomplete,
+    staleTime: 0,
+    refetchOnMount: 'always',
     refetchInterval: 1000 * 60 * 5 // 5 minutes
   });
 
