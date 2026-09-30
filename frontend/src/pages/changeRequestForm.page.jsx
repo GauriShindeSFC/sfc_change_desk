@@ -176,6 +176,7 @@ function ChangeRequestFormPage({ onNavigate, user, initialData, searchQuery = ''
             });
             setCategories(body.data);
             
+            const reqCatName = (initialData?.category || initialData?.categoryName || '').trim().toLowerCase();
             if (reqCatName) {
               const targetCat = body.data.find(c => c.name.trim().toLowerCase() === reqCatName || reqCatName.includes(c.name.trim().toLowerCase()));
               if (targetCat) {

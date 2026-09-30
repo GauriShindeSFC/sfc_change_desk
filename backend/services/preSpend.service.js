@@ -12,6 +12,7 @@ import {
 import { enqueueNotification } from './notificationQueue.service.js';
 import { buildDateFilterClause } from '../utils/dateFilterUtils.js';
 import { uploadBase64ToAzureBlob } from '../utils/blobStorage.util.js';
+import { addAuditLog } from './auditLog.service.js';
 
 export const generatePreSpendCode = async (_tx = null) => {
   return await getNextRequestCode('PS', _tx);
@@ -103,7 +104,13 @@ export const createPreSpendService = async (data, user) => {
     approvalStage: 'manager_review',
     approvalCycle: 1,
     managerReviewEnteredAt: new Date(),
-    status: 'Pending Approval'
+  });
+
+  await addAuditLog({
+    actorId: requesterId,
+    action: 'Created Pre-Spend Requisition',
+    ref: requestCode,
+    detail: `Submitted Pre-Spend requisition ${requestCode} for ${created.itemDescription || created.category} (Est. ${created.estimatedAmount || 0}) for Manager review.`
   });
 
   // Enqueue initial Stage 1 Manager Invitation
@@ -507,6 +514,13 @@ const handlePreSpendActionWithinTransaction = async ({ id, action, actionComment
         comment: actionComment
       }).catch((err) => console.error('[mail] manager rejection notify failed:', err.message));
 
+      await addAuditLog({
+        actorId: actorId || actor?.userKey || actor?.id,
+        action: 'Rejected Pre-Spend (Manager)',
+        ref: req.requestCode,
+        detail: `Reporting Manager rejected Pre-Spend requisition ${req.requestCode}: "${actionComment || 'No comment'}"`
+      }, transaction);
+
       return req;
     }
 
@@ -526,6 +540,13 @@ const handlePreSpendActionWithinTransaction = async ({ id, action, actionComment
       req.approvalStage = 'stage_2_review';
       req.approvalHistory = history;
       await req.save({ transaction });
+
+      await addAuditLog({
+        actorId: actorId || actor?.userKey || actor?.id,
+        action: 'Approved Pre-Spend (Manager)',
+        ref: req.requestCode,
+        detail: `Reporting Manager approved Pre-Spend requisition ${req.requestCode} and forwarded to Board review.`
+      }, transaction);
 
       // Notify Board members (Stage 2 approvers) & send view-only copy to Pre-Spend Admin
       Promise.all([
@@ -573,6 +594,13 @@ const handlePreSpendActionWithinTransaction = async ({ id, action, actionComment
   req.approvalStage = action === 'approve' ? 'completed' : 'rejected';
   req.approvalHistory = history;
   await req.save({ transaction });
+
+  await addAuditLog({
+    actorId: actorId || actor?.userKey || actor?.id,
+    action: action === 'approve' ? 'Approved Pre-Spend (Board)' : 'Rejected Pre-Spend (Board)',
+    ref: req.requestCode,
+    detail: `${isBoardUser ? 'Board Member' : 'Super Admin'} ${action === 'approve' ? 'approved' : 'rejected'} Pre-Spend requisition ${req.requestCode}: "${actionComment || 'No comment'}"`
+  }, transaction);
 
   // Notify Requester, Pre-Spend Admin, and Finance (FINANCE_NOTIFICATION_EMAIL if set)
   Promise.all([

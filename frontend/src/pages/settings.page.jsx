@@ -420,7 +420,15 @@ function SettingsPage({ user }) {
     }
   };
 
-  const auditFilters = ['All activity', 'Change requests', 'Approvals', 'Rejected', 'User & role changes'];
+  const auditFilters = [
+    'All activity',
+    'Change requests',
+    'Pre-Spend requests',
+    'Travel requests',
+    'Approvals',
+    'Rejected',
+    'User & role changes'
+  ];
 
   if (!isSuperAdmin) {
     return (

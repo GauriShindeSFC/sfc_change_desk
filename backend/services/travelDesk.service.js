@@ -11,6 +11,7 @@ import {
 } from './mail.service.js';
 import { enqueueNotification } from './notificationQueue.service.js';
 import { buildDateFilterClause } from '../utils/dateFilterUtils.js';
+import { addAuditLog } from './auditLog.service.js';
 
 export const generateTravelCode = async (_tx = null) => {
   return await getNextRequestCode('TR', _tx);
@@ -104,6 +105,13 @@ export const createTravelService = async (data, user) => {
     approvalCycle: 1,
     managerReviewEnteredAt: new Date(),
     status: 'Pending Approval'
+  });
+
+  await addAuditLog({
+    actorId: requesterId,
+    action: 'Created Travel Reservation',
+    ref: requestCode,
+    detail: `Submitted Travel request ${requestCode} for ${created.travellerName} (${created.travelMode}: ${created.fromLocation || 'Origin'} → ${created.toLocation || 'Destination'}) for Manager review.`
   });
 
   // Enqueue initial Stage 1 Manager Invitation
@@ -469,6 +477,13 @@ const handleTravelActionWithinTransaction = async ({ id, action, actionComment, 
         comment: actionComment
       }).catch((err) => console.error('[mail] travel manager rejection notify failed:', err.message));
 
+      await addAuditLog({
+        actorId: actorId || actor?.userKey || actor?.id,
+        action: 'Rejected Travel (Manager)',
+        ref: req.requestCode,
+        detail: `Reporting Manager rejected Travel request ${req.requestCode}: "${actionComment || 'No comment'}"`
+      }, transaction);
+
       return req;
     }
 
@@ -488,6 +503,13 @@ const handleTravelActionWithinTransaction = async ({ id, action, actionComment, 
       req.approvalStage = 'stage_2_review';
       req.approvalHistory = history;
       await req.save({ transaction });
+
+      await addAuditLog({
+        actorId: actorId || actor?.userKey || actor?.id,
+        action: 'Approved Travel (Manager)',
+        ref: req.requestCode,
+        detail: `Reporting Manager approved Travel request ${req.requestCode} and forwarded to Travel Desk.`
+      }, transaction);
 
       // Notify Travel Admin / Board Members for Stage 2
       getTravelDeskApproverEmails(req.isShortNotice).then((approverEmails) => {
@@ -535,6 +557,13 @@ const handleTravelActionWithinTransaction = async ({ id, action, actionComment, 
   req.approvalStage = action === 'approve' ? 'completed' : 'rejected';
   req.approvalHistory = history;
   await req.save({ transaction });
+
+  await addAuditLog({
+    actorId: actorId || actor?.userKey || actor?.id,
+    action: action === 'approve' ? 'Approved Travel' : 'Rejected Travel',
+    ref: req.requestCode,
+    detail: `${isBoardUser ? 'Board Member' : isTravelAdmin ? 'Travel Admin' : 'Super Admin'} ${action === 'approve' ? 'approved' : 'rejected'} Travel request ${req.requestCode}: "${actionComment || 'No comment'}"`
+  }, transaction);
 
   // Notify Traveller, Travel Admin, and Finance (FINANCE_NOTIFICATION_EMAIL if set)
   Promise.all([

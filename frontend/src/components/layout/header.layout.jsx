@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Search, Menu, Sun, Moon } from 'lucide-react';
-import { useTheme } from '../../context/ThemeContext';
+import { Search, Menu } from 'lucide-react';
 
 function Header({
   activeRoute = 'Dashboard',
@@ -14,7 +13,6 @@ function Header({
 }) {
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const profileRef = useRef(null);
-  const { theme, toggle: toggleTheme } = useTheme();
 
   // Click outside to close profile dropdown
   useEffect(() => {
@@ -110,16 +108,6 @@ function Header({
             />
           </div>
         )}
-
-        <button
-          type="button"
-          onClick={toggleTheme}
-          aria-label="Toggle theme"
-          title={theme === 'dark' ? 'Switch to light' : 'Switch to dark'}
-          className={squareBtnClass}
-        >
-          {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
-        </button>
 
         {/* Profile Menu */}
         <div ref={profileRef} className="relative">

@@ -20,9 +20,9 @@ export function useWorklistActionableDots({ user, allowedModuleIds = [] }) {
       };
     },
     enabled: Boolean(user?.id) && allowedModuleIds.length > 0,
-    // Freshness comes from invalidating this key wherever a worklist action is
-    // submitted (see worklist.page.jsx); this interval is only a safety net for
-    // updates made by other reviewers in other sessions, so it can stay long.
-    refetchInterval: 1000 * 60 * 30 // 30 minutes
+    staleTime: 1000 * 60 * 5, // 5 minutes cache
+    refetchOnMount: false,
+    refetchOnWindowFocus: false,
+    refetchInterval: 1000 * 60 * 5 // 5 minutes periodic sync
   });
 }

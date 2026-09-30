@@ -10,6 +10,9 @@ export function useCurrentUser() {
       const body = await res.json();
       return body.user || body;
     },
+    staleTime: 1000 * 60 * 30, // 30 minutes
+    refetchOnMount: false,
+    refetchOnWindowFocus: false
   });
 }
 

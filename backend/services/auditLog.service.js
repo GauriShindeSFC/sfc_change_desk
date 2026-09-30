@@ -11,13 +11,12 @@ export const addAuditLog = async ({ actorId = null, action, ref = '—', detail 
   );
 };
 
-// Same category regexes serializeAuditLog() uses to derive `category` (Rejected >
-// Approved/Implemented > CR/Created/Draft/Submitted/Sent Back > everything else),
-// translated to SQL so filtering can happen in the WHERE clause instead of after
-// pulling the whole table into memory.
+// Category regexes matching SQL WHERE clauses
 const REJECTED_RE = 'Rejected';
 const APPROVALS_RE = 'Approved|Implemented';
-const CHANGE_REQUESTS_RE = 'CR|Created|Draft|Submitted|Sent Back';
+const CHANGE_REQUESTS_RE = 'Change Request|CR-|Draft|Submitted|Sent Back';
+const PRE_SPEND_RE = 'Pre-Spend|PS-|Requisition';
+const TRAVEL_RE = 'Travel|TR-|Trip|Reservation';
 const USER_ROLE_RE = 'User|Permission|Role|Catalog|Workflow';
 
 const buildAuditWhereForFilter = (filter) => {
@@ -30,12 +29,30 @@ const buildAuditWhereForFilter = (filter) => {
     return { action: { [Op.iRegexp]: APPROVALS_RE } };
   }
   if (key === 'change requests') {
-    return { action: { [Op.iRegexp]: CHANGE_REQUESTS_RE } };
+    return {
+      [Op.or]: [
+        { action: { [Op.iRegexp]: CHANGE_REQUESTS_RE } },
+        { ref: { [Op.iLike]: 'CR-%' } }
+      ]
+    };
+  }
+  if (key === 'pre-spend requests') {
+    return {
+      [Op.or]: [
+        { action: { [Op.iRegexp]: PRE_SPEND_RE } },
+        { ref: { [Op.iLike]: 'PS-%' } }
+      ]
+    };
+  }
+  if (key === 'travel requests') {
+    return {
+      [Op.or]: [
+        { action: { [Op.iRegexp]: TRAVEL_RE } },
+        { ref: { [Op.iLike]: 'TR-%' } }
+      ]
+    };
   }
   if (key === 'user & role changes') {
-    // Matches the explicit keyword set, OR falls into this bucket the same way
-    // serializeAuditLog() defaults to it: anything that isn't Rejected, an
-    // Approval/Implementation, or a Change Request action (e.g. "Comment Added").
     return {
       [Op.or]: [
         { action: { [Op.iRegexp]: USER_ROLE_RE } },
@@ -43,14 +60,16 @@ const buildAuditWhereForFilter = (filter) => {
           [Op.and]: [
             { action: { [Op.notIRegexp]: REJECTED_RE } },
             { action: { [Op.notIRegexp]: APPROVALS_RE } },
-            { action: { [Op.notIRegexp]: CHANGE_REQUESTS_RE } }
+            { action: { [Op.notIRegexp]: CHANGE_REQUESTS_RE } },
+            { action: { [Op.notIRegexp]: PRE_SPEND_RE } },
+            { action: { [Op.notIRegexp]: TRAVEL_RE } }
           ]
         }
       ]
     };
   }
 
-  return {}; // 'all activity' (or anything unrecognized) — no filter
+  return {}; // 'all activity' — no filter
 };
 
 const resolveAndSerializeAuditRows = async (rows) => {

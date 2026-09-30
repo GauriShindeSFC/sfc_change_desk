@@ -1,30 +1,18 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useContext, useEffect } from 'react';
 
-const THEME_KEY = 'changedesk.theme';
 const ThemeCtx = createContext(null);
 
 export function ThemeProvider({ children }) {
-  const [theme, setTheme] = useState(() => {
-    try {
-      const stored = localStorage.getItem(THEME_KEY);
-      return stored === 'light' || stored === 'dark' ? stored : 'dark';
-    } catch {
-      return 'dark';
-    }
-  });
-
   useEffect(() => {
-    document.documentElement.classList.toggle('dark', theme === 'dark');
+    document.documentElement.classList.remove('dark');
     try {
-      localStorage.setItem(THEME_KEY, theme);
+      localStorage.setItem('changedesk.theme', 'light');
     } catch {
       /* ignore */
     }
-  }, [theme]);
+  }, []);
 
-  const toggle = () => setTheme((t) => (t === 'dark' ? 'light' : 'dark'));
-
-  return <ThemeCtx.Provider value={{ theme, toggle }}>{children}</ThemeCtx.Provider>;
+  return <ThemeCtx.Provider value={{ theme: 'light', toggle: () => {} }}>{children}</ThemeCtx.Provider>;
 }
 
 export function useTheme() {
