@@ -14,6 +14,7 @@ export default defineConfig({
     }
   },
   server: {
+    allowedHosts: ['hello.stfox.com'],
     port: 5174,
     strictPort: true,
     open: true,

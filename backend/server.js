@@ -8,6 +8,7 @@ import { sequelize, Role } from './models/index.js';
 import { roles } from './data/seed.js';
 import { verifyMailTransport } from './services/mail.service.js';
 import { startNotificationWorker } from './services/notificationQueue.service.js';
+import { isAllowedOrigin } from './utils/corsOriginMatcher.js';
 
 import publicActionRoutes from './routes/publicAction.routes.js';
 
@@ -24,7 +25,7 @@ const allowAllOrigins = allowedOrigins.includes('*');
 app.use(cors({
   origin: (origin, callback) => {
     // Same-origin requests, curl, health checks, etc. send no Origin header — allow those through.
-    if (!origin || allowAllOrigins || allowedOrigins.includes(origin)) {
+    if (!origin || allowAllOrigins || isAllowedOrigin(origin, allowedOrigins)) {
       return callback(null, true);
     }
     return callback(new Error(`Origin "${origin}" is not allowed by CORS policy`));
