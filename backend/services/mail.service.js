@@ -612,20 +612,14 @@ export const verifyMailTransport = async () => {
 
 // ---------- Templated emails ------------------------------
 
-/** New change request submitted → notify Reporting Manager as primary in TO (and approvers in CC). */
-export const sendChangeRequestCreatedEmail = async ({ cr, requesterName, approverEmails, managerEmail }) => {
-  const managerList = asList(managerEmail);
-  const approverList = asList(approverEmails);
-
-  // If managerEmail is provided, Reporting Manager is the primary TO recipient (Stage 1 Manager Review), approvers in CC
-  // Otherwise, approvers are in TO
-  const to = managerList.length ? managerList : approverList;
-  const cc = managerList.length ? approverList : [];
+/** Stage 2: Change request advancing to Change Manager review → notify Change Managers directly in TO. */
+export const sendChangeRequestCreatedEmail = async ({ cr, requesterName, approverEmails }) => {
+  const to = asList(approverEmails);
   const primary = to.length ? to : asList(env.MAIL_APPROVER_FALLBACK || 'approver@changedesk.local');
 
   const secret = process.env.JWT_SECRET || 'sfc-change-desk-secure-jwt-secret-key-2026';
   const token = jwt.sign(
-    { crId: cr.id, approverEmail: primary[0] || 'approver@company.com' },
+    { crId: cr.id, stage: 'stage_2_review', approverEmail: primary[0] || 'approver@company.com' },
     secret,
     { expiresIn: '7d' }
   );
@@ -839,7 +833,7 @@ export const sendChangeRequestCreatedEmail = async ({ cr, requesterName, approve
     }
   ];
 
-  return sendMail({ to: primary, cc, subject, text, html, attachments });
+  return sendMail({ to: primary, subject, text, html, attachments });
 };
 
 /** Change request approved by Change Manager → notify Change Implementers (+ requester & manager). */

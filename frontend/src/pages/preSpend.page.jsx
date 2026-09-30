@@ -294,9 +294,32 @@ export default function PreSpendPage({ onNavigate, user, initialCostCentre = '',
               type="button"
               onClick={() => {
                 setSubmitted(false);
+                setCreatedCode('');
                 setStep(1);
                 setCategory('');
                 setSubcategory('');
+                setDetails({
+                  buying: '',
+                  location: '',
+                  neededBy: '',
+                  justification: '',
+                  urgent: false
+                });
+                setVendors([emptyVendor(), emptyVendor(), emptyVendor()]);
+                setCommercial({ exception: 'Not applicable', exceptionReason: '', reason: '', justification: '' });
+                setCertified(false);
+                setNotice('');
+                setPastVendor(null);
+                setUsePastVendor(false);
+                const curr = activeSessionUser;
+                setRequesterDetails({
+                  employeeName: curr?.employee?.name || curr?.name || '',
+                  employeeEmail: curr?.employee?.email || curr?.email || '',
+                  employeeId: resolveEmpBusinessId(curr, ''),
+                  location: resolveEmpLocation(curr, ''),
+                  managerName: '',
+                  managerEmail: ''
+                });
               }}
               className="cursor-pointer rounded-[8px] border-0 bg-[#047857] px-[1.35rem] py-[0.65rem] text-[0.85rem] font-semibold text-white"
             >

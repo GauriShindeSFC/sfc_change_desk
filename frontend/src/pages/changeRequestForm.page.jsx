@@ -558,8 +558,28 @@ function ChangeRequestFormPage({ onNavigate, user, initialData, searchQuery = ''
               type="button"
               onClick={() => {
                 setSubmitSuccess(false);
+                setCreatedCode('');
                 setStep(1);
+                setSelectedCategoryId('');
+                setSelectedSubcategoryId('');
+                setSelectedSubcategory(null);
+                setFields([]);
+                setCustomFieldValues({});
                 setCertified(false);
+                setErrorMessage('');
+                const curr = activeSessionUser;
+                setFormData({
+                  title: '',
+                  startDate: getTodayDateString(),
+                  endDate: '',
+                  justification: '',
+                  employeeName: curr?.employee?.name || curr?.name || '',
+                  employeeEmail: curr?.employee?.email || curr?.email || '',
+                  employeeId: resolveEmpBusinessId(curr, ''),
+                  location: resolveEmpLocation(curr, ''),
+                  managerName: '',
+                  managerEmail: ''
+                });
               }}
               className="cursor-pointer rounded-lg border-none bg-[#047857] px-[1.35rem] py-[0.65rem] text-[0.85rem] font-semibold text-white"
             >

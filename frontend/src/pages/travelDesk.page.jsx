@@ -576,9 +576,23 @@ export default function TravelDeskPage({ onNavigate, user, travellerName = '', d
               type="button"
               onClick={() => {
                 setSubmitted(false);
+                setCreatedCode('');
                 setStep(1);
                 setCategory('');
+                setDrafts({});
+                setCertified(false);
+                setMessage('');
+                setStepErrors({});
                 setMultiCityLegs([{ id: 'leg-1', travelDate: '', preferredTime: '', from: '', to: '' }]);
+                const curr = activeSessionUser;
+                setRequesterDetails({
+                  employeeName: travellerName || curr?.employee?.name || curr?.name || '',
+                  employeeEmail: curr?.employee?.email || curr?.email || '',
+                  employeeId: resolveEmpBusinessId(curr, ''),
+                  location: resolveEmpLocation(curr, '') || '',
+                  managerName: '',
+                  managerEmail: ''
+                });
               }}
               className="cursor-pointer rounded-lg border-none bg-[#047857] px-[1.35rem] py-[0.65rem] text-[0.85rem] font-semibold text-white"
             >

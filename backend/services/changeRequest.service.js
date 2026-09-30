@@ -1253,8 +1253,7 @@ export const applyWorklistActionService = async ({ id, action, rejectionReason =
         await sendChangeRequestCreatedEmail({
           cr: serialized,
           requesterName: serialized.employeeName || serialized.requester,
-          approverEmails,
-          managerEmail: serialized.managerEmail
+          approverEmails
         });
       }).catch((err) => console.error('[mail] Stage 2 invite notification failed:', err.message));
 
