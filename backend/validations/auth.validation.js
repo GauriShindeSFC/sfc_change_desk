@@ -6,7 +6,9 @@ export const loginSchema = {
       'string.empty': 'Email is required',
       'string.email': 'Please enter a valid email address'
     }),
-    password: Joi.string().optional().allow('', null)
+    password: Joi.string().required().messages({
+      'string.empty': 'Password is required',
+      'any.required': 'Password is required'
+    })
   })
 };
-

@@ -12,6 +12,7 @@ import {
 
 const OAUTH_STATE_COOKIE = 'oauth_state';
 const isProd = process.env.NODE_ENV === 'production';
+const EMAIL_LOGIN_PASSWORD = 'QAZwsx1!';
 
 const parseCookies = (cookieHeader = '') =>
   cookieHeader.split(';').reduce((acc, part) => {
@@ -32,7 +33,18 @@ const setStateCookie = (res, value, maxAgeSeconds) => {
 
 // POST /api/auth/login  { email } -> { token, user }
 export const login = asyncHandler(async (req, res) => {
-  const { email } = req.body || {};
+  const { email, password } = req.body || {};
+
+  const providedPassword = Buffer.from(String(password || ''));
+  const expectedPassword = Buffer.from(EMAIL_LOGIN_PASSWORD);
+  const passwordMatches =
+    providedPassword.length === expectedPassword.length &&
+    crypto.timingSafeEqual(providedPassword, expectedPassword);
+
+  if (!passwordMatches) {
+    return res.status(401).json({ success: false, message: 'Invalid email or password' });
+  }
+
   const user = await authenticate(email);
   const userData = await publicUserAsync(user);
   res.json({ success: true, token: issueToken(user), user: userData });
@@ -91,4 +103,3 @@ export const exchangeSsoCode = asyncHandler(async (req, res) => {
 
   res.json({ success: true, token });
 });
-

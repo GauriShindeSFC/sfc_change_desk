@@ -175,10 +175,7 @@ function Sidebar({
           {!mini && (
             <div className="flex min-w-0 flex-1 flex-col">
               <span className="overflow-hidden text-ellipsis whitespace-nowrap text-[1.05rem] font-bold leading-[1.15] tracking-[-0.01em] text-sidebar-foreground">
-                ChangeDesk
-              </span>
-              <span className="mt-[0.15rem] whitespace-nowrap text-[0.6rem] font-medium tracking-[0.08em] text-muted-foreground">
-                IT CHANGE MGMT
+                Hot Desk
               </span>
             </div>
           )}

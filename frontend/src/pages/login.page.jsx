@@ -4,6 +4,7 @@ import { useTheme } from '../context/ThemeContext';
 
 export default function LoginPage({ onLogin, onLoginSuccess }) {
   const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const { theme } = useTheme();
@@ -51,7 +52,7 @@ export default function LoginPage({ onLogin, onLoginSuccess }) {
     setError('');
     setIsLoading(true);
     try {
-      const session = await login(email.trim());
+      const session = await login(email.trim(), password);
       if (onLogin) onLogin(session);
       else if (onLoginSuccess) onLoginSuccess(session);
     } catch (err) {
@@ -132,6 +133,18 @@ export default function LoginPage({ onLogin, onLoginSuccess }) {
             placeholder="you@stfox.com"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
+            className="w-full rounded-[var(--radius-md)] border border-border bg-input px-4 py-[0.85rem] text-[0.9rem] text-foreground outline-none [font-family:var(--font-family)]"
+          />
+
+          <input
+            id="login-password"
+            name="password"
+            type="password"
+            required
+            autoComplete="current-password"
+            placeholder="Password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
             className="w-full rounded-[var(--radius-md)] border border-border bg-input px-4 py-[0.85rem] text-[0.9rem] text-foreground outline-none [font-family:var(--font-family)]"
           />
 
